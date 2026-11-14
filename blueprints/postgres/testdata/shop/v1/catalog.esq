@@ -1,0 +1,26 @@
+package catalog
+
+enum Status { ACTIVE INACTIVE }
+
+entity Category {
+  name string required unique
+}
+
+entity Product {
+  name        string  required
+  description text
+  price       decimal required default(0)
+  stock       int     default(0)
+  status      Status  default(ACTIVE)
+  launched_on date    default(now)
+  details     json    default("{}")
+  note        string  default("it's new")
+  category    -> Category required
+  tags        <-> Tag
+
+  @postgres(index [name, status])
+}
+
+entity Tag {
+  name string required @postgres(column label)
+}

@@ -187,3 +187,21 @@ func TestGenRunsPostGenHooks(t *testing.T) {
 		t.Fatalf("explain: %s", out)
 	}
 }
+
+func TestGenSavesTheProjectForTheNextRun(t *testing.T) {
+	dir := demoProject(t)
+	snapshot := filepath.Join(dir, ".esquadro/model.json")
+	if code, _, errOut := gen(t, "-dry-run", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	if _, err := os.Stat(snapshot); !os.IsNotExist(err) {
+		t.Fatal("a dry run must not save the project")
+	}
+	if code, _, errOut := gen(t, dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	data, err := os.ReadFile(snapshot)
+	if err != nil || !strings.Contains(string(data), `"pascal": "Product"`) {
+		t.Fatalf("snapshot: %v\n%s", err, data)
+	}
+}

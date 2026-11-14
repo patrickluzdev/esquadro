@@ -10,15 +10,15 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/compose"
 )
 
-// project is a project folder under test.
-type project struct {
+// folder is a project folder under test.
+type folder struct {
 	t   *testing.T
 	dir string
 }
 
-func newProject(t *testing.T) *project { return &project{t: t, dir: t.TempDir()} }
+func newProject(t *testing.T) *folder { return &folder{t: t, dir: t.TempDir()} }
 
-func (p *project) read(path string) (string, bool) {
+func (p *folder) read(path string) (string, bool) {
 	data, err := os.ReadFile(filepath.Join(p.dir, path))
 	if os.IsNotExist(err) {
 		return "", false
@@ -29,7 +29,7 @@ func (p *project) read(path string) (string, bool) {
 	return string(data), true
 }
 
-func (p *project) write(path, content string) {
+func (p *folder) write(path, content string) {
 	full := filepath.Join(p.dir, path)
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		p.t.Fatal(err)
@@ -41,7 +41,7 @@ func (p *project) write(path, content string) {
 
 // gen plans and writes a generation, returning the plan as "change path"
 // lines and Write's error.
-func (p *project) gen(force bool, files ...*compose.File) (string, error) {
+func (p *folder) gen(force bool, files ...*compose.File) (string, error) {
 	p.t.Helper()
 	lock, err := ReadLock(p.dir)
 	if err != nil {

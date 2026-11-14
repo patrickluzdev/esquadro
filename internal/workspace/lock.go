@@ -13,6 +13,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // Dir is the folder, inside the project, where esquadro keeps its state.
@@ -87,4 +89,37 @@ func ReadLock(projectDir string) (*Lock, error) {
 func (l *Lock) encode() []byte {
 	data, _ := json.MarshalIndent(l, "", "  ")
 	return append(data, '\n')
+}
+
+// SnapshotPath is where the description of the last generated project is
+// kept, so the next generation can tell what changed (for migrations).
+const SnapshotPath = Dir + "/model.json"
+
+// ReadSnapshot reads the project description saved by the last generation,
+// or nil when there is none.
+func ReadSnapshot(projectDir string) (*project.Description, error) {
+	data, err := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(SnapshotPath)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var d project.Description
+	if err := json.Unmarshal(data, &d); err != nil {
+		return nil, fmt.Errorf("%s is not a valid snapshot: %w", SnapshotPath, err)
+	}
+	return &d, nil
+}
+
+// WriteSnapshot saves the project description of a successful generation.
+func WriteSnapshot(projectDir string, d project.Description) error {
+	data, err := json.MarshalIndent(d, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, Dir), 0o755); err != nil {
+		return err
+	}
+	return writeAtomic(filepath.Join(projectDir, filepath.FromSlash(SnapshotPath)), append(data, '\n'))
 }

@@ -1,0 +1,12 @@
+package orders
+
+entity Order {
+  number    string required unique
+  placed_at time   required default(now)
+}
+
+entity OrderItem {
+  order    -> Order required
+  product  -> Product required
+  quantity int required
+}

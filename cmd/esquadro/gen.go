@@ -57,8 +57,13 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	previous, err := workspace.ReadSnapshot(dir)
+	if err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
+		return 1
+	}
 	ctx := context.Background()
-	runner := &hook.Runner{ProjectDir: dir, Builtin: builtinHooks, Out: stderr}
+	runner := &hook.Runner{ProjectDir: dir, Builtin: builtinHooks, Out: stderr, Previous: previous}
 	if err := runner.PreGen(ctx, l.project, l.set, res, *dryRun); err != nil {
 		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
@@ -109,6 +114,12 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	if err := runner.PostGen(ctx, l.project, l.set, res); err != nil {
 		fmt.Fprintln(stderr, "esquadro gen:", err)
 		fmt.Fprintln(stderr, "The generated files were written; fix the hook and run esquadro gen again.")
+		return 1
+	}
+	// Last, and only when everything worked: the next generation compares
+	// the project with this one.
+	if err := workspace.WriteSnapshot(dir, l.project.Describe()); err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
 	}
 	return 0

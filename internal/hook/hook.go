@@ -45,7 +45,11 @@ type Input struct {
 	// ProjectDir is the project folder, absolute; external hooks also run
 	// in it.
 	ProjectDir string `json:"project_dir"`
-	DryRun     bool   `json:"dry_run"`
+	// Previous is the project as the last successful generation saw it, or
+	// null for the first one: what a hook compares the project with to
+	// write, for example, a migration.
+	Previous *project.Description `json:"previous"`
+	DryRun   bool                 `json:"dry_run"`
 }
 
 // GoRequire is a Go module a blueprint needs, with its minimum version.
@@ -72,6 +76,9 @@ type Message struct {
 type File struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
+	// Once makes the file the user's, like a .once template: created when
+	// missing, never updated or deleted.
+	Once bool `json:"once,omitempty"`
 }
 
 // Func is a hook built into esquadro.
@@ -84,6 +91,8 @@ type Runner struct {
 	Builtin map[string]Func
 	// Out receives the hooks' messages and stderr.
 	Out io.Writer
+	// Previous is the project of the last successful generation, if any.
+	Previous *project.Description
 }
 
 // Key names a built-in hook in Runner.Builtin.
@@ -145,7 +154,8 @@ func (r *Runner) PreGen(ctx context.Context, p *project.Project, set *blueprint.
 				return fmt.Errorf("hook %s returned %s, which blueprint %s already generates from %s", id, target, prev.Blueprint, prev.Template)
 			}
 			res.Files = append(res.Files, &compose.File{
-				Path: target, Content: []byte(f.Content), Blueprint: hk.Blueprint.Manifest.Name, Template: "hook " + hk.Hook.Path,
+				Path: target, Content: []byte(f.Content), Blueprint: hk.Blueprint.Manifest.Name,
+				Template: "hook " + hk.Hook.Path, Once: f.Once,
 			})
 		}
 	}
@@ -210,7 +220,7 @@ func (r *Runner) input(p *project.Project, set *blueprint.Set, res *compose.Resu
 	return Input{
 		Event: hk.Hook.Event, Blueprint: hk.Blueprint.Manifest.Name, Project: p.Describe(),
 		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, GoRequires: reqs,
-		ProjectDir: dir, DryRun: dryRun,
+		ProjectDir: dir, Previous: r.Previous, DryRun: dryRun,
 	}
 }
 
