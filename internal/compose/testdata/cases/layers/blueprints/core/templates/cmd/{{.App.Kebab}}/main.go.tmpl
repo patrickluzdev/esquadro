@@ -1,0 +1,13 @@
+package main
+
+import "net/http"
+
+func routes(mux *http.ServeMux) {
+{{slot "core.routes" .}}
+}
+
+func main() {
+	mux := http.NewServeMux()
+	routes(mux)
+	_ = http.ListenAndServe(":8080", mux)
+}

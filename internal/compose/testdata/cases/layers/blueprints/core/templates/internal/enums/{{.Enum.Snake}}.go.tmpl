@@ -1,0 +1,7 @@
+package enums
+
+const (
+{{- range .Enum.Values}}
+	{{$.Enum.Pascal}}{{.Pascal}} = {{quote .Raw}}
+{{- end}}
+)

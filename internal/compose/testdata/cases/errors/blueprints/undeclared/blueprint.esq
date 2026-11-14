@@ -1,0 +1,4 @@
+blueprint undeclared {
+  version "0.1.0"
+  slot "undeclared.routes"
+}

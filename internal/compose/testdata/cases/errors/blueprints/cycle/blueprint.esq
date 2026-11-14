@@ -1,0 +1,5 @@
+blueprint cycle {
+  version "0.1.0"
+  slot "cycle.x"
+  slot "cycle.y"
+}

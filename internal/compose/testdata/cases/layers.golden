@@ -1,0 +1,54 @@
+=== README.md  [extra: README.md.tmpl] replaced=core
+# Shop (with extra)
+=== cmd/shop/main.go  [core: cmd/{{.App.Kebab}}/main.go.tmpl] slot:extra.hooks<-third slot:core.routes<-extra,extra
+package main
+
+import "net/http"
+
+func routes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/health", nil)
+	mux.HandleFunc("GET /third", nil) // from third for shop
+}
+
+func main() {
+	mux := http.NewServeMux()
+	routes(mux)
+	_ = http.ListenAndServe(":8080", mux)
+}
+=== internal/audit/product.txt  [extra: internal/audit/{{.Entity.Snake}}.txt.tmpl]
+audit log for product
+=== internal/enums/status.go  [core: internal/enums/{{.Enum.Snake}}.go.tmpl]
+package enums
+
+const (
+	StatusOpen   = "OPEN"
+	StatusClosed = "CLOSED"
+)
+=== internal/model/category.go  [core: internal/model/{{.Entity.Snake}}.go.tmpl]
+package model
+
+// Category is generated.
+type Category struct {
+	ID        string
+	Name      string
+	CreatedAt string
+	UpdatedAt string
+}
+=== internal/model/product.go  [core: internal/model/{{.Entity.Snake}}.go.tmpl] slot:core.model.methods<-extra
+package model
+
+// Product is generated.
+type Product struct {
+	ID        string
+	Name      string
+	Status    string
+	CreatedAt string
+	UpdatedAt string
+}
+
+// Audited reports that Product changes are logged.
+func (Product) Audited() bool { return true }
+=== notes.md  [core: notes.md.once.tmpl] once
+Notes for shop
+=== static/logo.txt  [core: static/logo.txt]
+LOGO {{ not a template }}

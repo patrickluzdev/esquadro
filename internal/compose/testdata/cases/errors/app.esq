@@ -1,0 +1,18 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint undeclared
+  blueprint parse
+  blueprint exec
+  blueprint badgo
+  blueprint badpath
+  blueprint cycle
+  blueprint both
+  blueprint collide
+  blueprint inner
+}
+
+enum Status { OPEN }
+
+entity Product {
+  name string
+}

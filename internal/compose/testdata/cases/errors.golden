@@ -1,0 +1,33 @@
+builtin/badgo/templates/bad.go.tmpl: error: generated bad.go is not valid Go: 3:6: expected 'IDENT', found '{'
+  = help: line 3 of the generated file is: func {
+
+builtin/badpath/templates/{{".."}}/x.txt.tmpl: error: file name renders to "../x.txt", which is not a path inside the project
+
+builtin/both/templates/{{.Entity.Snake}}-{{.Enum.Snake}}.txt.tmpl: error: a template path cannot use both .Entity and .Enum
+
+builtin/collide/templates/same.txt.tmpl: error: same.txt and same.txt.tmpl both generate same.txt
+
+builtin/cycle/templates/out.txt.tmpl: error: slots open each other in a cycle: cycle.x -> cycle.y -> cycle.x
+
+builtin/exec/templates/exec.txt.tmpl:2:15: error: map has no entry for key "prot"
+  |
+2 | port {{.Options.prot}}
+  |               ^
+
+builtin/inner/slots/inner.x.tmpl:2:13: error: nil pointer evaluating *model.Entity.Pascal
+  |
+2 | two {{.Entity.Pascal}}
+  |             ^
+  = help: .Entity is only set in templates whose file name uses .Entity (rendered once per entity) and in slots opened from them
+
+builtin/parse/templates/broken.txt.tmpl:3:1: error: unclosed action started at builtin/parse/templates/broken.txt.tmpl:2
+  |
+3 | 
+  | ^
+
+builtin/undeclared/slots/undeclared.route.tmpl: error: contribution to slot "undeclared.route", which no blueprint of this app declares (did you mean "undeclared.routes"?)
+
+9 errors
+
+=== same.txt  [collide: same.txt]
+a

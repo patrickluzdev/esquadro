@@ -1,0 +1,4 @@
+blueprint third {
+  version "0.1.0"
+  requires extra
+}

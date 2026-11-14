@@ -1,0 +1,9 @@
+package model
+
+// {{.Entity.Pascal}} is generated.
+type {{.Entity.Pascal}} struct {
+{{- range .Entity.Fields}}
+	{{.Pascal}} string
+{{- end}}
+}
+{{slot "core.model.methods" .}}

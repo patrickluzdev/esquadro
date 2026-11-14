@@ -1,0 +1,21 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint third
+  blueprint extra {
+    prefix "/api"
+  }
+  blueprint core
+}
+
+enum Status { OPEN CLOSED }
+
+entity Product {
+  name   string required
+  status Status
+
+  @extra(audited)
+}
+
+entity Category {
+  name string
+}

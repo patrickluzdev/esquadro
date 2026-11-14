@@ -1,0 +1,9 @@
+blueprint extra {
+  version "0.1.0"
+  requires core
+  option prefix string default("/")
+  annotation entity {
+    audited bool
+  }
+  slot "extra.hooks"
+}

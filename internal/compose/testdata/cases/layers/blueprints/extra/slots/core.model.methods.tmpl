@@ -1,0 +1,4 @@
+{{if ann .Entity}}
+// Audited reports that {{.Entity.Pascal}} changes are logged.
+func ({{.Entity.Pascal}}) Audited() bool { return true }
+{{end}}
