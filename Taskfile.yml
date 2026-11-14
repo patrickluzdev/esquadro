@@ -15,8 +15,13 @@ tasks:
     cmds:
       - go build -ldflags "-X github.com/patrickluz/esquadro/internal/version.Version={{.VERSION}}" -o bin/{{.BINARY}} ./cmd/esquadro
 
+  install:
+    desc: Install esquadro on your PATH (go install)
+    cmds:
+      - go install -ldflags "-X github.com/patrickluz/esquadro/internal/version.Version={{.VERSION}}" ./cmd/esquadro
+
   run:
-    desc: 'Run esquadro (e.g. task run -- version)'
+    desc: 'Run esquadro without installing (arguments go after --, e.g. task run -- version)'
     cmds:
       - go run ./cmd/esquadro {{.CLI_ARGS}}
 
