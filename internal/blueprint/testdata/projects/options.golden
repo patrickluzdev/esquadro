@@ -1,0 +1,18 @@
+testdata/projects/options/app.esq:4:5: error: blueprint base has no option "prot"
+  |
+4 |     prot 9000
+  |     ^^^^
+  = help: did you mean "port"?
+
+testdata/projects/options/app.esq:7:14: error: option pool_max of blueprint postgres: expected a whole number
+  |
+7 |     pool_max "20"
+  |              ^^^^
+
+testdata/projects/options/app.esq:9:13: error: option token of blueprint needs is required
+  |
+9 |   blueprint "./blueprints/needs"
+  |             ^^^^^^^^^^^^^^^^^^^^
+  = help: add it: blueprint "./blueprints/needs" { token "text" }
+
+3 errors

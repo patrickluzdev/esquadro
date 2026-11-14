@@ -137,6 +137,9 @@ func (b *builder) build() {
 			b.declare(d.Name, d)
 		case *dsl.EntityDecl:
 			b.declare(d.Name, d)
+		case *dsl.BlueprintDecl:
+			b.errorf(d.Name.Span, "blueprint manifests cannot be part of a project").
+				Suggestion = "put this block in blueprint.esq inside the blueprint's own folder"
 		}
 	}
 
@@ -217,7 +220,7 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 
 	seen := map[string]*BlueprintRef{}
 	for _, r := range d.Blueprints {
-		ref := &BlueprintRef{Ref: r.Ref.Text, Options: r.Options, Pos: r.Pos}
+		ref := &BlueprintRef{Ref: r.Ref.Text, Options: r.Options, Pos: r.Pos, RefSpan: r.Ref.Span}
 		switch {
 		case r.Ref.Kind == dsl.IdentValue:
 			ref.Source = SourceBuiltin

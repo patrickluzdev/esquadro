@@ -1,0 +1,4 @@
+blueprint needs {
+  version "0.1.0"
+  option token string required
+}

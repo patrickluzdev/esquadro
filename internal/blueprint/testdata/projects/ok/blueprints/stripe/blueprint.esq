@@ -1,0 +1,26 @@
+blueprint stripe {
+  version "0.1.0"
+  requires base, postgres
+  after admin
+
+  option currency     string default("USD")
+  option webhook_path string default("/webhooks/stripe")
+  option live         bool
+
+  annotation app {
+    account string required
+  }
+  annotation entity {
+    sellable bool
+    mode     name default(payment)
+  }
+  annotation field {
+    amount bool
+  }
+  annotation relation {
+    link bool
+  }
+
+  slot "stripe.events"
+  go_require "github.com/stripe/stripe-go/v82" "v82.0.0"
+}

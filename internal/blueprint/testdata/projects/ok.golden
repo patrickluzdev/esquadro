@@ -1,0 +1,11 @@
+order: base(built-in) postgres(built-in) stripe(testdata/projects/ok/blueprints/stripe) audit(testdata/projects/ok/blueprints/audit)
+options base: {port=8080}
+options postgres: {pool_max=20}
+options stripe: {currency="BRL", webhook_path="/webhooks/stripe"}
+options audit: {}
+@stripe on app: {account="acct_1"}
+@postgres on Product: {index=[]string{"name", "status"}, unique_index=[]string{"name"}}
+@stripe on Product: {mode="payment", sellable=true}
+@postgres on Product.name: {column="product_name"}
+@stripe on Product.price: {amount=true}
+@stripe on Product.category: {link=true}

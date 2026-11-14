@@ -45,6 +45,7 @@ type App struct {
 	Blueprints []*BlueprintRef
 	// Annotations are validated later against the blueprints' schemas.
 	Annotations []*dsl.Annotation
+	Ann         Ann
 	Pos         diag.Pos
 }
 
@@ -64,7 +65,15 @@ type BlueprintRef struct {
 	Source  SourceKind
 	Options []*dsl.Option
 	Pos     diag.Pos
+	// RefSpan is the span of the name or path, for error messages.
+	RefSpan dsl.Span
 }
+
+// Ann holds validated annotation values: blueprint name, then key, then
+// value (string, int64, float64, bool, []string or []any). It is filled when
+// blueprints are resolved; a blueprint's entry exists only when its
+// annotation was written on that node.
+type Ann map[string]map[string]any
 
 // Enum is an enum type.
 type Enum struct {
@@ -102,6 +111,7 @@ type Entity struct {
 	// relations declared on other entities (Inferred is true for those).
 	Relations   []*Relation
 	Annotations []*dsl.Annotation
+	Ann         Ann
 	Pos         diag.Pos
 }
 
@@ -154,6 +164,7 @@ type Field struct {
 	// Implicit is true for id, created_at and updated_at.
 	Implicit    bool
 	Annotations []*dsl.Annotation
+	Ann         Ann
 	Pos         diag.Pos
 }
 
@@ -215,6 +226,7 @@ type Relation struct {
 	// both sides.
 	JoinTable   string
 	Annotations []*dsl.Annotation
+	Ann         Ann
 	Pos         diag.Pos
 }
 

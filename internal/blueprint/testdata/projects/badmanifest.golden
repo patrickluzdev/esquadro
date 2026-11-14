@@ -1,0 +1,111 @@
+testdata/projects/badmanifest/app.esq:3:13: error: blueprint "./blueprints/bad" has an invalid manifest
+  |
+3 |   blueprint "./blueprints/bad"
+  |             ^^^^^^^^^^^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:1:11: error: blueprint name "Bad" must be lower case letters and digits, separated by - or _
+  |
+1 | blueprint Bad {
+  |           ^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:2:11: error: version "1.0" must look like 1.2.3
+  |
+2 |   version "1.0"
+  |           ^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:3:3: error: version is already set at line 2
+  |
+3 |   version "2.0.0"
+  |   ^^^^^^^^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:4:12: error: blueprint Bad cannot depend on itself
+  |
+4 |   requires Bad, base, base
+  |            ^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:4:23: error: base is already listed as a dependency
+  |
+4 |   requires Bad, base, base
+  |                       ^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:6:12: error: unknown option type "strng"
+  |
+6 |   option a strng
+  |            ^^^^^
+  = help: did you mean "string"?
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:7:25: error: an option cannot be both required and have a default
+  |
+7 |   option b int required default(1)
+  |                         ^^^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:8:24: error: default of c: expected a whole number
+  |
+8 |   option c int default("one")
+  |                        ^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:9:19: error: unknown modifier "requred"
+  |
+9 |   option d string requred
+  |                   ^^^^^^^
+  = help: did you mean "required"?
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:10:10: error: option a is already set at line 6
+   |
+10 |   option a string
+   |          ^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:14:20: error: default of k2: expected a whole number
+   |
+14 |     k2 int default(1.5)
+   |                    ^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:17:7: error: field is not available on app annotations
+   |
+17 |     f field
+   |       ^^^^^
+   = help: field and fields name fields of an entity; use them on entity, field or relation annotations
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:19:14: error: unknown annotation target "entyty"
+   |
+19 |   annotation entyty {}
+   |              ^^^^^^
+   = help: did you mean "entity"?
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:21:8: error: slot "routes" must start with the blueprint name, e.g. "Bad.routes"
+   |
+21 |   slot "routes"
+   |        ^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:22:8: error: slot "other.routes" must start with the blueprint name, e.g. "Bad.routes"
+   |
+22 |   slot "other.routes"
+   |        ^^^^^^^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:23:31: error: Go module version "1.2.3" must look like v1.2.3
+   |
+23 |   go_require "github.com/x/y" "1.2.3"
+   |                               ^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:24:34: error: writes is only allowed on post-gen hooks
+   |
+24 |   hook pre-gen "hooks/ok" writes "x/**"
+   |                                  ^^^^^^
+   = help: pre-gen hooks return files to the engine instead of writing them
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:25:17: error: hook path "../outside" must be relative to the blueprint folder and stay inside it
+   |
+25 |   hook post-gen "../outside"
+   |                 ^^^^^^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:27:8: error: unknown hook event "on-save"
+   |
+27 |   hook on-save "hooks/ok"
+   |        ^^^^^^^
+
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:28:36: error: "../x" must be a path relative to the project and stay inside it
+   |
+28 |   hook post-gen "hooks/ok" writes ["../x", "ok/**"]
+   |                                    ^^^^^^
+
+21 errors

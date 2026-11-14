@@ -116,3 +116,33 @@ func TestCheckBadArguments(t *testing.T) {
 		t.Fatalf("exit %d, want 2", code)
 	}
 }
+
+func TestCheckValidatesBlueprints(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, dir, "shop.esq", `app shop {
+  module "github.com/example/shop"
+  blueprint postgres {
+    pool_max "ten"
+  }
+}
+
+entity Product {
+  name string @postgres(colum product_name)
+}
+`)
+	code, _, errOut := check(t)
+	if code != 1 {
+		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
+	}
+	for _, want := range []string{
+		"blueprint postgres requires base",
+		"option pool_max of blueprint postgres: expected a whole number",
+		`@postgres has no key "colum" on fields`,
+		`did you mean "column"?`,
+	} {
+		if !strings.Contains(errOut, want) {
+			t.Errorf("stderr missing %q:\n%s", want, errOut)
+		}
+	}
+}

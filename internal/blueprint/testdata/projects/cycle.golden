@@ -1,0 +1,6 @@
+testdata/projects/cycle/app.esq:3:13: error: blueprints depend on each other in a cycle: a -> b -> a
+  |
+3 |   blueprint "./blueprints/a"
+  |             ^^^^^^^^^^^^^^^^
+
+1 error

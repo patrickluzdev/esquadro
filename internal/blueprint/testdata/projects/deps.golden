@@ -1,0 +1,46 @@
+testdata/projects/deps/app.esq:3:13: error: unknown built-in blueprint "postgress"
+  |
+3 |   blueprint postgress
+  |             ^^^^^^^^^
+  = help: did you mean "postgres"?
+
+testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires base
+  |
+4 |   blueprint "./blueprints/stripe"
+  |             ^^^^^^^^^^^^^^^^^^^^^
+  = help: add to the app: blueprint base
+
+testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires postgres
+  |
+4 |   blueprint "./blueprints/stripe"
+  |             ^^^^^^^^^^^^^^^^^^^^^
+  = help: add to the app: blueprint postgres
+
+testdata/projects/deps/app.esq:5:13: error: blueprint folder testdata/projects/deps/blueprints/missing does not exist
+  |
+5 |   blueprint "./blueprints/missing"
+  |             ^^^^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/deps/app.esq:6:13: error: blueprints from git are not supported yet
+  |
+6 |   blueprint "github.com/acme/esquadro-stripe@v1.0.0"
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: clone it into a folder and use the local path, e.g. blueprint "./blueprints/name"
+
+testdata/projects/deps/app.esq:8:13: error: blueprint mine (from testdata/projects/deps/blueprints/also-mine) has the same name as the one at line 7
+  |
+8 |   blueprint "./blueprints/also-mine"
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/deps/app.esq:9:13: error: testdata/projects/deps/app.esq is not a folder
+  |
+9 |   blueprint "./app.esq"
+  |             ^^^^^^^^^^^
+
+testdata/projects/deps/app.esq:10:13: error: testdata/projects/deps/blueprints/empty has no blueprint.esq
+   |
+10 |   blueprint "./blueprints/empty"
+   |             ^^^^^^^^^^^^^^^^^^^^
+   = help: every blueprint folder needs a manifest
+
+8 errors

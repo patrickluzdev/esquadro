@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/patrickluzdev/esquadro/blueprints"
+	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/model"
 )
@@ -44,8 +46,19 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	p, diags := model.Load(sources...)
+	loader := &blueprint.Loader{Builtin: blueprints.FS, ProjectDir: dir}
+	if !diags.HasErrors() {
+		_, more := blueprint.Resolve(p, loader)
+		diags = append(diags, more...)
+		diags.Sort()
+	}
 	if len(diags) > 0 {
-		diag.Render(stderr, diags, sourceFunc(sources))
+		diag.Render(stderr, diags, func(name string) []byte {
+			if src := sourceFunc(sources)(name); src != nil {
+				return src
+			}
+			return loader.Source(name)
+		})
 	}
 	if diags.HasErrors() {
 		return 1

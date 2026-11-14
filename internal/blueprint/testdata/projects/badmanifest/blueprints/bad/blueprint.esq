@@ -1,0 +1,29 @@
+blueprint Bad {
+  version "1.0"
+  version "2.0.0"
+  requires Bad, base, base
+
+  option a strng
+  option b int required default(1)
+  option c int default("one")
+  option d string requred
+  option a string
+
+  annotation entity {
+    k  fields
+    k2 int default(1.5)
+  }
+  annotation app {
+    f field
+  }
+  annotation entyty {}
+
+  slot "routes"
+  slot "other.routes"
+  go_require "github.com/x/y" "1.2.3"
+  hook pre-gen "hooks/ok" writes "x/**"
+  hook post-gen "../outside"
+  hook post-gen "hooks/missing"
+  hook on-save "hooks/ok"
+  hook post-gen "hooks/ok" writes ["../x", "ok/**"]
+}

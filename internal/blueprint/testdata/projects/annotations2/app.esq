@@ -1,0 +1,17 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base
+  blueprint postgres
+}
+
+entity Product {
+  name     string  @postgres(column "name")
+  price    decimal @postgres(column a) @postgres(column b)
+  category -> Category @postgres(column cat)
+
+  @postgres(index [name, stauts], unique_index [category, price], table products, table items)
+}
+
+entity Category {
+  name string
+}

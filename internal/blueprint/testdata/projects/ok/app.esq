@@ -1,0 +1,13 @@
+app shop {
+  module "github.com/example/shop"
+
+  blueprint "./blueprints/stripe" {
+    currency "BRL"
+  }
+  blueprint "./blueprints/audit"
+  blueprint postgres {
+    pool_max 20
+  }
+  blueprint base
+  @stripe(account "acct_1")
+}

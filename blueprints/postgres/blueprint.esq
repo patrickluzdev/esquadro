@@ -1,0 +1,24 @@
+/// PostgreSQL storage: migrations with goose, queries with sqlc and a
+/// repository per entity.
+blueprint postgres {
+  version "0.1.0"
+  requires base
+
+  /// Maximum number of connections in the pool.
+  option pool_max int default(10)
+
+  annotation entity {
+    /// Table name, when it should differ from the plural snake case name.
+    table        name
+    /// Columns of an index, e.g. index [name, status].
+    index        fields
+    /// Columns of a unique index.
+    unique_index fields
+  }
+  annotation field {
+    /// Column name, when it should differ from the snake case name.
+    column name
+  }
+
+  go_require "github.com/jackc/pgx/v5" "v5.7.1"
+}

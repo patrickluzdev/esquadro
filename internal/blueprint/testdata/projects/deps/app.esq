@@ -1,0 +1,11 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint postgress
+  blueprint "./blueprints/stripe"
+  blueprint "./blueprints/missing"
+  blueprint "github.com/acme/esquadro-stripe@v1.0.0"
+  blueprint "./blueprints/mine"
+  blueprint "./blueprints/also-mine"
+  blueprint "./app.esq"
+  blueprint "./blueprints/empty"
+}

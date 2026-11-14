@@ -1,0 +1,23 @@
+/// The foundation of every generated project: go.mod, configuration,
+/// structured logging, the HTTP server and the Go models of the entities.
+blueprint base {
+  version "0.1.0"
+
+  /// Port the HTTP server listens on when PORT is not set.
+  option port int default(8080)
+
+  /// Fields of the Config struct.
+  slot "base.config.fields"
+  /// Code that fills those fields from the environment.
+  slot "base.config.load"
+  /// Code run at startup, before the server starts.
+  slot "base.main.init"
+  /// Code run on shutdown, after the server stops.
+  slot "base.main.shutdown"
+  /// HTTP routes, registered on the ServeMux.
+  slot "base.routes"
+  /// Extra Makefile targets.
+  slot "base.makefile.targets"
+  /// Extra methods on each entity's Go model.
+  slot "base.model.methods"
+}

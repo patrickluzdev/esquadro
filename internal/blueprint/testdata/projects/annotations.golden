@@ -1,0 +1,47 @@
+testdata/projects/annotations/app.esq:4:3: error: blueprint base has no annotation for apps
+  |
+4 |   @base(x 1)
+  |   ^^^^^^^^^^
+
+testdata/projects/annotations/app.esq:8:19: error: unknown annotation @postgress
+  |
+8 |   name     string @postgress(column x)
+  |                   ^^^^^^^^^^^^^^^^^^^^
+  = help: did you mean "postgres"?
+
+testdata/projects/annotations/app.esq:9:20: error: @postgres needs blueprint postgres, which this app does not use
+  |
+9 |   price    decimal @postgres(column product_price)
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: add to the app: blueprint postgres
+
+testdata/projects/annotations/app.esq:10:19: error: blueprint base has no annotation for fields
+   |
+10 |   status   string @base(x)
+   |                   ^^^^^^^^
+
+testdata/projects/annotations/app.esq:11:19: error: @postgres needs blueprint postgres, which this app does not use
+   |
+11 |   sku      string @postgres(colum sku)
+   |                   ^^^^^^^^^^^^^^^^^^^^
+   = help: add to the app: blueprint postgres
+
+testdata/projects/annotations/app.esq:12:19: error: @postgres needs blueprint postgres, which this app does not use
+   |
+12 |   code     string @postgres(column)
+   |                   ^^^^^^^^^^^^^^^^^
+   = help: add to the app: blueprint postgres
+
+testdata/projects/annotations/app.esq:13:24: error: @postgres needs blueprint postgres, which this app does not use
+   |
+13 |   category -> Category @postgres(column cat)
+   |                        ^^^^^^^^^^^^^^^^^^^^^
+   = help: add to the app: blueprint postgres
+
+testdata/projects/annotations/app.esq:15:3: error: @postgres needs blueprint postgres, which this app does not use
+   |
+15 |   @postgres(index [name, stauts])
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: add to the app: blueprint postgres
+
+8 errors

@@ -1,0 +1,10 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base {
+    prot 9000
+  }
+  blueprint postgres {
+    pool_max "20"
+  }
+  blueprint "./blueprints/needs"
+}
