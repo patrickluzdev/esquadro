@@ -1,7 +1,7 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (and (eq (len $ws) 1) (contains ((index $ws 0).In "n") "postgres.") (printf "%s/internal/platform/postgres" .App.Module))}}
+{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (and (not $ws) (printf "%s/internal/platform/postgres" .App.Module))}}
 // Create{{$e.Pascal}} stores a new {{lower $e.Label}}, with its defaults, once it
 // passes the rules declared for {{$e.Plural.Snake}}.
 func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
@@ -9,12 +9,10 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
 	}
-{{- if gt (len $ws) 1}}
-	row, err := sqlgen.New({{$r}}.Pool).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params(n))
-{{- else if eq (len $ws) 1}}
-	row, err := sqlgen.New({{$r}}.Pool).Create{{$e.Pascal}}(ctx, {{(index $ws 0).In "n"}})
+{{- if $ws}}
+	row, err := sqlgen.New({{$r}}.Pool).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params({{$r}}.NewID(), n))
 {{- else}}
-	row, err := sqlgen.New({{$r}}.Pool).Create{{$e.Pascal}}(ctx)
+	row, err := sqlgen.New({{$r}}.Pool).Create{{$e.Pascal}}(ctx, postgres.UUID({{$r}}.NewID()))
 {{- end}}
 	if err != nil {
 		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)

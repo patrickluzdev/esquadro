@@ -1,10 +1,10 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "errors" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (and (not $ws) (printf "%s/internal/platform/postgres" .App.Module))}}
+{{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (and (not $ws) (printf "%s/internal/platform/postgres" .App.Module))}}
 // Update{{$e.Pascal}} replaces the {{lower $e.Label}} with the given id by n, with
 // its defaults, once it passes the rules declared for {{$e.Plural.Snake}}.
-func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id string, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
+func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UUID, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
 	n = n.WithDefaults()
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err

@@ -10,7 +10,7 @@ func Test{{$e.Pascal}}UseCases(t *testing.T) {
 }
 {{- else}}
 
-{{importBlock "context" "errors" "testing" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+{{importBlock "context" "errors" "testing" "uuid" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
 // given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
 // first; i tells records apart. Change the values freely: esquadro wrote
 // them from the rules in the .esq file.
@@ -30,7 +30,7 @@ func given{{$e.Pascal}}(t *testing.T, {{if parents $e}}{{$r}}{{else}}_{{end}} *{
 {{- if eq .Target.Module $m}}
 		{{.Pascal}}ID: {{.Camel}}.ID,
 {{- else}}
-		{{.Pascal}}ID: "00000000-0000-0000-0000-000000000001", // in another module: no foreign key
+		{{.Pascal}}ID: uuid.NewV7(), // in another module: no foreign key
 {{- end}}
 {{- end}}{{end}}
 	}
@@ -49,7 +49,7 @@ func TestCreateAndRead{{$e.Pascal}}(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if read.ID != created.ID || !read.CreatedAt.Equal(created.CreatedAt) {
+	if read.ID != created.ID || read.ID == uuid.Nil() || !read.CreatedAt.Equal(created.CreatedAt) {
 		t.Fatalf("read %+v, created %+v", read, created)
 	}
 }
@@ -59,7 +59,7 @@ func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
 	ctx := context.Background()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
 
-	want := map[string]bool{}
+	want := map[uuid.UUID]bool{}
 	for i := range 3 {
 		created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
 		if err != nil {
@@ -67,8 +67,8 @@ func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
 		}
 		want[created.ID] = true
 	}
-	seen := map[string]bool{}
-	after := ""
+	seen := map[uuid.UUID]bool{}
+	after := uuid.Nil()
 	for {
 		page, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, after, 2)
 		if err != nil {
@@ -80,7 +80,7 @@ func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
 			}
 			seen[listed.ID] = true
 		}
-		if page.Next == "" {
+		if page.Next == uuid.Nil() {
 			break
 		}
 		after = page.Next
@@ -106,7 +106,7 @@ func TestUpdate{{$e.Pascal}}(t *testing.T) {
 	if updated.ID != created.ID || updated.UpdatedAt.Before(created.UpdatedAt) {
 		t.Fatalf("updated %+v, created %+v", updated, created)
 	}
-	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, "00000000-0000-0000-0000-000000000000", given{{$e.Pascal}}(t, {{$r}}, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, uuid.NewV7(), given{{$e.Pascal}}(t, {{$r}}, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
 		t.Fatalf("updating a missing {{lower $e.Label}}: %v", err)
 	}
 }
@@ -135,9 +135,9 @@ func TestRead{{$e.Pascal}}ThatDoesNotExist(t *testing.T) {
 	t.Parallel()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
 
-	for _, id := range []string{"00000000-0000-0000-0000-000000000000", "not-an-id"} {
+	for _, id := range []uuid.UUID{uuid.Nil(), uuid.NewV7()} {
 		if _, err := {{$r}}.Read{{$e.Pascal}}(context.Background(), id); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
-			t.Fatalf("Read{{$e.Pascal}}(%q): %v", id, err)
+			t.Fatalf("Read{{$e.Pascal}}(%s): %v", id, err)
 		}
 	}
 }

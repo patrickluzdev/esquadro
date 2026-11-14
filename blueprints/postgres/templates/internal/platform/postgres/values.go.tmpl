@@ -1,7 +1,7 @@
 {{- $decimal := false}}{{range .Entities}}{{if needs . "decimal"}}{{$decimal = true}}{{end}}{{end -}}
 package postgres
 
-{{importBlock "fmt" "time" "github.com/jackc/pgx/v5/pgtype" (and $decimal "github.com/shopspring/decimal")}}
+{{importBlock "time" "uuid" "github.com/jackc/pgx/v5/pgtype" (and $decimal "github.com/shopspring/decimal")}}
 // In optional columns, the empty value of a Go type stands for NULL: an
 // empty string, a zero time. Numbers and booleans are always stored, since
 // their zero is a value.
@@ -24,23 +24,15 @@ func Timestamptz(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Tim
 // Date is the day of t, NULL when zero.
 func Date(t time.Time) pgtype.Date { return pgtype.Date{Time: t, Valid: !t.IsZero()} }
 
-// UUID is the UUID written in s, NULL when s is not one: an ID that cannot
-// exist finds nothing.
-func UUID(s string) pgtype.UUID {
-	var u pgtype.UUID
-	if err := u.Scan(s); err != nil {
-		return pgtype.UUID{}
-	}
-	return u
-}
+// UUID is u, NULL when it is the nil UUID.
+func UUID(u uuid.UUID) pgtype.UUID { return pgtype.UUID{Bytes: u, Valid: u != uuid.Nil()} }
 
-// ID writes a UUID as text, empty when NULL.
-func ID(u pgtype.UUID) string {
+// ID is the UUID u holds, the nil UUID when NULL.
+func ID(u pgtype.UUID) uuid.UUID {
 	if !u.Valid {
-		return ""
+		return uuid.Nil()
 	}
-	b := u.Bytes
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	return u.Bytes
 }
 {{- if $decimal}}
 

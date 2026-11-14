@@ -19,7 +19,7 @@ type {{$e.Pascal}} struct {
 	{{.Pascal}} {{goType .}}
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
-	{{.Pascal}}ID string
+	{{.Pascal}}ID uuid.UUID
 {{- end}}{{end}}
 {{- range $e.Fields}}{{if and .Implicit (ne .Snake "id")}}
 	{{.Pascal}} {{goType .}}
@@ -32,7 +32,7 @@ type New{{$e.Pascal}} struct {
 	{{.Pascal}} {{goType .}}
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
-	{{.Pascal}}ID string
+	{{.Pascal}}ID uuid.UUID
 {{- end}}{{end}}
 }
 {{- $defaults := false}}
@@ -43,9 +43,13 @@ type New{{$e.Pascal}} struct {
 // {{$e.Plural.Snake}}.
 func (n New{{$e.Pascal}}) WithDefaults() New{{$e.Pascal}} {
 {{- range $e.Fields}}{{if and .Default (not .Implicit)}}{{$x := printf "n.%s" .Pascal}}
-{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "uuid")}}
+{{- if or (eq .Type "string") (eq .Type "text")}}
 	if {{$x}} == "" {
 		{{$x}} = {{quote .Default.Text}}
+	}
+{{- else if eq .Type "uuid"}}
+	if {{$x}} == uuid.Nil() {
+		{{$x}} = uuid.MustParse({{quote .Default.Text}})
 	}
 {{- else if eq .Type "enum"}}
 	if {{$x}} == "" {
@@ -79,8 +83,12 @@ func (n New{{$e.Pascal}}) Validate() error {
 	refuse := func(field, code string) { invalid = append(invalid, FieldError{Field: field, Code: code}) }
 {{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{$x := printf "n.%s" .Pascal}}
 {{- if .Required}}
-{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "uuid") (eq .Type "enum")}}
+{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "enum")}}
 	if {{$x}} == "" {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "uuid"}}
+	if {{$x}} == uuid.Nil() {
 		refuse({{quote .Snake}}, "required")
 	}
 {{- else if or (eq .Type "time") (eq .Type "date")}}
@@ -138,7 +146,7 @@ func (n New{{$e.Pascal}}) Validate() error {
 {{- end}}
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if and .OwnsForeignKey .Required}}
-	if n.{{.Pascal}}ID == "" {
+	if n.{{.Pascal}}ID == uuid.Nil() {
 		refuse({{quote .Snake}}, "required")
 	}
 {{- end}}{{end}}

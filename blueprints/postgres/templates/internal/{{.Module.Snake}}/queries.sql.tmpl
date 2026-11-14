@@ -3,12 +3,8 @@
 {{- range .Module.Entities}}{{$e := .}}{{$t := pgTable $e $.Options}}{{$ws := writable $e}}
 
 -- name: Create{{$e.Pascal}} :one
-{{- if $ws}}
-INSERT INTO {{$t}} ({{range $i, $w := $ws}}{{if $i}}, {{end}}{{$w.Column}}{{end}})
-VALUES ({{range $i, $w := $ws}}{{if $i}}, {{end}}@{{$w.Param}}{{end}})
-{{- else}}
-INSERT INTO {{$t}} DEFAULT VALUES
-{{- end}}
+INSERT INTO {{$t}} (id{{range $ws}}, {{.Column}}{{end}})
+VALUES (@id{{range $ws}}, @{{.Param}}{{end}})
 RETURNING *;
 
 -- name: Get{{$e.Pascal}} :one
@@ -16,9 +12,8 @@ SELECT * FROM {{$t}} WHERE id = @id;
 
 -- name: List{{$e.Plural.Pascal}} :many
 SELECT * FROM {{$t}}
-WHERE sqlc.narg(after)::uuid IS NULL
-   OR (created_at, id) > (SELECT created_at, id FROM {{$t}} WHERE id = sqlc.narg(after)::uuid)
-ORDER BY created_at, id
+WHERE sqlc.narg(after)::uuid IS NULL OR id > sqlc.narg(after)::uuid
+ORDER BY id
 LIMIT sqlc.arg(page_size);
 
 -- name: Update{{$e.Pascal}} :one

@@ -243,9 +243,6 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 			module := enumModule(l.d, f.Enum)
 			c.sqlType = l.schema(module) + "." + l.enumName(module, snakeOfEnum(l.d, f.Enum))
 		}
-		if f.Implicit && f.Snake == "id" {
-			c.def = "gen_random_uuid()"
-		}
 		if f.Default != nil {
 			c.def = defaultSQL(f)
 		}

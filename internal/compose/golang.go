@@ -20,7 +20,7 @@ var goTypes = map[project.Type]string{
 	project.TypeBool:    "bool",
 	project.TypeTime:    "time.Time",
 	project.TypeDate:    "time.Time",
-	project.TypeUUID:    "string",
+	project.TypeUUID:    "uuid.UUID",
 	project.TypeJSON:    "json.RawMessage",
 }
 
@@ -30,6 +30,7 @@ var goImportOf = map[project.Type]string{
 	project.TypeTime:    "time",
 	project.TypeDate:    "time",
 	project.TypeJSON:    "encoding/json",
+	project.TypeUUID:    "uuid",
 }
 
 // goType returns the Go type of a field.
@@ -55,15 +56,20 @@ func goImports(e *project.Entity) []string {
 
 // importBlock writes a Go import declaration from import paths given as
 // strings or string slices: empty ones are skipped, duplicates dropped, and
-// the standard library comes first, in its own group, as goimports does. It
-// writes nothing when there are no imports.
+// the standard library comes first, in its own group, as goimports does. A
+// path may carry a name: "ogenuuid github.com/google/uuid". It writes
+// nothing when there are no imports.
 func importBlock(paths ...any) string {
 	var std, other []string
 	add := func(p string) {
 		if p == "" || slices.Contains(std, p) || slices.Contains(other, p) {
 			return
 		}
-		if first, _, _ := strings.Cut(p, "/"); strings.Contains(first, ".") {
+		path := p
+		if _, after, aliased := strings.Cut(p, " "); aliased {
+			path = after
+		}
+		if first, _, _ := strings.Cut(path, "/"); strings.Contains(first, ".") {
 			other = append(other, p)
 		} else {
 			std = append(std, p)
@@ -86,18 +92,20 @@ func importBlock(paths ...any) string {
 	slices.Sort(other)
 	var b strings.Builder
 	b.WriteString("import (\n")
-	for _, p := range std {
-		b.WriteString("\t")
-		b.WriteString(strconv.Quote(p))
-		b.WriteString("\n")
-	}
-	if len(std) > 0 && len(other) > 0 {
-		b.WriteString("\n")
-	}
-	for _, p := range other {
-		b.WriteString("\t")
-		b.WriteString(strconv.Quote(p))
-		b.WriteString("\n")
+	for i, group := range [][]string{std, other} {
+		if i == 1 && len(std) > 0 && len(other) > 0 {
+			b.WriteString("\n")
+		}
+		for _, p := range group {
+			b.WriteString("\t")
+			if alias, path, aliased := strings.Cut(p, " "); aliased {
+				b.WriteString(alias)
+				b.WriteString(" ")
+				p = path
+			}
+			b.WriteString(strconv.Quote(p))
+			b.WriteString("\n")
+		}
 	}
 	b.WriteString(")\n")
 	return b.String()

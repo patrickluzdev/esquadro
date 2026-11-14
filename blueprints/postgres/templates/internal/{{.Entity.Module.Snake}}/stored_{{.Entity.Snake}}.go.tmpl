@@ -1,7 +1,7 @@
 {{- $e := .Entity}}{{$ws := writable $e}}{{$rs := refusals $e -}}
 package {{$e.Module.Snake}}
 
-{{importBlock (and (needs $e "json") "encoding/json") (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock (and (needs $e "json") "encoding/json") (and $ws "uuid") (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // {{$e.Camel}}Of is the {{lower $e.Label}} a stored row holds.
 func {{$e.Camel}}Of(row sqlgen.{{sqlcModel $e .Options}}) {{$e.Pascal}} {
 	return {{$e.Pascal}}{
@@ -13,11 +13,12 @@ func {{$e.Camel}}Of(row sqlgen.{{sqlcModel $e .Options}}) {{$e.Pascal}} {
 {{- end}}{{end}}
 	}
 }
-{{- if gt (len $ws) 1}}
+{{- if $ws}}
 
-// create{{$e.Pascal}}Params are the values of n as the insert takes them.
-func create{{$e.Pascal}}Params(n New{{$e.Pascal}}) sqlgen.Create{{$e.Pascal}}Params {
+// create{{$e.Pascal}}Params are id and the values of n as the insert takes them.
+func create{{$e.Pascal}}Params(id uuid.UUID, n New{{$e.Pascal}}) sqlgen.Create{{$e.Pascal}}Params {
 	return sqlgen.Create{{$e.Pascal}}Params{
+		ID: postgres.UUID(id),
 {{- range $ws}}
 		{{.GoParam}}: {{.In "n"}},
 {{- end}}
@@ -27,7 +28,7 @@ func create{{$e.Pascal}}Params(n New{{$e.Pascal}}) sqlgen.Create{{$e.Pascal}}Par
 {{- if $ws}}
 
 // update{{$e.Pascal}}Params are the values of n as the update of id takes them.
-func update{{$e.Pascal}}Params(id string, n New{{$e.Pascal}}) sqlgen.Update{{$e.Pascal}}Params {
+func update{{$e.Pascal}}Params(id uuid.UUID, n New{{$e.Pascal}}) sqlgen.Update{{$e.Pascal}}Params {
 	return sqlgen.Update{{$e.Pascal}}Params{
 {{- range $ws}}
 		{{.GoParam}}: {{.In "n"}},

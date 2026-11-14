@@ -8,7 +8,7 @@ CREATE SCHEMA orders;
 CREATE TYPE public.catalog_status AS ENUM ('ACTIVE', 'INACTIVE');
 
 CREATE TABLE public.categories (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     name text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -17,7 +17,7 @@ CREATE TABLE public.categories (
 );
 
 CREATE TABLE public.products (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     name text NOT NULL,
     description text,
     price numeric NOT NULL DEFAULT 0,
@@ -39,7 +39,7 @@ CREATE TABLE public.product_tags (
 );
 
 CREATE TABLE public.tags (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     label text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -47,7 +47,7 @@ CREATE TABLE public.tags (
 );
 
 CREATE TABLE orders.orders (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     number text NOT NULL,
     placed_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -57,7 +57,7 @@ CREATE TABLE orders.orders (
 );
 
 CREATE TABLE orders.order_items (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     quantity integer NOT NULL,
     order_id uuid NOT NULL,
     product_id uuid NOT NULL,
@@ -127,7 +127,7 @@ ALTER TABLE public.product_tags DROP CONSTRAINT product_tags_product_id_fkey;
 ALTER TABLE public.product_tags DROP CONSTRAINT product_tags_tag_id_fkey;
 
 CREATE TABLE public.makers (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     name text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -185,7 +185,7 @@ CREATE TABLE public.product_tags (
 );
 
 CREATE TABLE public.tags (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     label text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -228,11 +228,7 @@ DROP TABLE public.makers;
 -- applying it; esquadro never changes it again.
 
 -- +goose Up
-ALTER TABLE public.products DROP CONSTRAINT products_maker_id_fkey;
-
 ALTER TABLE orders.order_items DROP CONSTRAINT order_items_order_id_fkey;
-
-ALTER TABLE public.products ADD CONSTRAINT products_maker_id_fkey FOREIGN KEY (maker_id) REFERENCES public.makers (id) ON DELETE RESTRICT;
 
 DROP TABLE orders.orders;
 
@@ -243,10 +239,8 @@ DROP SCHEMA orders;
 -- +goose Down
 CREATE SCHEMA orders;
 
-ALTER TABLE public.products DROP CONSTRAINT products_maker_id_fkey;
-
 CREATE TABLE orders.orders (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     number text NOT NULL,
     placed_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -256,7 +250,7 @@ CREATE TABLE orders.orders (
 );
 
 CREATE TABLE orders.order_items (
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL,
     quantity integer NOT NULL,
     order_id uuid NOT NULL,
     product_id uuid NOT NULL,
@@ -264,8 +258,6 @@ CREATE TABLE orders.order_items (
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 );
-
-ALTER TABLE public.products ADD CONSTRAINT products_maker_id_fkey FOREIGN KEY (maker_id) REFERENCES public.makers (id) ON DELETE CASCADE;
 
 ALTER TABLE orders.order_items ADD CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders.orders (id) ON DELETE RESTRICT;
 

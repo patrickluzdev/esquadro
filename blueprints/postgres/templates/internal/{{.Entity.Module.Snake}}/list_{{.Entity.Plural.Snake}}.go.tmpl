@@ -1,21 +1,22 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Max{{$e.Pascal}}Page is the most {{$e.Plural.Snake}} a page holds.
 const Max{{$e.Pascal}}Page = 100
 
-// {{$e.Pascal}}Page is a page of {{$e.Plural.Snake}} in the order they were created.
-// Next is the cursor of the next page, empty on the last one.
+// {{$e.Pascal}}Page is a page of {{$e.Plural.Snake}} in the order they were created
+// (their IDs are UUID v7, which sort by time). Next is the cursor of the next
+// page, the nil UUID on the last one.
 type {{$e.Pascal}}Page struct {
 	{{$e.Plural.Pascal}} []{{$e.Pascal}}
-	Next string
+	Next uuid.UUID
 }
 
 // List{{$e.Plural.Pascal}} returns up to limit {{$e.Plural.Snake}} (at most
 // Max{{$e.Pascal}}Page) created after the one whose id is after, or from the
-// first when after is empty.
-func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after string, limit int) ({{$e.Pascal}}Page, error) {
+// first when after is the nil UUID.
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after uuid.UUID, limit int) ({{$e.Pascal}}Page, error) {
 	limit = min(max(limit, 1), Max{{$e.Pascal}}Page)
 	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Plural.Pascal}}(ctx, sqlgen.List{{$e.Plural.Pascal}}Params{
 		After:    postgres.UUID(after),

@@ -342,7 +342,7 @@ func sample(f *project.Field, pkg, i string) string {
 		}
 		return sampleString(f, i)
 	case project.TypeUUID:
-		return `fmt.Sprintf("00000000-0000-0000-0000-%012d", ` + i + `)`
+		return "uuid.NewV7()"
 	case project.TypeInt, project.TypeInt64:
 		n := "1"
 		if f.Min != nil {

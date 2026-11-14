@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and (needsType $m "decimal") "github.com/shopspring/decimal") "github.com/google/uuid" (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module)}}
+{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module)}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -26,7 +26,7 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.
 }
 
 func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*apigen.{{$P}}, error) {
-	found, err := h.{{$p}}.Read{{$P}}(ctx, params.{{$id}}.String())
+	found, err := h.{{$p}}.Read{{$P}}(ctx, uuid.UUID(params.{{$id}}))
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -35,7 +35,14 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 }
 
 func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
-	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, params.After.Or(""), params.Limit.Or(25))
+	after := uuid.Nil()
+	if cursor, ok := params.After.Get(); ok {
+		var err error
+		if after, err = uuid.Parse(cursor); err != nil {
+			return nil, edge.ErrInvalidRequest
+		}
+	}
+	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -43,8 +50,8 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 	for _, listed := range page.{{.Plural.Pascal}} {
 		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
 	}
-	if page.Next != "" {
-		answer.Next = apigen.NewOptString(page.Next)
+	if page.Next != uuid.Nil() {
+		answer.Next = apigen.NewOptString(page.Next.String())
 	}
 	return &answer, nil
 }
@@ -54,7 +61,7 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 	if unread != nil {
 		return nil, problemOf(refuse{{$P}}(n, unread))
 	}
-	updated, err := h.{{$p}}.Update{{$P}}(ctx, params.{{$id}}.String(), n)
+	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), n)
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -63,7 +70,7 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 }
 
 func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
-	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, params.{{$id}}.String()))
+	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}})))
 }
 
 // new{{$P}}Of reads a New{{$P}} as the contract writes it, with the fields
@@ -80,7 +87,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 	}
 {{- else if eq .Type "uuid"}}
-	{{$x}} = req.{{$g}}.String()
+	{{$x}} = uuid.UUID(req.{{$g}})
 {{- else if eq .Type "json"}}
 	{{$x}} = []byte(req.{{$g}})
 {{- else if eq .Type "enum"}}
@@ -100,7 +107,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 		}
 {{- else if eq .Type "uuid"}}
-		{{$x}} = v.String()
+		{{$x}} = uuid.UUID(v)
 {{- else if eq .Type "enum"}}
 		{{$x}} = {{.Enum.Pascal}}(v)
 {{- else}}
@@ -112,10 +119,10 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 {{- end}}
 {{- range keys $e}}{{$g := ogenName (printf "%sId" .Camel)}}
 {{- if .Required}}
-	n.{{.Pascal}}ID = req.{{$g}}.String()
+	n.{{.Pascal}}ID = uuid.UUID(req.{{$g}})
 {{- else}}
 	if v, ok := req.{{$g}}.Get(); ok {
-		n.{{.Pascal}}ID = v.String()
+		n.{{.Pascal}}ID = uuid.UUID(v)
 	}
 {{- end}}
 {{- end}}
@@ -139,14 +146,14 @@ func refuse{{$P}}(n New{{$P}}, unread []FieldError) error {
 // {{.Camel}}Answer writes a {{$P}} as the contract does.
 func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 	a := apigen.{{$P}}{
-		ID:        uuid.MustParse(x.ID),
+		ID:        ogenuuid.UUID(x.ID),
 		CreatedAt: x.CreatedAt,
 		UpdatedAt: x.UpdatedAt,
 {{- range inRequest $e}}{{if .Required}}{{$g := ogenName (jsonName .)}}
 {{- if eq .Type "decimal"}}
 		{{$g}}: x.{{.Pascal}}.String(),
 {{- else if eq .Type "uuid"}}
-		{{$g}}: uuid.MustParse(x.{{.Pascal}}),
+		{{$g}}: ogenuuid.UUID(x.{{.Pascal}}),
 {{- else if eq .Type "json"}}
 		{{$g}}: jx.Raw(x.{{.Pascal}}),
 {{- else if eq .Type "enum"}}
@@ -156,7 +163,7 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 {{- end}}
 {{- end}}{{end}}
 {{- range keys $e}}{{if .Required}}
-		{{ogenName (printf "%sId" .Camel)}}: uuid.MustParse(x.{{.Pascal}}ID),
+		{{ogenName (printf "%sId" .Camel)}}: ogenuuid.UUID(x.{{.Pascal}}ID),
 {{- end}}{{end}}
 	}
 {{- range inRequest $e}}{{if not .Required}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}
@@ -181,8 +188,8 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 		a.{{$g}} = apigen.NewOptDate({{$x}})
 	}
 {{- else if eq .Type "uuid"}}
-	if {{$x}} != "" {
-		a.{{$g}} = apigen.NewOptUUID(uuid.MustParse({{$x}}))
+	if {{$x}} != uuid.Nil() {
+		a.{{$g}} = apigen.NewOptUUID(ogenuuid.UUID({{$x}}))
 	}
 {{- else if eq .Type "json"}}
 	if len({{$x}}) > 0 {
@@ -195,8 +202,8 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 {{- end}}
 {{- end}}{{end}}
 {{- range keys $e}}{{if not .Required}}
-	if x.{{.Pascal}}ID != "" {
-		a.{{ogenName (printf "%sId" .Camel)}} = apigen.NewOptUUID(uuid.MustParse(x.{{.Pascal}}ID))
+	if x.{{.Pascal}}ID != uuid.Nil() {
+		a.{{ogenName (printf "%sId" .Camel)}} = apigen.NewOptUUID(ogenuuid.UUID(x.{{.Pascal}}ID))
 	}
 {{- end}}{{end}}
 	return a
