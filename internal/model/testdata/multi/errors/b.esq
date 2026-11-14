@@ -1,0 +1,15 @@
+app other {
+  module "github.com/example/other"
+}
+
+entity Product {
+  title string
+}
+
+entity Order {
+  buyer -> Customer
+}
+
+entity Customer {
+  orders string
+}

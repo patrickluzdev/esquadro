@@ -1,0 +1,8 @@
+entity Product {
+  name     string required
+  category -> Category
+}
+
+entity Category {
+  name string
+}

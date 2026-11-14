@@ -1,0 +1,8 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base
+}
+
+entity Product {
+  name string
+}

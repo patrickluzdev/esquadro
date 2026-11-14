@@ -13,25 +13,45 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/dsl"
 )
 
-// Load parses and builds a .esq file. Semantic checks only run when the file
-// has no syntax errors, to avoid reporting problems caused by a broken tree.
-func Load(filename string, src []byte) (*Project, diag.List) {
-	f, diags := dsl.Parse(filename, src)
+// Source is the name and contents of one .esq file.
+type Source struct {
+	Name string
+	Src  []byte
+}
+
+// Load parses and builds a project made of one or more .esq files, which
+// together form a single project: declarations can reference each other
+// across files and their order does not matter. Semantic checks only run when
+// every file parses, to avoid reporting problems caused by a broken tree.
+func Load(sources ...Source) (*Project, diag.List) {
+	var diags diag.List
+	files := make([]*dsl.File, 0, len(sources))
+	for _, s := range sources {
+		f, d := dsl.Parse(s.Name, s.Src)
+		diags = append(diags, d...)
+		files = append(files, f)
+	}
 	if diags.HasErrors() {
+		diags.Sort()
 		return nil, diags
 	}
-	p, more := Build(f)
+	p, more := Build(files...)
 	diags = append(diags, more...)
 	diags.Sort()
 	return p, diags
 }
 
-// Build resolves and validates a parsed file. It returns the project even when
-// there are errors, so callers can inspect what was understood.
-func Build(f *dsl.File) (*Project, diag.List) {
+// Build resolves and validates parsed files that form one project. It returns
+// the project even when there are errors, so callers can inspect what was
+// understood.
+func Build(files ...*dsl.File) (*Project, diag.List) {
+	names := make([]string, len(files))
+	for i, f := range files {
+		names[i] = f.Name
+	}
 	b := &builder{
-		file:     f,
-		p:        &Project{File: f.Name},
+		files:    files,
+		p:        &Project{Files: names},
 		decls:    map[string]dsl.Decl{},
 		entities: map[string]*Entity{},
 		enums:    map[string]*Enum{},
@@ -42,7 +62,7 @@ func Build(f *dsl.File) (*Project, diag.List) {
 }
 
 type builder struct {
-	file     *dsl.File
+	files    []*dsl.File
 	p        *Project
 	diags    diag.List
 	decls    map[string]dsl.Decl // entity and enum names as written
@@ -56,6 +76,24 @@ type builder struct {
 
 func (b *builder) errorf(s dsl.Span, format string, args ...any) *diag.Diagnostic {
 	return b.diags.Errorf(s.Pos, s.End, format, args...)
+}
+
+// allDecls returns the declarations of every file, in file order.
+func (b *builder) allDecls() []dsl.Decl {
+	var out []dsl.Decl
+	for _, f := range b.files {
+		out = append(out, f.Decls...)
+	}
+	return out
+}
+
+// where describes ref for a message about at: "line 12" in the same file,
+// "catalog.esq:12" in another one.
+func where(at, ref diag.Pos) string {
+	if at.File == ref.File {
+		return fmt.Sprintf("line %d", ref.Line)
+	}
+	return fmt.Sprintf("%s:%d", ref.File, ref.Line)
 }
 
 func didYouMean(name string, cands []string) string {
@@ -91,7 +129,7 @@ func asciiOnly(s string) string {
 
 func (b *builder) build() {
 	var apps []*dsl.AppDecl
-	for _, d := range b.file.Decls {
+	for _, d := range b.allDecls() {
 		switch d := d.(type) {
 		case *dsl.AppDecl:
 			apps = append(apps, d)
@@ -104,25 +142,32 @@ func (b *builder) build() {
 
 	switch len(apps) {
 	case 0:
-		start := diag.Pos{File: b.file.Name, Line: 1, Col: 1}
-		b.diags.Errorf(start, diag.Pos{}, "missing app block").
+		var start diag.Pos
+		if len(b.files) > 0 {
+			start = diag.Pos{File: b.files[0].Name, Line: 1, Col: 1}
+		}
+		msg := "missing app block"
+		if len(b.files) > 1 {
+			msg = "missing app block (none of the project's files has one)"
+		}
+		b.diags.Errorf(start, diag.Pos{}, "%s", msg).
 			Suggestion = `add one, e.g. app shop { module "github.com/you/shop" }`
 		b.p.App = &App{Pos: start}
 	default:
 		for _, extra := range apps[1:] {
-			b.errorf(extra.Name.Span, "only one app block is allowed; the first one is at line %d", apps[0].Pos.Line)
+			b.errorf(extra.Name.Span, "only one app block is allowed; the first one is at %s", where(extra.Name.Pos, apps[0].Pos))
 		}
 		b.p.App = b.buildApp(apps[0])
 	}
 
 	// Pass 1: enums, then entity shells and fields, so relations can point
 	// at any entity and display any field regardless of declaration order.
-	for _, d := range b.file.Decls {
+	for _, d := range b.allDecls() {
 		if d, ok := d.(*dsl.EnumDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
 			b.buildEnum(d)
 		}
 	}
-	for _, d := range b.file.Decls {
+	for _, d := range b.allDecls() {
 		if d, ok := d.(*dsl.EntityDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
 			b.buildEntity(d)
 		}
@@ -149,7 +194,7 @@ func (b *builder) declare(name dsl.Ident, d dsl.Decl) {
 		}
 	}
 	if prev, ok := b.decls[name.Name]; ok {
-		b.errorf(name.Span, "%s is already declared at line %d", name.Name, prev.SourceSpan().Pos.Line)
+		b.errorf(name.Span, "%s is already declared at %s", name.Name, where(name.Pos, prev.SourceSpan().Pos))
 		return
 	}
 	b.decls[name.Name] = d
@@ -763,19 +808,19 @@ func (b *builder) inferInverses() {
 
 func (b *builder) checkTypeNameClashes() {
 	type owner struct {
-		raw  string
-		line int
+		raw string
+		pos diag.Pos
 	}
 	pascal := map[string]owner{}
 	check := func(n Names, pos diag.Pos, span dsl.Span) {
 		if prev, ok := pascal[n.Pascal]; ok && prev.raw != n.Raw {
-			b.errorf(span, "%s and %s (line %d) would get the same generated name %q", n.Raw, prev.raw, prev.line, n.Pascal)
+			b.errorf(span, "%s and %s (%s) would get the same generated name %q", n.Raw, prev.raw, where(span.Pos, prev.pos), n.Pascal)
 			return
 		}
-		pascal[n.Pascal] = owner{n.Raw, pos.Line}
+		pascal[n.Pascal] = owner{n.Raw, pos}
 	}
 	tables := map[string]*Entity{}
-	for _, d := range b.file.Decls {
+	for _, d := range b.allDecls() {
 		switch d := d.(type) {
 		case *dsl.EnumDecl:
 			if e := b.enums[d.Name.Name]; e != nil {
@@ -788,7 +833,7 @@ func (b *builder) checkTypeNameClashes() {
 			}
 			check(e.Names, e.Pos, d.Name.Span)
 			if prev, ok := tables[e.Plural.Snake]; ok && prev != e {
-				b.errorf(d.Name.Span, "%s and %s (line %d) have the same plural %q", e.Raw, prev.Raw, prev.Pos.Line, e.Plural.Snake).
+				b.errorf(d.Name.Span, "%s and %s (%s) have the same plural %q", e.Raw, prev.Raw, where(d.Name.Pos, prev.Pos), e.Plural.Snake).
 					Suggestion = `set a different plural with (plural "...")`
 				continue
 			}
@@ -843,8 +888,8 @@ func (b *builder) checkMemberClashes(e *Entity) {
 		}
 		if prev, ok := seen[r.Snake]; ok {
 			src := r.Inverse
-			b.diags.Errorf(src.Pos, nameEnd(src.Pos, src.Raw), "the inverse of %s.%s would be %s.%s, which clashes with %s %s (line %d)",
-				src.Entity.Raw, src.Raw, e.Raw, r.Snake, prev.what, prev.raw, prev.pos.Line).
+			b.diags.Errorf(src.Pos, nameEnd(src.Pos, src.Raw), "the inverse of %s.%s would be %s.%s, which clashes with %s %s (%s)",
+				src.Entity.Raw, src.Raw, e.Raw, r.Snake, prev.what, prev.raw, where(src.Pos, prev.pos)).
 				Suggestion = "name the inverse yourself, e.g. inverse(" + r.Snake + "_list)"
 			continue
 		}

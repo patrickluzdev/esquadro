@@ -36,26 +36,43 @@ func TestCheckOK(t *testing.T) {
 	t.Chdir(dir)
 	writeFile(t, dir, "shop.esq", okProject)
 	writeFile(t, dir, "blueprint.esq", "not a project file")
+	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "sub"), "ignored.esq", "not read: subdirectories are not part of the project")
 
 	code, out, errOut := check(t)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
 	}
-	if out != "shop.esq: ok (app shop, 1 entity, 0 enums, 1 blueprint)\n" {
+	if out != "ok: app shop (1 file, 1 entity, 0 enums, 1 blueprint)\n" {
 		t.Fatalf("stdout = %q", out)
 	}
 }
 
-func TestCheckReportsErrors(t *testing.T) {
+func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint base\n}\n")
+	writeFile(t, dir, "catalog.esq", "entity Product {\n  name string\n  category -> Category\n}\n")
+	writeFile(t, dir, "category.esq", "entity Category {\n  name string\n}\n")
+
+	code, out, errOut := check(t, dir)
+	if code != 0 || out != "ok: app shop (3 files, 2 entities, 0 enums, 1 blueprint)\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+}
+
+func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", strings.Replace(okProject, "name string", "name strng", 1))
+	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint base\n}\n")
+	writeFile(t, dir, "catalog.esq", "entity Product {\n  name strng\n}\n")
 
-	code, out, errOut := check(t, "-f", "shop.esq")
+	code, out, errOut := check(t)
 	if code != 1 || out != "" {
 		t.Fatalf("exit %d, stdout %q", code, out)
 	}
-	for _, want := range []string{`shop.esq:7:8: error: unknown type "strng"`, `did you mean "string"?`, "1 error"} {
+	for _, want := range []string{`catalog.esq:2:8: error: unknown type "strng"`, `2 | `, `did you mean "string"?`, "1 error"} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr missing %q:\n%s", want, errOut)
 		}
@@ -68,7 +85,7 @@ func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 	writeFile(t, dir, "shop.esq", strings.Replace(okProject, "  blueprint base\n", "", 1))
 
 	code, out, errOut := check(t)
-	if code != 0 || !strings.Contains(out, "ok") {
+	if code != 0 || !strings.HasPrefix(out, "ok:") {
 		t.Fatalf("exit %d, stdout %q", code, out)
 	}
 	if !strings.Contains(errOut, "warning: app shop uses no blueprints") {
@@ -76,33 +93,26 @@ func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 	}
 }
 
-func TestCheckFileDiscovery(t *testing.T) {
+func TestCheckNoFiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-
-	code, _, errOut := check(t)
-	if code != 1 || !strings.Contains(errOut, "no .esq file in the current directory") {
+	if code, _, errOut := check(t); code != 1 || !strings.Contains(errOut, "no .esq files in .") {
 		t.Fatalf("empty dir: exit %d, %q", code, errOut)
 	}
-
-	writeFile(t, dir, "a.esq", okProject)
-	writeFile(t, dir, "b.esq", okProject)
-	code, _, errOut = check(t)
-	if code != 1 || !strings.Contains(errOut, "found several .esq files (a.esq, b.esq)") {
-		t.Fatalf("two files: exit %d, %q", code, errOut)
+	if code, _, errOut := check(t, "missing"); code != 1 || !strings.Contains(errOut, "missing") {
+		t.Fatalf("missing dir: exit %d, %q", code, errOut)
 	}
-
-	code, _, errOut = check(t, "-f", "missing.esq")
-	if code != 1 || !strings.Contains(errOut, "missing.esq") {
-		t.Fatalf("missing file: exit %d, %q", code, errOut)
+	writeFile(t, dir, "shop.esq", okProject)
+	if code, _, errOut := check(t, "shop.esq"); code != 1 || !strings.Contains(errOut, "shop.esq is not a directory") {
+		t.Fatalf("file argument: exit %d, %q", code, errOut)
 	}
 }
 
-func TestCheckBadFlag(t *testing.T) {
+func TestCheckBadArguments(t *testing.T) {
 	if code, _, _ := check(t, "-nope"); code != 2 {
 		t.Fatalf("exit %d, want 2", code)
 	}
-	if code, _, _ := check(t, "extra"); code != 2 {
+	if code, _, _ := check(t, "a", "b"); code != 2 {
 		t.Fatalf("exit %d, want 2", code)
 	}
 }

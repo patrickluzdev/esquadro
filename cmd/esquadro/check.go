@@ -1,14 +1,12 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/model"
@@ -20,42 +18,40 @@ const manifestName = "blueprint.esq"
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	file := fs.String("f", "", "the .esq file to check (default: the only .esq file in the current directory)")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: esquadro check [-f file.esq]")
+		fmt.Fprintln(stderr, "Usage: esquadro check [dir]")
 		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Checks a .esq file for syntax and semantic errors without generating anything.")
-		fmt.Fprintln(stderr)
-		fs.PrintDefaults()
+		fmt.Fprintln(stderr, "Checks the project in dir (default: the current directory) for syntax and")
+		fmt.Fprintln(stderr, "semantic errors without generating anything. Every .esq file in dir except")
+		fmt.Fprintln(stderr, "blueprint.esq is part of the project; subdirectories are not read.")
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "esquadro check: unexpected argument %q\n", fs.Arg(0))
+	if fs.NArg() > 1 {
+		fmt.Fprintf(stderr, "esquadro check: expected one directory, got %d arguments\n", fs.NArg())
 		fs.Usage()
 		return 2
 	}
+	dir := "."
+	if fs.NArg() == 1 {
+		dir = fs.Arg(0)
+	}
 
-	path, err := findProjectFile(*file)
+	sources, err := readProject(dir)
 	if err != nil {
 		fmt.Fprintln(stderr, "esquadro check:", err)
 		return 1
 	}
-	src, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintln(stderr, "esquadro check:", err)
-		return 1
-	}
-
-	p, diags := model.Load(path, src)
+	p, diags := model.Load(sources...)
 	if len(diags) > 0 {
-		diag.Render(stderr, diags, func(string) []byte { return src })
+		diag.Render(stderr, diags, sourceFunc(sources))
 	}
 	if diags.HasErrors() {
 		return 1
 	}
-	fmt.Fprintf(stdout, "%s: ok (app %s, %s, %s, %s)\n", path, p.App.Raw,
+	fmt.Fprintf(stdout, "ok: app %s (%s, %s, %s, %s)\n", p.App.Raw,
+		count(len(sources), "file", "files"),
 		count(len(p.Entities), "entity", "entities"),
 		count(len(p.Enums), "enum", "enums"),
 		count(len(p.App.Blueprints), "blueprint", "blueprints"))
@@ -69,29 +65,56 @@ func count(n int, one, many string) string {
 	return fmt.Sprintf("%d %s", n, many)
 }
 
-// findProjectFile returns the explicit file, or the only .esq file in the
-// current directory (ignoring blueprint manifests).
-func findProjectFile(explicit string) (string, error) {
-	if explicit != "" {
-		return explicit, nil
-	}
-	matches, err := filepath.Glob("*.esq")
+// projectFiles lists the .esq files of the project in dir, sorted, without
+// blueprint manifests.
+func projectFiles(dir string) ([]string, error) {
+	info, err := os.Stat(dir)
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", dir)
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "*.esq"))
+	if err != nil {
+		return nil, err
 	}
 	var files []string
 	for _, m := range matches {
-		if m != manifestName {
+		if filepath.Base(m) != manifestName {
 			files = append(files, m)
 		}
 	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no .esq files in %s", dir)
+	}
 	sort.Strings(files)
-	switch len(files) {
-	case 0:
-		return "", errors.New("no .esq file in the current directory; pass one with -f")
-	case 1:
-		return files[0], nil
-	default:
-		return "", fmt.Errorf("found several .esq files (%s); pick one with -f", strings.Join(files, ", "))
+	return files, nil
+}
+
+func readProject(dir string) ([]model.Source, error) {
+	files, err := projectFiles(dir)
+	if err != nil {
+		return nil, err
+	}
+	sources := make([]model.Source, 0, len(files))
+	for _, f := range files {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			return nil, err
+		}
+		sources = append(sources, model.Source{Name: f, Src: src})
+	}
+	return sources, nil
+}
+
+func sourceFunc(sources []model.Source) diag.SourceFunc {
+	return func(name string) []byte {
+		for _, s := range sources {
+			if s.Name == name {
+				return s.Src
+			}
+		}
+		return nil
 	}
 }

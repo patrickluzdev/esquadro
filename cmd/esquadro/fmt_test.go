@@ -90,3 +90,36 @@ func TestFmtFlags(t *testing.T) {
 		t.Fatalf("exit %d, want 2", code)
 	}
 }
+
+func TestFmtDirectoryAndFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, dir, "a.esq", messy)
+	writeFile(t, dir, "b.esq", tidy)
+
+	code, _, errOut := fmtCmd(t, "-check")
+	if code != 1 || !strings.Contains(errOut, "a.esq is not formatted") || strings.Contains(errOut, "b.esq") {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if code, _, errOut := fmtCmd(t, "-w", "a.esq"); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if code, _, errOut := fmtCmd(t, "-check", "."); code != 0 {
+		t.Fatalf("after -w: exit %d, stderr %q", code, errOut)
+	}
+}
+
+func TestFmtKeepsGoingAfterAnError(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, dir, "a.esq", "entity Product {\n  name\n}\n")
+	writeFile(t, dir, "b.esq", messy)
+
+	code, _, errOut := fmtCmd(t, "-w")
+	if code != 1 || !strings.Contains(errOut, "a.esq:2:7: error:") {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "b.esq")); string(got) != tidy {
+		t.Fatal("b.esq should still be formatted when a.esq has errors")
+	}
+}

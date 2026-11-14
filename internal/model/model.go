@@ -9,9 +9,9 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/dsl"
 )
 
-// Project is the resolved model of a .esq file.
+// Project is the resolved model of the .esq files of a project.
 type Project struct {
-	File     string
+	Files    []string
 	App      *App
 	Enums    []*Enum
 	Entities []*Entity

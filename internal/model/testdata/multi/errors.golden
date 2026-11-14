@@ -1,0 +1,17 @@
+b.esq:1:5: error: only one app block is allowed; the first one is at a.esq:1
+  |
+1 | app other {
+  |     ^^^^^
+
+b.esq:5:8: error: Product is already declared at a.esq:6
+  |
+5 | entity Product {
+  |        ^^^^^^^
+
+b.esq:10:3: error: the inverse of Order.buyer would be Customer.orders, which clashes with field orders (line 14)
+   |
+10 |   buyer -> Customer
+   |   ^^^^^
+   = help: name the inverse yourself, e.g. inverse(orders_list)
+
+3 errors

@@ -18,7 +18,7 @@ func load(t *testing.T, path string) (*Project, diag.List, []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, diags := Load(filepath.Base(path), src)
+	p, diags := Load(Source{Name: filepath.Base(path), Src: src})
 	return p, diags, src
 }
 
@@ -154,7 +154,7 @@ entity Order {
   seller -> Person
 }
 `
-	p, diags := Load("t.esq", []byte(src))
+	p, diags := Load(Source{Name: "t.esq", Src: []byte(src)})
 	if len(diags) > 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -196,8 +196,67 @@ entity Order {
 }
 
 func TestSyntaxErrorsSkipSemantics(t *testing.T) {
-	p, diags := Load("t.esq", []byte("entity A {\n  x\n}\n"))
+	p, diags := Load(Source{Name: "t.esq", Src: []byte("entity A {\n  x\n}\n")})
 	if p != nil || len(diags) != 1 {
 		t.Fatalf("want only the syntax error, got %v", diags)
+	}
+}
+
+func loadDir(t *testing.T, dir string) (*Project, diag.List, map[string][]byte) {
+	t.Helper()
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.esq"))
+	srcs := map[string][]byte{}
+	var sources []Source
+	for _, p := range paths {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		srcs[filepath.Base(p)] = src
+		sources = append(sources, Source{Name: filepath.Base(p), Src: src})
+	}
+	p, diags := Load(sources...)
+	return p, diags, srcs
+}
+
+func TestMultiFileProject(t *testing.T) {
+	p, diags, _ := loadDir(t, "testdata/multi/ok")
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := strings.Join(p.Files, " "); got != "app.esq catalog.esq orders.esq" {
+		t.Errorf("files = %s", got)
+	}
+	order := p.Entity("Order")
+	if order == nil || order.Field("status").Enum != p.Enum("OrderStatus") {
+		t.Fatal("enum declared after its use in the same file was not resolved")
+	}
+	items := order.Relations[0]
+	if items.Target != p.Entity("Product") || items.Inverse.Entity != p.Entity("Product") {
+		t.Fatalf("relation across files not resolved: %+v", items)
+	}
+	if p.Entity("Product").Pos.File != "catalog.esq" {
+		t.Errorf("Product position = %v", p.Entity("Product").Pos)
+	}
+}
+
+func TestMultiFileErrors(t *testing.T) {
+	_, diags, srcs := loadDir(t, "testdata/multi/errors")
+	var b strings.Builder
+	diag.Render(&b, diags, func(name string) []byte { return srcs[name] })
+	got := b.String()
+	golden := "testdata/multi/errors.golden"
+	if *update {
+		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("missing golden file (run go test ./internal/model -update): %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("output differs from %s\n--- got ---\n%s\n--- want ---\n%s", golden, got, want)
 	}
 }
