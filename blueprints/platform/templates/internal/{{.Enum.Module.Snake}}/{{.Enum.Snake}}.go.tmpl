@@ -1,0 +1,19 @@
+package {{.Enum.Module.Snake}}
+
+{{goDoc .Enum.Pascal .Enum.Doc (printf "%s is one of %s." .Enum.Pascal (enumValues .Enum))}}
+type {{.Enum.Pascal}} string
+
+const (
+{{- range .Enum.Values}}
+	{{$.Enum.Pascal}}{{.Pascal}} {{$.Enum.Pascal}} = {{quote .Raw}}
+{{- end}}
+)
+
+// Valid reports whether {{lower (slice .Enum.Camel 0 1)}} is one of the declared values.
+func ({{lower (slice .Enum.Camel 0 1)}} {{.Enum.Pascal}}) Valid() bool {
+	switch {{lower (slice .Enum.Camel 0 1)}} {
+	case {{range $i, $v := .Enum.Values}}{{if $i}}, {{end}}{{$.Enum.Pascal}}{{$v.Pascal}}{{end}}:
+		return true
+	}
+	return false
+}

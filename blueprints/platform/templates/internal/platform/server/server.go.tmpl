@@ -1,0 +1,35 @@
+// Package server runs the HTTP server until its context ends, then shuts it
+// down gracefully.
+package server
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+)
+
+// shutdownTimeout is how long open requests may take to finish on shutdown.
+const shutdownTimeout = 10 * time.Second
+
+// Serve serves h on addr until ctx ends or the server fails.
+func Serve(ctx context.Context, addr string, h http.Handler, logger *slog.Logger) error {
+	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	failed := make(chan error, 1)
+	go func() {
+		logger.Info("listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			failed <- err
+		}
+	}()
+	select {
+	case err := <-failed:
+		return err
+	case <-ctx.Done():
+	}
+	logger.Info("shutting down")
+	stopping, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+	return srv.Shutdown(stopping)
+}

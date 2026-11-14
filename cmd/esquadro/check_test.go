@@ -5,6 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/patrickluzdev/esquadro/blueprints"
+	"github.com/patrickluzdev/esquadro/internal/blueprint"
+	"github.com/patrickluzdev/esquadro/internal/hook"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 const okProject = `package catalog
@@ -147,6 +152,24 @@ entity Product {
 	} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr missing %q:\n%s", want, errOut)
+		}
+	}
+}
+
+func TestEveryBuiltinHookIsRegistered(t *testing.T) {
+	l := &blueprint.Loader{Builtin: blueprints.FS}
+	for _, name := range l.BuiltinNames() {
+		b, diags := l.Load(&project.BlueprintRef{Ref: name, Source: project.SourceBuiltin})
+		if b == nil {
+			continue // a hook file is missing: the loader reports it below
+		}
+		for _, d := range diags {
+			t.Errorf("built-in %s: %v", name, d)
+		}
+		for _, h := range b.Manifest.Hooks {
+			if builtinHooks[hook.Key(name, h.Path)] == nil {
+				t.Errorf("built-in blueprint %s declares hook %s, which is not in builtinHooks", name, h.Path)
+			}
 		}
 	}
 }

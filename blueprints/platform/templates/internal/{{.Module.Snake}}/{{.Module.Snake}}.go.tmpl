@@ -1,0 +1,12 @@
+// Package {{.Module.Snake}} holds{{range $i, $e := .Module.Entities}}{{if $i}},{{end}} {{$e.Pascal}}{{end}}{{if not .Module.Entities}} its enums{{end}}.
+package {{.Module.Snake}}
+
+// FieldError is a field the module refuses, with a code that says why:
+// required, too_short, too_long, too_small, too_large, pattern or
+// invalid_value.
+type FieldError struct{ Field, Code string }
+
+// InvalidFields is a value the module refuses, field by field.
+type InvalidFields struct{ Fields []FieldError }
+
+func (e *InvalidFields) Error() string { return "{{.Module.Snake}}: invalid fields" }

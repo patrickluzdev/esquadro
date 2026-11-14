@@ -2,6 +2,10 @@ package compose
 
 import (
 	"slices"
+	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
@@ -47,4 +51,95 @@ func goImports(e *project.Entity) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// importBlock writes a Go import declaration from import paths given as
+// strings or string slices: empty ones are skipped, duplicates dropped, and
+// the standard library comes first, in its own group, as goimports does. It
+// writes nothing when there are no imports.
+func importBlock(paths ...any) string {
+	var std, other []string
+	add := func(p string) {
+		if p == "" || slices.Contains(std, p) || slices.Contains(other, p) {
+			return
+		}
+		if first, _, _ := strings.Cut(p, "/"); strings.Contains(first, ".") {
+			other = append(other, p)
+		} else {
+			std = append(std, p)
+		}
+	}
+	for _, p := range paths {
+		switch p := p.(type) {
+		case string:
+			add(p)
+		case []string:
+			for _, x := range p {
+				add(x)
+			}
+		}
+	}
+	if len(std)+len(other) == 0 {
+		return ""
+	}
+	slices.Sort(std)
+	slices.Sort(other)
+	var b strings.Builder
+	b.WriteString("import (\n")
+	for _, p := range std {
+		b.WriteString("\t")
+		b.WriteString(strconv.Quote(p))
+		b.WriteString("\n")
+	}
+	if len(std) > 0 && len(other) > 0 {
+		b.WriteString("\n")
+	}
+	for _, p := range other {
+		b.WriteString("\t")
+		b.WriteString(strconv.Quote(p))
+		b.WriteString("\n")
+	}
+	b.WriteString(")\n")
+	return b.String()
+}
+
+// goDoc writes a doc comment for a Go declaration named name, following Go's
+// convention that it starts with the name: "Product is something the shop
+// sells." from the .esq doc "Something the shop sells.". Without a doc, it
+// uses fallback, which should already start with the name.
+func goDoc(name string, doc []string, fallback string) string {
+	if len(doc) == 0 {
+		return "// " + fallback
+	}
+	lines := slices.Clone(doc)
+	if first := lines[0]; !strings.HasPrefix(first, name+" ") {
+		lines[0] = name + " is " + lowerFirst(first)
+	}
+	for i, l := range lines {
+		lines[i] = strings.TrimRight("// "+l, " ")
+	}
+	return strings.Join(lines, "\n")
+}
+
+// lowerFirst lowers the first letter of s unless it starts an acronym
+// ("HTTP server" stays as is).
+func lowerFirst(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+	next, _ := utf8.DecodeRuneInString(s[size:])
+	if size == 0 || unicode.IsUpper(next) {
+		return s
+	}
+	return string(unicode.ToLower(r)) + s[size:]
+}
+
+// enumValues lists an enum's values as "A, B or C".
+func enumValues(e *project.Enum) string {
+	names := make([]string, len(e.Values))
+	for i, v := range e.Values {
+		names[i] = v.Raw
+	}
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
 }

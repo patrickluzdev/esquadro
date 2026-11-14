@@ -42,7 +42,10 @@ type Input struct {
 	Files []string `json:"files"`
 	// GoRequires are the Go modules every blueprint of the project needs.
 	GoRequires []GoRequire `json:"go_requires"`
-	DryRun     bool        `json:"dry_run"`
+	// ProjectDir is the project folder, absolute; external hooks also run
+	// in it.
+	ProjectDir string `json:"project_dir"`
+	DryRun     bool   `json:"dry_run"`
 }
 
 // GoRequire is a Go module a blueprint needs, with its minimum version.
@@ -200,9 +203,14 @@ func (r *Runner) input(p *project.Project, set *blueprint.Set, res *compose.Resu
 			reqs = append(reqs, GoRequire{Module: r.Module, Version: r.Version})
 		}
 	}
+	dir, err := filepath.Abs(r.ProjectDir)
+	if err != nil {
+		dir = r.ProjectDir
+	}
 	return Input{
 		Event: hk.Hook.Event, Blueprint: hk.Blueprint.Manifest.Name, Project: p.Describe(),
-		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, GoRequires: reqs, DryRun: dryRun,
+		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, GoRequires: reqs,
+		ProjectDir: dir, DryRun: dryRun,
 	}
 }
 

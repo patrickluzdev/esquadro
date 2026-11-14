@@ -1,0 +1,115 @@
+{{- $e := .Entity -}}
+{{- $utf8 := ""}}{{$re := "" -}}
+{{- range $e.Fields}}{{if not .Implicit -}}
+{{- if and (or (eq .Type "string") (eq .Type "text")) (or .Min .Max)}}{{$utf8 = "unicode/utf8"}}{{end -}}
+{{- if .Pattern}}{{$re = "regexp"}}{{end -}}
+{{- end}}{{end -}}
+package {{$e.Module.Snake}}
+
+{{importBlock (goImports $e) $re $utf8}}
+{{goDoc $e.Pascal $e.Doc (printf "%s is %s %s of %s." $e.Pascal (or (and (eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o") "an") "a") (lower $e.Label) $e.Module.Snake)}}
+type {{$e.Pascal}} struct {
+{{- range $e.Fields}}{{if eq .Snake "id"}}
+	{{.Pascal}} {{goType .}}
+{{- end}}{{end}}
+{{- range $e.Fields}}{{if not .Implicit}}
+{{- if .Doc}}
+	{{goDoc .Pascal .Doc ""}}
+{{- end}}
+	{{.Pascal}} {{goType .}}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+	{{.Pascal}}ID string
+{{- end}}{{end}}
+{{- range $e.Fields}}{{if and .Implicit (ne .Snake "id")}}
+	{{.Pascal}} {{goType .}}
+{{- end}}{{end}}
+}
+
+// New{{$e.Pascal}} is {{if eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower $e.Label}} as it is written, before it is stored.
+type New{{$e.Pascal}} struct {
+{{- range $e.Fields}}{{if not .Implicit}}
+	{{.Pascal}} {{goType .}}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+	{{.Pascal}}ID string
+{{- end}}{{end}}
+}
+{{range $e.Fields}}{{if .Pattern}}
+// {{$e.Camel}}{{.Pascal}}Pattern is the pattern declared for {{$e.Pascal}}.{{.Raw}}.
+var {{$e.Camel}}{{.Pascal}}Pattern = regexp.MustCompile({{rawQuote .Pattern}})
+{{end}}{{end}}
+// Validate checks a New{{$e.Pascal}} against the rules declared for {{$e.Plural.Snake}}.
+func (n New{{$e.Pascal}}) Validate() error {
+	var invalid []FieldError
+	refuse := func(field, code string) { invalid = append(invalid, FieldError{Field: field, Code: code}) }
+{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{$x := printf "n.%s" .Pascal}}
+{{- if .Required}}
+{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "uuid") (eq .Type "enum")}}
+	if {{$x}} == "" {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if or (eq .Type "time") (eq .Type "date")}}
+	if {{$x}}.IsZero() {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "json"}}
+	if len({{$x}}) == 0 {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- end}}
+{{- end}}
+{{- if or (eq .Type "string") (eq .Type "text")}}
+{{- if .Min}}
+	if {{$x}} != "" && utf8.RuneCountInString({{$x}}) < {{.Min.Text}} {
+		refuse({{quote .Snake}}, "too_short")
+	}
+{{- end}}
+{{- if .Max}}
+	if utf8.RuneCountInString({{$x}}) > {{.Max.Text}} {
+		refuse({{quote .Snake}}, "too_long")
+	}
+{{- end}}
+{{- if .Pattern}}
+	if {{$x}} != "" && !{{$e.Camel}}{{.Pascal}}Pattern.MatchString({{$x}}) {
+		refuse({{quote .Snake}}, "pattern")
+	}
+{{- end}}
+{{- else if or (eq .Type "int") (eq .Type "int64")}}
+{{- if .Min}}
+	if {{$x}} < {{.Min.Text}} {
+		refuse({{quote .Snake}}, "too_small")
+	}
+{{- end}}
+{{- if .Max}}
+	if {{$x}} > {{.Max.Text}} {
+		refuse({{quote .Snake}}, "too_large")
+	}
+{{- end}}
+{{- else if eq .Type "decimal"}}
+{{- if .Min}}
+	if {{$x}}.LessThan(decimal.RequireFromString({{quote .Min.Text}})) {
+		refuse({{quote .Snake}}, "too_small")
+	}
+{{- end}}
+{{- if .Max}}
+	if {{$x}}.GreaterThan(decimal.RequireFromString({{quote .Max.Text}})) {
+		refuse({{quote .Snake}}, "too_large")
+	}
+{{- end}}
+{{- else if eq .Type "enum"}}
+	if {{$x}} != "" && !{{$x}}.Valid() {
+		refuse({{quote .Snake}}, "invalid_value")
+	}
+{{- end}}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if and .OwnsForeignKey .Required}}
+	if n.{{.Pascal}}ID == "" {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- end}}{{end}}
+	if len(invalid) > 0 {
+		return &InvalidFields{Fields: invalid}
+	}
+	return nil
+}

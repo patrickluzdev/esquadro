@@ -309,8 +309,19 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 		"goType":    goType,
 		"goImports": goImports,
 		"quote":     strconv.Quote,
-		"lower":     strings.ToLower,
-		"upper":     strings.ToUpper,
+		// rawQuote writes s as a Go raw string when it can, which regexps
+		// read best in.
+		"rawQuote": func(s string) string {
+			if strings.ContainsAny(s, "`\r") {
+				return strconv.Quote(s)
+			}
+			return "`" + s + "`"
+		},
+		"importBlock": importBlock,
+		"goDoc":       goDoc,
+		"enumValues":  enumValues,
+		"lower":       strings.ToLower,
+		"upper":       strings.ToUpper,
 		// indent prefixes every non-empty line of s with n spaces.
 		"indent": func(n int, s string) string {
 			pad := strings.Repeat(" ", n)

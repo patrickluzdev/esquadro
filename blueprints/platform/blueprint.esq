@@ -1,23 +1,33 @@
-/// The foundation of every generated project: go.mod, configuration,
-/// structured logging, the HTTP server and the Go models of the entities.
+/// The foundation of every generated project: configuration, structured
+/// logging, the HTTP server, the commands, and each module's domain types
+/// with the rules declared in the .esq files.
 blueprint platform {
   version "0.1.0"
 
   /// Port the HTTP server listens on when PORT is not set.
   option port int default(8080)
 
-  /// Fields of the Config struct.
+  /// Fields of config.Config.
   slot "platform.config.fields"
-  /// Code that fills those fields from the environment.
+  /// Code in config.Load that fills those fields; c is the Config.
   slot "platform.config.load"
-  /// Code run at startup, before the server starts.
+  /// Imports of cmd/<app>/main.go.
+  slot "platform.main.imports"
+  /// Code in run that builds dependencies before the server starts; deps
+  /// is the dependencies value, and an error is returned.
   slot "platform.main.init"
-  /// Code run on shutdown, after the server stops.
+  /// Code in run after the server stops; err holds its result.
   slot "platform.main.shutdown"
-  /// HTTP routes, registered on the ServeMux.
+  /// Imports of cmd/<app>/routes.go.
+  slot "platform.routes.imports"
+  /// Fields of the dependencies struct the routes receive.
+  slot "platform.dependencies"
+  /// Routes, registered on mux; d is the dependencies.
   slot "platform.routes"
-  /// Extra Makefile targets.
-  slot "platform.makefile.targets"
-  /// Extra methods on each entity's Go model.
-  slot "platform.model.methods"
+  /// Tasks of Taskfile.esquadro.yml, indented by two spaces.
+  slot "platform.tasks"
+
+  go_require "github.com/shopspring/decimal" "v1.4.0"
+
+  hook post-gen "go-mod" edits ["go.mod", "go.sum"]
 }

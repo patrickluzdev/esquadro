@@ -1,0 +1,46 @@
+// Command {{.App.Kebab}} serves {{.App.Label}}.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"{{.App.Module}}/internal/platform/config"
+	"{{.App.Module}}/internal/platform/logging"
+	"{{.App.Module}}/internal/platform/server"
+{{- with slot "platform.main.imports" .}}
+{{.}}
+{{- end}}
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// run builds the service's dependencies and serves until an interrupt.
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	logger := logging.New(cfg.Env)
+	deps := dependencies{config: cfg, logger: logger}
+{{- with slot "platform.main.init" .}}
+{{.}}
+{{- end}}
+
+	err = server.Serve(ctx, cfg.Addr(), deps.routes(), logger)
+{{- with slot "platform.main.shutdown" .}}
+{{.}}
+{{- end}}
+	return err
+}

@@ -70,7 +70,7 @@ func resolveDir(t *testing.T, dir string) string {
 		diag.Render(&b, diags, func(n string) []byte { return srcs[n] })
 		t.Fatalf("test project does not build:\n%s", b.String())
 	}
-	l := &Loader{Builtin: blueprints.FS, ProjectDir: dir}
+	l := &Loader{Builtin: blueprints.FS, ProjectDir: dir, HasBuiltinHook: anyHook}
 	set, diags := Resolve(p, l)
 
 	var b strings.Builder
@@ -134,7 +134,7 @@ func sortedMap(m map[string]any) string {
 }
 
 func TestBuiltinBlueprintsAreValid(t *testing.T) {
-	l := &Loader{Builtin: blueprints.FS}
+	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook}
 	names := l.BuiltinNames()
 	if strings.Join(names, " ") != "platform postgres" {
 		t.Fatalf("built-in blueprints = %v", names)
@@ -147,3 +147,7 @@ func TestBuiltinBlueprintsAreValid(t *testing.T) {
 		}
 	}
 }
+
+// anyHook stands in for the registry of built-in hooks, which lives in the
+// command; cmd/esquadro checks that every built-in hook is registered.
+func anyHook(string, string) bool { return true }

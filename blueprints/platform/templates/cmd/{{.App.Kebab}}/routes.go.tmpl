@@ -1,0 +1,32 @@
+package main
+
+import (
+	"log/slog"
+	"net/http"
+
+	"{{.App.Module}}/internal/platform/config"
+{{- with slot "platform.routes.imports" .}}
+{{.}}
+{{- end}}
+)
+
+// dependencies are what the routes need, built by run.
+type dependencies struct {
+	config config.Config
+	logger *slog.Logger
+{{- with slot "platform.dependencies" .}}
+{{.}}
+{{- end}}
+}
+
+// routes registers every operation of the service.
+func (d dependencies) routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+{{- with slot "platform.routes" .}}
+{{.}}
+{{- end}}
+	return mux
+}

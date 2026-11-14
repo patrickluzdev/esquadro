@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/patrickluzdev/esquadro/blueprints"
+	"github.com/patrickluzdev/esquadro/blueprints/platform"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
@@ -12,7 +13,9 @@ import (
 )
 
 // builtinHooks are the hooks of the built-in blueprints, by hook.Key.
-var builtinHooks = map[string]hook.Func{}
+var builtinHooks = map[string]hook.Func{
+	hook.Key("platform", "go-mod"): platform.GoMod,
+}
 
 // loadedProject is a project read from its folder, with its blueprints
 // resolved.
