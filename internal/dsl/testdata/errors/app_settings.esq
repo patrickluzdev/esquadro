@@ -3,7 +3,6 @@ app shop {
   module github.com/example/shop
   module "a"
   module "b"
-  lang
   blueprint { x 1 }
   blueprint postgres {
     pool_max

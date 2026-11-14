@@ -15,19 +15,14 @@ app_settings.esq:5:3: error: module is already set at line 4
 5 |   module "b"
   |   ^^^^^^
 
-app_settings.esq:6:7: error: expected language after lang (en or pt), found newline
+app_settings.esq:6:13: error: expected blueprint name or path, found "{"
   |
-6 |   lang
-  |       ^
-
-app_settings.esq:7:13: error: expected blueprint name or path, found "{"
-  |
-7 |   blueprint { x 1 }
+6 |   blueprint { x 1 }
   |             ^
 
-app_settings.esq:9:13: error: expected a value after option pool_max (string, number, true/false, name or [list]), found newline
+app_settings.esq:8:13: error: expected a value after option pool_max (string, number, true/false, name or [list]), found newline
   |
-9 |     pool_max
+8 |     pool_max
   |             ^
 
-6 errors
+5 errors

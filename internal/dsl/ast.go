@@ -76,10 +76,9 @@ type AnnotationArg struct {
 type AppDecl struct {
 	Doc  []string
 	Name Ident
-	// Module and Lang are nil when not set. When set more than once, the
-	// parser keeps the first and reports the rest.
+	// Module is nil when not set. When set more than once, the parser keeps
+	// the first and reports the rest.
 	Module      *Value
-	Lang        *Ident
 	Blueprints  []*BlueprintRef
 	Annotations []*Annotation
 	Span

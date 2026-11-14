@@ -6,7 +6,7 @@ import (
 
 var (
 	topKeywords = []string{"app", "enum", "entity"}
-	appSettings = []string{"module", "lang", "blueprint"}
+	appSettings = []string{"module", "blueprint"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -291,7 +291,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 		return true
 	}
 	if t.Kind != Name {
-		p.errorf(t, "expected an app setting (module, lang or blueprint), found %s", t.describe())
+		p.errorf(t, "expected an app setting (module or blueprint), found %s", t.describe())
 		return false
 	}
 	switch t.Text {
@@ -310,17 +310,6 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 			return true
 		}
 		app.Module = v
-	case "lang":
-		p.advance()
-		id, ok := p.expectIdent("language after lang (en or pt)")
-		if !ok {
-			return false
-		}
-		if app.Lang != nil {
-			p.errorf(t, "lang is already set at line %d", app.Lang.Pos.Line)
-			return true
-		}
-		app.Lang = &id
 	case "blueprint":
 		p.advance()
 		r := p.tok()

@@ -29,9 +29,6 @@ func Dump(f *File) string {
 			if d.Module != nil {
 				w(1, "module %s", dumpValue(*d.Module))
 			}
-			if d.Lang != nil {
-				w(1, "lang %s", d.Lang.Name)
-			}
 			for _, bp := range d.Blueprints {
 				w(1, "blueprint %s @%s", dumpValue(bp.Ref), pos(bp.Span))
 				for _, o := range bp.Options {

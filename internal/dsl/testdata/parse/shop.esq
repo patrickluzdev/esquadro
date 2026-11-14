@@ -1,7 +1,6 @@
 /// The demo shop used across the docs.
 app shop {
   module "github.com/example/shop"
-  lang en
 
   blueprint base
   blueprint postgres {

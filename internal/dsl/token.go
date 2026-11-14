@@ -6,7 +6,6 @@
 //	File       = { AppDecl | EnumDecl | EntityDecl } .
 //	AppDecl    = "app" Ident "{" { AppItem } "}" .
 //	AppItem    = "module" String
-//	           | "lang" Ident
 //	           | "blueprint" ( Ident | String ) [ "{" { Option } "}" ]
 //	           | Annotation .
 //	EnumDecl   = "enum" Ident "{" { Ident [ "," ] } "}" .
