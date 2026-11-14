@@ -1,28 +1,28 @@
-app.esq:2:10: error: "has spaces/x" is not a valid Go module path
+app.esq:4:10: error: "has spaces/x" is not a valid Go module path
   |
-2 |   module "has spaces/x"
+4 |   module "has spaces/x"
   |          ^^^^^^^^^^^^^^
   = help: e.g. module "github.com/you/shop"
 
-app.esq:4:13: error: blueprint platform is already used at line 3
+app.esq:6:13: error: blueprint platform is already used at line 5
   |
-4 |   blueprint platform
+6 |   blueprint platform
   |             ^^^^^^^^
 
-app.esq:5:13: error: "mine" is not a local path or a git source
+app.esq:7:13: error: "mine" is not a local path or a git source
   |
-5 |   blueprint "mine"
+7 |   blueprint "mine"
   |             ^^^^^^
   = help: built-in blueprints are written without quotes, e.g. blueprint mine; local ones start with "./"
 
-app.esq:8:5: error: option pool_max is already set at line 7
-  |
-8 |     pool_max 20
-  |     ^^^^^^^^
-
-app.esq:12:5: error: only one app block is allowed; the first one is at line 1
+app.esq:10:5: error: option pool_max is already set at line 9
    |
-12 | app other {
+10 |     pool_max 20
+   |     ^^^^^^^^
+
+app.esq:14:5: error: only one app block is allowed; the first one is at line 3
+   |
+14 | app other {
    |     ^^^^^
 
 5 errors

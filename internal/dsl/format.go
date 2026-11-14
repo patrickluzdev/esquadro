@@ -40,6 +40,11 @@ func Format(f *File) []byte {
 			p.entity(&out, d)
 		case *BlueprintDecl:
 			p.blueprint(&out, d)
+		case *PackageDecl:
+			out.WriteString("package ")
+			out.WriteString(d.Name.Name)
+			out.WriteString(p.closeTrail(d.Span))
+			out.WriteString("\n")
 		}
 		p.lastLine = d.SourceSpan().End.Line
 		prevWasDecl = true

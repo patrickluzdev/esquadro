@@ -1,3 +1,5 @@
+package catalog
+
 entity Product {
   name     string required
   category -> Category

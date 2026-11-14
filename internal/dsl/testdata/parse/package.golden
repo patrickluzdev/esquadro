@@ -1,0 +1,5 @@
+package catalog @2:1-2:16
+entity Product @4:1-6:2
+  field name string @5:3-5:14
+comment "// The shop catalog." @1:1-1:21
+comment "// products and categories" @2:17-2:43

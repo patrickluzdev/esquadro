@@ -1,0 +1,6 @@
+// The shop catalog.
+package catalog // products and categories
+
+entity Product {
+  name string
+}

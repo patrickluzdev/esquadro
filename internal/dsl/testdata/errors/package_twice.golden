@@ -1,0 +1,11 @@
+package_twice.esq:2:1: error: package is already declared at line 1
+  |
+2 | package b
+  | ^^^^^^^^^
+
+package_twice.esq:7:8: error: expected module name after package, found newline
+  |
+7 | package
+  |        ^
+
+2 errors

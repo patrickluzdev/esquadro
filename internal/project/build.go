@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -72,6 +74,9 @@ type builder struct {
 	entityDecls []*dsl.EntityDecl
 	// explicitInverse holds inverse(name) modifiers until inverses are built.
 	explicitInverse []pendingInverse
+	// modules by name, and the module of each entity and enum declaration.
+	modules  map[string]*Module
+	moduleOf map[dsl.Decl]*Module
 }
 
 func (b *builder) errorf(s dsl.Span, format string, args ...any) *diag.Diagnostic {
@@ -162,6 +167,8 @@ func (b *builder) build() {
 		}
 		b.p.App = b.buildApp(apps[0])
 	}
+
+	b.buildModules()
 
 	// Pass 1: enums, then entity shells and fields, so relations can point
 	// at any entity and display any field regardless of declaration order.
@@ -258,7 +265,10 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 // ---- enums ----
 
 func (b *builder) buildEnum(d *dsl.EnumDecl) {
-	e := &Enum{Names: b.names(d.Name), Doc: d.Doc, Pos: d.Pos}
+	e := &Enum{Names: b.names(d.Name), Module: b.moduleOf[d], Doc: d.Doc, Pos: d.Pos}
+	if e.Module != nil {
+		e.Module.Enums = append(e.Module.Enums, e)
+	}
 	if len(d.Values) == 0 {
 		b.errorf(d.Name.Span, "enum %s has no values", d.Name.Name)
 	}
@@ -296,7 +306,10 @@ func implicitField(name string, t Type, d *Default) *Field {
 }
 
 func (b *builder) buildEntity(d *dsl.EntityDecl) {
-	e := &Entity{Names: b.names(d.Name), Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
+	e := &Entity{Names: b.names(d.Name), Module: b.moduleOf[d], Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
+	if e.Module != nil {
+		e.Module.Entities = append(e.Module.Entities, e)
+	}
 	e.Plural, _ = makePlural(e.Raw)
 
 	seenOpt := map[string]*dsl.Option{}
@@ -325,7 +338,7 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 	e.Fields = append(e.Fields, implicitField(implicitID, TypeUUID, nil))
 	for _, f := range d.Fields {
-		if fld := b.buildField(f); fld != nil {
+		if fld := b.buildField(e.Module, f); fld != nil {
 			e.Fields = append(e.Fields, fld)
 		}
 	}
@@ -341,7 +354,7 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 var fieldModifiers = []string{"required", "unique", "min", "max", "pattern", "default"}
 
-func (b *builder) buildField(d *dsl.Field) *Field {
+func (b *builder) buildField(mod *Module, d *dsl.Field) *Field {
 	n := b.names(d.Name)
 	switch n.Snake {
 	case implicitID, implicitCreatedAt, implicitUpdatedAt:
@@ -357,6 +370,11 @@ func (b *builder) buildField(d *dsl.Field) *Field {
 		f.Type = Type(typ)
 	case b.enums[typ] != nil:
 		f.Type, f.Enum = TypeEnum, b.enums[typ]
+		if em := f.Enum.Module; em != nil && mod != nil && em != mod {
+			b.errorf(d.Type.Span, "enum %s belongs to module %s; an enum is used only inside its own module", typ, em.Raw).
+				Suggestion = "declare the enum in module " + mod.Raw + " too, with the values this module needs"
+			return nil
+		}
 	case b.isEntity(typ):
 		b.errorf(d.Type.Span, "%s is an entity, not a field type", typ).
 			Suggestion = fmt.Sprintf("use a relation: %s -> %s", d.Name.Name, typ)
@@ -777,7 +795,7 @@ func (b *builder) inferInverses() {
 	for _, e := range b.p.Entities {
 		declared := append([]*Relation(nil), e.Relations...)
 		for _, r := range declared {
-			if r.Inferred {
+			if r.Inferred || (r.Entity.Module != nil && r.CrossesModules()) {
 				continue
 			}
 			kind := r.Kind
@@ -898,4 +916,74 @@ func (b *builder) checkMemberClashes(e *Entity) {
 		}
 		seen[r.Snake] = member{"relation", r.Raw, r.Pos}
 	}
+}
+
+// ---- modules ----
+
+var (
+	moduleNameRE    = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+	reservedModules = []string{"platform", "main", "cmd", "internal"}
+	// layerNames describe a technical layer, not a part of the domain.
+	layerNames = []string{
+		"model", "models", "entity", "entities", "domain", "service", "services",
+		"repository", "repositories", "repo", "repos", "handler", "handlers",
+		"controller", "controllers", "dto", "dtos", "dao", "util", "utils",
+		"helper", "helpers", "common", "shared", "misc", "core", "base", "lib",
+	}
+)
+
+// buildModules reads each file's package declaration and assigns its
+// entities and enums to that module. Every file with entities or enums must
+// declare one.
+func (b *builder) buildModules() {
+	b.modules = map[string]*Module{}
+	b.moduleOf = map[dsl.Decl]*Module{}
+	for _, f := range b.files {
+		var mod *Module
+		reported := false
+		for _, d := range f.Decls {
+			switch d := d.(type) {
+			case *dsl.PackageDecl:
+				mod = b.module(d)
+			case *dsl.EntityDecl, *dsl.EnumDecl:
+				if mod != nil {
+					b.moduleOf[d] = mod
+					continue
+				}
+				if !reported {
+					sp := d.SourceSpan()
+					b.diags.Errorf(diag.Pos{File: f.Name, Line: 1, Col: 1}, diag.Pos{}, "%s has entities or enums but no package declaration", f.Name).
+						Suggestion = fmt.Sprintf("start the file with the module its declarations belong to, e.g. package catalog (first declaration at line %d)", sp.Pos.Line)
+					reported = true
+				}
+			}
+		}
+	}
+	for _, m := range b.modules {
+		b.p.Modules = append(b.p.Modules, m)
+	}
+	sort.Slice(b.p.Modules, func(i, j int) bool { return b.p.Modules[i].Raw < b.p.Modules[j].Raw })
+}
+
+// module returns the module a package declaration names, creating it and
+// checking its name the first time.
+func (b *builder) module(d *dsl.PackageDecl) *Module {
+	name := d.Name.Name
+	if m, ok := b.modules[name]; ok {
+		return m
+	}
+	switch {
+	case !moduleNameRE.MatchString(name):
+		b.errorf(d.Name.Span, "module name %q must be lower case letters and digits, like a Go package", name).
+			Suggestion = "e.g. package " + strings.ToLower(strings.NewReplacer("_", "", "-", "").Replace(asciiOnly(name)))
+	case slices.Contains(reservedModules, name):
+		b.errorf(d.Name.Span, "%s is reserved and cannot be a module name", name)
+	case slices.Contains(layerNames, name):
+		b.diags.Warnf(d.Name.Pos, d.Name.End, "module %s names a technical layer, not a part of the domain", name).
+			Suggestion = "name the part of the domain it covers, e.g. catalog, orders, billing"
+	}
+	n, _ := makeNames(name)
+	m := &Module{Names: n, Pos: d.Pos}
+	b.modules[name] = m
+	return m
 }

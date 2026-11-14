@@ -138,7 +138,9 @@ func TestShopModel(t *testing.T) {
 }
 
 func TestInverseNaming(t *testing.T) {
-	src := `app a { module "x.com/a"
+	src := `package people
+
+app a { module "x.com/a"
   blueprint platform
 }
 entity Person (plural "people") {
@@ -233,8 +235,14 @@ func TestMultiFileProject(t *testing.T) {
 		t.Fatal("enum declared after its use in the same file was not resolved")
 	}
 	items := order.Relations[0]
-	if items.Target != p.Entity("Product") || items.Inverse.Entity != p.Entity("Product") {
+	if items.Target != p.Entity("Product") || !items.CrossesModules() {
 		t.Fatalf("relation across files not resolved: %+v", items)
+	}
+	if items.Inverse != nil || len(p.Entity("Product").Relations) != 1 {
+		t.Fatal("a relation to another module must not add an inverse: catalog does not know about orders")
+	}
+	if got := len(p.Module("catalog").Entities); got != 2 || p.Module("orders").Enums[0].Raw != "OrderStatus" {
+		t.Fatalf("modules = %+v", p.Modules)
 	}
 	if p.Entity("Product").Pos.File != "catalog.esq" {
 		t.Errorf("Product position = %v", p.Entity("Product").Pos)

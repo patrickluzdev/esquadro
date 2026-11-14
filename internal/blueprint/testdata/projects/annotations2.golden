@@ -1,28 +1,28 @@
-testdata/projects/annotations2/app.esq:8:37: error: key column of @postgres: expected a name (without quotes)
-  |
-8 |   name     string  @postgres(column "name")
-  |                                     ^^^^^^
-
-testdata/projects/annotations2/app.esq:9:40: error: @postgres is already used here at column 20
-  |
-9 |   price    decimal @postgres(column a) @postgres(column b)
-  |                                        ^^^^^^^^^^^^^^^^^^^
-  = help: put all keys in one annotation
-
-testdata/projects/annotations2/app.esq:10:24: error: blueprint postgres has no annotation for relations
+testdata/projects/annotations2/app.esq:10:37: error: key column of @postgres: expected a name (without quotes)
    |
-10 |   category -> Category @postgres(column cat)
+10 |   name     string  @postgres(column "name")
+   |                                     ^^^^^^
+
+testdata/projects/annotations2/app.esq:11:40: error: @postgres is already used here at column 20
+   |
+11 |   price    decimal @postgres(column a) @postgres(column b)
+   |                                        ^^^^^^^^^^^^^^^^^^^
+   = help: put all keys in one annotation
+
+testdata/projects/annotations2/app.esq:12:24: error: blueprint postgres has no annotation for relations
+   |
+12 |   category -> Category @postgres(column cat)
    |                        ^^^^^^^^^^^^^^^^^^^^^
    = help: @postgres can be used on entities and fields
 
-testdata/projects/annotations2/app.esq:12:26: error: Product has no field "stauts"
+testdata/projects/annotations2/app.esq:14:26: error: Product has no field "stauts"
    |
-12 |   @postgres(index [name, stauts], unique_index [category, price], table products, table items)
+14 |   @postgres(index [name, stauts], unique_index [category, price], table products, table items)
    |                          ^^^^^^
 
-testdata/projects/annotations2/app.esq:12:83: error: key table is already set
+testdata/projects/annotations2/app.esq:14:83: error: key table is already set
    |
-12 |   @postgres(index [name, stauts], unique_index [category, price], table products, table items)
+14 |   @postgres(index [name, stauts], unique_index [category, price], table products, table items)
    |                                                                                   ^^^^^
 
 5 errors

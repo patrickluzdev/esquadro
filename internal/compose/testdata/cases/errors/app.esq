@@ -1,3 +1,5 @@
+package catalog
+
 app shop {
   module "github.com/example/shop"
   blueprint undeclared

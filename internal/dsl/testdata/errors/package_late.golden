@@ -1,0 +1,7 @@
+package_late.esq:5:1: error: package must come before every other declaration of the file
+  |
+5 | package late
+  | ^^^^^^^^^^^^
+  = help: move this line to the top of the file
+
+1 error

@@ -15,8 +15,28 @@ import (
 type Project struct {
 	Files    []string
 	App      *App
+	Modules  []*Module
 	Enums    []*Enum
 	Entities []*Entity
+}
+
+// Module is a part of the domain: the entities and enums of the files that
+// declare "package <name>". It becomes one Go package.
+type Module struct {
+	Names
+	Entities []*Entity
+	Enums    []*Enum
+	Pos      diag.Pos
+}
+
+// Module returns the module with the given name, or nil.
+func (p *Project) Module(name string) *Module {
+	for _, m := range p.Modules {
+		if m.Raw == name {
+			return m
+		}
+	}
+	return nil
 }
 
 // Entity returns the entity with the given name as written, or nil.
@@ -80,6 +100,7 @@ type Ann map[string]map[string]any
 // Enum is an enum type.
 type Enum struct {
 	Names
+	Module *Module
 	Doc    []string
 	Values []*EnumValue
 	Pos    diag.Pos
@@ -104,6 +125,7 @@ type EnumValue struct {
 // Entity is a resolved entity.
 type Entity struct {
 	Names
+	Module *Module
 	Plural Names
 	Doc    []string
 	// Fields includes the implicit id, created_at and updated_at, in that
@@ -251,6 +273,13 @@ type Relation struct {
 	Annotations []*dsl.Annotation
 	Ann         Ann
 	Pos         diag.Pos
+}
+
+// CrossesModules reports whether the relation points to an entity of another
+// module. Such relations have no inverse: a module does not know who points
+// at it.
+func (r *Relation) CrossesModules() bool {
+	return r.Entity.Module != r.Target.Module
 }
 
 // OwnsForeignKey reports whether this side stores the foreign key column.

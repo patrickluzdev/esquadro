@@ -1,99 +1,99 @@
-modifiers.esq:9:12: error: unknown modifier "requred"
-  |
-9 |   a string requred
-  |            ^^^^^^^
-  = help: did you mean "required"?
-
-modifiers.esq:10:21: error: required is already set at column 12
+modifiers.esq:11:12: error: unknown modifier "requred"
    |
-10 |   b string required required
+11 |   a string requred
+   |            ^^^^^^^
+   = help: did you mean "required"?
+
+modifiers.esq:12:21: error: required is already set at column 12
+   |
+12 |   b string required required
    |                     ^^^^^^^^
 
-modifiers.esq:11:12: error: required takes no arguments
+modifiers.esq:13:12: error: required takes no arguments
    |
-11 |   c string required(1)
+13 |   c string required(1)
    |            ^^^^^^^^^^^
    = help: write just required
 
-modifiers.esq:12:10: error: min is not allowed on bool fields
+modifiers.esq:14:10: error: min is not allowed on bool fields
    |
-12 |   d bool min(1)
+14 |   d bool min(1)
    |          ^^^
    = help: min and max apply to string, text, int, int64 and decimal
 
-modifiers.esq:13:9: error: min (10) is greater than max (5)
+modifiers.esq:15:9: error: min (10) is greater than max (5)
    |
-13 |   e int min(10) max(5)
+15 |   e int min(10) max(5)
    |         ^^^^^^^
 
-modifiers.esq:14:16: error: min on string fields is a length and cannot be negative
+modifiers.esq:16:16: error: min on string fields is a length and cannot be negative
    |
-14 |   f string min(-1)
+16 |   f string min(-1)
    |                ^^
 
-modifiers.esq:15:20: error: invalid pattern: missing closing ]: `[a-`
+modifiers.esq:17:20: error: invalid pattern: missing closing ]: `[a-`
    |
-15 |   g string pattern("[a-")
+17 |   g string pattern("[a-")
    |                    ^^^^^
 
-modifiers.esq:16:9: error: pattern is not allowed on int fields
+modifiers.esq:18:9: error: pattern is not allowed on int fields
    |
-16 |   h int pattern("^1$")
+18 |   h int pattern("^1$")
    |         ^^^^^^^
    = help: pattern applies to string and text
 
-modifiers.esq:17:17: error: default for an int field must be a whole number
+modifiers.esq:19:17: error: default for an int field must be a whole number
    |
-17 |   i int default("one")
+19 |   i int default("one")
    |                 ^^^^^
    = help: e.g. default(0)
 
-modifiers.esq:18:20: error: OPNE is not a value of Status
+modifiers.esq:20:20: error: OPNE is not a value of Status
    |
-18 |   j Status default(OPNE)
+20 |   j Status default(OPNE)
    |                    ^^^^
    = help: did you mean "OPEN"?
 
-modifiers.esq:19:24: error: default 0 is outside the field's min/max
+modifiers.esq:21:24: error: default 0 is outside the field's min/max
    |
-19 |   k int min(1) default(0)
+21 |   k int min(1) default(0)
    |                        ^
 
-modifiers.esq:20:27: error: default "toolong" does not satisfy the field's min/max length
+modifiers.esq:22:27: error: default "toolong" does not satisfy the field's min/max length
    |
-20 |   l string max(3) default("toolong")
+22 |   l string max(3) default("toolong")
    |                           ^^^^^^^^^
 
-modifiers.esq:21:18: error: default for a date field must be now or a date like "2025-01-31"
+modifiers.esq:23:18: error: default for a date field must be now or a date like "2025-01-31"
    |
-21 |   m date default("tomorrow")
+23 |   m date default("tomorrow")
    |                  ^^^^^^^^^^
    = help: e.g. default(now)
 
-modifiers.esq:22:12: error: inverse is only allowed on relations
+modifiers.esq:24:12: error: inverse is only allowed on relations
    |
-22 |   n string inverse(x)
+24 |   n string inverse(x)
    |            ^^^^^^^
 
-modifiers.esq:23:13: error: min needs exactly one value
+modifiers.esq:25:13: error: min needs exactly one value
    |
-23 |   o decimal min
+25 |   o decimal min
    |             ^^^
    = help: e.g. min(3)
 
-modifiers.esq:24:15: error: min on int64 fields must be a whole number
+modifiers.esq:26:15: error: min on int64 fields must be a whole number
    |
-24 |   p int64 min(1.5)
+26 |   p int64 min(1.5)
    |               ^^^
 
-modifiers.esq:25:17: error: required is not allowed on many-to-many relations
+modifiers.esq:27:17: error: required is not allowed on many-to-many relations
    |
-25 |   tags  <-> Tag required
+27 |   tags  <-> Tag required
    |                 ^^^^^^^^
 
-modifiers.esq:26:16: error: min is not allowed on relations
+modifiers.esq:28:16: error: min is not allowed on relations
    |
-26 |   owner -> Tag min(1)
+28 |   owner -> Tag min(1)
    |                ^^^
 
 18 errors

@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-const okProject = `app shop {
+const okProject = `package catalog
+
+app shop {
   module "github.com/example/shop"
   blueprint platform
 }
@@ -53,8 +55,8 @@ func TestCheckOK(t *testing.T) {
 func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
-	writeFile(t, dir, "catalog.esq", "entity Product {\n  name string\n  category -> Category\n}\n")
-	writeFile(t, dir, "category.esq", "entity Category {\n  name string\n}\n")
+	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category -> Category\n}\n")
+	writeFile(t, dir, "category.esq", "package catalog\n\nentity Category {\n  name string\n}\n")
 
 	code, out, errOut := check(t, dir)
 	if code != 0 || out != "ok: app shop (3 files, 2 entities, 0 enums, 1 blueprint)\n" {
@@ -66,13 +68,13 @@ func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
-	writeFile(t, dir, "catalog.esq", "entity Product {\n  name strng\n}\n")
+	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name strng\n}\n")
 
 	code, out, errOut := check(t)
 	if code != 1 || out != "" {
 		t.Fatalf("exit %d, stdout %q", code, out)
 	}
-	for _, want := range []string{`catalog.esq:2:8: error: unknown type "strng"`, `2 | `, `did you mean "string"?`, "1 error"} {
+	for _, want := range []string{`catalog.esq:4:8: error: unknown type "strng"`, `4 | `, `did you mean "string"?`, "1 error"} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr missing %q:\n%s", want, errOut)
 		}
@@ -120,7 +122,9 @@ func TestCheckBadArguments(t *testing.T) {
 func TestCheckValidatesBlueprints(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", `app shop {
+	writeFile(t, dir, "shop.esq", `package catalog
+
+app shop {
   module "github.com/example/shop"
   blueprint postgres {
     pool_max "ten"

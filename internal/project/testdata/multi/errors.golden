@@ -1,17 +1,29 @@
-b.esq:1:5: error: only one app block is allowed; the first one is at a.esq:1
+b.esq:3:5: error: only one app block is allowed; the first one is at a.esq:3
   |
-1 | app other {
+3 | app other {
   |     ^^^^^
 
-b.esq:5:8: error: Product is already declared at a.esq:6
+b.esq:7:8: error: Product is already declared at a.esq:8
   |
-5 | entity Product {
+7 | entity Product {
   |        ^^^^^^^
 
-b.esq:10:3: error: the inverse of Order.buyer would be Customer.orders, which clashes with field orders (line 14)
+b.esq:12:3: error: the inverse of Order.buyer would be Customer.orders, which clashes with field orders (line 16)
    |
-10 |   buyer -> Customer
+12 |   buyer -> Customer
    |   ^^^^^
    = help: name the inverse yourself, e.g. inverse(orders_list)
 
-3 errors
+c.esq:1:9: warning: module models names a technical layer, not a part of the domain
+  |
+1 | package models
+  |         ^^^^^^
+  = help: name the part of the domain it covers, e.g. catalog, orders, billing
+
+c.esq:4:9: error: enum Color belongs to module catalog; an enum is used only inside its own module
+  |
+4 |   color Color
+  |         ^^^^^
+  = help: declare the enum in module models too, with the values this module needs
+
+4 errors, 1 warning

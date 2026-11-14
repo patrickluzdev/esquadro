@@ -1,3 +1,5 @@
+package catalog
+
 entity Tag {
   name string
 }

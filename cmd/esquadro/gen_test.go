@@ -22,7 +22,9 @@ func demoProject(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	write("shop.esq", `app shop {
+	write("shop.esq", `package catalog
+
+app shop {
   module "github.com/example/shop"
   blueprint "./blueprints/demo"
 }

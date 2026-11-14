@@ -6,6 +6,7 @@ package project
 // names written in the .esq files.
 type Description struct {
 	App      AppDescription      `json:"app"`
+	Modules  []Names             `json:"modules"`
 	Enums    []EnumDescription   `json:"enums"`
 	Entities []EntityDescription `json:"entities"`
 }
@@ -20,12 +21,14 @@ type AppDescription struct {
 // EnumDescription describes an enum.
 type EnumDescription struct {
 	Names
+	Module string  `json:"module"`
 	Values []Names `json:"values"`
 }
 
 // EntityDescription describes an entity.
 type EntityDescription struct {
 	Names
+	Module    string                `json:"module"`
 	Plural    Names                 `json:"plural"`
 	Fields    []FieldDescription    `json:"fields"`
 	Relations []RelationDescription `json:"relations"`
@@ -64,11 +67,15 @@ type RelationDescription struct {
 func (p *Project) Describe() Description {
 	d := Description{
 		App:      AppDescription{Names: p.App.Names, Module: p.App.Module, Ann: p.App.Ann},
+		Modules:  []Names{},
 		Enums:    []EnumDescription{},
 		Entities: []EntityDescription{},
 	}
+	for _, m := range p.Modules {
+		d.Modules = append(d.Modules, m.Names)
+	}
 	for _, e := range p.Enums {
-		ed := EnumDescription{Names: e.Names, Values: []Names{}}
+		ed := EnumDescription{Names: e.Names, Module: moduleName(e.Module), Values: []Names{}}
 		for _, v := range e.Values {
 			ed.Values = append(ed.Values, v.Names)
 		}
@@ -76,7 +83,7 @@ func (p *Project) Describe() Description {
 	}
 	for _, e := range p.Entities {
 		ed := EntityDescription{
-			Names: e.Names, Plural: e.Plural, Ann: e.Ann,
+			Names: e.Names, Module: moduleName(e.Module), Plural: e.Plural, Ann: e.Ann,
 			Fields: []FieldDescription{}, Relations: []RelationDescription{},
 		}
 		for _, f := range e.Fields {
@@ -110,4 +117,11 @@ func (p *Project) Describe() Description {
 		d.Entities = append(d.Entities, ed)
 	}
 	return d
+}
+
+func moduleName(m *Module) string {
+	if m == nil {
+		return ""
+	}
+	return m.Raw
 }

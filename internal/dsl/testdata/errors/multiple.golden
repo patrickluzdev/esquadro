@@ -8,7 +8,7 @@ multiple.esq:4:17: error: expected a value in min(...) (string, number, true/fal
 4 |   stock int min(
   |                 ^
 
-multiple.esq:7:1: error: expected app, enum, entity or blueprint, found name "entiy"
+multiple.esq:7:1: error: expected package, app, enum, entity or blueprint, found name "entiy"
   |
 7 | entiy Customer {
   | ^^^^^

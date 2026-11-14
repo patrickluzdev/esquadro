@@ -1,0 +1,7 @@
+badmodule.esq:1:9: error: module name "Catalog_Items" must be lower case letters and digits, like a Go package
+  |
+1 | package Catalog_Items
+  |         ^^^^^^^^^^^^^
+  = help: e.g. package catalogitems
+
+1 error

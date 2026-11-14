@@ -1,3 +1,5 @@
+package catalog
+
 entity Product {
   name     string  required @postgres(column product_name)
   price    decimal required @stripe(amount)

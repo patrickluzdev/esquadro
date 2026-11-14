@@ -292,6 +292,14 @@ type HookItem struct {
 }
 
 func (*BlueprintDecl) declNode() {}
+func (*PackageDecl) declNode()   {}
+
+// PackageDecl is "package <name>": the module the file's entities and enums
+// belong to.
+type PackageDecl struct {
+	Name Ident
+	Span
+}
 
 func (*VersionItem) manifestItemNode()    {}
 func (*DependsItem) manifestItemNode()    {}

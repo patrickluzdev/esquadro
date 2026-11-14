@@ -1,65 +1,65 @@
-names.esq:6:6: error: enum Empty has no values
+names.esq:8:6: error: enum Empty has no values
   |
-6 | enum Empty { }
+8 | enum Empty { }
   |      ^^^^^
 
-names.esq:7:18: error: red and RED (line 7) would get the same generated name "red"
+names.esq:9:18: error: red and RED (line 9) would get the same generated name "red"
   |
-7 | enum Color { RED red Red BLUE }
+9 | enum Color { RED red Red BLUE }
   |                  ^^^
 
-names.esq:7:22: error: Red and RED (line 7) would get the same generated name "red"
+names.esq:9:22: error: Red and RED (line 9) would get the same generated name "red"
   |
-7 | enum Color { RED red Red BLUE }
+9 | enum Color { RED red Red BLUE }
   |                      ^^^
 
-names.esq:9:8: error: "string" is a built-in type and cannot be used as a name
-  |
-9 | entity string {
-  |        ^^^^^^
-
-names.esq:13:17: error: unknown entity option "size"
+names.esq:11:8: error: "string" is a built-in type and cannot be used as a name
    |
-13 | entity Product (size "big") {
+11 | entity string {
+   |        ^^^^^^
+
+names.esq:15:17: error: unknown entity option "size"
+   |
+15 | entity Product (size "big") {
    |                 ^^^^
 
-names.esq:14:3: error: id is added to every entity automatically
+names.esq:16:3: error: id is added to every entity automatically
    |
-14 |   id        uuid
+16 |   id        uuid
    |   ^^
    = help: remove this field
 
-names.esq:16:3: error: fields full_name and fullName (line 15) would get the same generated name "full_name"
+names.esq:18:3: error: fields full_name and fullName (line 17) would get the same generated name "full_name"
    |
-16 |   full_name string
+18 |   full_name string
    |   ^^^^^^^^^
 
-names.esq:17:3: error: "preço" must use ASCII letters, digits and underscores only
+names.esq:19:3: error: "preço" must use ASCII letters, digits and underscores only
    |
-17 |   preço     decimal
+19 |   preço     decimal
    |   ^^^^^
    = help: names become Go identifiers, SQL columns and file paths
 
-names.esq:18:3: error: field category_id clashes with the foreign key column category_id of relation category
+names.esq:20:3: error: field category_id clashes with the foreign key column category_id of relation category
    |
-18 |   category_id uuid
+20 |   category_id uuid
    |   ^^^^^^^^^^^
    = help: remove it: the relation already stores the key
 
-names.esq:19:3: error: the inverse of Product.category would be Category.products, which clashes with field products (line 27)
+names.esq:21:3: error: the inverse of Product.category would be Category.products, which clashes with field products (line 29)
    |
-19 |   category  -> Category
+21 |   category  -> Category
    |   ^^^^^^^^
    = help: name the inverse yourself, e.g. inverse(products_list)
 
-names.esq:22:8: error: Product is already declared at line 13
+names.esq:24:8: error: Product is already declared at line 15
    |
-22 | entity Product {
+24 | entity Product {
    |        ^^^^^^^
 
-names.esq:34:8: error: Human and Person (line 30) have the same plural "people"
+names.esq:36:8: error: Human and Person (line 32) have the same plural "people"
    |
-34 | entity Human (plural "people") {
+36 | entity Human (plural "people") {
    |        ^^^^^
    = help: set a different plural with (plural "...")
 

@@ -1,3 +1,5 @@
+package orders
+
 entity Order {
   number string required
   status OrderStatus default(OPEN)

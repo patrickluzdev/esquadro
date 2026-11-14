@@ -1,0 +1,5 @@
+entity A {
+  x int
+}
+
+package late

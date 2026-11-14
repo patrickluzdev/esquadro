@@ -1,0 +1,6 @@
+reservedmodule.esq:1:9: error: platform is reserved and cannot be a module name
+  |
+1 | package platform
+  |         ^^^^^^^^
+
+1 error

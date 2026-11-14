@@ -58,7 +58,7 @@ func newFixture(t *testing.T, manifestHooks string, scripts map[string]string) *
 		t.Skip("hook scripts are POSIX shell")
 	}
 	f := &fixture{t: t, dir: t.TempDir()}
-	f.write("shop.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint \"./bp/demo\"\n}\n\nentity Product {\n  name string\n}\n", 0o644)
+	f.write("shop.esq", "package catalog\n\napp shop {\n  module \"github.com/example/shop\"\n  blueprint \"./bp/demo\"\n}\n\nentity Product {\n  name string\n}\n", 0o644)
 	f.write("bp/demo/blueprint.esq", "blueprint demo {\n  version \"0.1.0\"\n"+manifestHooks+"}\n", 0o644)
 	f.write("bp/demo/templates/catalog/{{.Entity.Snake}}.txt.tmpl", "{{.Entity.Pascal}}\n", 0o644)
 	for name, body := range scripts {

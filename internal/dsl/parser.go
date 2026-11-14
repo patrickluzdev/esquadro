@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	topKeywords      = []string{"app", "enum", "entity", "blueprint"}
+	topKeywords      = []string{"package", "app", "enum", "entity", "blueprint"}
 	appSettings      = []string{"module", "blueprint"}
 	manifestSettings = []string{"version", "requires", "after", "option", "annotation", "slot", "go_require", "hook"}
 )
@@ -41,12 +41,14 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 				d = p.parseEntity()
 			case "blueprint":
 				d = p.parseBlueprint()
+			case "package":
+				d = p.parsePackage(f)
 			}
 		}
 		if d == nil {
 			// A failed app/enum/entity has already reported and resynced.
 			if t.Kind != Name || !isTopKeyword(t.Text) {
-				e := p.errorf(t, "expected app, enum, entity or blueprint, found %s", t.describe())
+				e := p.errorf(t, "expected package, app, enum, entity or blueprint, found %s", t.describe())
 				if t.Kind == Name {
 					e.Suggestion = didYouMean(t.Text, topKeywords)
 				}
@@ -825,4 +827,29 @@ func (p *parser) parsePlainModifiers(mods *[]*Modifier) bool {
 		return false
 	}
 	return true
+}
+
+// parsePackage parses "package <name>", which must come before every other
+// declaration of the file.
+func (p *parser) parsePackage(f *File) Decl {
+	p.dropDoc()
+	start := p.advance() // "package"
+	name, ok := p.expectIdent("module name after package")
+	if !ok {
+		p.syncLine()
+		return nil
+	}
+	d := &PackageDecl{Name: name, Pos: start.Pos, End: name.End}
+	for _, prev := range f.Decls {
+		if prevPkg, ok := prev.(*PackageDecl); ok {
+			p.diags.Errorf(start.Pos, name.End, "package is already declared at line %d", prevPkg.Pos.Line)
+			return nil
+		}
+	}
+	if len(f.Decls) > 0 {
+		p.diags.Errorf(start.Pos, name.End, "package must come before every other declaration of the file").
+			Suggestion = "move this line to the top of the file"
+		return nil
+	}
+	return d
 }

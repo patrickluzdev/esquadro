@@ -45,6 +45,8 @@ func Dump(f *File) string {
 				w(1, "value %s", v.Name.Name)
 				docs(2, v.Doc)
 			}
+		case *PackageDecl:
+			w(0, "package %s @%s", d.Name.Name, pos(d.Span))
 		case *BlueprintDecl:
 			w(0, "blueprint %s @%s", d.Name.Name, pos(d.Span))
 			docs(1, d.Doc)

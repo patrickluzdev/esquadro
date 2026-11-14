@@ -1,3 +1,5 @@
+package catalog
+
 app shop {
   module "has spaces/x"
   blueprint platform

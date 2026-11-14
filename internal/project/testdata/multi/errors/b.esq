@@ -1,3 +1,5 @@
+package catalog
+
 app other {
   module "github.com/example/other"
 }

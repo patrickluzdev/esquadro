@@ -1,3 +1,5 @@
+package catalog
+
 app shop {
   module "github.com/example/shop"
   blueprint platform
@@ -6,3 +8,5 @@ app shop {
 entity Product {
   name string
 }
+
+enum Color { RED }

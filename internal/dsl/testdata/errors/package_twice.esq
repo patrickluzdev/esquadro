@@ -1,0 +1,7 @@
+package a
+package b
+
+entity A {
+  x int
+}
+package
