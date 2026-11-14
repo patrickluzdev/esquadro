@@ -20,7 +20,7 @@ func TestRunUnknownCommand(t *testing.T) {
 	if code := run([]string{"nope"}, &out, &errOut); code != 2 {
 		t.Fatalf("expected exit 2, got %d", code)
 	}
-	if !strings.Contains(errOut.String(), `comando desconhecido "nope"`) {
+	if !strings.Contains(errOut.String(), `unknown command "nope"`) {
 		t.Fatalf("unexpected stderr %q", errOut.String())
 	}
 }

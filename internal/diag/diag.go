@@ -45,9 +45,9 @@ const (
 
 func (s Severity) String() string {
 	if s == Warning {
-		return "aviso"
+		return "warning"
 	}
-	return "erro"
+	return "error"
 }
 
 // Diagnostic is a single problem found in a source file.
@@ -142,11 +142,11 @@ func Render(w io.Writer, l List, src SourceFunc) {
 	}
 	switch {
 	case nerr > 0 && nwarn > 0:
-		fmt.Fprintf(w, "%s, %s\n", plural(nerr, "erro", "erros"), plural(nwarn, "aviso", "avisos"))
+		fmt.Fprintf(w, "%s, %s\n", plural(nerr, "error", "errors"), plural(nwarn, "warning", "warnings"))
 	case nerr > 0:
-		fmt.Fprintln(w, plural(nerr, "erro", "erros"))
+		fmt.Fprintln(w, plural(nerr, "error", "errors"))
 	case nwarn > 0:
-		fmt.Fprintln(w, plural(nwarn, "aviso", "avisos"))
+		fmt.Fprintln(w, plural(nwarn, "warning", "warnings"))
 	}
 }
 
@@ -160,11 +160,11 @@ func plural(n int, one, many string) string {
 // RenderOne writes a single diagnostic. src is the full contents of the file
 // the diagnostic points to; when nil, only the header line is written.
 //
-//	loja.esq:12:16: erro: entidade "Categria" não existe
+//	shop.esq:12:15: error: unknown entity "Categry"
 //	   |
-//	12 |   categoria -> Categria (nome)
-//	   |                ^^^^^^^^
-//	   = sugestão: você quis dizer "Categoria"?
+//	12 |   category -> Categry (name)
+//	   |               ^^^^^^^
+//	   = help: did you mean "Category"?
 func RenderOne(w io.Writer, d Diagnostic, src []byte) {
 	fmt.Fprintf(w, "%s: %s: %s\n", d.Pos, d.Severity, d.Message)
 	line, ok := lineAt(src, d.Pos.Line)
@@ -181,7 +181,7 @@ func RenderOne(w io.Writer, d Diagnostic, src []byte) {
 		fmt.Fprintf(w, "%s | %s%s\n", gutter, strings.Repeat(" ", caretAt), strings.Repeat("^", width))
 	}
 	if d.Suggestion != "" {
-		fmt.Fprintf(w, "%s = sugestão: %s\n", gutter, d.Suggestion)
+		fmt.Fprintf(w, "%s = help: %s\n", gutter, d.Suggestion)
 	}
 }
 

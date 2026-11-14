@@ -1,35 +1,34 @@
 # Esquadro
 
-Gerador de projetos Go inspirado no JHipster. Você descreve o sistema num
-arquivo `.esq` (entidades, campos, relações) e escolhe as **plantas** (plugins
-de templates). O `esquadro gen` gera um projeto Go completo, que pode ser
-regenerado sempre que o modelo mudar.
+A Go project generator inspired by JHipster. You describe your system in a
+`.esq` file (entities, fields, relationships) and pick a set of **blueprints**
+(template plugins). `esquadro gen` generates a complete Go project, and you can
+regenerate it whenever the model changes.
 
 ```
-app loja {
-  module "github.com/exemplo/loja"
-  lang pt
+app shop {
+  module "github.com/example/shop"
 
-  planta base
-  planta postgres
+  blueprint base
+  blueprint postgres
 }
 
-entity Produto {
-  nome      string  required min(3)
-  preco     decimal required min(0)
-  categoria -> Categoria (nome)
+entity Product {
+  name     string  required min(3)
+  price    decimal required min(0)
+  category -> Category (name)
 }
 ```
 
-> Em desenvolvimento. Ainda não está pronto para uso.
+> Work in progress. Not ready for use yet.
 
-## Desenvolvimento
+## Development
 
-Requer Go e [Task](https://taskfile.dev).
+Requires Go and [Task](https://taskfile.dev).
 
 ```
-task test       # testes
+task test       # run tests
 task lint       # gofmt + go vet
-task build      # binário em bin/esquadro
+task build      # binary in bin/esquadro
 task run -- version
 ```

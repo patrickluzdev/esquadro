@@ -1,5 +1,5 @@
 // Command esquadro generates Go projects from a .esq model and a set of
-// plantas (template plugins).
+// blueprints (template plugins).
 package main
 
 import (
@@ -18,7 +18,7 @@ type command struct {
 
 func commands() []command {
 	return []command{
-		{"version", "mostra a versão do esquadro", runVersion},
+		{"version", "print the esquadro version", runVersion},
 	}
 }
 
@@ -36,15 +36,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return c.run(args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintf(stderr, "esquadro: comando desconhecido %q\n\n", args[0])
+	fmt.Fprintf(stderr, "esquadro: unknown command %q\n\n", args[0])
 	usage(stderr)
 	return 2
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, "Uso: esquadro <comando> [argumentos]")
+	fmt.Fprintln(w, "Usage: esquadro <command> [arguments]")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Comandos:")
+	fmt.Fprintln(w, "Commands:")
 	for _, c := range commands() {
 		fmt.Fprintf(w, "  %-10s %s\n", c.name, c.short)
 	}
