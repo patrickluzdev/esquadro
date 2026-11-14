@@ -1,0 +1,98 @@
+{{- if .Entities -}}
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+
+	ht "github.com/ogen-go/ogen/http"
+	"github.com/ogen-go/ogen/ogenerrors"
+
+	"{{.App.Module}}/internal/apigen"
+	"{{.App.Module}}/internal/platform/edge"
+{{- range .Modules}}{{if .Entities}}
+	"{{$.App.Module}}/internal/{{.Snake}}"
+{{- end}}{{end}}
+)
+
+// Each module's HTTP part, under a name of its own so they can be embedded
+// together.
+type (
+{{- range .Modules}}{{if .Entities}}
+	{{.Camel}}Operations = {{.Snake}}.HTTP
+{{- end}}{{end}}
+)
+
+// api is every operation of the contract: the HTTP part of each module.
+type api struct {
+{{- range .Modules}}{{if .Entities}}
+	{{.Camel}}Operations
+{{- end}}{{end}}
+	logger *slog.Logger
+}
+
+// newAPI builds the handler of the contract's operations, mounted at
+// /api/v1.
+func newAPI(d dependencies) (http.Handler, error) {
+	a := api{
+{{- range .Modules}}{{if .Entities}}
+		{{.Camel}}Operations: {{.Snake}}.NewHTTP(d.{{.Camel}}),
+{{- end}}{{end}}
+		logger: d.logger,
+	}
+	// Requests ogen cannot decode are answered as Problem Details too.
+	return apigen.NewServer(a, apigen.WithErrorHandler(func(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
+		p := a.NewError(ctx, err)
+		body, mErr := p.Response.MarshalJSON()
+		if mErr != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(p.StatusCode)
+		_, _ = w.Write(body)
+	}))
+}
+
+// NewError answers every error as Problem Details; anything that is not a
+// known problem is logged and answered as internal.
+func (a api) NewError(ctx context.Context, err error) *apigen.ProblemStatusCode {
+	p := problemOf(err)
+	if p == edge.ErrInternal {
+		a.logger.ErrorContext(ctx, "operation failed", slog.Any("error", err))
+	}
+	var fields []apigen.FieldProblem
+	for _, f := range p.Errors {
+		fields = append(fields, apigen.FieldProblem{Field: f.Field, Code: f.Code})
+	}
+	return &apigen.ProblemStatusCode{
+		StatusCode: p.Status,
+		Response: apigen.Problem{
+			Type:   "about:blank",
+			Title:  p.Title,
+			Status: int32(p.Status),
+			Code:   p.Code,
+			Errors: fields,
+		},
+	}
+}
+
+// problemOf finds the problem behind an error of an operation or of ogen.
+func problemOf(err error) *edge.Problem {
+	if p, ok := errors.AsType[*edge.Problem](err); ok {
+		return p
+	}
+	if _, ok := errors.AsType[*ogenerrors.DecodeParamsError](err); ok {
+		return edge.ErrInvalidRequest
+	}
+	if _, ok := errors.AsType[*ogenerrors.DecodeRequestError](err); ok {
+		return edge.ErrInvalidRequest
+	}
+	if errors.Is(err, ht.ErrNotImplemented) {
+		return edge.ErrNotImplemented
+	}
+	return edge.ErrInternal
+}
+{{end -}}

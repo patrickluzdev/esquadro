@@ -136,7 +136,7 @@ func sortedMap(m map[string]any) string {
 func TestBuiltinBlueprintsAreValid(t *testing.T) {
 	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook}
 	names := l.BuiltinNames()
-	if strings.Join(names, " ") != "platform postgres" {
+	if strings.Join(names, " ") != "api platform postgres" {
 		t.Fatalf("built-in blueprints = %v", names)
 	}
 	for _, name := range names {

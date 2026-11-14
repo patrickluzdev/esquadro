@@ -1,0 +1,239 @@
+{{- $m := .Module}}{{$p := $m.Snake -}}
+{{- if $m.Entities -}}
+package {{$p}}
+
+{{importBlock "context" "errors" "slices" (and (needsType $m "decimal") "github.com/shopspring/decimal") "github.com/google/uuid" (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module)}}
+// HTTP exposes the {{$p}} module's use cases as the API's operations. It only
+// translates between the contract and the module; the rules live in the
+// module.
+type HTTP struct{ {{$p}} *{{$m.Pascal}} }
+
+// NewHTTP returns the API's operations on m.
+func NewHTTP(m *{{$m.Pascal}}) HTTP { return HTTP{ {{$p}}: m} }
+{{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
+
+func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.{{$P}}, error) {
+	n, unread := new{{$P}}Of(req)
+	if unread != nil {
+		return nil, problemOf(refuse{{$P}}(n, unread))
+	}
+	created, err := h.{{$p}}.Create{{$P}}(ctx, n)
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	answer := {{.Camel}}Answer(created)
+	return &answer, nil
+}
+
+func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*apigen.{{$P}}, error) {
+	found, err := h.{{$p}}.Read{{$P}}(ctx, params.{{$id}}.String())
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	answer := {{.Camel}}Answer(found)
+	return &answer, nil
+}
+
+func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
+	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, params.After.Or(""), params.Limit.Or(25))
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	answer := apigen.{{$P}}Page{Items: make([]apigen.{{$P}}, 0, len(page.{{.Plural.Pascal}}))}
+	for _, listed := range page.{{.Plural.Pascal}} {
+		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
+	}
+	if page.Next != "" {
+		answer.Next = apigen.NewOptString(page.Next)
+	}
+	return &answer, nil
+}
+
+func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params apigen.Update{{$P}}Params) (*apigen.{{$P}}, error) {
+	n, unread := new{{$P}}Of(req)
+	if unread != nil {
+		return nil, problemOf(refuse{{$P}}(n, unread))
+	}
+	updated, err := h.{{$p}}.Update{{$P}}(ctx, params.{{$id}}.String(), n)
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	answer := {{.Camel}}Answer(updated)
+	return &answer, nil
+}
+
+func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
+	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, params.{{$id}}.String()))
+}
+
+// new{{$P}}Of reads a New{{$P}} as the contract writes it, with the fields
+// it could not read (a decimal that is no number), if any.
+func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
+	var n New{{$P}}
+	var invalid []FieldError
+{{- range inRequest $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "n.%s" .Pascal}}
+{{- if .Required}}
+{{- if eq .Type "decimal"}}
+	if d, err := decimal.NewFromString(req.{{$g}}); err == nil {
+		{{$x}} = d
+	} else {
+		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+	}
+{{- else if eq .Type "uuid"}}
+	{{$x}} = req.{{$g}}.String()
+{{- else if eq .Type "json"}}
+	{{$x}} = []byte(req.{{$g}})
+{{- else if eq .Type "enum"}}
+	{{$x}} = {{.Enum.Pascal}}(req.{{$g}})
+{{- else}}
+	{{$x}} = req.{{$g}}
+{{- end}}
+{{- else}}
+{{- if eq .Type "json"}}
+	{{$x}} = []byte(req.{{$g}})
+{{- else}}
+	if v, ok := req.{{$g}}.Get(); ok {
+{{- if eq .Type "decimal"}}
+		if d, err := decimal.NewFromString(v); err == nil {
+			{{$x}} = d
+		} else {
+			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+		}
+{{- else if eq .Type "uuid"}}
+		{{$x}} = v.String()
+{{- else if eq .Type "enum"}}
+		{{$x}} = {{.Enum.Pascal}}(v)
+{{- else}}
+		{{$x}} = v
+{{- end}}
+	}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- range keys $e}}{{$g := ogenName (printf "%sId" .Camel)}}
+{{- if .Required}}
+	n.{{.Pascal}}ID = req.{{$g}}.String()
+{{- else}}
+	if v, ok := req.{{$g}}.Get(); ok {
+		n.{{.Pascal}}ID = v.String()
+	}
+{{- end}}
+{{- end}}
+	return n, invalid
+}
+
+// refuse{{$P}} joins the fields the contract could not read with those the
+// domain refuses, so a client learns every problem at once.
+func refuse{{$P}}(n New{{$P}}, unread []FieldError) error {
+	all := unread
+	if invalid, ok := errors.AsType[*InvalidFields](n.WithDefaults().Validate()); ok {
+		for _, f := range invalid.Fields {
+			if !slices.ContainsFunc(all, func(u FieldError) bool { return u.Field == f.Field }) {
+				all = append(all, f)
+			}
+		}
+	}
+	return &InvalidFields{Fields: all}
+}
+
+// {{.Camel}}Answer writes a {{$P}} as the contract does.
+func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
+	a := apigen.{{$P}}{
+		ID:        uuid.MustParse(x.ID),
+		CreatedAt: x.CreatedAt,
+		UpdatedAt: x.UpdatedAt,
+{{- range inRequest $e}}{{if .Required}}{{$g := ogenName (jsonName .)}}
+{{- if eq .Type "decimal"}}
+		{{$g}}: x.{{.Pascal}}.String(),
+{{- else if eq .Type "uuid"}}
+		{{$g}}: uuid.MustParse(x.{{.Pascal}}),
+{{- else if eq .Type "json"}}
+		{{$g}}: jx.Raw(x.{{.Pascal}}),
+{{- else if eq .Type "enum"}}
+		{{$g}}: apigen.{{enumName .Enum}}(x.{{.Pascal}}),
+{{- else}}
+		{{$g}}: x.{{.Pascal}},
+{{- end}}
+{{- end}}{{end}}
+{{- range keys $e}}{{if .Required}}
+		{{ogenName (printf "%sId" .Camel)}}: uuid.MustParse(x.{{.Pascal}}ID),
+{{- end}}{{end}}
+	}
+{{- range inRequest $e}}{{if not .Required}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}
+{{- if or (eq .Type "string") (eq .Type "text")}}
+	if {{$x}} != "" {
+		a.{{$g}} = apigen.NewOptString({{$x}})
+	}
+{{- else if eq .Type "int"}}
+	a.{{$g}} = apigen.NewOptInt({{$x}})
+{{- else if eq .Type "int64"}}
+	a.{{$g}} = apigen.NewOptInt64({{$x}})
+{{- else if eq .Type "bool"}}
+	a.{{$g}} = apigen.NewOptBool({{$x}})
+{{- else if eq .Type "decimal"}}
+	a.{{$g}} = apigen.NewOptString({{$x}}.String())
+{{- else if eq .Type "time"}}
+	if !{{$x}}.IsZero() {
+		a.{{$g}} = apigen.NewOptDateTime({{$x}})
+	}
+{{- else if eq .Type "date"}}
+	if !{{$x}}.IsZero() {
+		a.{{$g}} = apigen.NewOptDate({{$x}})
+	}
+{{- else if eq .Type "uuid"}}
+	if {{$x}} != "" {
+		a.{{$g}} = apigen.NewOptUUID(uuid.MustParse({{$x}}))
+	}
+{{- else if eq .Type "json"}}
+	if len({{$x}}) > 0 {
+		a.{{$g}} = jx.Raw({{$x}})
+	}
+{{- else if eq .Type "enum"}}
+	if {{$x}} != "" {
+		a.{{$g}} = apigen.NewOpt{{enumName .Enum}}(apigen.{{enumName .Enum}}({{$x}}))
+	}
+{{- end}}
+{{- end}}{{end}}
+{{- range keys $e}}{{if not .Required}}
+	if x.{{.Pascal}}ID != "" {
+		a.{{ogenName (printf "%sId" .Camel)}} = apigen.NewOptUUID(uuid.MustParse(x.{{.Pascal}}ID))
+	}
+{{- end}}{{end}}
+	return a
+}
+{{- end}}
+
+// apiFields names, as the contract does, the fields the module refuses.
+var apiFields = map[string]string{
+{{- range apiFieldNames $m}}
+	{{quote .Domain}}: {{quote .API}},
+{{- end}}
+}
+
+// problemOf turns the module's errors into the problems the API answers
+// with; other errors pass through.
+func problemOf(err error) error {
+	switch {
+	case err == nil:
+		return nil
+{{- range $m.Entities}}
+	case errors.Is(err, Err{{.Pascal}}NotFound):
+		return edge.NotFound({{quote (printf "No such %s." (lower .Label))}})
+	case errors.Is(err, Err{{.Pascal}}InUse):
+		return edge.Conflict("in_use", {{quote (printf "Other records still point at the %s." (lower .Label))}})
+{{- end}}
+	}
+	if invalid, ok := errors.AsType[*InvalidFields](err); ok {
+		fields := make([]edge.FieldProblem, 0, len(invalid.Fields))
+		for _, f := range invalid.Fields {
+			name := f.Field
+			if api, ok := apiFields[name]; ok {
+				name = api
+			}
+			fields = append(fields, edge.FieldProblem{Field: name, Code: f.Code})
+		}
+		return edge.InvalidFields(fields)
+	}
+	return err
+}
+{{end -}}

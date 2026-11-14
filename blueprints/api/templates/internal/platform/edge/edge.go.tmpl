@@ -1,0 +1,38 @@
+{{- if .Entities -}}
+// Package edge is the boundary of the API: the problems an operation answers
+// with, as Problem Details, without knowing the contract's generated types.
+package edge
+
+// Problem is an error an operation answers with.
+type Problem struct {
+	Status int
+	Code   string
+	Title  string
+	Errors []FieldProblem
+}
+
+// FieldProblem is one field refused, named as in the contract.
+type FieldProblem struct{ Field, Code string }
+
+func (p *Problem) Error() string { return p.Code + ": " + p.Title }
+
+var (
+	// ErrInvalidRequest is a request that does not match the contract.
+	ErrInvalidRequest = &Problem{Status: 400, Code: "invalid_request", Title: "The request does not match the API's contract."}
+	// ErrNotImplemented is an operation of the contract nobody implemented.
+	ErrNotImplemented = &Problem{Status: 501, Code: "not_implemented", Title: "The operation is not implemented."}
+	// ErrInternal is anything else, logged on the server.
+	ErrInternal = &Problem{Status: 500, Code: "internal", Title: "Something went wrong on our side."}
+)
+
+// NotFound is a record that does not exist.
+func NotFound(title string) *Problem { return &Problem{Status: 404, Code: "not_found", Title: title} }
+
+// Conflict is a request the current state of the records refuses.
+func Conflict(code, title string) *Problem { return &Problem{Status: 409, Code: code, Title: title} }
+
+// InvalidFields lists every field refused at once.
+func InvalidFields(fields []FieldProblem) *Problem {
+	return &Problem{Status: 422, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
+}
+{{end -}}

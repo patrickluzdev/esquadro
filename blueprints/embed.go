@@ -9,4 +9,5 @@ import "embed"
 //
 //go:embed platform/blueprint.esq all:platform/templates
 //go:embed postgres/blueprint.esq all:postgres/templates postgres/slots
+//go:embed api/blueprint.esq all:api/templates api/slots
 var FS embed.FS

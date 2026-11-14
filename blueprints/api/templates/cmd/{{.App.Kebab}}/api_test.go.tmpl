@@ -1,0 +1,84 @@
+{{- if .Entities -}}
+package main
+
+{{importBlock "context" "errors" "log/slog" "net/http/httptest" "testing" (apiSampleImports .Entities) (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+// newTestClient serves the API on a database of its own and returns ogen's
+// client for it, so tests go through the whole contract: JSON, decoding,
+// the module, Postgres and back.
+func newTestClient(t *testing.T) *apigen.Client {
+	t.Helper()
+	pool := postgrestest.Fresh(t)
+	d := dependencies{logger: slog.New(slog.DiscardHandler), pool: pool}
+{{- range .Modules}}{{if .Entities}}
+	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{Pool: pool})
+{{- end}}{{end}}
+	h, err := newAPI(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	c, err := apigen.NewClient(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+{{- range .Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
+{{- if canSampleAPI $e}}
+
+// givenAPI{{$P}} returns a valid request for a {{lower .Label}} with its required
+// fields, creating the records it needs first; i tells records apart.
+func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.Client, i int) *apigen.New{{$P}} {
+	t.Helper()
+{{- range apiParents $e}}
+	{{.Camel}}, err := c.Create{{.Target.Pascal}}(context.Background(), givenAPI{{.Target.Pascal}}(t, c, i))
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- end}}
+	return &apigen.New{{$P}}{
+{{- range inRequest $e}}{{if .Required}}
+		{{ogenName (jsonName .)}}: {{apiSample . "i"}},
+{{- end}}{{end}}
+{{- range keys $e}}{{if .Required}}
+{{- if eq .Target.Module $e.Module}}
+		{{ogenName (printf "%sId" .Camel)}}: {{.Camel}}.ID,
+{{- else}}
+		{{ogenName (printf "%sId" .Camel)}}: uuid.MustParse("00000000-0000-0000-0000-000000000001"), // another module: no foreign key
+{{- end}}
+{{- end}}{{end}}
+	}
+}
+
+func TestAPI{{.Plural.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := newTestClient(t)
+
+	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := c.Get{{$P}}(ctx, apigen.Get{{$P}}Params{ {{$id}}: created.ID })
+	if err != nil || read.ID != created.ID {
+		t.Fatalf("get: %+v, %v", read, err)
+	}
+	page, err := c.List{{.Plural.Pascal}}(ctx, apigen.List{{.Plural.Pascal}}Params{})
+	if err != nil || len(page.Items) != 1 || page.Items[0].ID != created.ID {
+		t.Fatalf("list: %+v, %v", page, err)
+	}
+	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID }); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if err := c.Delete{{$P}}(ctx, apigen.Delete{{$P}}Params{ {{$id}}: created.ID }); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	_, err = c.Get{{$P}}(ctx, apigen.Get{{$P}}Params{ {{$id}}: created.ID })
+	if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != 404 || p.Response.Code != "not_found" {
+		t.Fatalf("get after delete: %v", err)
+	}
+}
+{{- end}}
+{{- end}}
+{{end -}}

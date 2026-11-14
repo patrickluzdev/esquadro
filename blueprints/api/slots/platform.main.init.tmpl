@@ -1,0 +1,5 @@
+{{- if .Entities}}
+	if deps.api, err = newAPI(deps); err != nil {
+		return err
+	}
+{{- end}}

@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints"
+	"github.com/patrickluzdev/esquadro/blueprints/api"
 	"github.com/patrickluzdev/esquadro/blueprints/platform"
 	"github.com/patrickluzdev/esquadro/blueprints/postgres"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
@@ -19,11 +20,13 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("platform", "go-mod"):     platform.GoMod,
 	hook.Key("postgres", "migrations"): postgres.Migrations,
 	hook.Key("postgres", "sqlc"):       postgres.SQLC,
+	hook.Key("api", "ogen"):            api.Ogen,
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
 	"postgres": postgres.TemplateFuncs(),
+	"api":      api.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

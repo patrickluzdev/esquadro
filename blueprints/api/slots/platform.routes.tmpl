@@ -1,0 +1,3 @@
+{{- if .Entities}}
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", d.api))
+{{- end}}

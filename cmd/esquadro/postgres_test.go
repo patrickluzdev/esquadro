@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// TestPostgresGeneratesAWorkingService generates a project with the platform
-// and postgres blueprints, checks that it builds and passes go vet, applies
+// TestPostgresGeneratesAWorkingService generates a project with the platform,
+// postgres and api blueprints, checks that it builds and passes go vet, applies
 // its migrations with its own migrate command against a real Postgres, and
 // runs the tests esquadro generated for it. It needs Docker (for Postgres, and for sqlc when it is
 // not installed) and the network (Go modules); it is skipped with -short or
@@ -43,7 +43,7 @@ func TestPostgresGeneratesAWorkingService(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n  blueprint postgres\n}\n")
+	write("app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n  blueprint postgres\n  blueprint api\n}\n")
 	write("catalog.esq", `package catalog
 
 entity Category {
@@ -98,7 +98,10 @@ entity Product {
 
 	// The tests esquadro generates run every use case against their own
 	// Postgres (testcontainers).
-	if !strings.Contains(run(nil, "go", "test", "-v", "./..."), "--- PASS: TestCreateAndReadProduct") {
-		t.Fatal("the generated tests did not run")
+	tests := run(nil, "go", "test", "-v", "./...")
+	for _, want := range []string{"--- PASS: TestCreateAndReadProduct", "--- PASS: TestAPIProducts"} {
+		if !strings.Contains(tests, want) {
+			t.Fatalf("the generated tests did not run %s:\n%s", want, tests)
+		}
 	}
 }
