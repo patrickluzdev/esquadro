@@ -8,9 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/patrickluzdev/esquadro/blueprints"
-	"github.com/patrickluzdev/esquadro/internal/blueprint"
-	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -40,31 +37,13 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		dir = fs.Arg(0)
 	}
 
-	sources, err := readProject(dir)
-	if err != nil {
-		fmt.Fprintln(stderr, "esquadro check:", err)
+	l := loadProject("check", dir, stderr)
+	if l == nil {
 		return 1
 	}
-	p, diags := project.Load(sources...)
-	loader := &blueprint.Loader{Builtin: blueprints.FS, ProjectDir: dir}
-	if !diags.HasErrors() {
-		_, more := blueprint.Resolve(p, loader)
-		diags = append(diags, more...)
-		diags.Sort()
-	}
-	if len(diags) > 0 {
-		diag.Render(stderr, diags, func(name string) []byte {
-			if src := sourceFunc(sources)(name); src != nil {
-				return src
-			}
-			return loader.Source(name)
-		})
-	}
-	if diags.HasErrors() {
-		return 1
-	}
+	p := l.project
 	fmt.Fprintf(stdout, "ok: app %s (%s, %s, %s, %s)\n", p.App.Raw,
-		count(len(sources), "file", "files"),
+		count(len(l.sources), "file", "files"),
 		count(len(p.Entities), "entity", "entities"),
 		count(len(p.Enums), "enum", "enums"),
 		count(len(p.App.Blueprints), "blueprint", "blueprints"))
@@ -119,15 +98,4 @@ func readProject(dir string) ([]project.Source, error) {
 		sources = append(sources, project.Source{Name: f, Src: src})
 	}
 	return sources, nil
-}
-
-func sourceFunc(sources []project.Source) diag.SourceFunc {
-	return func(name string) []byte {
-		for _, s := range sources {
-			if s.Name == name {
-				return s.Src
-			}
-		}
-		return nil
-	}
 }

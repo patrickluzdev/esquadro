@@ -1,6 +1,6 @@
 === README.md  [extra: README.md.tmpl] replaced=core
 # Shop (with extra)
-=== cmd/shop/main.go  [core: cmd/{{.App.Kebab}}/main.go.tmpl] slot:extra.hooks<-third slot:core.routes<-extra,extra
+=== cmd/shop/main.go  [core: cmd/{{.App.Kebab}}/main.go.tmpl] slot:extra.hooks<-third slot:core.routes<-extra
 package main
 
 import "net/http"

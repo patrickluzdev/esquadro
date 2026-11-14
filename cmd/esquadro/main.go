@@ -18,8 +18,10 @@ type command struct {
 
 func commands() []command {
 	return []command{
-		{"check", "check a .esq file for errors", runCheck},
-		{"fmt", "format a .esq file", runFmt},
+		{"check", "check the project for errors", runCheck},
+		{"explain", "tell where a generated file came from", runExplain},
+		{"fmt", "format .esq files", runFmt},
+		{"gen", "generate the project", runGen},
 		{"version", "print the esquadro version", runVersion},
 	}
 }

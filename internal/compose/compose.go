@@ -364,7 +364,9 @@ func (c *composer) slot(name string, data Data) (string, error) {
 			continue
 		}
 		parts = append(parts, out)
-		use.Contributors = append(use.Contributors, ct.bp.Manifest.Name)
+		if !slices.Contains(use.Contributors, ct.bp.Manifest.Name) {
+			use.Contributors = append(use.Contributors, ct.bp.Manifest.Name)
+		}
 	}
 	if c.cur != nil && len(use.Contributors) > 0 {
 		c.cur.Slots = append(c.cur.Slots, use)
