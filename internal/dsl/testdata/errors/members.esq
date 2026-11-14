@@ -6,8 +6,8 @@ entity Product (plural "products" "x") {
 
 entity Order {
   "total" decimal
-  customer -> (name)
-  items <-> Item (name
+  customer > (name)
+  items <> Item (name
   @ (x)
   @admin(label "a" "b")
   status

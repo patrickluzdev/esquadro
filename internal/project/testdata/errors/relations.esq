@@ -1,0 +1,36 @@
+package catalog
+
+app shop {
+  module "github.com/example/shop"
+  blueprint platform
+}
+
+entity Category {
+  name     string
+  products < Product
+  featured < Product.highlight
+  owner    < Person required
+}
+
+entity Product {
+  name     string
+  category > Category on_delete(cascade)
+  main     > Category on_delete(explode)
+  backup   > Category required on_delete(set_null)
+  badge    > Badge unique
+  maker    > Maker inverse(products)
+  related  <> Product on_delete(cascade)
+  sibling  > Product.name
+}
+
+entity Badge {
+  code string
+}
+
+entity Maker {
+  name string
+}
+
+entity Person {
+  name string
+}

@@ -32,8 +32,8 @@ entity Product (plural "products") {
   price       decimal required min(0) // never negative
   status      Status  default(OPEN)
 
-  category -> Category (name) required
-  tags     <-> Tag
+  category > Category (name) required
+  tags     <> Tag
   sku      string pattern(`^[A-Z]{3}-\d+$`) @admin(label "SKU")
   // a standalone comment
   @postgres(index [name, status], table "products")

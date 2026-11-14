@@ -12,7 +12,7 @@ entity Product {
   status   string @platform(x)
   sku      string @postgres(colum sku)
   code     string @postgres(column)
-  category -> Category @postgres(column cat)
+  category > Category @postgres(column cat)
 
   @postgres(index [name, stauts])
 }

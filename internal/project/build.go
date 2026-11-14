@@ -72,8 +72,8 @@ type builder struct {
 	enums    map[string]*Enum
 	// entityDecls keeps declaration order for the relation pass.
 	entityDecls []*dsl.EntityDecl
-	// explicitInverse holds inverse(name) modifiers until inverses are built.
-	explicitInverse []pendingInverse
+	// oneToMany holds the "<" relations until they are paired.
+	oneToMany []pendingOneToMany
 	// modules by name, and the module of each entity and enum declaration.
 	modules  map[string]*Module
 	moduleOf map[dsl.Decl]*Module
@@ -187,6 +187,7 @@ func (b *builder) build() {
 		b.buildRelations(b.entities[d.Name.Name], d)
 	}
 	// Pass 3: inverse sides, then name clashes.
+	b.pairOneToMany()
 	b.inferInverses()
 	b.checkTypeNameClashes()
 	for _, e := range b.p.Entities {
@@ -652,13 +653,17 @@ func (b *builder) setDefault(f *Field, m *dsl.Modifier) {
 
 // ---- relations ----
 
-var relationModifiers = []string{"required", "unique", "inverse"}
+var (
+	relationModifiers = []string{"required", "on_delete"}
+	onDeleteActions   = []string{"cascade", "restrict", "set_null"}
+)
 
-// pendingInverse remembers an explicit inverse(name) until pass 3.
-type pendingInverse struct {
-	rel  *Relation
-	name *Names
-	span dsl.Span
+// pendingOneToMany remembers a "<" until every entity's relations are built,
+// so it can be paired with the ">" on the other side.
+type pendingOneToMany struct {
+	rel   *Relation
+	field *dsl.Ident // the relation named after "." on the target, if any
+	span  dsl.Span
 }
 
 func (b *builder) buildRelations(e *Entity, d *dsl.EntityDecl) {
@@ -698,9 +703,26 @@ func (b *builder) buildRelation(e *Entity, d *dsl.Relation) *Relation {
 		Names: b.names(d.Name), Doc: d.Doc, Entity: e, Target: target,
 		Annotations: d.Annotations, Pos: d.Pos,
 	}
-	if d.Kind == dsl.ManyToMany {
+	switch d.Kind {
+	case dsl.ManyToOne:
+		rel.Kind = ManyToOne
+	case dsl.OneToOne:
+		rel.Kind = OneToOne
+	case dsl.ManyToMany:
 		rel.Kind = ManyToMany
 		rel.JoinTable = e.Snake + "_" + rel.Snake
+	case dsl.OneToMany:
+		rel.Kind = OneToMany
+		if e.Module != nil && target.Module != nil && e.Module != target.Module {
+			b.errorf(d.Name.Span, "%s cannot declare the other side of a relation in module %s", e.Raw, target.Module.Raw).
+				Suggestion = "a module does not know who points at it; declare the relation in " + target.Module.Raw + " with >"
+			return nil
+		}
+		b.oneToMany = append(b.oneToMany, pendingOneToMany{rel: rel, field: d.TargetField, span: d.Span})
+	}
+	if d.TargetField != nil && d.Kind != dsl.OneToMany {
+		b.errorf(d.TargetField.Span, "only < names a relation on the other side").
+			Suggestion = "write just the entity: " + d.Name.Name + " " + d.Kind.String() + " " + d.Target.Name
 	}
 
 	seen := map[string]bool{}
@@ -712,35 +734,47 @@ func (b *builder) buildRelation(e *Entity, d *dsl.Relation) *Relation {
 		}
 		seen[name] = true
 		switch name {
-		case "required", "unique":
-			if rel.Kind == ManyToMany {
-				b.errorf(m.Name.Span, "%s is not allowed on many-to-many relations", name)
-				continue
-			}
-			if !b.noArgs(m) {
+		case "required", "on_delete":
+			if rel.Kind != ManyToOne && rel.Kind != OneToOne {
+				e := b.errorf(m.Name.Span, "%s is not allowed on %s relations", name, rel.Kind)
+				if rel.Kind == OneToMany {
+					e.Suggestion = "it belongs on the > side, which holds the key"
+				}
 				continue
 			}
 			if name == "required" {
-				rel.Required = true
-			} else {
-				rel.Kind = OneToOne
+				if b.noArgs(m) {
+					rel.Required = true
+				}
+				continue
 			}
-		case "inverse":
-			v, ok := b.oneArg(m, "inverse(products)")
+			v, ok := b.oneArg(m, "on_delete(cascade)")
 			if !ok {
 				continue
 			}
-			if v.Kind != dsl.IdentValue && v.Kind != dsl.StringValue {
-				b.errorf(v.Span, "inverse must be a name").Suggestion = "e.g. inverse(products)"
+			if v.Kind != dsl.IdentValue || !slices.Contains(onDeleteActions, v.Text) {
+				e := b.errorf(v.Span, "on_delete must be cascade, restrict or set_null")
+				if s := didYouMean(v.Text, onDeleteActions); s != "" {
+					e.Suggestion = s
+				}
 				continue
 			}
-			n := b.names(dsl.Ident{Name: v.Text, Span: v.Span})
-			b.explicitInverse = append(b.explicitInverse, pendingInverse{rel: rel, name: &n, span: v.Span})
+			rel.OnDelete = v.Text
+		case "unique":
+			b.errorf(m.Name.Span, "unique is not a relation modifier").
+				Suggestion = fmt.Sprintf("for one-to-one, write: %s - %s", d.Name.Name, d.Target.Name)
+		case "inverse":
+			b.errorf(m.Name.Span, "inverse is not a relation modifier").
+				Suggestion = fmt.Sprintf("name the other side on %s with <, e.g. %s < %s", d.Target.Name, e.Plural.Snake, e.Raw)
 		case "min", "max", "pattern", "default":
 			b.errorf(m.Name.Span, "%s is not allowed on relations", name)
 		default:
 			b.errorf(m.Name.Span, "unknown modifier %q", name).Suggestion = didYouMean(name, relationModifiers)
 		}
+	}
+	if rel.OnDelete == "set_null" && rel.Required {
+		b.errorf(d.Span, "a required relation cannot use on_delete(set_null)").
+			Suggestion = "use cascade or restrict, or drop required"
 	}
 
 	if d.Display != nil {
@@ -776,16 +810,70 @@ func defaultDisplay(e *Entity) *Field {
 	return e.Fields[0] // id
 }
 
-// inferInverses adds the inverse side of every declared relation to its
-// target. The inverse is named after the source entity (plural for
-// one-to-many and many-to-many: Category.products), or after the source and
-// the relation when that would be ambiguous (Person.people_by_manager), unless
-// inverse(name) was given.
-func (b *builder) inferInverses() {
-	explicit := map[*Relation]pendingInverse{}
-	for _, pi := range b.explicitInverse {
-		explicit[pi.rel] = pi
+// pairOneToMany pairs each "<" with the ">" on the other side: the one it
+// names after ".", or the only one pointing back. With none, it adds that
+// side to the target, named after this entity, as if it were declared there.
+func (b *builder) pairOneToMany() {
+	for _, pending := range b.oneToMany {
+		r := pending.rel
+		var candidates []*Relation
+		for _, other := range r.Target.Relations {
+			if !other.Inferred && other.Kind == ManyToOne && other.Target == r.Entity {
+				candidates = append(candidates, other)
+			}
+		}
+		var pair *Relation
+		switch {
+		case pending.field != nil:
+			for _, other := range r.Target.Relations {
+				if other.Raw == pending.field.Name {
+					pair = other
+				}
+			}
+			if pair == nil || pair.Kind != ManyToOne || pair.Target != r.Entity || pair.Inferred {
+				var names []string
+				for _, c := range candidates {
+					names = append(names, c.Raw)
+				}
+				e := b.errorf(pending.field.Span, "%s has no relation %s > %s", r.Target.Raw, pending.field.Name, r.Entity.Raw)
+				e.Suggestion = didYouMean(pending.field.Name, names)
+				continue
+			}
+		case len(candidates) == 1:
+			pair = candidates[0]
+		case len(candidates) > 1:
+			var names []string
+			for _, c := range candidates {
+				names = append(names, c.Raw)
+			}
+			b.errorf(pending.span, "%s has several relations to %s (%s); say which one this is", r.Target.Raw, r.Entity.Raw, strings.Join(names, ", ")).
+				Suggestion = fmt.Sprintf("e.g. %s < %s.%s", r.Raw, r.Target.Raw, names[0])
+			continue
+		default:
+			n, _ := makeNames(r.Entity.Snake)
+			pair = &Relation{
+				Names: n, Kind: ManyToOne, Entity: r.Target, Target: r.Entity,
+				Display: defaultDisplay(r.Entity), Inferred: true, Pos: r.Pos,
+			}
+			r.Target.Relations = append(r.Target.Relations, pair)
+		}
+		if pair.Inverse != nil {
+			b.errorf(pending.span, "%s.%s is already the other side of %s.%s", pair.Entity.Raw, pair.Raw, pair.Inverse.Entity.Raw, pair.Inverse.Raw)
+			continue
+		}
+		pair.Inverse, r.Inverse = r, pair
+		if r.Display == nil {
+			r.Display = defaultDisplay(r.Target)
+		}
 	}
+}
+
+// inferInverses adds the side nobody wrote to relations within a module: a
+// ">" gets a "<" on its target named after the source's plural
+// (Category.products), or after the source and the relation when that would
+// be ambiguous (Person.people_by_manager); "-" and "<>" get their mirror.
+// Name the other side yourself with "<" to choose its name.
+func (b *builder) inferInverses() {
 	count := map[[2]*Entity]int{}
 	for _, e := range b.p.Entities {
 		for _, r := range e.Relations {
@@ -795,7 +883,7 @@ func (b *builder) inferInverses() {
 	for _, e := range b.p.Entities {
 		declared := append([]*Relation(nil), e.Relations...)
 		for _, r := range declared {
-			if r.Inferred || (r.Entity.Module != nil && r.CrossesModules()) {
+			if r.Inferred || r.Inverse != nil || r.Kind == OneToMany || (r.Entity.Module != nil && r.CrossesModules()) {
 				continue
 			}
 			kind := r.Kind
@@ -807,9 +895,7 @@ func (b *builder) inferInverses() {
 				from = e.Names
 			}
 			var n Names
-			if pi, ok := explicit[r]; ok {
-				n = *pi.name
-			} else if count[[2]*Entity{e, r.Target}] > 1 || e == r.Target {
+			if count[[2]*Entity{e, r.Target}] > 1 || e == r.Target {
 				n, _ = makeNames(from.Snake + "_by_" + r.Snake)
 			} else {
 				n, _ = makeNames(from.Snake)
@@ -907,15 +993,45 @@ func (b *builder) checkMemberClashes(e *Entity) {
 		if !r.Inferred {
 			continue
 		}
+		src := r.Inverse
+		clash := func(prev member) {
+			d := b.diags.Errorf(src.Pos, nameEnd(src.Pos, src.Raw), "the other side of %s.%s would be %s.%s, which clashes with %s %s (%s)",
+				src.Entity.Raw, src.Raw, e.Raw, r.Snake, prev.what, prev.raw, where(src.Pos, prev.pos))
+			if r.Kind == ManyToOne {
+				// Added for a "<": the user can declare it with another name.
+				d.Suggestion = fmt.Sprintf("declare it on %s with another name, e.g. %s_ref > %s", e.Raw, r.Snake, src.Entity.Raw)
+			} else {
+				d.Suggestion = fmt.Sprintf("name it yourself on %s, e.g. %s_list %s %s", e.Raw, r.Snake, inverseSign(src.Kind), src.Entity.Raw)
+			}
+		}
 		if prev, ok := seen[r.Snake]; ok {
-			src := r.Inverse
-			b.diags.Errorf(src.Pos, nameEnd(src.Pos, src.Raw), "the inverse of %s.%s would be %s.%s, which clashes with %s %s (%s)",
-				src.Entity.Raw, src.Raw, e.Raw, r.Snake, prev.what, prev.raw, where(src.Pos, prev.pos)).
-				Suggestion = "name the inverse yourself, e.g. inverse(" + r.Snake + "_list)"
+			clash(prev)
 			continue
 		}
 		seen[r.Snake] = member{"relation", r.Raw, r.Pos}
+		if r.OwnsForeignKey() {
+			fk := r.Snake + "_id"
+			if prev, ok := seen[fk]; ok {
+				clash(prev)
+				continue
+			}
+			seen[fk] = member{"foreign key of", r.Raw, r.Pos}
+		}
 	}
+}
+
+// inverseSign is the sign that declares the other side of a relation of
+// kind k.
+func inverseSign(k RelationKind) string {
+	switch k {
+	case ManyToOne:
+		return "<"
+	case OneToMany:
+		return ">"
+	case OneToOne:
+		return "-"
+	}
+	return "<>"
 }
 
 // ---- modules ----

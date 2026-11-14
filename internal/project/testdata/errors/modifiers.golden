@@ -86,14 +86,14 @@ modifiers.esq:26:15: error: min on int64 fields must be a whole number
 26 |   p int64 min(1.5)
    |               ^^^
 
-modifiers.esq:27:17: error: required is not allowed on many-to-many relations
+modifiers.esq:27:16: error: required is not allowed on many-to-many relations
    |
-27 |   tags  <-> Tag required
-   |                 ^^^^^^^^
+27 |   tags  <> Tag required
+   |                ^^^^^^^^
 
-modifiers.esq:28:16: error: min is not allowed on relations
+modifiers.esq:28:15: error: min is not allowed on relations
    |
-28 |   owner -> Tag min(1)
-   |                ^^^
+28 |   owner > Tag min(1)
+   |               ^^^
 
 18 errors

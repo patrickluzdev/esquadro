@@ -69,6 +69,12 @@ func TestMigrationsApplyToPostgres(t *testing.T) {
 	IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name IN ('catalog', 'orders')) THEN
 		RAISE EXCEPTION 'schemas left behind after every down';
 	END IF;
+	IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public') THEN
+		RAISE EXCEPTION 'tables left behind in public after every down';
+	END IF;
+	IF EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typtype = 'e') THEN
+		RAISE EXCEPTION 'enum types left behind in public after every down';
+	END IF;
 END $$;`); err != nil {
 		t.Fatal(err)
 	}

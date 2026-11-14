@@ -86,6 +86,7 @@ func (r *resolver) resolve() {
 			}
 		}
 		r.set.Options[b.Manifest.Name] = r.options(b)
+		b.Ref.Name, b.Ref.Values = b.Manifest.Name, r.set.Options[b.Manifest.Name]
 	}
 	r.set.Blueprints = r.order()
 	r.annotations()

@@ -99,8 +99,11 @@ func Dump(f *File) string {
 					docs(2, m.Doc)
 				case *Relation:
 					disp := ""
+					if m.TargetField != nil {
+						disp = "." + m.TargetField.Name
+					}
 					if m.Display != nil {
-						disp = " (" + m.Display.Name + ")"
+						disp += " (" + m.Display.Name + ")"
 					}
 					w(1, "relation %s %s %s%s%s @%s", m.Name.Name, m.Kind, m.Target.Name, disp, dumpMods(m.Modifiers, m.Annotations), pos(m.Span))
 					docs(2, m.Doc)

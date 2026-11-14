@@ -533,17 +533,22 @@ func (p *parser) parseMember(ent *EntityDecl) bool {
 	name := identOf(p.advance())
 
 	switch k := p.tok(); k.Kind {
-	case Arrow, BiArrow:
+	case Gt, Lt, Dash, LtGt:
 		p.advance()
-		r := &Relation{Doc: doc, Name: name, Kind: ManyToOne}
-		if k.Kind == BiArrow {
-			r.Kind = ManyToMany
-		}
+		r := &Relation{Doc: doc, Name: name, Kind: map[Kind]RelationKind{Gt: ManyToOne, Dash: OneToOne, LtGt: ManyToMany, Lt: OneToMany}[k.Kind]}
 		target, ok := p.expectIdent("target entity after " + k.Kind.String())
 		if !ok {
 			return false
 		}
 		r.Target = target
+		if p.tok().Kind == Dot {
+			p.advance()
+			f, ok := p.expectIdent("relation of " + target.Name + ` after "."`)
+			if !ok {
+				return false
+			}
+			r.TargetField = &f
+		}
 		if p.tok().Kind == LParen {
 			p.advance()
 			disp, ok := p.expectIdent("display field of " + target.Name)
@@ -570,7 +575,7 @@ func (p *parser) parseMember(ent *EntityDecl) bool {
 		ent.Fields = append(ent.Fields, f)
 		ent.Members = append(ent.Members, f)
 	default:
-		p.errorf(k, "expected a type or a relation (-> or <->) after field %q, found %s", name.Name, k.describe())
+		p.errorf(k, "expected a type or a relation (>, <, - or <>) after field %q, found %s", name.Name, k.describe())
 		return false
 	}
 	return true

@@ -32,10 +32,10 @@ testdata/projects/annotations/app.esq:14:19: error: @postgres needs blueprint po
    |                   ^^^^^^^^^^^^^^^^^
    = help: add to the app: blueprint postgres
 
-testdata/projects/annotations/app.esq:15:24: error: @postgres needs blueprint postgres, which this app does not use
+testdata/projects/annotations/app.esq:15:23: error: @postgres needs blueprint postgres, which this app does not use
    |
-15 |   category -> Category @postgres(column cat)
-   |                        ^^^^^^^^^^^^^^^^^^^^^
+15 |   category > Category @postgres(column cat)
+   |                       ^^^^^^^^^^^^^^^^^^^^^
    = help: add to the app: blueprint postgres
 
 testdata/projects/annotations/app.esq:17:3: error: @postgres needs blueprint postgres, which this app does not use

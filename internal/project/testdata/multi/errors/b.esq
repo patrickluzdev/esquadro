@@ -9,7 +9,7 @@ entity Product {
 }
 
 entity Order {
-  buyer -> Customer
+  buyer > Customer
 }
 
 entity Customer {

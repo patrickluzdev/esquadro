@@ -2,7 +2,7 @@ package catalog
 
 entity Product {
   name     string required
-  category -> Category
+  category > Category
 }
 
 entity Category {

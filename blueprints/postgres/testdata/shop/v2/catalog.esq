@@ -3,7 +3,8 @@ package catalog
 enum Status { ACTIVE INACTIVE SOLD_OUT }
 
 entity Category {
-  name string required
+  name     string required
+  products < Product.category
 }
 
 entity Product {
@@ -15,8 +16,8 @@ entity Product {
   launched_on date    default(now)
   details     json    default("{}")
   sku         string  unique
-  category    -> Category
-  maker       -> Maker required
+  category    > Category
+  maker       > Maker required on_delete(cascade)
 
   @postgres(index [name], unique_index [sku])
 }

@@ -9,10 +9,10 @@ testdata/projects/annotations2/app.esq:11:40: error: @postgres is already used h
    |                                        ^^^^^^^^^^^^^^^^^^^
    = help: put all keys in one annotation
 
-testdata/projects/annotations2/app.esq:12:24: error: blueprint postgres has no annotation for relations
+testdata/projects/annotations2/app.esq:12:23: error: blueprint postgres has no annotation for relations
    |
-12 |   category -> Category @postgres(column cat)
-   |                        ^^^^^^^^^^^^^^^^^^^^^
+12 |   category > Category @postgres(column cat)
+   |                       ^^^^^^^^^^^^^^^^^^^^^
    = help: @postgres can be used on entities and fields
 
 testdata/projects/annotations2/app.esq:14:26: error: Product has no field "stauts"

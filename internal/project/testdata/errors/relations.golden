@@ -1,0 +1,52 @@
+relations.esq:10:3: error: Product has several relations to Category (category, main, backup); say which one this is
+   |
+10 |   products < Product
+   |   ^^^^^^^^^^^^^^^^^^
+   = help: e.g. products < Product.category
+
+relations.esq:11:22: error: Product has no relation highlight > Category
+   |
+11 |   featured < Product.highlight
+   |                      ^^^^^^^^^
+
+relations.esq:12:21: error: required is not allowed on one-to-many relations
+   |
+12 |   owner    < Person required
+   |                     ^^^^^^^^
+   = help: it belongs on the > side, which holds the key
+
+relations.esq:18:33: error: on_delete must be cascade, restrict or set_null
+   |
+18 |   main     > Category on_delete(explode)
+   |                                 ^^^^^^^
+
+relations.esq:19:3: error: a required relation cannot use on_delete(set_null)
+   |
+19 |   backup   > Category required on_delete(set_null)
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: use cascade or restrict, or drop required
+
+relations.esq:20:20: error: unique is not a relation modifier
+   |
+20 |   badge    > Badge unique
+   |                    ^^^^^^
+   = help: for one-to-one, write: badge - Badge
+
+relations.esq:21:20: error: inverse is not a relation modifier
+   |
+21 |   maker    > Maker inverse(products)
+   |                    ^^^^^^^
+   = help: name the other side on Maker with <, e.g. products < Product
+
+relations.esq:22:23: error: on_delete is not allowed on many-to-many relations
+   |
+22 |   related  <> Product on_delete(cascade)
+   |                       ^^^^^^^^^
+
+relations.esq:23:22: error: only < names a relation on the other side
+   |
+23 |   sibling  > Product.name
+   |                      ^^^^
+   = help: write just the entity: sibling > Product
+
+9 errors

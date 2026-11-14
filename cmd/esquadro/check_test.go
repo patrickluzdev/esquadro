@@ -60,7 +60,7 @@ func TestCheckOK(t *testing.T) {
 func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
-	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category -> Category\n}\n")
+	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category > Category\n}\n")
 	writeFile(t, dir, "category.esq", "package catalog\n\nentity Category {\n  name string\n}\n")
 
 	code, out, errOut := check(t, dir)

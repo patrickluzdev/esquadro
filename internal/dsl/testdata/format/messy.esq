@@ -30,8 +30,8 @@ entity Product ( plural "products" ) {
 
 
 
-  category -> Category ( name ) required
-  tags <-> Tag
+  category > Category ( name ) required
+  tags <> Tag
   sku string pattern(`^[A-Z]{3}-\d+$`) @admin(label "SKU")
   // a standalone comment
   @postgres(

@@ -6,7 +6,7 @@ entity Order {
 }
 
 entity OrderItem {
-  order    -> Order required
-  product  -> Product required
+  order    > Order required
+  product  > Product required
   quantity int required
 }

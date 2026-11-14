@@ -23,8 +23,8 @@ entity Product (plural "products") {
   price       decimal required min(0)
   stock       int     default(0)
   status      ProductStatus default(ACTIVE)
-  category    -> Category (name) required
-  tags        <-> Tag (name)
+  category    > Category (name) required
+  tags        <> Tag (name)
 
   @postgres(index [name, status])
 }

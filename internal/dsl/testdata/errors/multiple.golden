@@ -1,7 +1,7 @@
-multiple.esq:3:12: error: expected target entity after "->", found newline
+multiple.esq:3:11: error: expected target entity after ">", found newline
   |
-3 |   price -> 
-  |            ^
+3 |   price > 
+  |           ^
 
 multiple.esq:4:17: error: expected a value in min(...) (string, number, true/false, name or [list]), found newline
   |

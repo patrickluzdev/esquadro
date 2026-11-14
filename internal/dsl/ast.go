@@ -153,30 +153,32 @@ type Field struct {
 	Span
 }
 
-// RelationKind is the arrow used by a relation.
+// RelationKind is the sign of a relation, as in DBML.
 type RelationKind int
 
 const (
-	// ManyToOne is "->": a foreign key on this entity. Becomes one-to-one with
-	// the unique modifier.
+	// ManyToOne is ">": this entity holds the foreign key.
 	ManyToOne RelationKind = iota
-	// ManyToMany is "<->": a join table.
+	// OneToOne is "-": this entity holds a unique foreign key.
+	OneToOne
+	// ManyToMany is "<>": a join table.
 	ManyToMany
+	// OneToMany is "<": the other side of a ">" on the target.
+	OneToMany
 )
 
 func (k RelationKind) String() string {
-	if k == ManyToMany {
-		return "<->"
-	}
-	return "->"
+	return [...]string{">", "-", "<>", "<"}[k]
 }
 
-// Relation is "name -> Target (displayField) modifiers... annotations...".
+// Relation is "name > Target (displayField) modifiers... annotations...".
+// For "<", Target may name the relation on the other side: "< Order.buyer".
 type Relation struct {
 	Doc         []string
 	Name        Ident
 	Kind        RelationKind
 	Target      Ident
+	TargetField *Ident
 	Display     *Ident
 	Modifiers   []*Modifier
 	Annotations []*Annotation

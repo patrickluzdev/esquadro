@@ -14,8 +14,25 @@ type Description struct {
 // AppDescription describes the app block.
 type AppDescription struct {
 	Names
-	Module string `json:"module"`
-	Ann    Ann    `json:"ann,omitempty"`
+	Module     string                 `json:"module"`
+	Blueprints []BlueprintDescription `json:"blueprints"`
+	Ann        Ann                    `json:"ann,omitempty"`
+}
+
+// BlueprintDescription is a blueprint the app uses, with its options.
+type BlueprintDescription struct {
+	Name    string         `json:"name"`
+	Options map[string]any `json:"options,omitempty"`
+}
+
+// Options returns the options of the blueprint with the given name, or nil.
+func (a AppDescription) Options(blueprint string) map[string]any {
+	for _, b := range a.Blueprints {
+		if b.Name == blueprint {
+			return b.Options
+		}
+	}
+	return nil
 }
 
 // EnumDescription describes an enum.
@@ -59,6 +76,8 @@ type RelationDescription struct {
 	Required  bool   `json:"required,omitempty"`
 	Inverse   string `json:"inverse,omitempty"`
 	Inferred  bool   `json:"inferred,omitempty"`
+	OwnsKey   bool   `json:"owns_key,omitempty"`
+	OnDelete  string `json:"on_delete,omitempty"`
 	JoinTable string `json:"join_table,omitempty"`
 	Ann       Ann    `json:"ann,omitempty"`
 }
@@ -66,10 +85,15 @@ type RelationDescription struct {
 // Describe returns the project as plain data.
 func (p *Project) Describe() Description {
 	d := Description{
-		App:      AppDescription{Names: p.App.Names, Module: p.App.Module, Ann: p.App.Ann},
+		App:      AppDescription{Names: p.App.Names, Module: p.App.Module, Ann: p.App.Ann, Blueprints: []BlueprintDescription{}},
 		Modules:  []Names{},
 		Enums:    []EnumDescription{},
 		Entities: []EntityDescription{},
+	}
+	for _, b := range p.App.Blueprints {
+		if b.Name != "" {
+			d.App.Blueprints = append(d.App.Blueprints, BlueprintDescription{Name: b.Name, Options: b.Values})
+		}
 	}
 	for _, m := range p.Modules {
 		d.Modules = append(d.Modules, m.Names)
@@ -105,6 +129,7 @@ func (p *Project) Describe() Description {
 			rd := RelationDescription{
 				Names: r.Names, Kind: r.Kind.String(), Target: r.Target.Raw,
 				Required: r.Required, Inferred: r.Inferred, JoinTable: r.JoinTable, Ann: r.Ann,
+				OwnsKey: r.OwnsForeignKey(), OnDelete: r.OnDelete,
 			}
 			if r.Display != nil {
 				rd.Display = r.Display.Raw

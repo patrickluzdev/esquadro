@@ -145,16 +145,17 @@ app a { module "x.com/a"
 }
 entity Person (plural "people") {
   name    string
-  manager -> Person
-  mentor  -> Person inverse(mentees)
-  badge   -> Badge unique
+  manager > Person
+  mentor  > Person
+  badge   - Badge
+  mentees < Person.mentor
 }
 entity Badge {
   code string
 }
 entity Order {
-  buyer  -> Person
-  seller -> Person
+  buyer  > Person
+  seller > Person
 }
 `
 	p, diags := Load(Source{Name: "t.esq", Src: []byte(src)})
@@ -171,9 +172,8 @@ entity Order {
 	}
 	want := map[string]string{
 		"Person.people_by_manager": "one-to-many", // self relation
-		"Person.mentees":           "one-to-many", // explicit inverse(...)
 		"Badge.person":             "one-to-one",  // singular for one-to-one
-		"Person.orders_by_buyer":   "one-to-many", // two relations Order -> Person
+		"Person.orders_by_buyer":   "one-to-many", // two relations Order > Person
 		"Person.orders_by_seller":  "one-to-many",
 	}
 	for k, v := range want {
@@ -182,19 +182,61 @@ entity Order {
 		}
 	}
 	if len(got) != len(want) {
-		t.Errorf("got %d inverses, want %d: %v", len(got), len(want), got)
+		t.Errorf("got %d inferred sides, want %d: %v", len(got), len(want), got)
+	}
+	person := p.Entity("Person")
+	var mentor, mentees *Relation
+	for _, r := range person.Relations {
+		switch r.Raw {
+		case "mentor":
+			mentor = r
+		case "mentees":
+			mentees = r
+		}
+	}
+	if mentees == nil || mentees.Inferred || mentees.Kind != OneToMany || mentor.Inverse != mentees || mentees.Inverse != mentor {
+		t.Fatalf("mentees < Person.mentor is not paired: %+v / %+v", mentees, mentor)
+	}
+	if mentees.OwnsForeignKey() || !mentor.OwnsForeignKey() {
+		t.Fatal("the > side owns the key")
 	}
 	if d := p.Entity("Badge").Relations[0].Display; d.Raw != "name" {
 		t.Errorf("default display of Person = %s, want name", d.Raw)
 	}
-	if d := p.Entity("Person").Field("name"); d == nil {
-		t.Fatal("no name field")
+	if r := person.Relations[2]; r.Raw != "badge" || r.Display.Raw != "code" {
+		t.Errorf("Person.badge display = %s, want code (first string field)", r.Display.Raw)
 	}
-	if r := p.Entity("Order").Relations[0]; r.Display.Raw != "name" {
-		t.Errorf("Order.buyer display = %s", r.Display.Raw)
+}
+
+func TestOneToManyAloneAddsTheKeySide(t *testing.T) {
+	src := `package catalog
+
+app a { module "x.com/a"
+  blueprint platform
+}
+entity Category {
+  name     string
+  products < Product
+}
+entity Product {
+  title string
+}
+`
+	p, diags := Load(Source{Name: "t.esq", Src: []byte(src)})
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if r := p.Entity("Person").Relations; r[2].Display.Raw != "code" {
-		t.Errorf("Person.badge display = %s, want code (first string field)", r[2].Display.Raw)
+	product := p.Entity("Product")
+	if len(product.Relations) != 1 {
+		t.Fatalf("Product relations = %+v", product.Relations)
+	}
+	added := product.Relations[0]
+	if added.Snake != "category" || added.Kind != ManyToOne || !added.OwnsForeignKey() || added.Required ||
+		added.Target != p.Entity("Category") || added.Inverse != p.Entity("Category").Relations[0] {
+		t.Fatalf("added side = %+v", added)
+	}
+	if p.Entity("Category").Relations[0].Display.Raw != "title" {
+		t.Error("the < side displays the target's display field")
 	}
 }
 

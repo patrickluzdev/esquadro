@@ -46,11 +46,11 @@ names.esq:20:3: error: field category_id clashes with the foreign key column cat
    |   ^^^^^^^^^^^
    = help: remove it: the relation already stores the key
 
-names.esq:21:3: error: the inverse of Product.category would be Category.products, which clashes with field products (line 29)
+names.esq:21:3: error: the other side of Product.category would be Category.products, which clashes with field products (line 29)
    |
-21 |   category  -> Category
+21 |   category  > Category
    |   ^^^^^^^^
-   = help: name the inverse yourself, e.g. inverse(products_list)
+   = help: name it yourself on Category, e.g. products_list < Product
 
 names.esq:24:8: error: Product is already declared at line 15
    |

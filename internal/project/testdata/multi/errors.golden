@@ -8,11 +8,11 @@ b.esq:7:8: error: Product is already declared at a.esq:8
 7 | entity Product {
   |        ^^^^^^^
 
-b.esq:12:3: error: the inverse of Order.buyer would be Customer.orders, which clashes with field orders (line 16)
+b.esq:12:3: error: the other side of Order.buyer would be Customer.orders, which clashes with field orders (line 16)
    |
-12 |   buyer -> Customer
+12 |   buyer > Customer
    |   ^^^^^
-   = help: name the inverse yourself, e.g. inverse(orders_list)
+   = help: name it yourself on Customer, e.g. orders_list < Order
 
 c.esq:1:9: warning: module models names a technical layer, not a part of the domain
   |

@@ -52,8 +52,8 @@ entity Product {
   sku         string pattern(`+"`^[A-Z]{3}-\\d+$`"+`)
   launched_on date
   details     json
-  category    -> Category (name) required
-  tags        <-> Tag
+  category    > Category (name) required
+  tags        <> Tag
 }
 
 entity Tag {
@@ -68,8 +68,8 @@ entity Order {
 }
 
 entity OrderItem {
-  order    -> Order required
-  product  -> Product required
+  order    > Order required
+  product  > Product required
   quantity int64 min(1)
 }
 `)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,10 +115,67 @@ func TestFileNameNumbersAndReuses(t *testing.T) {
 		t.Fatalf("again = %q", again)
 	}
 	next := Diff(snapshot(t, cur), load(t, "testdata/shop/v2"))
-	if n, _ := FileName(dir, next); n != "migrations/00002_add_status_sold_out_and_more.sql" {
+	if n, _ := FileName(dir, next); n != "migrations/00002_add_catalog_status_sold_out_and_more.sql" {
 		t.Fatalf("next = %q", n)
 	}
 	if n, _ := FileName(dir, Diff(snapshot(t, cur), cur)); n != "" {
 		t.Fatalf("no change must give no file, got %q", n)
+	}
+}
+
+// withSchemas returns a copy of d whose postgres blueprint lists schemas.
+func withSchemas(t *testing.T, d project.Description, schemas ...string) project.Description {
+	t.Helper()
+	c := *snapshot(t, d)
+	list := make([]any, len(schemas))
+	for i, s := range schemas {
+		list[i] = s
+	}
+	for i, b := range c.App.Blueprints {
+		if b.Name == "postgres" {
+			opts := maps.Clone(b.Options)
+			if opts == nil {
+				opts = map[string]any{}
+			}
+			opts["schemas"] = list
+			c.App.Blueprints[i].Options = opts
+		}
+	}
+	return c
+}
+
+func TestMovingAModuleToItsOwnSchemaIsATodo(t *testing.T) {
+	cur := load(t, "testdata/shop/v3")
+	moved := withSchemas(t, cur, "catalog")
+	m := Diff(snapshot(t, cur), moved)
+	if strings.Contains(m.Up, "DROP TABLE") || strings.Contains(m.Up, "CREATE TABLE") {
+		t.Fatalf("moving tables must never drop and recreate them:\n%s", m.Up)
+	}
+	for _, want := range []string{
+		"CREATE SCHEMA catalog;",
+		"-- TODO: table public.products is now catalog.products: move it by hand (ALTER TABLE public.products SET SCHEMA catalog",
+		"-- TODO: enum type public.catalog_status is now catalog.status",
+	} {
+		if !strings.Contains(m.Up, want) {
+			t.Errorf("up misses %q:\n%s", want, m.Up)
+		}
+	}
+}
+
+func TestCheckFindsTablesThatCollideInPublic(t *testing.T) {
+	d := load(t, "testdata/shop/v1")
+	if p := Check(d); len(p) != 0 {
+		t.Fatalf("problems = %v", p)
+	}
+	for i, e := range d.Entities {
+		if e.Raw == "Order" {
+			d.Entities[i].Plural.Snake = "products" // as @postgres(table products) would
+		}
+	}
+	d = withSchemas(t, d)
+	problems := Check(withSchemas(t, d, "nope"))
+	if len(problems) != 2 || !strings.Contains(problems[0], `"nope", which is not a module`) ||
+		!strings.Contains(problems[1], "catalog.Product and orders.Order would both be table public.products") {
+		t.Fatalf("problems = %v", problems)
 	}
 }

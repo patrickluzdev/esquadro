@@ -1,6 +1,6 @@
 entity Product {
   name string required
-  price -> 
+  price > 
   stock int min(
 }
 

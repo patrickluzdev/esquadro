@@ -3,7 +3,8 @@ package catalog
 enum Status { ACTIVE INACTIVE }
 
 entity Category {
-  name string required unique
+  name     string required unique
+  products < Product
 }
 
 entity Product {
@@ -15,8 +16,8 @@ entity Product {
   launched_on date    default(now)
   details     json    default("{}")
   note        string  default("it's new")
-  category    -> Category required
-  tags        <-> Tag
+  category    > Category required
+  tags        <> Tag
 
   @postgres(index [name, status])
 }

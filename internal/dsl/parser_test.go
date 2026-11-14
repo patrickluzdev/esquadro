@@ -88,7 +88,7 @@ func TestParseIsDeterministicAndKeepsGoing(t *testing.T) {
 
 func TestLexerPositionsCountRunes(t *testing.T) {
 	var diags diag.List
-	toks, _ := lex("t.esq", []byte("naïve -> Größe\n"), &diags)
+	toks, _ := lex("t.esq", []byte("naïve > Größe\n"), &diags)
 	if len(diags) > 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -98,9 +98,9 @@ func TestLexerPositionsCountRunes(t *testing.T) {
 		col, end int
 	}{
 		{Name, "naïve", 1, 6},
-		{Arrow, "->", 7, 9},
-		{Name, "Größe", 10, 15},
-		{Newline, "\n", 15, 1},
+		{Gt, ">", 7, 8},
+		{Name, "Größe", 9, 14},
+		{Newline, "\n", 14, 1},
 		{EOF, "", 1, 1},
 	}
 	if len(toks) != len(want) {
@@ -114,16 +114,19 @@ func TestLexerPositionsCountRunes(t *testing.T) {
 	}
 }
 
-func TestLexerHyphenatedNamesAndArrows(t *testing.T) {
+func TestLexerRelationSignsAndHyphenatedNames(t *testing.T) {
 	var diags diag.List
-	toks, _ := lex("t.esq", []byte("admin-htmx a->b c<->d -5 x-1"), &diags)
+	toks, _ := lex("t.esq", []byte("admin-htmx a > b c <> d e - f g < H.h -5 x-1"), &diags)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
 	var got []string
 	for _, tk := range toks {
 		if tk.Kind != EOF {
 			got = append(got, tk.Kind.String()+":"+tk.Text)
 		}
 	}
-	want := `name:admin-htmx name:a "->":-> name:b name:c "<->":<-> name:d number:-5 name:x-1`
+	want := `name:admin-htmx name:a ">":> name:b name:c "<>":<> name:d name:e "-":- name:f name:g "<":< name:H ".":. name:h number:-5 name:x-1`
 	if strings.Join(got, " ") != want {
 		t.Fatalf("got  %s\nwant %s", strings.Join(got, " "), want)
 	}

@@ -10,28 +10,28 @@ types.esq:12:12: error: unknown type "Customer"
    |            ^^^^^^^^
    = help: built-in types are string, text, int, int64, decimal, bool, time, date, uuid and json
 
-types.esq:14:15: error: unknown entity "Categry"
+types.esq:14:14: error: unknown entity "Categry"
    |
-14 |   category -> Categry (name)
-   |               ^^^^^^^
+14 |   category > Categry (name)
+   |              ^^^^^^^
    = help: did you mean "Category"?
 
-types.esq:15:15: error: Status is an enum, not an entity
+types.esq:15:14: error: Status is an enum, not an entity
    |
-15 |   state    -> Status
-   |               ^^^^^^
+15 |   state    > Status
+   |              ^^^^^^
    = help: use a field: state Status
 
-types.esq:16:15: error: string is a field type, not an entity
+types.esq:16:14: error: string is a field type, not an entity
    |
-16 |   label    -> string
-   |               ^^^^^^
+16 |   label    > string
+   |              ^^^^^^
    = help: use a field: label string
 
-types.esq:17:20: error: Tag has no field "titel" to display
+types.esq:17:19: error: Tag has no field "titel" to display
    |
-17 |   tag      -> Tag (titel)
-   |                    ^^^^^
+17 |   tag      > Tag (titel)
+   |                   ^^^^^
    = help: did you mean "title"?
 
 6 errors

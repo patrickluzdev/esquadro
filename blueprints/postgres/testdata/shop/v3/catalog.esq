@@ -15,8 +15,8 @@ entity Product {
   launched_on date    default(now)
   details     json    default("{}")
   sku         string  unique
-  category    -> Category
-  maker       -> Maker required
+  category    > Category
+  maker       > Maker required
 
   @postgres(index [name], unique_index [sku])
 }

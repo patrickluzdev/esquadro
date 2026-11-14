@@ -3,7 +3,7 @@ package orders
 entity Order {
   number string required
   status OrderStatus default(OPEN)
-  items  <-> Product
+  items  <> Product
 }
 
 enum OrderStatus { OPEN PAID }

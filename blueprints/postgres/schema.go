@@ -4,6 +4,7 @@
 package postgres
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -11,9 +12,11 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
-// Each module owns a Postgres schema named after it: its tables and enum
-// types live there, and foreign keys only point inside it, so the database
-// keeps modules as separate as the code does.
+// Tables live in public, except for the modules listed in the blueprint's
+// schemas option, which own a Postgres schema named after them. Either way,
+// foreign keys only point inside a module, so the database keeps modules as
+// separate as the code does. In public, enum types are prefixed with their
+// module (catalog_status), since two modules may declare the same enum name.
 
 // database is the schema of a whole project.
 type database struct {
@@ -23,6 +26,9 @@ type database struct {
 }
 
 type enumType struct {
+	// key identifies the enum across versions of the project, whatever its
+	// schema and name: module and enum as written.
+	key          string
 	schema, name string
 	values       []string
 }
@@ -30,6 +36,9 @@ type enumType struct {
 func (e enumType) qualified() string { return e.schema + "." + e.name }
 
 type table struct {
+	// key identifies the table across versions of the project, whatever
+	// its schema and name: the entity, or the join table's relation.
+	key          string
 	schema, name string
 	columns      []column
 	foreignKeys  []foreignKey
@@ -108,14 +117,62 @@ func columnName(f project.FieldDescription) string {
 	return f.Snake
 }
 
+// layout says where each module's tables go.
+type layout struct {
+	own map[string]bool // modules with a schema of their own
+	d   project.Description
+}
+
+func newLayout(d project.Description) layout {
+	l := layout{own: map[string]bool{}, d: d}
+	for _, name := range ownSchemas(d) {
+		l.own[name] = true
+	}
+	return l
+}
+
+// ownSchemas lists the modules of the schemas option.
+func ownSchemas(d project.Description) []string {
+	var out []string
+	switch v := d.App.Options("postgres")["schemas"].(type) {
+	case []any:
+		for _, x := range v {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+	case []string:
+		out = v
+	}
+	return out
+}
+
+func (l layout) schema(module string) string {
+	if l.own[module] {
+		return moduleSnake(l.d, module)
+	}
+	return "public"
+}
+
+// enumName is an enum type's name in its schema.
+func (l layout) enumName(module, enum string) string {
+	if l.own[module] {
+		return enum
+	}
+	return moduleSnake(l.d, module) + "_" + enum
+}
+
 // describe builds the database a project description stands for.
 func describe(d project.Description) database {
 	var db database
+	l := newLayout(d)
 	for _, m := range d.Modules {
-		db.schemas = append(db.schemas, m.Snake)
+		if l.own[m.Raw] {
+			db.schemas = append(db.schemas, m.Snake)
+		}
 	}
 	for _, e := range d.Enums {
-		et := enumType{schema: moduleSchema(d, e.Module), name: e.Snake}
+		et := enumType{key: e.Module + "." + e.Raw, schema: l.schema(e.Module), name: l.enumName(e.Module, e.Snake)}
 		for _, v := range e.Values {
 			et.values = append(et.values, v.Raw)
 		}
@@ -126,17 +183,17 @@ func describe(d project.Description) database {
 		entities[e.Raw] = e
 	}
 	for _, e := range d.Entities {
-		db.tables = append(db.tables, entityTable(d, e, entities))
+		db.tables = append(db.tables, entityTable(l, e, entities))
 		for _, r := range e.Relations {
 			if r.Kind == "many-to-many" && !r.Inferred {
-				db.tables = append(db.tables, joinTable(d, e, r, entities[r.Target]))
+				db.tables = append(db.tables, joinTable(l, e, r, entities[r.Target]))
 			}
 		}
 	}
 	return db
 }
 
-func moduleSchema(d project.Description, module string) string {
+func moduleSnake(d project.Description, module string) string {
 	for _, m := range d.Modules {
 		if m.Raw == module {
 			return m.Snake
@@ -145,15 +202,46 @@ func moduleSchema(d project.Description, module string) string {
 	return module
 }
 
-func entityTable(d project.Description, e project.EntityDescription, entities map[string]project.EntityDescription) table {
-	schema := moduleSchema(d, e.Module)
-	t := table{schema: schema, name: tableName(e), primaryKey: []string{"id"}}
+// Check reports what would make the database invalid: tables of different
+// modules with the same name in public, and schemas option entries that are
+// not modules. It does not change anything.
+func Check(d project.Description) []string {
+	var problems []string
+	l := newLayout(d)
+	for _, name := range ownSchemas(d) {
+		known := false
+		for _, m := range d.Modules {
+			known = known || m.Raw == name
+		}
+		if !known {
+			problems = append(problems, fmt.Sprintf("the schemas option lists %q, which is not a module", name))
+		}
+	}
+	seen := map[string]string{}
+	for _, e := range d.Entities {
+		if l.own[e.Module] {
+			continue
+		}
+		t := tableName(e)
+		if prev, ok := seen[t]; ok {
+			problems = append(problems, fmt.Sprintf("%s and %s.%s would both be table public.%s; rename one with @postgres(table ...) or give a module its own schema", prev, e.Module, e.Raw, t))
+			continue
+		}
+		seen[t] = e.Module + "." + e.Raw
+	}
+	return problems
+}
+
+func entityTable(l layout, e project.EntityDescription, entities map[string]project.EntityDescription) table {
+	schema := l.schema(e.Module)
+	t := table{key: "entity " + e.Module + "." + e.Raw, schema: schema, name: tableName(e), primaryKey: []string{"id"}}
 	columns := map[string]string{} // field or relation name as written -> column
 	for _, f := range e.Fields {
 		c := column{name: columnName(f), notNull: f.Required, unique: f.Unique}
 		c.sqlType = sqlTypes[f.Type]
 		if f.Type == project.TypeEnum {
-			c.sqlType = moduleSchema(d, enumModule(d, f.Enum)) + "." + snakeOfEnum(d, f.Enum)
+			module := enumModule(l.d, f.Enum)
+			c.sqlType = l.schema(module) + "." + l.enumName(module, snakeOfEnum(l.d, f.Enum))
 		}
 		if f.Implicit && f.Snake == "id" {
 			c.def = "gen_random_uuid()"
@@ -165,7 +253,7 @@ func entityTable(d project.Description, e project.EntityDescription, entities ma
 		columns[f.Raw] = c.name
 	}
 	for _, r := range e.Relations {
-		if r.Inferred || (r.Kind != "many-to-one" && r.Kind != "one-to-one") {
+		if !r.OwnsKey {
 			continue
 		}
 		c := column{name: r.Snake + "_id", sqlType: "uuid", notNull: r.Required, unique: r.Kind == "one-to-one"}
@@ -181,13 +269,9 @@ func entityTable(d project.Description, e project.EntityDescription, entities ma
 		columns[r.Raw] = c.name
 		target := entities[r.Target]
 		if target.Module == e.Module {
-			onDelete := "SET NULL"
-			if r.Required {
-				onDelete = "RESTRICT"
-			}
 			t.foreignKeys = append(t.foreignKeys, foreignKey{
 				name: t.name + "_" + c.name + "_fkey", column: c.name,
-				refTable: schema + "." + tableName(target), onDelete: onDelete,
+				refTable: schema + "." + tableName(target), onDelete: onDelete(r),
 			})
 		}
 		if !c.unique {
@@ -223,13 +307,31 @@ func entityTable(d project.Description, e project.EntityDescription, entities ma
 	return t
 }
 
-func joinTable(d project.Description, e project.EntityDescription, r project.RelationDescription, target project.EntityDescription) table {
-	schema := moduleSchema(d, e.Module)
+// onDelete is the ON DELETE action of a relation's foreign key: the one it
+// declares, or RESTRICT when it is required and SET NULL when it is not.
+func onDelete(r project.RelationDescription) string {
+	switch r.OnDelete {
+	case "cascade":
+		return "CASCADE"
+	case "restrict":
+		return "RESTRICT"
+	case "set_null":
+		return "SET NULL"
+	}
+	if r.Required {
+		return "RESTRICT"
+	}
+	return "SET NULL"
+}
+
+func joinTable(l layout, e project.EntityDescription, r project.RelationDescription, target project.EntityDescription) table {
+	schema := l.schema(e.Module)
 	left, right := e.Snake+"_id", target.Snake+"_id"
 	if left == right {
 		right = r.Snake + "_id"
 	}
 	t := table{
+		key:    "join " + e.Module + "." + e.Raw + "." + r.Raw,
 		schema: schema, name: r.JoinTable, primaryKey: []string{left, right},
 		columns: []column{
 			{name: left, sqlType: "uuid", notNull: true},

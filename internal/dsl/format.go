@@ -461,6 +461,9 @@ func (p *printer) entity(out *strings.Builder, d *EntityDecl) {
 		case *Relation:
 			sp, doc = m.Span, m.Doc
 			target := m.Kind.String() + " " + m.Target.Name
+			if m.TargetField != nil {
+				target += "." + m.TargetField.Name
+			}
 			if m.Display != nil {
 				target += " (" + m.Display.Name + ")"
 			}

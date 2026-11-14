@@ -11,10 +11,10 @@ entity Product {
   name     strng
   owner    Customer
   status   Status
-  category -> Categry (name)
-  state    -> Status
-  label    -> string
-  tag      -> Tag (titel)
+  category > Categry (name)
+  state    > Status
+  label    > string
+  tag      > Tag (titel)
 }
 
 entity Category {

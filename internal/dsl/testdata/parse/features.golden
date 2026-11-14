@@ -22,8 +22,8 @@ entity Person @24:1-39:2
   field naïve bool default(bool:false) @28:3-28:34
   field balance decimal min(num:-100.50) @29:3-29:33
   field size Size default(MEDIUM) @30:3-30:33
-  relation manager -> Person @31:3-31:22
-  relation passport -> Passport unique @32:3-32:31
+  relation manager > Person @31:3-31:21
+  relation passport - Passport @32:3-32:23
   field entity string @33:3-33:19
   @admin(icon "user", hidden)
   @postgres(index [email], table "persons")

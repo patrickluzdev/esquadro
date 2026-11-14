@@ -28,8 +28,8 @@ entity Person (plural "people", table "persons") {
   naïve     bool   default(false)
   balance   decimal min(-100.50)
   size      Size default(MEDIUM)
-  manager   -> Person
-  passport  -> Passport unique
+  manager   > Person
+  passport  - Passport
   entity    string   // a field may use a keyword as its name
   @admin(icon "user", hidden)
   @postgres(

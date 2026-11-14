@@ -89,6 +89,10 @@ type BlueprintRef struct {
 	Pos     diag.Pos
 	// RefSpan is the span of the name or path, for error messages.
 	RefSpan dsl.Span
+	// Name and Values are filled when blueprints are resolved: the name the
+	// manifest declares and the options with defaults.
+	Name   string
+	Values map[string]any
 }
 
 // Ann holds validated annotation values: blueprint name, then key, then
@@ -269,7 +273,11 @@ type Relation struct {
 	Inferred bool
 	// JoinTable is the snake_case join table name for ManyToMany, the same on
 	// both sides.
-	JoinTable   string
+	JoinTable string
+	// OnDelete is what deleting the target does to this side's rows:
+	// "cascade", "restrict" or "set_null"; empty for the default (restrict
+	// when required, set_null otherwise). Only on the side that owns the key.
+	OnDelete    string
 	Annotations []*dsl.Annotation
 	Ann         Ann
 	Pos         diag.Pos
@@ -282,7 +290,8 @@ func (r *Relation) CrossesModules() bool {
 	return r.Entity.Module != r.Target.Module
 }
 
-// OwnsForeignKey reports whether this side stores the foreign key column.
+// OwnsForeignKey reports whether this side stores the foreign key column:
+// the many side of a many-to-one, and the declared side of a one-to-one.
 func (r *Relation) OwnsForeignKey() bool {
-	return !r.Inferred && (r.Kind == ManyToOne || r.Kind == OneToOne)
+	return r.Kind == ManyToOne || (r.Kind == OneToOne && !r.Inferred)
 }

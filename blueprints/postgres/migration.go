@@ -107,7 +107,12 @@ func plan(from, to database) *steps {
 	}
 
 	for _, e := range to.enums {
-		prev := findEnum(from, e.qualified())
+		prev := findEnum(from, e.key)
+		if prev != nil && prev.qualified() != e.qualified() {
+			s.todo("enum type %s is now %s (its module changed schema): ALTER TYPE %s SET SCHEMA / RENAME TO, by hand",
+				prev.qualified(), e.qualified(), prev.qualified())
+			continue
+		}
 		if prev == nil {
 			s.createTypes = append(s.createTypes, createType(e))
 			s.labels = append(s.labels, "create_"+e.name)
@@ -126,14 +131,19 @@ func plan(from, to database) *steps {
 		}
 	}
 	for _, e := range from.enums {
-		if findEnum(to, e.qualified()) == nil {
+		if findEnum(to, e.key) == nil {
 			s.dropTypes = append(s.dropTypes, "DROP TYPE "+e.qualified()+";")
 			s.labels = append(s.labels, "drop_"+e.name)
 		}
 	}
 
 	for _, t := range to.tables {
-		prev := findTable(from, t.qualified())
+		prev := findTable(from, t.key)
+		if prev != nil && prev.qualified() != t.qualified() {
+			s.todo("table %s is now %s: move it by hand (ALTER TABLE %s SET SCHEMA %s and/or RENAME TO %s) to keep its rows",
+				prev.qualified(), t.qualified(), prev.qualified(), t.schema, t.name)
+			continue
+		}
 		if prev == nil {
 			s.createTables = append(s.createTables, createTable(t))
 			for _, fk := range t.foreignKeys {
@@ -148,7 +158,7 @@ func plan(from, to database) *steps {
 		alterTable(s, *prev, t)
 	}
 	for _, t := range from.tables {
-		if findTable(to, t.qualified()) == nil {
+		if findTable(to, t.key) == nil {
 			// Its foreign keys go first, so dropped tables that reference
 			// each other can go in any order.
 			for _, fk := range t.foreignKeys {
@@ -298,18 +308,18 @@ func createIndex(t table, ix index) string {
 	return fmt.Sprintf("CREATE %s %s ON %s (%s);", kind, ix.name, t.qualified(), strings.Join(ix.columns, ", "))
 }
 
-func findEnum(db database, qualified string) *enumType {
+func findEnum(db database, key string) *enumType {
 	for i := range db.enums {
-		if db.enums[i].qualified() == qualified {
+		if db.enums[i].key == key {
 			return &db.enums[i]
 		}
 	}
 	return nil
 }
 
-func findTable(db database, qualified string) *table {
+func findTable(db database, key string) *table {
 	for i := range db.tables {
-		if db.tables[i].qualified() == qualified {
+		if db.tables[i].key == key {
 			return &db.tables[i]
 		}
 	}

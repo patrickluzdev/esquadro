@@ -128,21 +128,17 @@ func (l *lexer) next() Token {
 		return l.str(start)
 	case r == '`':
 		return l.rawStr(start)
-	case r == '-' && l.peek(1) == '>':
+	case r == '<' && l.peek(1) == '>':
 		l.advance()
 		l.advance()
-		return l.tok(Arrow, start)
-	case r == '<' && l.peek(1) == '-' && l.peek(2) == '>':
-		l.advance()
-		l.advance()
-		l.advance()
-		return l.tok(BiArrow, start)
+		return l.tok(LtGt, start)
 	}
 
 	l.advance()
 	single := map[rune]Kind{
 		'{': LBrace, '}': RBrace, '(': LParen, ')': RParen,
 		'[': LBrack, ']': RBrack, ',': Comma, '@': At,
+		'>': Gt, '<': Lt, '-': Dash, '.': Dot,
 	}
 	if k, ok := single[r]; ok {
 		return l.tok(k, start)

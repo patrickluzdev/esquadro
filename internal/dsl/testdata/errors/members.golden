@@ -13,15 +13,15 @@ members.esq:8:3: error: expected a field, relation or @annotation, found string 
 8 |   "total" decimal
   |   ^^^^^^^
 
-members.esq:9:15: error: expected target entity after "->", found "("
+members.esq:9:14: error: expected target entity after ">", found "("
   |
-9 |   customer -> (name)
-  |               ^
+9 |   customer > (name)
+  |              ^
 
-members.esq:10:23: error: expected ")" after display field, found newline
+members.esq:10:22: error: expected ")" after display field, found newline
    |
-10 |   items <-> Item (name
-   |                       ^
+10 |   items <> Item (name
+   |                      ^
 
 members.esq:11:5: error: expected annotation name after "@", found "("
    |
@@ -33,7 +33,7 @@ members.esq:12:20: error: expected "," or ")" in @admin(...), found string "b"
 12 |   @admin(label "a" "b")
    |                    ^^^
 
-members.esq:13:9: error: expected a type or a relation (-> or <->) after field "status", found newline
+members.esq:13:9: error: expected a type or a relation (>, <, - or <>) after field "status", found newline
    |
 13 |   status
    |         ^

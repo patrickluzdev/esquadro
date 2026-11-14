@@ -12,7 +12,7 @@
 //	EntityDecl = "entity" Ident [ "(" Option { "," Option } ")" ] "{" { Member } "}" .
 //	Member     = Field | Relation | Annotation .
 //	Field      = Ident Ident { Modifier | Annotation } .
-//	Relation   = Ident ( "->" | "<->" ) Ident [ "(" Ident ")" ] { Modifier | Annotation } .
+//	Relation   = Ident ( ">" | "-" | "<>" | "<" ) Ident [ "." Ident ] [ "(" Ident ")" ] { Modifier | Annotation } .
 //	Modifier   = Ident [ "(" [ Value { "," Value } ] ")" ] .
 //	Annotation = "@" Ident [ "(" AnnArg { "," AnnArg } ")" ] .
 //	AnnArg     = Ident [ Value ] .
@@ -40,16 +40,19 @@ const (
 	String
 	Number
 	DocComment
-	LBrace  // {
-	RBrace  // }
-	LParen  // (
-	RParen  // )
-	LBrack  // [
-	RBrack  // ]
-	Comma   // ,
-	At      // @
-	Arrow   // ->
-	BiArrow // <->
+	LBrace // {
+	RBrace // }
+	LParen // (
+	RParen // )
+	LBrack // [
+	RBrack // ]
+	Comma  // ,
+	At     // @
+	Gt     // >  many-to-one
+	Lt     // <  one-to-many
+	Dash   // -  one-to-one
+	LtGt   // <> many-to-many
+	Dot    // .
 	Illegal
 )
 
@@ -68,8 +71,11 @@ var kindNames = [...]string{
 	RBrack:     `"]"`,
 	Comma:      `","`,
 	At:         `"@"`,
-	Arrow:      `"->"`,
-	BiArrow:    `"<->"`,
+	Gt:         `">"`,
+	Lt:         `"<"`,
+	Dash:       `"-"`,
+	LtGt:       `"<>"`,
+	Dot:        `"."`,
 	Illegal:    "invalid token",
 }
 

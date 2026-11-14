@@ -4,7 +4,7 @@ entity Product {
   name     string  required @postgres(column product_name)
   price    decimal required @stripe(amount)
   status   string
-  category -> Category @stripe(link)
+  category > Category @stripe(link)
 
   @postgres(index [name, status], unique_index name)
   @stripe(sellable)

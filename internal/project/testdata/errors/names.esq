@@ -18,7 +18,7 @@ entity Product (size "big") {
   full_name string
   preço     decimal
   category_id uuid
-  category  -> Category
+  category  > Category
 }
 
 entity Product {
