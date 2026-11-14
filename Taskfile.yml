@@ -33,7 +33,7 @@ tasks:
   test:update:
     desc: Rewrite golden files after an intended output change (review the diff!)
     cmds:
-      - go test ./internal/... -run Golden -update
+      - go test ./internal/dsl ./internal/model ./internal/blueprint ./internal/compose -run Golden -update
 
   fuzz:
     desc: 'Fuzz the DSL parser and formatter (default 1m each, e.g. task fuzz -- 5m)'
