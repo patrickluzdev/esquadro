@@ -1,0 +1,4 @@
+	pool *pgxpool.Pool
+{{- range .Modules}}{{if .Entities}}
+	{{.Camel}} *{{.Snake}}.{{.Pascal}}
+{{- end}}{{end}}

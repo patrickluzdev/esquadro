@@ -47,7 +47,7 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	if l == nil {
 		return 1
 	}
-	res, templates, diags := compose.Compose(l.project, l.set)
+	res, templates, diags := compose.ComposeWith(l.project, l.set, builtinFuncs)
 	diags = append(diags, hook.CheckOverlaps(l.set, res)...)
 	diags.Sort()
 	if len(diags) > 0 {

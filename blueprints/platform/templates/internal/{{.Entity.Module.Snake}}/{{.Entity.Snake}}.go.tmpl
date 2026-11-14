@@ -35,6 +35,40 @@ type New{{$e.Pascal}} struct {
 	{{.Pascal}}ID string
 {{- end}}{{end}}
 }
+{{- $defaults := false}}
+{{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end}}
+{{- if $defaults}}
+
+// WithDefaults fills the fields left empty with the defaults declared for
+// {{$e.Plural.Snake}}.
+func (n New{{$e.Pascal}}) WithDefaults() New{{$e.Pascal}} {
+{{- range $e.Fields}}{{if and .Default (not .Implicit)}}{{$x := printf "n.%s" .Pascal}}
+{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "uuid")}}
+	if {{$x}} == "" {
+		{{$x}} = {{quote .Default.Text}}
+	}
+{{- else if eq .Type "enum"}}
+	if {{$x}} == "" {
+		{{$x}} = {{.Enum.Pascal}}{{.Default.EnumValue.Pascal}}
+	}
+{{- else if eq .Type "json"}}
+	if len({{$x}}) == 0 {
+		{{$x}} = json.RawMessage({{quote .Default.Text}})
+	}
+{{- else if and (or (eq .Type "time") (eq .Type "date")) (eq .Default.Text "now")}}
+	if {{$x}}.IsZero() {
+		{{$x}} = time.Now()
+	}
+{{- end}}
+{{- end}}{{end}}
+	return n
+}
+{{- else}}
+
+// WithDefaults returns n: no field of {{$e.Plural.Snake}} has a default that an
+// empty value could stand for.
+func (n New{{$e.Pascal}}) WithDefaults() New{{$e.Pascal}} { return n }
+{{- end}}
 {{range $e.Fields}}{{if .Pattern}}
 // {{$e.Camel}}{{.Pascal}}Pattern is the pattern declared for {{$e.Pascal}}.{{.Raw}}.
 var {{$e.Camel}}{{.Pascal}}Pattern = regexp.MustCompile({{rawQuote .Pattern}})

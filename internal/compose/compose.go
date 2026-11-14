@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"go/format"
 	"io/fs"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -106,7 +107,13 @@ type Data struct {
 // Compose renders every blueprint of the set. Diagnostics point at template
 // files; Sources returns their contents for rendering.
 func Compose(p *project.Project, set *blueprint.Set) (*Result, *Sources, diag.List) {
-	c := &composer{p: p, set: set, src: &Sources{files: map[string][]byte{}}}
+	return ComposeWith(p, set, nil)
+}
+
+// ComposeWith is Compose with extra template functions per blueprint name:
+// built-in blueprints give their templates helpers written in Go.
+func ComposeWith(p *project.Project, set *blueprint.Set, extra map[string]template.FuncMap) (*Result, *Sources, diag.List) {
+	c := &composer{p: p, set: set, src: &Sources{files: map[string][]byte{}}, extra: extra}
 	res := c.compose()
 	c.diags.Sort()
 	return res, c.src, c.diags
@@ -130,6 +137,9 @@ type composer struct {
 	declared map[string]string
 	// contribs maps slot name to its contributions, in generation order.
 	contribs map[string][]*contribution
+
+	// extra are template functions by blueprint name.
+	extra map[string]template.FuncMap
 
 	// Rendering state.
 	cur   *File    // file being rendered
@@ -298,6 +308,12 @@ func (c *composer) parse(bp *blueprint.Blueprint, name, p string) *template.Temp
 
 func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 	self := bp.Manifest.Name
+	funcs := c.baseFuncs(self)
+	maps.Copy(funcs, c.extra[self])
+	return funcs
+}
+
+func (c *composer) baseFuncs(self string) template.FuncMap {
 	return template.FuncMap{
 		"slot": c.slot,
 		// ann returns this blueprint's annotation values on a node (app,

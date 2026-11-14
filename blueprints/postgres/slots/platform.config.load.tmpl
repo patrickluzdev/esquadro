@@ -1,0 +1,4 @@
+	c.DatabaseURL = get("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/{{.App.Snake}}?sslmode=disable")
+	if c.PoolMax, err = strconv.Atoi(get("{{upper .App.Snake}}_POOL_MAX", "{{.Options.pool_max}}")); err != nil {
+		return Config{}, fmt.Errorf("config: {{upper .App.Snake}}_POOL_MAX must be a number: %w", err)
+	}

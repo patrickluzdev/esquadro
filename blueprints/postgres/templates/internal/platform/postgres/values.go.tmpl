@@ -1,0 +1,72 @@
+{{- $decimal := false}}{{range .Entities}}{{if needs . "decimal"}}{{$decimal = true}}{{end}}{{end -}}
+package postgres
+
+{{importBlock "fmt" "time" "github.com/jackc/pgx/v5/pgtype" (and $decimal "github.com/shopspring/decimal")}}
+// In optional columns, the empty value of a Go type stands for NULL: an
+// empty string, a zero time. Numbers and booleans are always stored, since
+// their zero is a value.
+
+// Text is s, NULL when empty.
+func Text(s string) pgtype.Text { return pgtype.Text{String: s, Valid: s != ""} }
+
+// Int4 is n.
+func Int4(n int) pgtype.Int4 { return pgtype.Int4{Int32: int32(n), Valid: true} }
+
+// Int8 is n.
+func Int8(n int64) pgtype.Int8 { return pgtype.Int8{Int64: n, Valid: true} }
+
+// Bool is b.
+func Bool(b bool) pgtype.Bool { return pgtype.Bool{Bool: b, Valid: true} }
+
+// Timestamptz is t, NULL when zero.
+func Timestamptz(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t, Valid: !t.IsZero()} }
+
+// Date is the day of t, NULL when zero.
+func Date(t time.Time) pgtype.Date { return pgtype.Date{Time: t, Valid: !t.IsZero()} }
+
+// UUID is the UUID written in s, NULL when s is not one: an ID that cannot
+// exist finds nothing.
+func UUID(s string) pgtype.UUID {
+	var u pgtype.UUID
+	if err := u.Scan(s); err != nil {
+		return pgtype.UUID{}
+	}
+	return u
+}
+
+// ID writes a UUID as text, empty when NULL.
+func ID(u pgtype.UUID) string {
+	if !u.Valid {
+		return ""
+	}
+	b := u.Bytes
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+{{- if $decimal}}
+
+// Numeric is d.
+func Numeric(d decimal.Decimal) pgtype.Numeric {
+	var n pgtype.Numeric
+	if err := n.Scan(d.String()); err != nil {
+		return pgtype.Numeric{}
+	}
+	return n
+}
+
+// Decimal is n, zero when NULL.
+func Decimal(n pgtype.Numeric) decimal.Decimal {
+	v, err := n.Value()
+	if err != nil {
+		return decimal.Zero
+	}
+	s, ok := v.(string)
+	if !ok {
+		return decimal.Zero
+	}
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return decimal.Zero
+	}
+	return d
+}
+{{- end}}

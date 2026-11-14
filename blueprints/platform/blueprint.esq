@@ -26,6 +26,14 @@ blueprint platform {
   slot "platform.routes"
   /// Tasks of Taskfile.esquadro.yml, indented by two spaces.
   slot "platform.tasks"
+  /// Cases of the command switch in main, e.g. case "migrate": err = migrate().
+  slot "platform.commands"
+  /// Import lines of each module's file, e.g. "errors".
+  slot "platform.module.imports"
+  /// Fields of each module's Deps, e.g. Pool *pgxpool.Pool.
+  slot "platform.module.deps"
+  /// Declarations in each module's var block of errors.
+  slot "platform.module.errors"
 
   go_require "github.com/shopspring/decimal" "v1.4.0"
 

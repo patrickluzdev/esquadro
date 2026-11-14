@@ -1,0 +1,69 @@
+// Package postgres opens the database, applies its migrations and converts
+// values between Go and Postgres.
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib" // the "pgx" driver goose uses through database/sql
+	"github.com/pressly/goose/v3"
+
+	"{{.App.Module}}/migrations"
+)
+
+// Open connects to the database at url with at most maxConns connections and
+// checks that it answers.
+func Open(ctx context.Context, url string, maxConns int) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: %w", err)
+	}
+	config.MaxConns = int32(maxConns)
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("postgres: %w", err)
+	}
+	return pool, nil
+}
+
+// Migrate applies the migrations the database does not have yet.
+func Migrate(ctx context.Context, url string) error {
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		return fmt.Errorf("postgres: %w", err)
+	}
+	defer db.Close()
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.FS)
+	if err != nil {
+		return fmt.Errorf("postgres: load migrations: %w", err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		return fmt.Errorf("postgres: apply migrations: %w", err)
+	}
+	return nil
+}
+
+// Violation tells which constraint err broke and how ("unique" or
+// "foreign_key"); ok is false for any other error.
+func Violation(err error) (constraint, kind string, ok bool) {
+	pg, isPg := errors.AsType[*pgconn.PgError](err)
+	if !isPg {
+		return "", "", false
+	}
+	switch pg.Code {
+	case "23505":
+		return pg.ConstraintName, "unique", true
+	case "23503":
+		return pg.ConstraintName, "foreign_key", true
+	}
+	return "", "", false
+}

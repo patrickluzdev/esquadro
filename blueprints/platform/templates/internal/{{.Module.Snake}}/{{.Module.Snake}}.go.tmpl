@@ -1,12 +1,38 @@
 // Package {{.Module.Snake}} holds{{range $i, $e := .Module.Entities}}{{if $i}},{{end}} {{$e.Pascal}}{{end}}{{if not .Module.Entities}} its enums{{end}}.
 package {{.Module.Snake}}
+{{- with slot "platform.module.imports" .}}
+
+import (
+{{.}}
+)
+{{- end}}
+{{- with slot "platform.module.errors" .}}
+
+var (
+{{.}}
+)
+{{- end}}
 
 // FieldError is a field the module refuses, with a code that says why:
-// required, too_short, too_long, too_small, too_large, pattern or
-// invalid_value.
+// required, too_short, too_long, too_small, too_large, pattern,
+// invalid_value, not_found (a related record that does not exist) or taken
+// (a unique value already used).
 type FieldError struct{ Field, Code string }
 
 // InvalidFields is a value the module refuses, field by field.
 type InvalidFields struct{ Fields []FieldError }
 
 func (e *InvalidFields) Error() string { return "{{.Module.Snake}}: invalid fields" }
+
+// Deps are what {{.Module.Snake}} needs, given by main.
+type Deps struct {
+{{- with slot "platform.module.deps" .}}
+{{.}}
+{{- end}}
+}
+
+// {{.Module.Pascal}} is the {{.Module.Snake}} module: its use cases are its methods.
+type {{.Module.Pascal}} struct{ Deps }
+
+// New returns the module with its dependencies.
+func New(deps Deps) *{{.Module.Pascal}} { return &{{.Module.Pascal}}{Deps: deps} }

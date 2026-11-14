@@ -1,0 +1,17 @@
+package main
+
+import (
+	"context"
+
+	"{{.App.Module}}/internal/platform/config"
+	"{{.App.Module}}/internal/platform/postgres"
+)
+
+// migrate applies the database migrations the database does not have yet.
+func migrate() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	return postgres.Migrate(context.Background(), cfg.DatabaseURL)
+}

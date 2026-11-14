@@ -1,0 +1,15 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "errors" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// Read{{$e.Pascal}} returns the {{lower $e.Label}} with the given id.
+func ({{$r}} *{{$m.Pascal}}) Read{{$e.Pascal}}(ctx context.Context, id string) ({{$e.Pascal}}, error) {
+	row, err := sqlgen.New({{$r}}.Pool).Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return {{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
+	}
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+	return {{$e.Camel}}Of(row), nil
+}

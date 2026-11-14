@@ -4,7 +4,9 @@ package blueprints
 
 import "embed"
 
-// FS contains the built-in blueprints.
+// FS contains the built-in blueprints: each one's manifest, templates and
+// slots, and not its Go code or test data.
 //
-//go:embed all:platform all:postgres
+//go:embed platform/blueprint.esq all:platform/templates
+//go:embed postgres/blueprint.esq all:postgres/templates postgres/slots
 var FS embed.FS

@@ -1,0 +1,19 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// Delete{{$e.Pascal}} deletes the {{lower $e.Label}} with the given id, unless
+// other records still point at it.
+func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id string) error {
+	deleted, err := sqlgen.New({{$r}}.Pool).Delete{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
+		return Err{{$e.Pascal}}InUse
+	}
+	if err != nil {
+		return err
+	}
+	if deleted == 0 {
+		return Err{{$e.Pascal}}NotFound
+	}
+	return nil
+}

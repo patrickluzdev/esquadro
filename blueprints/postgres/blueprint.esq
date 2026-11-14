@@ -1,5 +1,6 @@
-/// PostgreSQL storage: migrations with goose, queries with sqlc and a
-/// repository per entity.
+/// PostgreSQL storage: migrations written from the change in the model,
+/// queries with sqlc, and each entity's use cases (create, read, list,
+/// update, delete) as methods of its module.
 blueprint postgres {
   version "0.1.0"
   requires platform
@@ -24,4 +25,8 @@ blueprint postgres {
   }
 
   go_require "github.com/jackc/pgx/v5" "v5.7.1"
+  go_require "github.com/pressly/goose/v3" "v3.24.1"
+
+  hook pre-gen "migrations"
+  hook post-gen "sqlc" writes "internal/*/sqlgen/**"
 }

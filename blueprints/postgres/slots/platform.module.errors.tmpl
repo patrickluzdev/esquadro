@@ -1,0 +1,6 @@
+{{- range .Module.Entities}}
+	// Err{{.Pascal}}NotFound is the error for an id that is no {{lower .Label}}.
+	Err{{.Pascal}}NotFound = errors.New("{{$.Module.Snake}}: no such {{lower .Label}}")
+	// Err{{.Pascal}}InUse is the error for deleting a {{lower .Label}} other records still point at.
+	Err{{.Pascal}}InUse = errors.New("{{$.Module.Snake}}: the {{lower .Label}} is still in use")
+{{- end}}

@@ -103,17 +103,24 @@ func ID(bp *blueprint.Blueprint, h *blueprint.Hook) string {
 	return bp.Manifest.Name + " " + h.Event + " " + h.Path
 }
 
-// Hooks returns the hooks of an event, in generation order.
+// Hooks returns the hooks of an event in generation order, except that
+// post-gen hooks that write files (generators, such as sqlc) run before those
+// that only edit files (tidy-ups, such as go mod tidy), which need the
+// generated code to be there.
 func Hooks(set *blueprint.Set, event string) []Hooked {
-	var out []Hooked
+	var writers, editors []Hooked
 	for _, bp := range set.Blueprints {
 		for _, h := range bp.Manifest.Hooks {
-			if h.Event == event {
-				out = append(out, Hooked{bp, h})
+			switch {
+			case h.Event != event:
+			case event == "post-gen" && len(h.Writes) == 0 && len(h.Edits) > 0:
+				editors = append(editors, Hooked{bp, h})
+			default:
+				writers = append(writers, Hooked{bp, h})
 			}
 		}
 	}
-	return out
+	return append(writers, editors...)
 }
 
 // Hooked is a hook with its blueprint.

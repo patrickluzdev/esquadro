@@ -197,14 +197,14 @@ func alterTable(s *steps, from, to table) {
 			if c.notNull {
 				verb = "SET"
 			}
-			s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s NOT NULL;", q, c.name, verb))
+			s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s NOT NULL;", q, Ident(c.name), verb))
 			s.labels = append(s.labels, "change_"+to.name+"_"+c.name)
 		}
 		if prev.def != c.def {
 			if c.def == "" {
-				s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;", q, c.name))
+				s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s DROP DEFAULT;", q, Ident(c.name)))
 			} else {
-				s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", q, c.name, c.def))
+				s.alterColumns = append(s.alterColumns, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", q, Ident(c.name), c.def))
 			}
 			s.labels = append(s.labels, "change_"+to.name+"_"+c.name)
 		}
@@ -219,7 +219,7 @@ func alterTable(s *steps, from, to table) {
 	}
 	for _, c := range from.columns {
 		if to.column(c.name) == nil {
-			s.dropColumns = append(s.dropColumns, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s;", q, c.name))
+			s.dropColumns = append(s.dropColumns, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s;", q, Ident(c.name)))
 			s.labels = append(s.labels, "drop_"+to.name+"_"+c.name)
 		}
 	}
@@ -269,17 +269,25 @@ func createTable(t table) string {
 	for _, c := range t.columns {
 		lines = append(lines, "    "+columnSQL(c))
 	}
-	lines = append(lines, "    PRIMARY KEY ("+strings.Join(t.primaryKey, ", ")+")")
+	lines = append(lines, "    PRIMARY KEY ("+idents(t.primaryKey)+")")
 	for _, c := range t.columns {
 		if c.unique {
-			lines = append(lines, fmt.Sprintf("    CONSTRAINT %s UNIQUE (%s)", uniqueName(t, c), c.name))
+			lines = append(lines, fmt.Sprintf("    CONSTRAINT %s UNIQUE (%s)", uniqueName(t, c), Ident(c.name)))
 		}
 	}
 	return "CREATE TABLE " + t.qualified() + " (\n" + strings.Join(lines, ",\n") + "\n);"
 }
 
+func idents(names []string) string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = Ident(n)
+	}
+	return strings.Join(out, ", ")
+}
+
 func columnSQL(c column) string {
-	s := c.name + " " + c.sqlType
+	s := Ident(c.name) + " " + c.sqlType
 	if c.notNull {
 		s += " NOT NULL"
 	}
@@ -292,12 +300,12 @@ func columnSQL(c column) string {
 func uniqueName(t table, c column) string { return t.name + "_" + c.name + "_key" }
 
 func addUnique(t table, c column) string {
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);", t.qualified(), uniqueName(t, c), c.name)
+	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);", t.qualified(), uniqueName(t, c), Ident(c.name))
 }
 
 func addForeignKey(t table, fk foreignKey) string {
 	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (id) ON DELETE %s;",
-		t.qualified(), fk.name, fk.column, fk.refTable, fk.onDelete)
+		t.qualified(), fk.name, Ident(fk.column), fk.refTable, fk.onDelete)
 }
 
 func createIndex(t table, ix index) string {
@@ -305,7 +313,7 @@ func createIndex(t table, ix index) string {
 	if ix.unique {
 		kind = "UNIQUE INDEX"
 	}
-	return fmt.Sprintf("CREATE %s %s ON %s (%s);", kind, ix.name, t.qualified(), strings.Join(ix.columns, ", "))
+	return fmt.Sprintf("CREATE %s %s ON %s (%s);", kind, ix.name, t.qualified(), idents(ix.columns))
 }
 
 func findEnum(db database, key string) *enumType {

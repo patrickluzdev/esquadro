@@ -1,0 +1,36 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// Max{{$e.Pascal}}Page is the most {{$e.Plural.Snake}} a page holds.
+const Max{{$e.Pascal}}Page = 100
+
+// {{$e.Pascal}}Page is a page of {{$e.Plural.Snake}} in the order they were created.
+// Next is the cursor of the next page, empty on the last one.
+type {{$e.Pascal}}Page struct {
+	{{$e.Plural.Pascal}} []{{$e.Pascal}}
+	Next string
+}
+
+// List{{$e.Plural.Pascal}} returns up to limit {{$e.Plural.Snake}} (at most
+// Max{{$e.Pascal}}Page) created after the one whose id is after, or from the
+// first when after is empty.
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after string, limit int) ({{$e.Pascal}}Page, error) {
+	limit = min(max(limit, 1), Max{{$e.Pascal}}Page)
+	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Plural.Pascal}}(ctx, sqlgen.List{{$e.Plural.Pascal}}Params{
+		After:    postgres.UUID(after),
+		PageSize: int32(limit + 1),
+	})
+	if err != nil {
+		return {{$e.Pascal}}Page{}, err
+	}
+	page := {{$e.Pascal}}Page{ {{$e.Plural.Pascal}}: make([]{{$e.Pascal}}, 0, min(len(rows), limit)) }
+	for i, row := range rows {
+		if i == limit {
+			page.Next = page.{{$e.Plural.Pascal}}[limit-1].ID
+			break
+		}
+		page.{{$e.Plural.Pascal}} = append(page.{{$e.Plural.Pascal}}, {{$e.Camel}}Of(row))
+	}
+	return page, nil
+}

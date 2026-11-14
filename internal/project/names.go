@@ -1,6 +1,7 @@
 package project
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -114,4 +115,20 @@ func capitalize(s string) string {
 		return s
 	}
 	return string(unicode.ToUpper(r)) + s[size:]
+}
+
+// NamesOf builds every spelling of a name, as the model does for the names
+// in .esq files. It returns ok=false for names that are not plain ASCII.
+func NamesOf(raw string) (Names, bool) { return makeNames(raw) }
+
+// Initialisms lists, sorted, the words written in capitals in Go names
+// (userID, not userId). Tools that name Go code, such as sqlc, are given the
+// same list so names agree.
+func Initialisms() []string {
+	out := make([]string, 0, len(commonInitialisms))
+	for w := range commonInitialisms {
+		out = append(out, w)
+	}
+	slices.Sort(out)
+	return out
 }

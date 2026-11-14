@@ -1,0 +1,10 @@
+
+  migrate:
+    desc: Apply the database migrations (DATABASE_URL)
+    cmds:
+      - go run ./cmd/{{.App.Kebab}} migrate
+
+  db:
+    desc: Start a Postgres for development on localhost:5432
+    cmds:
+      - docker run -d --name {{.App.Kebab}}-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB={{.App.Snake}} -p 5432:5432 postgres:17-alpine
