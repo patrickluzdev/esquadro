@@ -7,6 +7,8 @@ blueprint platform {
   /// Port the HTTP server listens on when PORT is not set.
   option port int default(8080)
 
+  /// Imports of config.go beyond fmt, os and strconv, e.g. "strings".
+  slot "platform.config.imports"
   /// Fields of config.Config.
   slot "platform.config.fields"
   /// Code in config.Load that fills those fields; c is the Config.

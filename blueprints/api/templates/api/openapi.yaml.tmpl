@@ -9,13 +9,18 @@ info:
   description: |
     The {{.App.Label}} API.
 
-    Errors are Problem Details whose `code` is stable: `invalid_request` (400)
-    for a request that does not match this contract, `not_found` (404),
-    `in_use` (409) for deleting a record others point at, and
+    Errors are Problem Details whose `code` is stable and whose `title` is in
+    the language Accept-Language asks for{{if gt (len (strs .Options.languages)) 1}} ({{join ", " (strs .Options.languages)}}){{end}}:
+    `invalid_request` (400) for a request that does not match this contract,
+    `not_found` (404), `method_not_allowed` (405), `not_acceptable` (406),
+    `in_use` (409) for deleting a record others point at,
+    `request_too_large` (413), `unsupported_media_type` (415),
     `invalid_fields` (422) listing every field refused at once, with codes
     `required`, `too_short`, `too_long`, `too_small`, `too_large`, `pattern`,
     `invalid_value`, `not_found` (a related record that does not exist) and
-    `taken` (a unique value already used).
+    `taken` (a unique value already used), `rate_limited` (429, with
+    Retry-After) and `internal` (500). Every response carries X-Request-Id,
+    which errors repeat as `requestId`.
 servers:
   - url: /api/v1
 tags:
@@ -167,6 +172,7 @@ components:
           description: With `invalid_fields`, every field refused.
           items:
             $ref: "#/components/schemas/FieldProblem"
+        requestId: {type: string, description: The request's X-Request-Id.}
     FieldProblem:
       type: object
       required: [field, code]

@@ -1,0 +1,20 @@
+{{- if .Entities -}}
+package edge
+
+// translations are the titles of the problems by language and code, for
+// every language of Languages but English, in which they are written. Yours
+// to change: esquadro wrote this file once and never changes it again, so
+// add a language here when you add it to the api blueprint's languages, and
+// a title when a blueprint adds a problem. A title missing here is answered
+// in English; the code is the same in every language.
+var translations = map[string]map[string]string{
+{{- range strs .Options.languages}}{{$lang := .}}{{if not (english $lang)}}
+	{{quote $lang}}: {
+{{- range problems}}
+		{{quote .Code}}: {{quote (translation $lang .Code)}},{{if not (translated $lang .Code)}} // TODO: translate{{end}}
+{{- end}}
+	},
+{{- end}}
+{{- end}}
+}
+{{end -}}

@@ -6,6 +6,7 @@ package api
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -30,6 +31,12 @@ func TemplateFuncs() template.FuncMap {
 		"apiSample":        apiSample,
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
+		"problems":         func() []Problem { return Problems },
+		"translation":      func(lang, code string) string { t, _ := translation(lang, code); return t },
+		"translated":       func(lang, code string) bool { _, ok := translation(lang, code); return ok },
+		"english":          func(lang string) bool { base, _, _ := strings.Cut(lang, "-"); return strings.EqualFold(base, "en") },
+		"strs":             strs,
+		"goStrings":        goStrings,
 	}
 }
 
@@ -275,4 +282,100 @@ func modulePaths(appModule string, modules []*project.Module) []string {
 		}
 	}
 	return out
+}
+
+// ---- edge ----
+
+// Problem is a problem every generated API may answer with, apart from the
+// titles each module writes for its records.
+type Problem struct {
+	Code   string
+	Status int
+	Name   string // of its Err variable in package edge
+	Title  string
+	Doc    string
+}
+
+// Problems are the problems of package edge, in the order of their status.
+var Problems = []Problem{
+	{"invalid_request", 400, "ErrInvalidRequest", "The request does not match the API's contract.", "a request that does not match the contract"},
+	{"not_found", 404, "ErrNotFound", "Nothing was found at this address.", "an address with nothing behind it"},
+	{"method_not_allowed", 405, "ErrMethodNotAllowed", "This address does not take that method.", "a method the address does not take"},
+	{"not_acceptable", 406, "ErrNotAcceptable", "The API answers only in JSON.", "an Accept header that leaves out JSON"},
+	{"in_use", 409, "", "Other records still point at this one.", ""},
+	{"request_too_large", 413, "ErrRequestTooLarge", "The request body is too large.", "a body over the limit"},
+	{"unsupported_media_type", 415, "ErrUnsupportedMediaType", "Send the request body as application/json.", "a body that is not JSON"},
+	{"invalid_fields", 422, "", "Some fields are not valid.", ""},
+	{"rate_limited", 429, "ErrRateLimited", "Too many requests; try again later.", "a client over the rate limit"},
+	{"internal", 500, "ErrInternal", "Something went wrong on our side.", "anything else, logged on the server"},
+	{"not_implemented", 501, "ErrNotImplemented", "The operation is not implemented.", "an operation of the contract nobody implemented"},
+}
+
+// translations are the titles of Problems in the languages esquadro knows,
+// written into a new project's translations.go.
+var translations = map[string]map[string]string{
+	"pt-BR": {
+		"invalid_request":        "A requisição não segue o contrato da API.",
+		"not_found":              "Nada foi encontrado neste endereço.",
+		"method_not_allowed":     "Este endereço não aceita esse método.",
+		"not_acceptable":         "A API responde apenas em JSON.",
+		"in_use":                 "Outros registros ainda apontam para este.",
+		"request_too_large":      "O corpo da requisição é grande demais.",
+		"unsupported_media_type": "Envie o corpo da requisição como application/json.",
+		"invalid_fields":         "Alguns campos não são válidos.",
+		"rate_limited":           "Requisições demais; tente de novo mais tarde.",
+		"internal":               "Algo deu errado do nosso lado.",
+		"not_implemented":        "A operação não foi implementada.",
+	},
+	"es": {
+		"invalid_request":        "La solicitud no sigue el contrato de la API.",
+		"not_found":              "No se encontró nada en esta dirección.",
+		"method_not_allowed":     "Esta dirección no acepta ese método.",
+		"not_acceptable":         "La API responde solo en JSON.",
+		"in_use":                 "Otros registros todavía apuntan a este.",
+		"request_too_large":      "El cuerpo de la solicitud es demasiado grande.",
+		"unsupported_media_type": "Envíe el cuerpo de la solicitud como application/json.",
+		"invalid_fields":         "Algunos campos no son válidos.",
+		"rate_limited":           "Demasiadas solicitudes; inténtelo más tarde.",
+		"internal":               "Algo salió mal de nuestro lado.",
+		"not_implemented":        "La operación no está implementada.",
+	},
+}
+
+// translation is the title of a problem in a language, and whether esquadro
+// knows it; the English title otherwise.
+func translation(lang, code string) (string, bool) {
+	if t, ok := translations[lang][code]; ok {
+		return t, true
+	}
+	for _, p := range Problems {
+		if p.Code == code {
+			return p.Title, false
+		}
+	}
+	return "", false
+}
+
+// strs is a list option as strings.
+func strs(v any) []string {
+	list, _ := v.([]any)
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		out = append(out, fmt.Sprint(x))
+	}
+	return out
+}
+
+// goStrings is a Go []string literal of a list option.
+func goStrings(v any) string {
+	var b strings.Builder
+	b.WriteString("[]string{")
+	for i, s := range strs(v) {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(strconv.Quote(s))
+	}
+	b.WriteString("}")
+	return b.String()
 }

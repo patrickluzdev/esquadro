@@ -1,0 +1,191 @@
+{{- if .Entities -}}
+package edge
+
+import (
+{{- if .Options.compression}}
+	"compress/gzip"
+	"io"
+{{- end}}
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+var noContent = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+
+func serve(h http.Handler, req *http.Request) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	Chain(h, Identify).ServeHTTP(rec, req)
+	return rec
+}
+
+func TestNegotiatePicksTheLanguageAsked(t *testing.T) {
+	t.Parallel()
+	for header, want := range map[string]string{
+		"":                Languages[0],
+		"*":               Languages[0],
+		"xx-YY, zz;q=0.9": Languages[0],
+{{- range strs .Options.languages}}
+		{{quote .}}: {{quote .}},
+		{{quote (printf "xx;q=0.5, %s;q=0.8" .)}}: {{quote .}},
+{{- end}}
+	} {
+		if got := Negotiate(header); got != want {
+			t.Errorf("Negotiate(%q) = %q, want %q", header, got, want)
+		}
+	}
+}
+
+func TestIdentifyKeepsASensibleRequestID(t *testing.T) {
+	t.Parallel()
+	for id, kept := range map[string]bool{"abc-123": true, "": false, "a b": false, strings.Repeat("x", 65): false} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Request-Id", id)
+		got := serve(noContent, req).Header().Get("X-Request-Id")
+		if (got == id) != kept || got == "" {
+			t.Errorf("X-Request-Id %q answered as %q", id, got)
+		}
+	}
+}
+
+func TestRecoverAnswersAPanicAsInternal(t *testing.T) {
+	t.Parallel()
+	boom := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") })
+	rec := serve(Recover(slog.New(slog.DiscardHandler))(boom), httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 500 || !strings.Contains(rec.Body.String(), `"code":"internal"`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestSecureSetsTheHeadersOfAnAPI(t *testing.T) {
+	t.Parallel()
+	rec := serve(Secure(Settings{HSTS: true})(noContent), httptest.NewRequest("GET", "/", nil))
+	for _, h := range []string{"X-Content-Type-Options", "X-Frame-Options", "Content-Security-Policy", "Referrer-Policy", "Cache-Control", "Strict-Transport-Security"} {
+		if rec.Header().Get(h) == "" {
+			t.Errorf("no %s", h)
+		}
+	}
+}
+
+func TestCORSAnswersAllowedOriginsOnly(t *testing.T) {
+	t.Parallel()
+	h := CORS(Settings{CORSOrigins: []string{"https://app.example.com"}})(noContent)
+	for origin, allowed := range map[string]bool{"https://app.example.com": true, "https://evil.example.com": false} {
+		req := httptest.NewRequest("OPTIONS", "/", nil)
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		rec := serve(h, req)
+		if rec.Code != 204 || (rec.Header().Get("Access-Control-Allow-Origin") == origin) != allowed {
+			t.Errorf("preflight from %s: %d %v", origin, rec.Code, rec.Header())
+		}
+	}
+}
+
+func TestRateLimitRefusesPastTheLimit(t *testing.T) {
+	t.Parallel()
+	h := RateLimit(Settings{RateLimit: 2})(noContent)
+	var codes []int
+	for range 3 {
+		codes = append(codes, serve(h, httptest.NewRequest("GET", "/", nil)).Code)
+	}
+	if codes[0] != 204 || codes[1] != 204 || codes[2] != 429 {
+		t.Fatalf("codes %v", codes)
+	}
+}
+
+func TestLimiterRefillsOverTime(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(0, 0)
+	l := newLimiter(60, func() time.Time { return now })
+	for range 60 {
+		if ok, _, _ := l.take("a"); !ok {
+			t.Fatal("refused within the limit")
+		}
+	}
+	if ok, _, wait := l.take("a"); ok || wait <= 0 || wait > time.Second {
+		t.Fatalf("over the limit: ok %v, wait %v", ok, wait)
+	}
+	if ok, _, _ := l.take("b"); !ok {
+		t.Fatal("another client was refused")
+	}
+	now = now.Add(time.Second)
+	if ok, _, _ := l.take("a"); !ok {
+		t.Fatal("not refilled after a second")
+	}
+}
+
+func TestLimitBodyRefusesALargeBody(t *testing.T) {
+	t.Parallel()
+	rec := serve(LimitBody(Settings{MaxBody: 4})(noContent), httptest.NewRequest("POST", "/", strings.NewReader("12345")))
+	if rec.Code != 413 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestJSONOnlyRefusesOtherMedia(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		accept, contentType, body string
+		status                    int
+	}{
+		{"", "", "", 204},
+		{"application/json", "application/json; charset=utf-8", "{}", 204},
+		{"text/html", "", "", 406},
+		{"text/html, */*;q=0.1", "", "", 204},
+		{"", "text/plain", "x", 415},
+	} {
+		req := httptest.NewRequest("POST", "/", strings.NewReader(tc.body))
+		if tc.accept != "" {
+			req.Header.Set("Accept", tc.accept)
+		}
+		if tc.contentType != "" {
+			req.Header.Set("Content-Type", tc.contentType)
+		}
+		if rec := serve(JSONOnly(noContent), req); rec.Code != tc.status {
+			t.Errorf("%+v: %d", tc, rec.Code)
+		}
+	}
+}
+{{- if .Options.compression}}
+
+func TestCompressAnswersGzipToWhoAcceptsIt(t *testing.T) {
+	t.Parallel()
+	big := strings.Repeat(`{"name":"x"}`, 200)
+	h := Compress(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, big)
+	}))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip, br")
+	rec := serve(h, req)
+	if rec.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("not compressed: %v", rec.Header())
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body, err := io.ReadAll(zr); err != nil || string(body) != big {
+		t.Fatalf("body %d bytes, %v", len(body), err)
+	}
+	if rec := serve(h, httptest.NewRequest("GET", "/", nil)); rec.Header().Get("Content-Encoding") != "" || rec.Body.String() != big {
+		t.Fatal("compressed for a client that did not ask")
+	}
+}
+{{- end}}
+
+func TestWriteTitlesProblemsInTheRequestLanguage(t *testing.T) {
+	t.Parallel()
+	for _, lang := range Languages {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Accept-Language", lang)
+		rec := serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Write(w, r, ErrNotFound) }), req)
+		if rec.Header().Get("Content-Language") != lang || !strings.Contains(rec.Body.String(), TitleIn(lang, ErrNotFound)) {
+			t.Errorf("%s: %v %s", lang, rec.Header(), rec.Body)
+		}
+	}
+}
+{{end -}}

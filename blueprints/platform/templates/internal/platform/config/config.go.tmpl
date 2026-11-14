@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+{{- with slot "platform.config.imports" .}}
+{{.}}
+{{- end}}
 )
 
 // Config is the service's configuration.

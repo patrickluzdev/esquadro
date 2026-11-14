@@ -99,7 +99,7 @@ entity Product {
 	// The tests esquadro generates run every use case against their own
 	// Postgres (testcontainers).
 	tests := run(nil, "go", "test", "-v", "./...")
-	for _, want := range []string{"--- PASS: TestCreateAndReadProduct", "--- PASS: TestAPIProducts"} {
+	for _, want := range []string{"--- PASS: TestCreateAndReadProduct", "--- PASS: TestAPIProducts", "--- PASS: TestAPIEdge", "--- PASS: TestCompressAnswersGzipToWhoAcceptsIt"} {
 		if !strings.Contains(tests, want) {
 			t.Fatalf("the generated tests did not run %s:\n%s", want, tests)
 		}

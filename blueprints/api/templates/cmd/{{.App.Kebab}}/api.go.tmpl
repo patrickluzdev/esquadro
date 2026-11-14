@@ -10,6 +10,7 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 	"github.com/ogen-go/ogen/ogenerrors"
 
+	contract "{{.App.Module}}/api"
 	"{{.App.Module}}/internal/apigen"
 	"{{.App.Module}}/internal/platform/edge"
 {{- range .Modules}}{{if .Entities}}
@@ -33,8 +34,12 @@ type api struct {
 	logger *slog.Logger
 }
 
-// newAPI builds the handler of the contract's operations, mounted at
-// /api/v1.
+// newAPI builds what the service answers besides its health: the contract's
+// operations at /api/v1, the contract itself at /api/openapi.yaml
+{{- if .Options.docs}} and its
+// documentation at /docs (when the configuration allows)
+{{- end}}, and a not_found problem anywhere else. Every request
+// goes through the middleware of package edge, set from the configuration.
 func newAPI(d dependencies) (http.Handler, error) {
 	a := api{
 {{- range .Modules}}{{if .Entities}}
@@ -42,47 +47,94 @@ func newAPI(d dependencies) (http.Handler, error) {
 {{- end}}{{end}}
 		logger: d.logger,
 	}
-	// Requests ogen cannot decode are answered as Problem Details too.
-	return apigen.NewServer(a, apigen.WithErrorHandler(func(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
-		p := a.NewError(ctx, err)
-		body, mErr := p.Response.MarshalJSON()
-		if mErr != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(p.StatusCode)
-		_, _ = w.Write(body)
-	}))
+	operations, err := apigen.NewServer(a,
+		apigen.WithErrorHandler(func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+			edge.Write(w, r, a.problem(ctx, err))
+		}),
+		apigen.WithNotFound(func(w http.ResponseWriter, r *http.Request) { edge.Write(w, r, edge.ErrNotFound) }),
+		apigen.WithMethodNotAllowed(func(w http.ResponseWriter, r *http.Request, allowed string) {
+			w.Header().Set("Allow", allowed)
+			edge.Write(w, r, edge.ErrMethodNotAllowed)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	s := edge.Settings{
+		CORSOrigins: d.config.API.CORSOrigins,
+		RateLimit:   d.config.API.RateLimit,
+		MaxBody:     int64(d.config.API.MaxBodyKB) * 1024,
+		HSTS:        d.config.API.HSTS,
+		TrustProxy:  d.config.API.TrustProxy,
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", edge.Chain(operations, edge.JSONOnly, edge.LimitBody(s))))
+	mux.HandleFunc("GET /api/openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		_, _ = w.Write(contract.Contract)
+	})
+{{- if .Options.docs}}
+	if d.config.API.Docs {
+		mux.Handle("GET /docs", edge.Docs({{quote (or .Options.title .App.Label)}}, "/api/openapi.yaml"))
+	}
+{{- end}}
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { edge.Write(w, r, edge.ErrNotFound) })
+	return edge.Chain(mux,
+		edge.Identify,
+		edge.Log(d.logger, s),
+		edge.Recover(d.logger),
+		edge.Secure(s),
+		edge.CORS(s),
+		edge.RateLimit(s),
+{{- if .Options.compression}}
+		edge.Compress,
+{{- end}}
+	), nil
 }
 
-// NewError answers every error as Problem Details; anything that is not a
-// known problem is logged and answered as internal.
+// NewError answers the errors of the operations as Problem Details.
 func (a api) NewError(ctx context.Context, err error) *apigen.ProblemStatusCode {
-	p := problemOf(err)
-	if p == edge.ErrInternal {
-		a.logger.ErrorContext(ctx, "operation failed", slog.Any("error", err))
-	}
-	var fields []apigen.FieldProblem
-	for _, f := range p.Errors {
+	doc := edge.DocumentOf(ctx, a.problem(ctx, err))
+	fields := make([]apigen.FieldProblem, 0, len(doc.Errors))
+	for _, f := range doc.Errors {
 		fields = append(fields, apigen.FieldProblem{Field: f.Field, Code: f.Code})
 	}
-	return &apigen.ProblemStatusCode{
-		StatusCode: p.Status,
+	p := &apigen.ProblemStatusCode{
+		StatusCode: doc.Status,
 		Response: apigen.Problem{
-			Type:   "about:blank",
-			Title:  p.Title,
-			Status: int32(p.Status),
-			Code:   p.Code,
+			Type:   doc.Type,
+			Title:  doc.Title,
+			Status: int32(doc.Status),
+			Code:   doc.Code,
 			Errors: fields,
 		},
 	}
+	if len(fields) == 0 {
+		p.Response.Errors = nil
+	}
+	if doc.RequestID != "" {
+		p.Response.RequestId = apigen.NewOptString(doc.RequestID)
+	}
+	return p
+}
+
+// problem is the problem behind an error of an operation or of ogen; one
+// that is not a known problem is logged and answered as internal.
+func (a api) problem(ctx context.Context, err error) *edge.Problem {
+	p := problemOf(err)
+	if p == edge.ErrInternal {
+		a.logger.ErrorContext(ctx, "operation failed", slog.Any("error", err), slog.String("request_id", edge.RequestIDOf(ctx)))
+	}
+	return p
 }
 
 // problemOf finds the problem behind an error of an operation or of ogen.
 func problemOf(err error) *edge.Problem {
 	if p, ok := errors.AsType[*edge.Problem](err); ok {
 		return p
+	}
+	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		return edge.ErrRequestTooLarge
 	}
 	if _, ok := errors.AsType[*ogenerrors.DecodeParamsError](err); ok {
 		return edge.ErrInvalidRequest

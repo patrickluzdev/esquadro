@@ -1,14 +1,15 @@
 {{- if .Entities -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http/httptest" "testing" (apiSampleImports .Entities) (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
-// newTestClient serves the API on a database of its own and returns ogen's
-// client for it, so tests go through the whole contract: JSON, decoding,
-// the module, Postgres and back.
-func newTestClient(t *testing.T) *apigen.Client {
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+// newTestServer serves the API on a database of its own, with every
+// middleware of package edge as the configuration sets it.
+func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	pool := postgrestest.Fresh(t)
 	d := dependencies{logger: slog.New(slog.DiscardHandler), pool: pool}
+	d.config.API.RateLimit = 1000
+	d.config.API.MaxBodyKB = 64
 {{- range .Modules}}{{if .Entities}}
 	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{Pool: pool})
 {{- end}}{{end}}
@@ -18,11 +19,59 @@ func newTestClient(t *testing.T) *apigen.Client {
 	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	c, err := apigen.NewClient(srv.URL)
+	return srv
+}
+
+// newTestClient returns ogen's client for a new test server, so tests go
+// through the whole contract: JSON, decoding, the module, Postgres and back.
+func newTestClient(t *testing.T) *apigen.Client {
+	t.Helper()
+	c, err := apigen.NewClient(newTestServer(t).URL + "/api/v1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	return c
+}
+
+// TestAPIEdge checks what every request gets from package edge: problems
+// for what the contract does not have, and the headers of an API.
+func TestAPIEdge(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	for _, tc := range []struct {
+		method, path, contentType, body string
+		status                          int
+		code                            string
+	}{
+		{"GET", "/nowhere", "", "", 404, "not_found"},
+		{"GET", "/api/v1/nowhere", "", "", 404, "not_found"},
+		{"PATCH", "/api/v1/{{(index .Entities 0).Plural.Kebab}}", "", "", 405, "method_not_allowed"},
+		{"POST", "/api/v1/{{(index .Entities 0).Plural.Kebab}}", "text/plain", "x", 415, "unsupported_media_type"},
+		{"POST", "/api/v1/{{(index .Entities 0).Plural.Kebab}}", "application/json", "{", 400, "invalid_request"},
+		{"POST", "/api/v1/{{(index .Entities 0).Plural.Kebab}}", "application/json", strings.Repeat(" ", 65*1024) + "{}", 413, "request_too_large"},
+	} {
+		req, err := http.NewRequest(tc.method, srv.URL+tc.path, strings.NewReader(tc.body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.contentType != "" {
+			req.Header.Set("Content-Type", tc.contentType)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc edge.Document
+		err = json.NewDecoder(res.Body).Decode(&doc)
+		_ = res.Body.Close()
+		if err != nil || res.StatusCode != tc.status || doc.Code != tc.code || doc.RequestID == "" ||
+			res.Header.Get("Content-Type") != "application/problem+json" {
+			t.Errorf("%s %s: %d %+v (%v), want %d %s", tc.method, tc.path, res.StatusCode, doc, err, tc.status, tc.code)
+		}
+		if res.Header.Get("X-Content-Type-Options") != "nosniff" || res.Header.Get("X-Request-Id") != doc.RequestID {
+			t.Errorf("%s %s: headers %v", tc.method, tc.path, res.Header)
+		}
+	}
 }
 {{- range .Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
 {{- if canSampleAPI $e}}

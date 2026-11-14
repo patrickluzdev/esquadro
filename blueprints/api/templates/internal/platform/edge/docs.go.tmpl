@@ -1,0 +1,38 @@
+{{- if and .Entities .Options.docs -}}
+package edge
+
+import (
+	"html/template"
+	"net/http"
+)
+
+// docsUI is the Scalar API reference the documentation page loads.
+const docsUI = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js"
+
+var docsPage = template.Must(template.New("docs").Parse(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{"{{.Title}}"}}</title>
+</head>
+<body>
+  <script id="api-reference" data-url="{{"{{.Contract}}"}}"></script>
+  <script src="{{"{{.UI}}"}}"></script>
+</body>
+</html>
+`))
+
+// Docs is the documentation page of the contract served at contractURL. It
+// loosens the Content-Security-Policy that Secure sets, for this page only,
+// to let it load the reference UI.
+func Docs(title, contractURL string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src https://cdn.jsdelivr.net; "+
+			"style-src 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://fonts.scalar.com data:; "+
+			"img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = docsPage.Execute(w, struct{ Title, Contract, UI string }{title, contractURL, docsUI})
+	})
+}
+{{end -}}

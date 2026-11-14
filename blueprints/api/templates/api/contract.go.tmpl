@@ -1,0 +1,12 @@
+{{- if .Entities -}}
+// Package api holds the contract of the API, api/openapi.yaml, which the
+// service serves as it is.
+package api
+
+import _ "embed"
+
+// Contract is api/openapi.yaml.
+//
+//go:embed openapi.yaml
+var Contract []byte
+{{end -}}

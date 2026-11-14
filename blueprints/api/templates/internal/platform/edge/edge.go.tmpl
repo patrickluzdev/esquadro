@@ -1,7 +1,16 @@
 {{- if .Entities -}}
 // Package edge is the boundary of the API: the problems an operation answers
-// with, as Problem Details, without knowing the contract's generated types.
+// with, as Problem Details in the client's language, and the middleware
+// every request goes through, without knowing the contract's generated types.
 package edge
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+)
 
 // Problem is an error an operation answers with.
 type Problem struct {
@@ -12,17 +21,18 @@ type Problem struct {
 }
 
 // FieldProblem is one field refused, named as in the contract.
-type FieldProblem struct{ Field, Code string }
+type FieldProblem struct {
+	Field string `json:"field"`
+	Code  string `json:"code"`
+}
 
 func (p *Problem) Error() string { return p.Code + ": " + p.Title }
 
 var (
-	// ErrInvalidRequest is a request that does not match the contract.
-	ErrInvalidRequest = &Problem{Status: 400, Code: "invalid_request", Title: "The request does not match the API's contract."}
-	// ErrNotImplemented is an operation of the contract nobody implemented.
-	ErrNotImplemented = &Problem{Status: 501, Code: "not_implemented", Title: "The operation is not implemented."}
-	// ErrInternal is anything else, logged on the server.
-	ErrInternal = &Problem{Status: 500, Code: "internal", Title: "Something went wrong on our side."}
+{{- range problems}}{{if .Name}}
+	// {{.Name}} is {{.Doc}}.
+	{{.Name}} = &Problem{Status: {{.Status}}, Code: {{quote .Code}}, Title: {{quote .Title}}}
+{{- end}}{{end}}
 )
 
 // NotFound is a record that does not exist.
@@ -34,5 +44,121 @@ func Conflict(code, title string) *Problem { return &Problem{Status: 409, Code: 
 // InvalidFields lists every field refused at once.
 func InvalidFields(fields []FieldProblem) *Problem {
 	return &Problem{Status: 422, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
+}
+
+// Document is a problem as Problem Details (RFC 9457).
+type Document struct {
+	Type      string         `json:"type"`
+	Title     string         `json:"title"`
+	Status    int            `json:"status"`
+	Code      string         `json:"code"`
+	Errors    []FieldProblem `json:"errors,omitempty"`
+	RequestID string         `json:"requestId,omitempty"`
+}
+
+// DocumentOf is p as the request of ctx gets it: titled in its language,
+// with its ID.
+func DocumentOf(ctx context.Context, p *Problem) Document {
+	return Document{
+		Type:      "about:blank",
+		Title:     TitleIn(LanguageOf(ctx), p),
+		Status:    p.Status,
+		Code:      p.Code,
+		Errors:    p.Errors,
+		RequestID: RequestIDOf(ctx),
+	}
+}
+
+// Write answers r with p.
+func Write(w http.ResponseWriter, r *http.Request, p *Problem) {
+	body, err := json.Marshal(DocumentOf(r.Context(), p))
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(p.Status)
+	_, _ = w.Write(body)
+}
+
+// ---- language ----
+
+// Languages are the languages of the problems' titles; the first is the
+// default.
+var Languages = {{goStrings .Options.languages}}
+
+// TitleIn is p's title in lang: its translation when there is one, the
+// title it was written with (in English) otherwise.
+func TitleIn(lang string, p *Problem) string {
+	if t, ok := translations[lang][p.Code]; ok {
+		return t
+	}
+	return p.Title
+}
+
+// Negotiate picks from Languages the one an Accept-Language header prefers:
+// an exact tag first, then one of the same language ("pt" or "pt-PT" for
+// "pt-BR"), and the default when none fits.
+func Negotiate(header string) string {
+	best, bestQ := Languages[0], 0.0
+	for part := range strings.SplitSeq(header, ",") {
+		tag, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+		q := 1.0
+		if v, ok := strings.CutPrefix(strings.TrimSpace(params), "q="); ok {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				q = f
+			}
+		}
+		if q <= bestQ || tag == "" {
+			continue
+		}
+		if lang, ok := match(tag); ok {
+			best, bestQ = lang, q
+		}
+	}
+	return best
+}
+
+// match finds the language of Languages a tag asks for.
+func match(tag string) (string, bool) {
+	if tag == "*" {
+		return Languages[0], true
+	}
+	for _, l := range Languages {
+		if strings.EqualFold(l, tag) {
+			return l, true
+		}
+	}
+	base, _, _ := strings.Cut(tag, "-")
+	for _, l := range Languages {
+		if lb, _, _ := strings.Cut(l, "-"); strings.EqualFold(lb, base) {
+			return l, true
+		}
+	}
+	return "", false
+}
+
+// ---- request context ----
+
+type contextKey int
+
+const (
+	requestIDKey contextKey = iota
+	languageKey
+)
+
+// RequestIDOf is the ID of the request of ctx, empty outside one.
+func RequestIDOf(ctx context.Context) string {
+	id, _ := ctx.Value(requestIDKey).(string)
+	return id
+}
+
+// LanguageOf is the language the request of ctx is answered in.
+func LanguageOf(ctx context.Context) string {
+	if lang, ok := ctx.Value(languageKey).(string); ok {
+		return lang
+	}
+	return Languages[0]
 }
 {{end -}}
