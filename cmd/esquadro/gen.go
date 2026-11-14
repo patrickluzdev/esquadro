@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/compose"
@@ -75,7 +76,8 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	}
 	printPlan(stdout, plan, *dryRun)
 	for _, hk := range hook.Hooks(l.set, "post-gen") {
-		fmt.Fprintf(stdout, "%-9s %s  (after writing; may change %s)\n", "run", hook.ID(hk.Blueprint, hk.Hook), strings.Join(hk.Hook.Writes, ", "))
+		fmt.Fprintf(stdout, "%-9s %s  (after writing; may change %s)\n", "run", hook.ID(hk.Blueprint, hk.Hook),
+			strings.Join(append(slices.Clone(hk.Hook.Writes), hk.Hook.Edits...), ", "))
 	}
 
 	conflicts := plan.Conflicts()

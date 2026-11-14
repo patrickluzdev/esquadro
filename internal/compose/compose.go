@@ -90,10 +90,13 @@ type Data struct {
 	App      *project.App
 	Entities []*project.Entity
 	Enums    []*project.Enum
-	// Entity is set in templates rendered per entity, Enum in templates
-	// rendered per enum. Slot contributions see their caller's values.
+	Modules  []*project.Module
+	// Entity is set in templates rendered per entity, Enum per enum and
+	// Module per module; per entity and per enum, Module is theirs. Slot
+	// contributions see their caller's values.
 	Entity *project.Entity
 	Enum   *project.Enum
+	Module *project.Module
 	// Options are the options of the blueprint whose template is running.
 	Options map[string]any
 	// Blueprint is the name of the blueprint whose template is running.
@@ -301,11 +304,13 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 		// entity, field or relation), or nil when it has none.
 		"ann": func(node any) map[string]any { return annOf(node)[self] },
 		// annOf returns another blueprint's annotation values on a node.
-		"annOf": func(name string, node any) map[string]any { return annOf(node)[name] },
-		"join":  func(sep string, items []string) string { return strings.Join(items, sep) },
-		"quote": strconv.Quote,
-		"lower": strings.ToLower,
-		"upper": strings.ToUpper,
+		"annOf":     func(name string, node any) map[string]any { return annOf(node)[name] },
+		"join":      func(sep string, items []string) string { return strings.Join(items, sep) },
+		"goType":    goType,
+		"goImports": goImports,
+		"quote":     strconv.Quote,
+		"lower":     strings.ToLower,
+		"upper":     strings.ToUpper,
 		// indent prefixes every non-empty line of s with n spaces.
 		"indent": func(n int, s string) string {
 			pad := strings.Repeat(" ", n)
@@ -379,6 +384,7 @@ func (c *composer) slot(name string, data Data) (string, error) {
 var (
 	entityRef = regexp.MustCompile(`\.Entity\b`)
 	enumRef   = regexp.MustCompile(`\.Enum\b`)
+	moduleRef = regexp.MustCompile(`\.Module\b`)
 )
 
 func (c *composer) renderBlueprint(bp *blueprint.Blueprint) []*File {
@@ -404,6 +410,8 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	outPath := strings.TrimSuffix(strings.TrimSuffix(rel, onceExt), tmplExt)
 
 	perEntity, perEnum := entityRef.MatchString(outPath), enumRef.MatchString(outPath)
+	// .Entity.Module and .Enum.Module are per entity or enum, not per module.
+	perModule := !perEntity && !perEnum && moduleRef.MatchString(outPath)
 	if perEntity && perEnum {
 		c.errorf(name, 0, "a template path cannot use both .Entity and .Enum")
 		return nil
@@ -426,7 +434,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	}
 
 	whole := Data{
-		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums,
+		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
 	var datas []Data
@@ -434,13 +442,19 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	case perEntity:
 		for _, e := range c.p.Entities {
 			d := whole
-			d.Entity = e
+			d.Entity, d.Module = e, e.Module
 			datas = append(datas, d)
 		}
 	case perEnum:
 		for _, e := range c.p.Enums {
 			d := whole
-			d.Enum = e
+			d.Enum, d.Module = e, e.Module
+			datas = append(datas, d)
+		}
+	case perModule:
+		for _, m := range c.p.Modules {
+			d := whole
+			d.Module = m
 			datas = append(datas, d)
 		}
 	default:

@@ -606,6 +606,9 @@ func (p *printer) blueprint(out *strings.Builder, d *BlueprintDecl) {
 			if it.Writes != nil {
 				l.text += " writes " + valueString(*it.Writes)
 			}
+			if it.Edits != nil {
+				l.text += " edits " + valueString(*it.Edits)
+			}
 		}
 		l.trail = p.trailing(sp.End.Offset)
 		b.lines = append(b.lines, l)

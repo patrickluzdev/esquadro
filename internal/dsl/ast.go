@@ -286,8 +286,9 @@ type GoRequireItem struct {
 type HookItem struct {
 	Event Ident
 	Path  Value
-	// Writes is a string or a list of strings; nil when absent.
+	// Writes and Edits are a string or a list of strings; nil when absent.
 	Writes *Value
+	Edits  *Value
 	Span
 }
 

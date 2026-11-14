@@ -197,7 +197,7 @@ func TestPostGenMayNotWriteOutsideItsGlobs(t *testing.T) {
 		"post": `cat >/dev/null; echo x > outside.txt`,
 	})
 	err := f.generate(false)
-	if err == nil || !strings.Contains(err.Error(), "changed files outside what it declares in writes (gen/**): outside.txt") {
+	if err == nil || !strings.Contains(err.Error(), "changed files outside what it declares in writes and edits (gen/**): outside.txt") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -252,7 +252,27 @@ func TestCheckOverlaps(t *testing.T) {
 	f := newFixture(t, `  hook post-gen "hooks/post" writes "catalog/**"`+"\n", map[string]string{"post": "cat >/dev/null"})
 	_, set, res := f.load()
 	diags := CheckOverlaps(set, res)
-	if len(diags) != 1 || !strings.Contains(diags[0].Message, "may write catalog/product.txt, which blueprint demo also generates") {
+	if len(diags) != 1 || !strings.Contains(diags[0].Message, "may change catalog/product.txt, which blueprint demo also generates") {
 		t.Fatalf("diags = %v", diags)
+	}
+}
+
+func TestPostGenEditsStayTheUsers(t *testing.T) {
+	f := newFixture(t, `  hook post-gen "hooks/post" edits "notes.txt"`+"\n", map[string]string{
+		"post": `cat >/dev/null; echo "line from hook" >> notes.txt`,
+	})
+	if err := f.generate(false); err != nil {
+		t.Fatal(err)
+	}
+	lock, _ := workspace.ReadLock(f.dir)
+	if _, tracked := lock.Files["notes.txt"]; tracked {
+		t.Fatal("files a hook edits must not be tracked")
+	}
+	f.write("notes.txt", "my own notes\n", 0o644)
+	if err := f.generate(false); err != nil {
+		t.Fatalf("an edit to a file the hook edits must never conflict: %v", err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(f.dir, "notes.txt")); string(data) != "my own notes\nline from hook\n" {
+		t.Fatalf("notes.txt = %q", data)
 	}
 }

@@ -800,16 +800,27 @@ func (p *parser) parseManifestItem() ManifestItem {
 			return nil
 		}
 		h := &HookItem{Event: event, Path: path, Pos: t.Pos, End: path.End}
-		if w := p.tok(); w.Kind == Name && w.Text == "writes" {
+		for {
+			w := p.tok()
+			if w.Kind != Name || (w.Text != "writes" && w.Text != "edits") {
+				return h
+			}
 			p.advance()
-			v, ok := p.parseValue("after writes")
+			v, ok := p.parseValue("after " + w.Text)
 			if !ok {
 				return nil
 			}
-			h.Writes = &v
+			target := &h.Writes
+			if w.Text == "edits" {
+				target = &h.Edits
+			}
+			if *target != nil {
+				p.diags.Errorf(w.Pos, w.End, "%s is already set for this hook", w.Text)
+				return nil
+			}
+			*target = &v
 			h.End = v.End
 		}
-		return h
 	}
 	p.errorf(t, "unknown manifest setting %q", t.Text).Suggestion = didYouMean(t.Text, manifestSettings)
 	return nil

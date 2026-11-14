@@ -17,6 +17,9 @@ func main() {
 }
 === internal/audit/product.txt  [extra: internal/audit/{{.Entity.Snake}}.txt.tmpl]
 audit log for product
+=== internal/catalog/doc.go  [core: internal/{{.Module.Snake}}/doc.go.tmpl]
+// Package catalog holds Product, Category.
+package catalog
 === internal/enums/status.go  [core: internal/enums/{{.Enum.Snake}}.go.tmpl]
 package enums
 

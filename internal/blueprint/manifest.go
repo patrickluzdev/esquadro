@@ -129,9 +129,13 @@ type Hook struct {
 	Event string // "pre-gen" or "post-gen"
 	Path  string // relative to the blueprint folder
 	// Writes are the globs, relative to the project root, of the files a
-	// post-gen hook may write.
+	// post-gen hook may write. They are tracked like generated files: an
+	// edit by the user is a conflict.
 	Writes []string
-	Span   dsl.Span
+	// Edits are the globs of files a post-gen hook may change that stay the
+	// user's, such as go.mod: never tracked, never a conflict.
+	Edits []string
+	Span  dsl.Span
 }
 
 var (
@@ -389,34 +393,47 @@ func (v *validator) hook(h *dsl.HookItem) *Hook {
 		return nil
 	}
 	out := &Hook{Event: ev, Path: path.Clean(p), Span: h.Span}
-	if h.Writes == nil {
-		return out
-	}
-	if ev != "post-gen" {
-		v.errorf(h.Writes.Span, "writes is only allowed on post-gen hooks").
-			Suggestion = "pre-gen hooks return files to the engine instead of writing them"
+	var ok bool
+	if out.Writes, ok = v.globs(h.Writes, "writes", ev); !ok {
 		return nil
 	}
-	vals := []dsl.Value{*h.Writes}
-	if h.Writes.Kind == dsl.ListValue {
-		vals = h.Writes.List
+	if out.Edits, ok = v.globs(h.Edits, "edits", ev); !ok {
+		return nil
 	}
+	return out
+}
+
+// globs validates the patterns of a hook's writes or edits.
+func (v *validator) globs(val *dsl.Value, what, event string) ([]string, bool) {
+	if val == nil {
+		return nil, true
+	}
+	if event != "post-gen" {
+		v.errorf(val.Span, "%s is only allowed on post-gen hooks", what).
+			Suggestion = "pre-gen hooks return files to the engine instead of writing them"
+		return nil, false
+	}
+	vals := []dsl.Value{*val}
+	if val.Kind == dsl.ListValue {
+		vals = val.List
+	}
+	var out []string
 	for _, w := range vals {
 		if w.Kind != dsl.StringValue {
-			v.errorf(w.Span, "writes must be a string or a list of strings")
-			return nil
+			v.errorf(w.Span, "%s must be a string or a list of strings", what)
+			return nil, false
 		}
 		if !isRelativePath(w.Text) {
 			v.errorf(w.Span, "%q must be a path relative to the project and stay inside it", w.Text)
-			return nil
+			return nil, false
 		}
 		if _, err := path.Match(w.Text, ""); err != nil {
 			v.errorf(w.Span, "invalid pattern %q", w.Text)
-			return nil
+			return nil, false
 		}
-		out.Writes = append(out.Writes, w.Text)
+		out = append(out, w.Text)
 	}
-	return out
+	return out, true
 }
 
 // isRelativePath reports whether p is a non-empty relative slash path that

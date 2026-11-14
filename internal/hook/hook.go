@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -38,8 +39,16 @@ type Input struct {
 	// Options are the blueprint's options, defaults included.
 	Options map[string]any `json:"options"`
 	// Files are the paths generated from templates in this run.
-	Files  []string `json:"files"`
-	DryRun bool     `json:"dry_run"`
+	Files []string `json:"files"`
+	// GoRequires are the Go modules every blueprint of the project needs.
+	GoRequires []GoRequire `json:"go_requires"`
+	DryRun     bool        `json:"dry_run"`
+}
+
+// GoRequire is a Go module a blueprint needs, with its minimum version.
+type GoRequire struct {
+	Module  string `json:"module"`
+	Version string `json:"version"`
 }
 
 // Output is what a hook writes on stdout. An empty stdout is an empty
@@ -107,9 +116,9 @@ func CheckOverlaps(set *blueprint.Set, res *compose.Result) diag.List {
 	var diags diag.List
 	for _, hk := range Hooks(set, "post-gen") {
 		for _, f := range res.Files {
-			if MatchAny(hk.Hook.Writes, f.Path) {
+			if MatchAny(hk.Hook.Writes, f.Path) || MatchAny(hk.Hook.Edits, f.Path) {
 				diags.Errorf(hk.Hook.Span.Pos, hk.Hook.Span.End,
-					"hook %s may write %s, which blueprint %s also generates from %s", ID(hk.Blueprint, hk.Hook), f.Path, f.Blueprint, f.Template)
+					"hook %s may change %s, which blueprint %s also generates from %s", ID(hk.Blueprint, hk.Hook), f.Path, f.Blueprint, f.Template)
 			}
 		}
 	}
@@ -160,8 +169,9 @@ func (r *Runner) PostGen(ctx context.Context, p *project.Project, set *blueprint
 			return err
 		}
 		var outside []string
+		allowed := append(slices.Clone(hk.Hook.Writes), hk.Hook.Edits...)
 		for _, path := range changed(before, after) {
-			if !MatchAny(hk.Hook.Writes, path) {
+			if !MatchAny(allowed, path) {
 				outside = append(outside, path)
 			}
 		}
@@ -169,8 +179,8 @@ func (r *Runner) PostGen(ctx context.Context, p *project.Project, set *blueprint
 			if len(outside) > 5 {
 				outside = append(outside[:5], fmt.Sprintf("and %d more", len(outside)-5))
 			}
-			return fmt.Errorf("hook %s changed files outside what it declares in writes (%s): %s",
-				id, strings.Join(hk.Hook.Writes, ", "), strings.Join(outside, ", "))
+			return fmt.Errorf("hook %s changed files outside what it declares in writes and edits (%s): %s",
+				id, strings.Join(allowed, ", "), strings.Join(outside, ", "))
 		}
 		if err := workspace.TrackHookFiles(r.ProjectDir, id, hk.Blueprint.Manifest.Name, hk.Hook.Writes, MatchAny); err != nil {
 			return err
@@ -184,9 +194,15 @@ func (r *Runner) input(p *project.Project, set *blueprint.Set, res *compose.Resu
 	for i, f := range res.Files {
 		files[i] = f.Path
 	}
+	reqs := []GoRequire{}
+	for _, bp := range set.Blueprints {
+		for _, r := range bp.Manifest.GoRequires {
+			reqs = append(reqs, GoRequire{Module: r.Module, Version: r.Version})
+		}
+	}
 	return Input{
 		Event: hk.Hook.Event, Blueprint: hk.Blueprint.Manifest.Name, Project: p.Describe(),
-		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, DryRun: dryRun,
+		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, GoRequires: reqs, DryRun: dryRun,
 	}
 }
 

@@ -1,4 +1,4 @@
-blueprint stripe @2:1-24:2
+blueprint stripe @2:1-25:2
   doc "Payments with Stripe."
   version "0.1.0"
   requires platform, postgres
@@ -16,3 +16,4 @@ blueprint stripe @2:1-24:2
   slot "stripe.events"
   go_require "github.com/stripe/stripe-go/v82" "v82.0.0"
   hook post-gen "hooks/check" writes ["internal/payments/**", "db/**"]
+  hook post-gen "go-mod" edits ["go.mod", "go.sum"]

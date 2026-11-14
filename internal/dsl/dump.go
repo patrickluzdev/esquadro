@@ -80,6 +80,9 @@ func Dump(f *File) string {
 					if it.Writes != nil {
 						writes = " writes " + dumpValue(*it.Writes)
 					}
+					if it.Edits != nil {
+						writes += " edits " + dumpValue(*it.Edits)
+					}
 					w(1, "hook %s %s%s", it.Event.Name, dumpValue(it.Path), writes)
 				}
 			}
