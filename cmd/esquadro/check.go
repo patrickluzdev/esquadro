@@ -11,7 +11,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // manifestName is the blueprint manifest file, which is not a project file.
@@ -45,7 +45,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "esquadro check:", err)
 		return 1
 	}
-	p, diags := model.Load(sources...)
+	p, diags := project.Load(sources...)
 	loader := &blueprint.Loader{Builtin: blueprints.FS, ProjectDir: dir}
 	if !diags.HasErrors() {
 		_, more := blueprint.Resolve(p, loader)
@@ -105,23 +105,23 @@ func projectFiles(dir string) ([]string, error) {
 	return files, nil
 }
 
-func readProject(dir string) ([]model.Source, error) {
+func readProject(dir string) ([]project.Source, error) {
 	files, err := projectFiles(dir)
 	if err != nil {
 		return nil, err
 	}
-	sources := make([]model.Source, 0, len(files))
+	sources := make([]project.Source, 0, len(files))
 	for _, f := range files {
 		src, err := os.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}
-		sources = append(sources, model.Source{Name: f, Src: src})
+		sources = append(sources, project.Source{Name: f, Src: src})
 	}
 	return sources, nil
 }
 
-func sourceFunc(sources []model.Source) diag.SourceFunc {
+func sourceFunc(sources []project.Source) diag.SourceFunc {
 	return func(name string) []byte {
 		for _, s := range sources {
 			if s.Name == name {

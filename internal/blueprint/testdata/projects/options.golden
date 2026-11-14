@@ -1,4 +1,4 @@
-testdata/projects/options/app.esq:4:5: error: blueprint base has no option "prot"
+testdata/projects/options/app.esq:4:5: error: blueprint platform has no option "prot"
   |
 4 |     prot 9000
   |     ^^^^

@@ -2,7 +2,7 @@
 /// repository per entity.
 blueprint postgres {
   version "0.1.0"
-  requires base
+  requires platform
 
   /// Maximum number of connections in the pool.
   option pool_max int default(10)

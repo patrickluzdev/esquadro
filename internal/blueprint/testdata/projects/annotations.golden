@@ -1,7 +1,7 @@
-testdata/projects/annotations/app.esq:4:3: error: blueprint base has no annotation for apps
+testdata/projects/annotations/app.esq:4:3: error: blueprint platform has no annotation for apps
   |
-4 |   @base(x 1)
-  |   ^^^^^^^^^^
+4 |   @platform(x 1)
+  |   ^^^^^^^^^^^^^^
 
 testdata/projects/annotations/app.esq:8:19: error: unknown annotation @postgress
   |
@@ -15,10 +15,10 @@ testdata/projects/annotations/app.esq:9:20: error: @postgres needs blueprint pos
   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   = help: add to the app: blueprint postgres
 
-testdata/projects/annotations/app.esq:10:19: error: blueprint base has no annotation for fields
+testdata/projects/annotations/app.esq:10:19: error: blueprint platform has no annotation for fields
    |
-10 |   status   string @base(x)
-   |                   ^^^^^^^^
+10 |   status   string @platform(x)
+   |                   ^^^^^^^^^^^^
 
 testdata/projects/annotations/app.esq:11:19: error: @postgres needs blueprint postgres, which this app does not use
    |

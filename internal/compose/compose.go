@@ -12,10 +12,10 @@
 //	  notes.md.once.tmpl                     owned by the user after creation
 //	  static/logo.png                        copied as is (no .tmpl)
 //	slots/
-//	  base.routes.tmpl      contribution to the slot base.routes
-//	  base.routes/*.tmpl    several contributions to the same slot
+//	  platform.routes.tmpl      contribution to the slot platform.routes
+//	  platform.routes/*.tmpl    several contributions to the same slot
 //
-// A template opens a slot with {{slot "base.routes" .}}; contributions are
+// A template opens a slot with {{slot "platform.routes" .}}; contributions are
 // rendered at that point with the caller's data. A template whose output is
 // only whitespace produces no file. Generated .go files are gofmt'ed.
 package compose
@@ -36,7 +36,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 const (
@@ -87,13 +87,13 @@ func (r *Result) File(p string) *File {
 
 // Data is what templates see as ".".
 type Data struct {
-	App      *model.App
-	Entities []*model.Entity
-	Enums    []*model.Enum
+	App      *project.App
+	Entities []*project.Entity
+	Enums    []*project.Enum
 	// Entity is set in templates rendered per entity, Enum in templates
 	// rendered per enum. Slot contributions see their caller's values.
-	Entity *model.Entity
-	Enum   *model.Enum
+	Entity *project.Entity
+	Enum   *project.Enum
 	// Options are the options of the blueprint whose template is running.
 	Options map[string]any
 	// Blueprint is the name of the blueprint whose template is running.
@@ -102,7 +102,7 @@ type Data struct {
 
 // Compose renders every blueprint of the set. Diagnostics point at template
 // files; Sources returns their contents for rendering.
-func Compose(p *model.Project, set *blueprint.Set) (*Result, *Sources, diag.List) {
+func Compose(p *project.Project, set *blueprint.Set) (*Result, *Sources, diag.List) {
 	c := &composer{p: p, set: set, src: &Sources{files: map[string][]byte{}}}
 	res := c.compose()
 	c.diags.Sort()
@@ -118,7 +118,7 @@ type Sources struct {
 func (s *Sources) Get(name string) []byte { return s.files[name] }
 
 type composer struct {
-	p     *model.Project
+	p     *project.Project
 	set   *blueprint.Set
 	src   *Sources
 	diags diag.List
@@ -172,7 +172,7 @@ func (c *composer) templateError(file string, err error) {
 		pos := diag.Pos{File: m[1], Line: line, Col: max(col, 1)}
 		d := c.diags.Errorf(pos, diag.Pos{}, "%s", cleanTemplateMsg(m[4]))
 		for _, v := range []string{"Entity", "Enum"} {
-			if strings.Contains(m[4], "nil pointer evaluating *model."+v+".") {
+			if strings.Contains(m[4], "nil pointer evaluating *project."+v+".") {
 				d.Suggestion = fmt.Sprintf(".%s is only set in templates whose file name uses .%s (rendered once per %s) and in slots opened from them",
 					v, v, strings.ToLower(v))
 			}
@@ -320,15 +320,15 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 	}
 }
 
-func annOf(node any) model.Ann {
+func annOf(node any) project.Ann {
 	switch n := node.(type) {
-	case *model.App:
+	case *project.App:
 		return n.Ann
-	case *model.Entity:
+	case *project.Entity:
 		return n.Ann
-	case *model.Field:
+	case *project.Field:
 		return n.Ann
-	case *model.Relation:
+	case *project.Relation:
 		return n.Ann
 	}
 	return nil
@@ -423,7 +423,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 		return nil
 	}
 
-	base := Data{
+	whole := Data{
 		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
@@ -431,18 +431,18 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	switch {
 	case perEntity:
 		for _, e := range c.p.Entities {
-			d := base
+			d := whole
 			d.Entity = e
 			datas = append(datas, d)
 		}
 	case perEnum:
 		for _, e := range c.p.Enums {
-			d := base
+			d := whole
 			d.Enum = e
 			datas = append(datas, d)
 		}
 	default:
-		datas = []Data{base}
+		datas = []Data{whole}
 	}
 
 	var out []*File

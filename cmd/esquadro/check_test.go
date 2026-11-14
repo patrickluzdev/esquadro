@@ -9,7 +9,7 @@ import (
 
 const okProject = `app shop {
   module "github.com/example/shop"
-  blueprint base
+  blueprint platform
 }
 
 entity Product {
@@ -52,7 +52,7 @@ func TestCheckOK(t *testing.T) {
 
 func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint base\n}\n")
+	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
 	writeFile(t, dir, "catalog.esq", "entity Product {\n  name string\n  category -> Category\n}\n")
 	writeFile(t, dir, "category.esq", "entity Category {\n  name string\n}\n")
 
@@ -65,7 +65,7 @@ func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint base\n}\n")
+	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
 	writeFile(t, dir, "catalog.esq", "entity Product {\n  name strng\n}\n")
 
 	code, out, errOut := check(t)
@@ -82,7 +82,7 @@ func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", strings.Replace(okProject, "  blueprint base\n", "", 1))
+	writeFile(t, dir, "shop.esq", strings.Replace(okProject, "  blueprint platform\n", "", 1))
 
 	code, out, errOut := check(t)
 	if code != 0 || !strings.HasPrefix(out, "ok:") {
@@ -136,7 +136,7 @@ entity Product {
 		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
 	}
 	for _, want := range []string{
-		"blueprint postgres requires base",
+		"blueprint postgres requires platform",
 		"option pool_max of blueprint postgres: expected a whole number",
 		`@postgres has no key "colum" on fields`,
 		`did you mean "column"?`,

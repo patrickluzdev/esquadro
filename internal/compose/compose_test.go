@@ -10,7 +10,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -80,18 +80,18 @@ func composeDir(t *testing.T, dir string) string {
 	return b.String()
 }
 
-func load(t *testing.T, dir string) (*model.Project, *blueprint.Set) {
+func load(t *testing.T, dir string) (*project.Project, *blueprint.Set) {
 	t.Helper()
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.esq"))
-	var sources []model.Source
+	var sources []project.Source
 	for _, path := range paths {
 		src, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sources = append(sources, model.Source{Name: filepath.Base(path), Src: src})
+		sources = append(sources, project.Source{Name: filepath.Base(path), Src: src})
 	}
-	p, diags := model.Load(sources...)
+	p, diags := project.Load(sources...)
 	if diags.HasErrors() {
 		t.Fatalf("test project does not build: %v", diags)
 	}

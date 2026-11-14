@@ -7,7 +7,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/dsl"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // Set is the resolved set of blueprints of a project.
@@ -33,7 +33,7 @@ func (s *Set) Get(name string) *Blueprint {
 // Resolve loads the blueprints a project uses and validates the project
 // against them: dependencies, options and annotations. Validated annotation
 // values are stored in the model's Ann fields.
-func Resolve(p *model.Project, l *Loader) (*Set, diag.List) {
+func Resolve(p *project.Project, l *Loader) (*Set, diag.List) {
 	r := &resolver{p: p, l: l, set: &Set{Options: map[string]map[string]any{}}}
 	r.resolve()
 	r.diags.Sort()
@@ -41,7 +41,7 @@ func Resolve(p *model.Project, l *Loader) (*Set, diag.List) {
 }
 
 type resolver struct {
-	p     *model.Project
+	p     *project.Project
 	l     *Loader
 	set   *Set
 	diags diag.List
@@ -64,7 +64,7 @@ func (r *resolver) resolve() {
 		b, diags := r.l.Load(ref)
 		r.diags = append(r.diags, diags...)
 		if b == nil {
-			if ref.Source == model.SourceBuiltin {
+			if ref.Source == project.SourceBuiltin {
 				r.failed[ref.Ref] = true
 			}
 			continue
@@ -234,11 +234,11 @@ func (r *resolver) annotations() {
 	}
 }
 
-func (r *resolver) annotate(anns []*dsl.Annotation, t Target, e *model.Entity) model.Ann {
+func (r *resolver) annotate(anns []*dsl.Annotation, t Target, e *project.Entity) project.Ann {
 	if len(anns) == 0 {
 		return nil
 	}
-	out := model.Ann{}
+	out := project.Ann{}
 	seen := map[string]*dsl.Annotation{}
 	for _, a := range anns {
 		name := a.Name.Name
@@ -298,7 +298,7 @@ func (r *resolver) unknownAnnotation(a *dsl.Annotation) {
 	}
 }
 
-func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name string, e *model.Entity) map[string]any {
+func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name string, e *project.Entity) map[string]any {
 	vals := map[string]any{}
 	ok := true
 	for _, arg := range a.Args {
@@ -367,7 +367,7 @@ func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name 
 
 // checkFieldNames reports names in a field or fields value that are not
 // fields (or foreign-key relations) of the entity.
-func (r *resolver) checkFieldNames(v dsl.Value, e *model.Entity) bool {
+func (r *resolver) checkFieldNames(v dsl.Value, e *project.Entity) bool {
 	if e == nil {
 		return true
 	}
@@ -418,8 +418,8 @@ func plural(t Target) string {
 }
 
 // refString writes a blueprint reference as in the app block.
-func refString(ref *model.BlueprintRef) string {
-	if ref.Source == model.SourceBuiltin {
+func refString(ref *project.BlueprintRef) string {
+	if ref.Source == project.SourceBuiltin {
 		return ref.Ref
 	}
 	return `"` + ref.Ref + `"`

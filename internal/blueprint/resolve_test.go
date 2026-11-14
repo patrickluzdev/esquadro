@@ -11,7 +11,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/internal/diag"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -54,17 +54,17 @@ func TestProjectsGolden(t *testing.T) {
 func resolveDir(t *testing.T, dir string) string {
 	t.Helper()
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.esq"))
-	var sources []model.Source
+	var sources []project.Source
 	srcs := map[string][]byte{}
 	for _, p := range paths {
 		src, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sources = append(sources, model.Source{Name: p, Src: src})
+		sources = append(sources, project.Source{Name: p, Src: src})
 		srcs[p] = src
 	}
-	p, diags := model.Load(sources...)
+	p, diags := project.Load(sources...)
 	if diags.HasErrors() {
 		var b strings.Builder
 		diag.Render(&b, diags, func(n string) []byte { return srcs[n] })
@@ -87,7 +87,7 @@ func resolveDir(t *testing.T, dir string) string {
 }
 
 // summary describes the resolved set: order, options and annotations.
-func summary(p *model.Project, set *Set) string {
+func summary(p *project.Project, set *Set) string {
 	var b strings.Builder
 	b.WriteString("order:")
 	for _, bp := range set.Blueprints {
@@ -97,7 +97,7 @@ func summary(p *model.Project, set *Set) string {
 	for _, bp := range set.Blueprints {
 		fmt.Fprintf(&b, "options %s: %s\n", bp.Manifest.Name, sortedMap(set.Options[bp.Manifest.Name]))
 	}
-	ann := func(where string, a model.Ann) {
+	ann := func(where string, a project.Ann) {
 		names := make([]string, 0, len(a))
 		for n := range a {
 			names = append(names, n)
@@ -136,11 +136,11 @@ func sortedMap(m map[string]any) string {
 func TestBuiltinBlueprintsAreValid(t *testing.T) {
 	l := &Loader{Builtin: blueprints.FS}
 	names := l.BuiltinNames()
-	if strings.Join(names, " ") != "base postgres" {
+	if strings.Join(names, " ") != "platform postgres" {
 		t.Fatalf("built-in blueprints = %v", names)
 	}
 	for _, name := range names {
-		ref := &model.BlueprintRef{Ref: name, Source: model.SourceBuiltin}
+		ref := &project.BlueprintRef{Ref: name, Source: project.SourceBuiltin}
 		b, diags := l.Load(ref)
 		if b == nil || len(diags) > 0 {
 			t.Errorf("built-in %s: %v", name, diags)

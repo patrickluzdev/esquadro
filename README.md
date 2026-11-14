@@ -9,7 +9,7 @@ regenerate it whenever the model changes.
 app shop {
   module "github.com/example/shop"
 
-  blueprint base
+  blueprint platform
   blueprint postgres
 }
 

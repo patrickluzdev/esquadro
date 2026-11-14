@@ -7,7 +7,7 @@ app shop {   // the app
   /// orphan doc before a blueprint
 
 
-  blueprint base
+  blueprint platform
   blueprint postgres { pool_max 20
   max_idle   5 // idle conns
       }

@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-const messy = "app shop {\n    module \"github.com/example/shop\"\n  blueprint base\n}\nentity Product {\n  name string required\n  description text\n}\n"
+const messy = "app shop {\n    module \"github.com/example/shop\"\n  blueprint platform\n}\nentity Product {\n  name string required\n  description text\n}\n"
 
-const tidy = "app shop {\n  module \"github.com/example/shop\"\n  blueprint base\n}\n\nentity Product {\n  name        string required\n  description text\n}\n"
+const tidy = "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n\nentity Product {\n  name        string required\n  description text\n}\n"
 
 func fmtCmd(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()

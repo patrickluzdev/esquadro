@@ -1,4 +1,4 @@
 blueprint stripe {
   version "0.1.0"
-  requires base, postgres
+  requires platform, postgres
 }

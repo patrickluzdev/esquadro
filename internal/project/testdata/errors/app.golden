@@ -4,10 +4,10 @@ app.esq:2:10: error: "has spaces/x" is not a valid Go module path
   |          ^^^^^^^^^^^^^^
   = help: e.g. module "github.com/you/shop"
 
-app.esq:4:13: error: blueprint base is already used at line 3
+app.esq:4:13: error: blueprint platform is already used at line 3
   |
-4 |   blueprint base
-  |             ^^^^
+4 |   blueprint platform
+  |             ^^^^^^^^
 
 app.esq:5:13: error: "mine" is not a local path or a git source
   |

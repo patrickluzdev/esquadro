@@ -4,11 +4,11 @@ testdata/projects/deps/app.esq:3:13: error: unknown built-in blueprint "postgres
   |             ^^^^^^^^^
   = help: did you mean "postgres"?
 
-testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires base
+testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires platform
   |
 4 |   blueprint "./blueprints/stripe"
   |             ^^^^^^^^^^^^^^^^^^^^^
-  = help: add to the app: blueprint base
+  = help: add to the app: blueprint platform
 
 testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires postgres
   |

@@ -1,6 +1,6 @@
 blueprint stripe {   // payments
   version "0.1.0"
-  requires base,postgres
+  requires platform,postgres
 
 
   option currency string default("USD") // ISO code

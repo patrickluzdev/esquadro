@@ -14,7 +14,7 @@ builtin/exec/templates/exec.txt.tmpl:2:15: error: map has no entry for key "prot
 2 | port {{.Options.prot}}
   |               ^
 
-builtin/inner/slots/inner.x.tmpl:2:13: error: nil pointer evaluating *model.Entity.Pascal
+builtin/inner/slots/inner.x.tmpl:2:13: error: nil pointer evaluating *project.Entity.Pascal
   |
 2 | two {{.Entity.Pascal}}
   |             ^

@@ -1,4 +1,4 @@
-package model
+package project
 
 import (
 	"flag"
@@ -47,7 +47,7 @@ func TestErrorsGolden(t *testing.T) {
 			}
 			want, err := os.ReadFile(golden)
 			if err != nil {
-				t.Fatalf("missing golden file (run go test ./internal/model -update): %v", err)
+				t.Fatalf("missing golden file (run go test ./internal/project -update): %v", err)
 			}
 			if got != string(want) {
 				t.Errorf("output differs from %s (run with -update to accept)\n--- got ---\n%s\n--- want ---\n%s", golden, got, want)
@@ -138,7 +138,7 @@ func TestShopModel(t *testing.T) {
 
 func TestInverseNaming(t *testing.T) {
 	src := `app a { module "x.com/a"
-  blueprint base
+  blueprint platform
 }
 entity Person (plural "people") {
   name    string
@@ -254,7 +254,7 @@ func TestMultiFileErrors(t *testing.T) {
 	}
 	want, err := os.ReadFile(golden)
 	if err != nil {
-		t.Fatalf("missing golden file (run go test ./internal/model -update): %v", err)
+		t.Fatalf("missing golden file (run go test ./internal/project -update): %v", err)
 	}
 	if got != string(want) {
 		t.Errorf("output differs from %s\n--- got ---\n%s\n--- want ---\n%s", golden, got, want)

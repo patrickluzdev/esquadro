@@ -1,4 +1,4 @@
-package model
+package project
 
 import (
 	"encoding/json"
@@ -250,7 +250,7 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 	}
 	if len(d.Blueprints) == 0 {
 		b.diags.Warnf(d.Name.Pos, d.Name.End, "app %s uses no blueprints, so nothing will be generated", d.Name.Name).
-			Suggestion = "add one, e.g. blueprint base"
+			Suggestion = "add one, e.g. blueprint platform"
 	}
 	return app
 }
@@ -781,20 +781,20 @@ func (b *builder) inferInverses() {
 				continue
 			}
 			kind := r.Kind
-			base := e.Plural
+			from := e.Plural
 			switch r.Kind {
 			case ManyToOne:
 				kind = OneToMany
 			case OneToOne:
-				base = e.Names
+				from = e.Names
 			}
 			var n Names
 			if pi, ok := explicit[r]; ok {
 				n = *pi.name
 			} else if count[[2]*Entity{e, r.Target}] > 1 || e == r.Target {
-				n, _ = makeNames(base.Snake + "_by_" + r.Snake)
+				n, _ = makeNames(from.Snake + "_by_" + r.Snake)
 			} else {
-				n, _ = makeNames(base.Snake)
+				n, _ = makeNames(from.Snake)
 			}
 			inv := &Relation{
 				Names: n, Kind: kind, Entity: r.Target, Target: e,

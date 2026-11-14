@@ -1,8 +1,8 @@
-// Package model turns a parsed .esq file into a validated, fully resolved
+// Package project turns a parsed .esq file into a validated, fully resolved
 // project model: types and relation targets are linked, inverse relations
 // are inferred, implicit fields are added and every name has all the
 // spellings templates need. Blueprints only ever see this model.
-package model
+package project
 
 import (
 	"github.com/patrickluzdev/esquadro/internal/diag"
@@ -53,7 +53,7 @@ type App struct {
 type SourceKind int
 
 const (
-	SourceBuiltin SourceKind = iota // blueprint base
+	SourceBuiltin SourceKind = iota // blueprint platform
 	SourceLocal                     // blueprint "./blueprints/mine"
 	SourceGit                       // blueprint "github.com/acme/x@v1.2.0"
 )

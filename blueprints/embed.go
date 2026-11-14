@@ -6,5 +6,5 @@ import "embed"
 
 // FS contains the built-in blueprints.
 //
-//go:embed all:base all:postgres
+//go:embed all:platform all:postgres
 var FS embed.FS

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
-	"github.com/patrickluzdev/esquadro/internal/model"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // Blueprint is a loaded blueprint: its manifest and its files.
@@ -18,7 +18,7 @@ type Blueprint struct {
 	Manifest *Manifest
 	// FS is rooted at the blueprint's folder.
 	FS  fs.FS
-	Ref *model.BlueprintRef
+	Ref *project.BlueprintRef
 	// Location is where the blueprint came from, for messages:
 	// "built-in", or the folder path.
 	Location string
@@ -61,7 +61,7 @@ func (l *Loader) BuiltinNames() []string {
 
 // Load loads the blueprint a project refers to. Diagnostics point at the
 // reference in the project or into the blueprint's manifest.
-func (l *Loader) Load(ref *model.BlueprintRef) (*Blueprint, diag.List) {
+func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	var diags diag.List
 	errAtRef := func(format string, args ...any) *diag.Diagnostic {
 		return diags.Errorf(ref.RefSpan.Pos, ref.RefSpan.End, format, args...)
@@ -73,7 +73,7 @@ func (l *Loader) Load(ref *model.BlueprintRef) (*Blueprint, diag.List) {
 		file     string
 	)
 	switch ref.Source {
-	case model.SourceBuiltin:
+	case project.SourceBuiltin:
 		if l.Builtin != nil {
 			if sub, err := fs.Sub(l.Builtin, ref.Ref); err == nil {
 				if _, err := fs.Stat(sub, ManifestFile); err == nil {
@@ -92,7 +92,7 @@ func (l *Loader) Load(ref *model.BlueprintRef) (*Blueprint, diag.List) {
 		}
 		location = "built-in"
 		file = "builtin/" + ref.Ref + "/" + ManifestFile
-	case model.SourceLocal:
+	case project.SourceLocal:
 		dir := ref.Ref
 		if !filepath.IsAbs(dir) {
 			dir = filepath.Join(l.ProjectDir, dir)
@@ -112,7 +112,7 @@ func (l *Loader) Load(ref *model.BlueprintRef) (*Blueprint, diag.List) {
 		fsys = os.DirFS(dir)
 		location = dir
 		file = filepath.Join(dir, ManifestFile)
-	case model.SourceGit:
+	case project.SourceGit:
 		errAtRef("blueprints from git are not supported yet").
 			Suggestion = "clone it into a folder and use the local path, e.g. blueprint \"./blueprints/name\""
 		return nil, diags
@@ -134,7 +134,7 @@ func (l *Loader) Load(ref *model.BlueprintRef) (*Blueprint, diag.List) {
 		errAtRef("blueprint %s has an invalid manifest", refString(ref))
 		return nil, diags
 	}
-	if ref.Source == model.SourceBuiltin && m.Name != ref.Ref {
+	if ref.Source == project.SourceBuiltin && m.Name != ref.Ref {
 		diags.Errorf(diag.Pos{File: file, Line: 1, Col: 1}, diag.Pos{}, "built-in blueprint folder %s declares blueprint %s", ref.Ref, m.Name)
 		return nil, diags
 	}

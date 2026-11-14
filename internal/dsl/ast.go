@@ -267,7 +267,7 @@ type AnnotationKeyDecl struct {
 }
 
 // SlotItem declares an extension point that the blueprint's templates open:
-// `slot "base.routes"`.
+// `slot "platform.routes"`.
 type SlotItem struct {
 	Doc  []string
 	Name Value
