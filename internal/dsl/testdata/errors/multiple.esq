@@ -1,0 +1,14 @@
+entity Product {
+  name string required
+  price -> 
+  stock int min(
+}
+
+entiy Customer {
+  name string
+}
+
+entity Order {
+  total decimal
+  status Status default(OPEN) ]
+}

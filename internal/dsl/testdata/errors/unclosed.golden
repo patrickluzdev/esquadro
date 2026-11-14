@@ -1,0 +1,6 @@
+unclosed.esq:4:1: error: expected "}" to close app shop opened at line 1 before entity Product
+  |
+4 | entity Product {
+  | ^^^^^^
+
+1 error

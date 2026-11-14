@@ -1,0 +1,33 @@
+/// The demo shop used across the docs.
+app shop {
+  module "github.com/example/shop"
+  lang en
+
+  blueprint base
+  blueprint postgres {
+    pool_max 20
+  }
+}
+
+enum ProductStatus { ACTIVE INACTIVE SOLD_OUT }
+
+entity Category {
+  name string required unique max(80)
+}
+
+/// Something we sell.
+entity Product (plural "products") {
+  name        string  required min(3) max(120)
+  description text
+  price       decimal required min(0)
+  stock       int     default(0)
+  status      ProductStatus default(ACTIVE)
+  category    -> Category (name) required
+  tags        <-> Tag (name)
+
+  @postgres(index [name, status])
+}
+
+entity Tag {
+  name string required unique
+}

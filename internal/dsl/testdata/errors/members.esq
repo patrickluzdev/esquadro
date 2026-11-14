@@ -1,0 +1,14 @@
+enum Status { OPEN, 42, CLOSED }
+
+entity Product (plural "products" "x") {
+  name string
+}
+
+entity Order {
+  "total" decimal
+  customer -> (name)
+  items <-> Item (name
+  @ (x)
+  @admin(label "a" "b")
+  status
+}

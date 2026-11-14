@@ -30,6 +30,16 @@ tasks:
     cmds:
       - go test ./...
 
+  test:update:
+    desc: Rewrite golden files after an intended output change (review the diff!)
+    cmds:
+      - go test ./internal/dsl -run Golden -update
+
+  fuzz:
+    desc: 'Fuzz the DSL parser (default 1m, e.g. task fuzz -- 5m)'
+    cmds:
+      - go test ./internal/dsl -run '^$' -fuzz FuzzParse -fuzztime {{.CLI_ARGS | default "1m"}}
+
   lint:
     desc: Check formatting and run go vet
     cmds:

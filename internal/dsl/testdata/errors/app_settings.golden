@@ -1,0 +1,33 @@
+app_settings.esq:2:3: error: unknown app setting "modul"
+  |
+2 |   modul "github.com/example/shop"
+  |   ^^^^^
+  = help: did you mean "module"?
+
+app_settings.esq:3:10: error: expected module path as a string, found name "github"
+  |
+3 |   module github.com/example/shop
+  |          ^^^^^^
+  = help: e.g. module "github.com/you/shop"
+
+app_settings.esq:5:3: error: module is already set at line 4
+  |
+5 |   module "b"
+  |   ^^^^^^
+
+app_settings.esq:6:7: error: expected language after lang (en or pt), found newline
+  |
+6 |   lang
+  |       ^
+
+app_settings.esq:7:13: error: expected blueprint name or path, found "{"
+  |
+7 |   blueprint { x 1 }
+  |             ^
+
+app_settings.esq:9:13: error: expected a value after option pool_max (string, number, true/false, name or [list]), found newline
+  |
+9 |     pool_max
+  |             ^
+
+6 errors

@@ -1,0 +1,5 @@
+entity Product {
+  name string pattern("\d+")
+  sku  string # inline hash
+  note string default("never closed
+}

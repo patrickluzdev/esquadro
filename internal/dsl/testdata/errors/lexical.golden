@@ -1,0 +1,17 @@
+lexical.esq:2:24: error: invalid escape sequence "\d"
+  |
+2 |   name string pattern("\d+")
+  |                        ^
+  = help: use a raw string with backticks to write backslashes literally, e.g. `\d+`
+
+lexical.esq:3:15: error: invalid character '#'
+  |
+3 |   sku  string # inline hash
+  |               ^
+
+lexical.esq:4:23: error: unterminated string
+  |
+4 |   note string default("never closed
+  |                       ^^^^^^^^^^^^^
+
+3 errors

@@ -1,0 +1,43 @@
+// A line comment at the top.
+app demo {
+  module "example.com/demo"
+  blueprint "./blueprints/mine"
+  blueprint "github.com/acme/esquadro-stripe@v1.2.0" {
+    currency "BRL"
+    test_mode true
+    retries 3
+    ratio 0.75
+  }
+  blueprint admin-htmx
+  @admin(title "Demo Admin")
+}
+
+/* A block comment
+   spanning lines. */
+enum Size {
+  /// Small one.
+  SMALL,
+  MEDIUM,
+  LARGE
+}
+
+entity Person (plural "people", table "persons") {
+  /// The display name.
+  full_name string required pattern(`^\p{L}+( \p{L}+)*$`)
+  email     string required unique pattern("^[^@]+@[^@]+$") @admin(label "E-mail", searchable)
+  naïve     bool   default(false)
+  balance   decimal min(-100.50)
+  size      Size default(MEDIUM)
+  manager   -> Person
+  passport  -> Passport unique
+  entity    string   // a field may use a keyword as its name
+  @admin(icon "user", hidden)
+  @postgres(
+    index [email],
+    table "persons"
+  )
+}
+
+entity Passport {
+  number string required
+}

@@ -1,0 +1,26 @@
+app shop @2:1-10:2
+  doc "The demo shop used across the docs."
+  module "github.com/example/shop"
+  lang en
+  blueprint base @6:3-6:17
+  blueprint postgres @7:3-9:4
+    option pool_max num:20
+enum ProductStatus @12:1-12:48
+  value ACTIVE
+  value INACTIVE
+  value SOLD_OUT
+entity Category @14:1-16:2
+  field name string required unique max(num:80) @15:3-15:38
+entity Product @19:1-29:2
+  doc "Something we sell."
+  option plural "products"
+  field name string required min(num:3) max(num:120) @20:3-20:47
+  field description text @21:3-21:19
+  field price decimal required min(num:0) @22:3-22:38
+  field stock int default(num:0) @23:3-23:33
+  field status ProductStatus default(ACTIVE) @24:3-24:44
+  relation category -> Category (name) required @25:3-25:42
+  relation tags <-> Tag (name) @26:3-26:29
+  @postgres(index [name, status])
+entity Tag @31:1-33:2
+  field name string required unique @32:3-32:30
