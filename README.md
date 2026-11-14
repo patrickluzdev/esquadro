@@ -6,6 +6,8 @@ A Go project generator inspired by JHipster. You describe your system in a
 regenerate it whenever the model changes.
 
 ```
+package catalog
+
 app shop {
   module "github.com/example/shop"
 
@@ -16,7 +18,7 @@ app shop {
 entity Product {
   name     string  required min(3)
   price    decimal required min(0)
-  category -> Category (name)
+  category > Category (name)
 }
 ```
 
