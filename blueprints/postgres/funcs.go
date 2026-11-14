@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -16,25 +17,30 @@ import (
 // opts is always the template's .Options, the postgres blueprint's options.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"pgTable":     pgTable,
-		"pgColumn":    pgColumn,
-		"sqlcModel":   sqlcModel,
-		"sqlcField":   sqlcField,
-		"sqlcIn":      sqlcIn,
-		"sqlcOut":     sqlcOut,
-		"sqlcEnum":    sqlcEnum,
-		"ownSchema":   ownSchema,
-		"keyColumn":   func(r *project.Relation) string { return r.Snake + "_id" },
-		"keyField":    func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
-		"keyIn":       keyIn,
-		"keyOut":      keyOut,
-		"needs":       needs,
-		"constraint":  constraint,
-		"pgIdent":     Ident,
-		"writable":    writable,
-		"refusals":    refusals,
-		"contains":    strings.Contains,
-		"initialisms": project.Initialisms,
+		"pgTable":         pgTable,
+		"pgColumn":        pgColumn,
+		"sqlcModel":       sqlcModel,
+		"sqlcField":       sqlcField,
+		"sqlcIn":          sqlcIn,
+		"sqlcOut":         sqlcOut,
+		"sqlcEnum":        sqlcEnum,
+		"ownSchema":       ownSchema,
+		"keyColumn":       func(r *project.Relation) string { return r.Snake + "_id" },
+		"keyField":        func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
+		"keyIn":           keyIn,
+		"keyOut":          keyOut,
+		"needs":           needs,
+		"constraint":      constraint,
+		"pgIdent":         Ident,
+		"writable":        writable,
+		"refusals":        refusals,
+		"contains":        strings.Contains,
+		"canSample":       canSample,
+		"parents":         parents,
+		"sample":          sample,
+		"sampleImports":   sampleImports,
+		"mustRefuseEmpty": mustRefuseEmpty,
+		"initialisms":     project.Initialisms,
 	}
 }
 
@@ -284,4 +290,152 @@ func refusals(e *project.Entity) []Refusal {
 		}
 	}
 	return out
+}
+
+// ---- test data ----
+
+// canSample reports whether esquadro can write a valid NewX for an entity:
+// not when a required field has a pattern (no generic value matches any
+// pattern), nor when a required relation needs a record it cannot write
+// either, or loops back.
+func canSample(e *project.Entity) bool { return sampleable(e, map[*project.Entity]bool{}) }
+
+func sampleable(e *project.Entity, visiting map[*project.Entity]bool) bool {
+	if visiting[e] {
+		return false
+	}
+	visiting[e] = true
+	defer delete(visiting, e)
+	for _, f := range e.Fields {
+		if f.Required && f.Pattern != "" && (f.Type == project.TypeString || f.Type == project.TypeText) {
+			return false
+		}
+	}
+	for _, r := range parents(e) {
+		if !sampleable(r.Target, visiting) {
+			return false
+		}
+	}
+	return true
+}
+
+// parents are the required relations of an entity to records of its own
+// module, which a test must create first.
+func parents(e *project.Entity) []*project.Relation {
+	var out []*project.Relation
+	for _, r := range e.Relations {
+		if r.OwnsForeignKey() && r.Required && r.Target.Module == e.Module {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// sample is a Go expression for a valid value of a field in tests, with i
+// (a Go expression) telling records apart; empty when the field is best
+// left unset (an optional field with a pattern).
+func sample(f *project.Field, pkg, i string) string {
+	switch f.Type {
+	case project.TypeString, project.TypeText:
+		if f.Pattern != "" {
+			return ""
+		}
+		return sampleString(f, i)
+	case project.TypeUUID:
+		return `fmt.Sprintf("00000000-0000-0000-0000-%012d", ` + i + `)`
+	case project.TypeInt, project.TypeInt64:
+		n := "1"
+		if f.Min != nil {
+			n = f.Min.Text
+		} else if f.Max != nil && f.Max.Value < 1 {
+			n = f.Max.Text
+		}
+		return n
+	case project.TypeDecimal:
+		n := "1"
+		if f.Min != nil {
+			n = f.Min.Text
+		} else if f.Max != nil && f.Max.Value < 1 {
+			n = f.Max.Text
+		}
+		return `decimal.RequireFromString("` + n + `")`
+	case project.TypeBool:
+		return "true"
+	case project.TypeTime, project.TypeDate:
+		return "time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)"
+	case project.TypeJSON:
+		return `json.RawMessage("{}")`
+	case project.TypeEnum:
+		return pkg + "." + f.Enum.Pascal + f.Enum.Values[0].Pascal
+	}
+	return ""
+}
+
+// sampleString is "<field> <i>", padded with zeros to the field's minimum
+// length, or a run of x when its maximum is too short for that.
+func sampleString(f *project.Field, i string) string {
+	word := f.Snake
+	digits := 1
+	if f.Min != nil {
+		digits = max(digits, int(f.Min.Value)-len(word)-1)
+	}
+	length := len(word) + 1 + digits
+	if f.Max != nil && float64(length) > f.Max.Value {
+		n := int(f.Max.Value)
+		if f.Min != nil {
+			n = int(f.Min.Value)
+		}
+		return fmt.Sprintf("strings.Repeat(\"x\", %d)", max(n, 1))
+	}
+	return fmt.Sprintf("fmt.Sprintf(\"%s %%0%dd\", %s)", word, digits, i)
+}
+
+// sampleImports lists the imports the samples of an entity need.
+func sampleImports(e *project.Entity) []string {
+	var out []string
+	add := func(p string) {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	for _, f := range e.Fields {
+		if f.Implicit {
+			continue
+		}
+		s := sample(f, "", "i")
+		switch {
+		case strings.HasPrefix(s, "fmt."):
+			add("fmt")
+		case strings.HasPrefix(s, "strings."):
+			add("strings")
+		case strings.HasPrefix(s, "decimal."):
+			add("github.com/shopspring/decimal")
+		case strings.HasPrefix(s, "time."):
+			add("time")
+		case strings.HasPrefix(s, "json."):
+			add("encoding/json")
+		}
+	}
+	return out
+}
+
+// mustRefuseEmpty reports whether an empty NewX breaks a rule, so a test can
+// check that creating one is refused.
+func mustRefuseEmpty(e *project.Entity) bool {
+	for _, f := range e.Fields {
+		if !f.Required || f.Implicit {
+			continue
+		}
+		switch f.Type {
+		case project.TypeString, project.TypeText, project.TypeUUID, project.TypeEnum,
+			project.TypeTime, project.TypeDate, project.TypeJSON:
+			return true
+		}
+	}
+	for _, r := range e.Relations {
+		if r.OwnsForeignKey() && r.Required {
+			return true
+		}
+	}
+	return false
 }

@@ -12,7 +12,7 @@ import (
 // TestPostgresGeneratesAWorkingService generates a project with the platform
 // and postgres blueprints, checks that it builds and passes go vet, applies
 // its migrations with its own migrate command against a real Postgres, and
-// runs its use cases. It needs Docker (for Postgres, and for sqlc when it is
+// runs the tests esquadro generated for it. It needs Docker (for Postgres, and for sqlc when it is
 // not installed) and the network (Go modules); it is skipped with -short or
 // without Docker.
 func TestPostgresGeneratesAWorkingService(t *testing.T) {
@@ -96,59 +96,9 @@ entity Product {
 	}
 	run([]string{url}, "go", "run", "./cmd/shop", "migrate")
 
-	write("cmd/try/main.go", `package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"os"
-
-	"example.com/shop/internal/catalog"
-	"example.com/shop/internal/platform/postgres"
-)
-
-func main() {
-	if err := try(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	// The tests esquadro generates run every use case against their own
+	// Postgres (testcontainers).
+	if !strings.Contains(run(nil, "go", "test", "-v", "./..."), "--- PASS: TestCreateAndReadProduct") {
+		t.Fatal("the generated tests did not run")
 	}
-}
-
-func try() error {
-	ctx := context.Background()
-	pool, err := postgres.Open(ctx, os.Getenv("DATABASE_URL"), 4)
-	if err != nil {
-		return err
-	}
-	c := catalog.New(catalog.Deps{Pool: pool})
-	cat, err := c.CreateCategory(ctx, catalog.NewCategory{Name: "Books"})
-	if err != nil {
-		return err
-	}
-	var invalid *catalog.InvalidFields
-	if _, err := c.CreateCategory(ctx, catalog.NewCategory{Name: "Books"}); !errors.As(err, &invalid) || invalid.Fields[0].Code != "taken" {
-		return fmt.Errorf("duplicate category: %v", err)
-	}
-	p, err := c.CreateProduct(ctx, catalog.NewProduct{Name: "Go", CategoryID: cat.ID})
-	if err != nil {
-		return err
-	}
-	page, err := c.ListProducts(ctx, "", 10)
-	if err != nil || len(page.Products) != 1 || page.Products[0].ID != p.ID {
-		return fmt.Errorf("list: %+v %v", page, err)
-	}
-	if err := c.DeleteCategory(ctx, cat.ID); !errors.Is(err, catalog.ErrCategoryInUse) {
-		return fmt.Errorf("delete in use: %v", err)
-	}
-	if err := c.DeleteProduct(ctx, p.ID); err != nil {
-		return err
-	}
-	if _, err := c.ReadProduct(ctx, p.ID); !errors.Is(err, catalog.ErrProductNotFound) {
-		return fmt.Errorf("read deleted: %v", err)
-	}
-	return nil
-}
-`)
-	run([]string{url}, "go", "run", "./cmd/try")
 }

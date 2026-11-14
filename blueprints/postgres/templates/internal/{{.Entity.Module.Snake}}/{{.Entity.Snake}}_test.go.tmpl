@@ -1,0 +1,156 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$p := $m.Snake}}{{$r := lower (slice $m.Camel 0 1)}}{{$ok := canSample $e -}}
+package {{$p}}_test
+{{- if not $ok}}
+
+import "testing"
+
+func Test{{$e.Pascal}}UseCases(t *testing.T) {
+	t.Skip("esquadro cannot write a valid New{{$e.Pascal}}: a required field has a pattern, or a required relation needs such a record. " +
+		"Write the tests of {{$e.Plural.Snake}} by hand.")
+}
+{{- else}}
+
+{{importBlock "context" "errors" "testing" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+// given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
+// first; i tells records apart. Change the values freely: esquadro wrote
+// them from the rules in the .esq file.
+func given{{$e.Pascal}}(t *testing.T, {{if parents $e}}{{$r}}{{else}}_{{end}} *{{$p}}.{{$m.Pascal}}, i int) {{$p}}.New{{$e.Pascal}} {
+	t.Helper()
+{{- range parents $e}}
+	{{.Camel}}, err := {{$r}}.Create{{.Target.Pascal}}(context.Background(), given{{.Target.Pascal}}(t, {{$r}}, i))
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- end}}
+	return {{$p}}.New{{$e.Pascal}}{
+{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{with sample $f $p "i"}}
+		{{$f.Pascal}}: {{.}},
+{{- end}}{{end}}{{end}}
+{{- range $e.Relations}}{{if and .OwnsForeignKey .Required}}
+{{- if eq .Target.Module $m}}
+		{{.Pascal}}ID: {{.Camel}}.ID,
+{{- else}}
+		{{.Pascal}}ID: "00000000-0000-0000-0000-000000000001", // in another module: no foreign key
+{{- end}}
+{{- end}}{{end}}
+	}
+}
+
+func TestCreateAndRead{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := {{$r}}.Read{{$e.Pascal}}(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.ID != created.ID || !read.CreatedAt.Equal(created.CreatedAt) {
+		t.Fatalf("read %+v, created %+v", read, created)
+	}
+}
+
+func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	want := map[string]bool{}
+	for i := range 3 {
+		created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want[created.ID] = true
+	}
+	seen := map[string]bool{}
+	after := ""
+	for {
+		page, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, after, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, listed := range page.{{$e.Plural.Pascal}} {
+			if seen[listed.ID] || !want[listed.ID] {
+				t.Fatalf("%s listed twice or never created", listed.ID)
+			}
+			seen[listed.ID] = true
+		}
+		if page.Next == "" {
+			break
+		}
+		after = page.Next
+	}
+	if len(seen) != len(want) {
+		t.Fatalf("listed %d of %d", len(seen), len(want))
+	}
+}
+
+func TestUpdate{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, given{{$e.Pascal}}(t, {{$r}}, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != created.ID || updated.UpdatedAt.Before(created.UpdatedAt) {
+		t.Fatalf("updated %+v, created %+v", updated, created)
+	}
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, "00000000-0000-0000-0000-000000000000", given{{$e.Pascal}}(t, {{$r}}, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("updating a missing {{lower $e.Label}}: %v", err)
+	}
+}
+
+func TestDelete{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := {{$r}}.Read{{$e.Pascal}}(ctx, created.ID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("reading a deleted {{lower $e.Label}}: %v", err)
+	}
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("deleting twice: %v", err)
+	}
+}
+
+func TestRead{{$e.Pascal}}ThatDoesNotExist(t *testing.T) {
+	t.Parallel()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	for _, id := range []string{"00000000-0000-0000-0000-000000000000", "not-an-id"} {
+		if _, err := {{$r}}.Read{{$e.Pascal}}(context.Background(), id); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+			t.Fatalf("Read{{$e.Pascal}}(%q): %v", id, err)
+		}
+	}
+}
+{{- if mustRefuseEmpty $e}}
+
+func TestCreate{{$e.Pascal}}RefusesBrokenRules(t *testing.T) {
+	t.Parallel()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	_, err := {{$r}}.Create{{$e.Pascal}}(context.Background(), {{$p}}.New{{$e.Pascal}}{})
+	if _, ok := errors.AsType[*{{$p}}.InvalidFields](err); !ok {
+		t.Fatalf("creating an empty {{lower $e.Label}}: %v", err)
+	}
+}
+{{- end}}
+{{- end}}

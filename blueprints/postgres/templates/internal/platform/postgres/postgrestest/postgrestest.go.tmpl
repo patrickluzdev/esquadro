@@ -1,0 +1,129 @@
+{{- if .Entities -}}
+// Package postgrestest gives each test its own Postgres database, cloned from
+// a migrated template in one container per test binary. Tests need Docker.
+package postgrestest
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"net/url"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"{{.App.Module}}/internal/platform/postgres"
+)
+
+const (
+	image    = "postgres:17-alpine"
+	template = "{{.App.Snake}}_template"
+)
+
+// server starts the container and migrates the template once per test
+// binary; it returns the URL of the admin database.
+var server = sync.OnceValues(func() (string, error) {
+	useDockerContext()
+	ctx := context.Background()
+	container, err := tcpostgres.Run(ctx, image,
+		tcpostgres.WithDatabase("postgres"),
+		tcpostgres.WithUsername("postgres"),
+		tcpostgres.WithPassword("postgres"),
+		tcpostgres.BasicWaitStrategies(),
+	)
+	if err != nil {
+		return "", fmt.Errorf("postgrestest: start postgres: %w", err)
+	}
+	admin, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		return "", fmt.Errorf("postgrestest: %w", err)
+	}
+	if err := createDatabase(ctx, admin, template, ""); err != nil {
+		return "", err
+	}
+	if err := postgres.Migrate(ctx, withDatabase(admin, template)); err != nil {
+		return "", fmt.Errorf("postgrestest: migrate the template: %w", err)
+	}
+	return admin, nil
+})
+
+// useDockerContext points testcontainers at the Docker the docker command
+// uses, such as Colima's or OrbStack's, which testcontainers does not find by
+// itself; DOCKER_HOST, when set, wins.
+func useDockerContext() {
+	if os.Getenv("DOCKER_HOST") != "" {
+		return
+	}
+	out, err := exec.Command("docker", "context", "inspect", "--format", "{{"{{.Endpoints.docker.Host}}"}}").Output()
+	if err != nil {
+		return
+	}
+	host := strings.TrimSpace(string(out))
+	if host == "" || host == "unix:///var/run/docker.sock" {
+		return
+	}
+	os.Setenv("DOCKER_HOST", host)
+	if os.Getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE") == "" {
+		// Inside the Docker VM the socket is at the usual place.
+		os.Setenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+	}
+}
+
+// Fresh returns a pool on a new database with every migration applied,
+// closed when the test ends.
+func Fresh(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+	admin, err := server()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	name := "test_" + hex.EncodeToString(b)
+	ctx := context.Background()
+	if err := createDatabase(ctx, admin, name, template); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, withDatabase(admin, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
+// createDatabase creates name, as a copy of from when from is not empty.
+func createDatabase(ctx context.Context, admin, name, from string) error {
+	conn, err := pgx.Connect(ctx, admin)
+	if err != nil {
+		return fmt.Errorf("postgrestest: %w", err)
+	}
+	defer conn.Close(ctx)
+	sql := "CREATE DATABASE " + pgx.Identifier{name}.Sanitize()
+	if from != "" {
+		sql += " TEMPLATE " + pgx.Identifier{from}.Sanitize()
+	}
+	if _, err := conn.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("postgrestest: create database %s: %w", name, err)
+	}
+	return nil
+}
+
+func withDatabase(admin, name string) string {
+	u, err := url.Parse(admin)
+	if err != nil {
+		return admin
+	}
+	u.Path = "/" + name
+	return u.String()
+}
+{{end -}}
