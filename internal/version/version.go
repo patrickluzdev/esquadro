@@ -1,5 +1,5 @@
 // Package version holds the Esquadro version, overridable at build time with
-// -ldflags "-X github.com/patrickluz/esquadro/internal/version.Version=v1.2.3".
+// -ldflags "-X github.com/patrickluzdev/esquadro/internal/version.Version=v1.2.3".
 package version
 
 import "runtime/debug"

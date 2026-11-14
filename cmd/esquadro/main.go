@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/patrickluz/esquadro/internal/version"
+	"github.com/patrickluzdev/esquadro/internal/version"
 )
 
 type command struct {
