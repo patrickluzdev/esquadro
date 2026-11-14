@@ -1,0 +1,37 @@
+types.esq:9:12: error: unknown type "strng"
+  |
+9 |   name     strng
+  |            ^^^^^
+  = help: did you mean "string"?
+
+types.esq:10:12: error: unknown type "Customer"
+   |
+10 |   owner    Customer
+   |            ^^^^^^^^
+   = help: built-in types are string, text, int, int64, decimal, bool, time, date, uuid and json
+
+types.esq:12:15: error: unknown entity "Categry"
+   |
+12 |   category -> Categry (name)
+   |               ^^^^^^^
+   = help: did you mean "Category"?
+
+types.esq:13:15: error: Status is an enum, not an entity
+   |
+13 |   state    -> Status
+   |               ^^^^^^
+   = help: use a field: state Status
+
+types.esq:14:15: error: string is a field type, not an entity
+   |
+14 |   label    -> string
+   |               ^^^^^^
+   = help: use a field: label string
+
+types.esq:15:20: error: Tag has no field "titel" to display
+   |
+15 |   tag      -> Tag (titel)
+   |                    ^^^^^
+   = help: did you mean "title"?
+
+6 errors

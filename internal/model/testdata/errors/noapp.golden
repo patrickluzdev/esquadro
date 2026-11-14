@@ -1,0 +1,7 @@
+noapp.esq:1:1: error: missing app block
+  |
+1 | entity Tag {
+  | ^
+  = help: add one, e.g. app shop { module "github.com/you/shop" }
+
+1 error

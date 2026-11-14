@@ -1,0 +1,6 @@
+app shop {
+}
+
+entity Tag {
+  name string
+}

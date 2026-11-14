@@ -1,0 +1,18 @@
+app shop {
+  module "has spaces/x"
+  blueprint base
+  blueprint base
+  blueprint "mine"
+  blueprint postgres {
+    pool_max 10
+    pool_max 20
+  }
+}
+
+app other {
+  blueprint base
+}
+
+entity Tag {
+  name string
+}

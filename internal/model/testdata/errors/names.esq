@@ -1,0 +1,36 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base
+}
+
+enum Empty { }
+enum Color { RED red Red BLUE }
+
+entity string {
+  x int
+}
+
+entity Product (size "big") {
+  id        uuid
+  fullName  string
+  full_name string
+  preço     decimal
+  category_id uuid
+  category  -> Category
+}
+
+entity Product {
+  y int
+}
+
+entity Category {
+  products string
+}
+
+entity Person (plural "people") {
+  name string
+}
+
+entity Human (plural "people") {
+  name string
+}

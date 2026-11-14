@@ -1,0 +1,13 @@
+nomodule.esq:1:5: error: app shop has no module
+  |
+1 | app shop {
+  |     ^^^^
+  = help: add the Go module path, e.g. module "github.com/you/shop"
+
+nomodule.esq:1:5: warning: app shop uses no blueprints, so nothing will be generated
+  |
+1 | app shop {
+  |     ^^^^
+  = help: add one, e.g. blueprint base
+
+1 error, 1 warning

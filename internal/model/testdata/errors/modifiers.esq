@@ -1,0 +1,31 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base
+}
+
+enum Status { OPEN CLOSED }
+
+entity Product {
+  a string requred
+  b string required required
+  c string required(1)
+  d bool min(1)
+  e int min(10) max(5)
+  f string min(-1)
+  g string pattern("[a-")
+  h int pattern("^1$")
+  i int default("one")
+  j Status default(OPNE)
+  k int min(1) default(0)
+  l string max(3) default("toolong")
+  m date default("tomorrow")
+  n string inverse(x)
+  o decimal min
+  p int64 min(1.5)
+  tags  <-> Tag required
+  owner -> Tag min(1)
+}
+
+entity Tag {
+  name string
+}

@@ -1,0 +1,24 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint base
+}
+
+enum Status { OPEN CLOSED }
+
+entity Product {
+  name     strng
+  owner    Customer
+  status   Status
+  category -> Categry (name)
+  state    -> Status
+  label    -> string
+  tag      -> Tag (titel)
+}
+
+entity Category {
+  name string
+}
+
+entity Tag {
+  title string
+}

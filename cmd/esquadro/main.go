@@ -18,6 +18,7 @@ type command struct {
 
 func commands() []command {
 	return []command{
+		{"check", "check a .esq file for errors", runCheck},
 		{"version", "print the esquadro version", runVersion},
 	}
 }
