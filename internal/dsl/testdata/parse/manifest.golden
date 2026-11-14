@@ -1,0 +1,18 @@
+blueprint stripe @2:1-24:2
+  doc "Payments with Stripe."
+  version "0.1.0"
+  requires base, postgres
+  after admin
+  option currency string default("USD") @8:3-8:44
+    doc "ISO currency code."
+  option webhook_path string default("/webhooks/stripe") @9:3-9:57
+  option live bool @10:3-10:27
+  annotation entity @12:3-15:4
+    key sellable bool
+      doc "Generates checkout for this entity."
+  annotation field @16:3-19:4
+    key amount bool
+    key index fields required
+  slot "stripe.events"
+  go_require "github.com/stripe/stripe-go/v82" "v82.0.0"
+  hook post-gen "hooks/check" writes ["internal/payments/**", "db/**"]

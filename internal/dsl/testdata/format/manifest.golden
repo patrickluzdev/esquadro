@@ -1,0 +1,19 @@
+blueprint stripe { // payments
+  version "0.1.0"
+  requires base, postgres
+
+  option currency string default("USD") // ISO code
+  option live     bool
+
+  // Entity-level settings.
+  annotation entity { // keys
+    sellable bool
+
+    /// Display label.
+    label string
+    // end of keys
+  }
+  annotation app {}
+  go_require "github.com/a/b"                  "v1.0.0"
+  go_require "github.com/stripe/stripe-go/v82" "v82.0.0"
+}

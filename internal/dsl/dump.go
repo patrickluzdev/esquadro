@@ -45,6 +45,42 @@ func Dump(f *File) string {
 				w(1, "value %s", v.Name.Name)
 				docs(2, v.Doc)
 			}
+		case *BlueprintDecl:
+			w(0, "blueprint %s @%s", d.Name.Name, pos(d.Span))
+			docs(1, d.Doc)
+			for _, it := range d.Items {
+				switch it := it.(type) {
+				case *VersionItem:
+					w(1, "version %s", dumpValue(it.Version))
+				case *DependsItem:
+					names := make([]string, len(it.Names))
+					for i, n := range it.Names {
+						names[i] = n.Name
+					}
+					w(1, "%s %s", it.Keyword.Name, strings.Join(names, ", "))
+				case *OptionDecl:
+					w(1, "option %s %s%s @%s", it.Name.Name, it.Type.Name, dumpMods(it.Modifiers, nil), pos(it.Span))
+					docs(2, it.Doc)
+				case *AnnotationDecl:
+					w(1, "annotation %s @%s", it.Target.Name, pos(it.Span))
+					docs(2, it.Doc)
+					for _, k := range it.Keys {
+						w(2, "key %s %s%s", k.Name.Name, k.Type.Name, dumpMods(k.Modifiers, nil))
+						docs(3, k.Doc)
+					}
+				case *SlotItem:
+					w(1, "slot %s", dumpValue(it.Name))
+					docs(2, it.Doc)
+				case *GoRequireItem:
+					w(1, "go_require %s %s", dumpValue(it.Module), dumpValue(it.Version))
+				case *HookItem:
+					writes := ""
+					if it.Writes != nil {
+						writes = " writes " + dumpValue(*it.Writes)
+					}
+					w(1, "hook %s %s%s", it.Event.Name, dumpValue(it.Path), writes)
+				}
+			}
 		case *EntityDecl:
 			w(0, "entity %s @%s", d.Name.Name, pos(d.Span))
 			docs(1, d.Doc)

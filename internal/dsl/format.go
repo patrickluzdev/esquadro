@@ -38,6 +38,8 @@ func Format(f *File) []byte {
 			p.enum(&out, d)
 		case *EntityDecl:
 			p.entity(&out, d)
+		case *BlueprintDecl:
+			p.blueprint(&out, d)
 		}
 		p.lastLine = d.SourceSpan().End.Line
 		prevWasDecl = true
@@ -64,6 +66,8 @@ func firstLine(d Decl) int {
 	case *EnumDecl:
 		doc = d.Doc
 	case *EntityDecl:
+		doc = d.Doc
+	case *BlueprintDecl:
 		doc = d.Doc
 	}
 	return d.SourceSpan().Pos.Line - len(doc)
@@ -129,6 +133,9 @@ const (
 	fieldRow rowKind = iota + 1
 	relationRow
 	optionRow
+	optionDeclRow
+	keyRow
+	goRequireRow
 )
 
 // body collects the lines of a block while tracking blank lines and
@@ -545,4 +552,110 @@ func annotationString(a *Annotation) string {
 		}
 	}
 	return "@" + a.Name.Name + "(" + strings.Join(args, ", ") + ")"
+}
+
+// ---- blueprint manifests ----
+
+func (p *printer) blueprint(out *strings.Builder, d *BlueprintDecl) {
+	p.docs(out, d.Doc)
+	first := d.End.Offset
+	if len(d.Items) > 0 {
+		first = d.Items[0].SourceSpan().Pos.Offset
+	}
+	out.WriteString("blueprint ")
+	out.WriteString(d.Name.Name)
+	out.WriteString(" {")
+	out.WriteString(p.headerTrail(d.Pos.Line, first))
+	out.WriteString("\n")
+	p.lastLine = d.Pos.Line
+	b := &body{p: p}
+	for _, it := range d.Items {
+		sp := it.SourceSpan()
+		// Comments and blank lines before the item come first: building a
+		// nested block below consumes the comments inside it.
+		doc := manifestItemDoc(it)
+		b.before(sp.Pos.Offset, sp.Pos.Line-len(doc))
+		b.docs(doc)
+		var l line
+		switch it := it.(type) {
+		case *VersionItem:
+			l.text = "version " + valueString(it.Version)
+		case *DependsItem:
+			names := make([]string, len(it.Names))
+			for i, n := range it.Names {
+				names[i] = n.Name
+			}
+			l.text = it.Keyword.Name + " " + strings.Join(names, ", ")
+		case *OptionDecl:
+			l.cells = []string{"option " + it.Name.Name, it.Type.Name, modifiersString(it.Modifiers, nil)}
+			l.kind = optionDeclRow
+		case *AnnotationDecl:
+			l.text = p.annotationDecl(it)
+		case *SlotItem:
+			l.text = "slot " + valueString(it.Name)
+		case *GoRequireItem:
+			l.cells = []string{"go_require " + valueString(it.Module), valueString(it.Version)}
+			l.kind = goRequireRow
+		case *HookItem:
+			l.text = "hook " + it.Event.Name + " " + valueString(it.Path)
+			if it.Writes != nil {
+				l.text += " writes " + valueString(*it.Writes)
+			}
+		}
+		l.trail = p.trailing(sp.End.Offset)
+		b.lines = append(b.lines, l)
+		p.lastLine = sp.End.Line
+	}
+	b.end(d.End.Offset - 1)
+	b.render(out, "  ")
+	out.WriteString("}")
+	out.WriteString(p.closeTrail(d.Span))
+	out.WriteString("\n")
+}
+
+func manifestItemDoc(it ManifestItem) []string {
+	switch it := it.(type) {
+	case *OptionDecl:
+		return it.Doc
+	case *AnnotationDecl:
+		return it.Doc
+	case *SlotItem:
+		return it.Doc
+	}
+	return nil
+}
+
+func (p *printer) annotationDecl(a *AnnotationDecl) string {
+	var sb strings.Builder
+	sb.WriteString("annotation ")
+	sb.WriteString(a.Target.Name)
+	if len(a.Keys) == 0 && !(p.ci < len(p.comments) && p.comments[p.ci].Pos.Offset < a.End.Offset-1) {
+		sb.WriteString(" {}")
+		return sb.String()
+	}
+	first := a.End.Offset
+	if len(a.Keys) > 0 {
+		first = a.Keys[0].Pos.Offset
+	}
+	sb.WriteString(" {")
+	sb.WriteString(p.headerTrail(a.Pos.Line, first))
+	sb.WriteString("\n")
+	p.lastLine = a.Pos.Line
+	b := &body{p: p}
+	for _, k := range a.Keys {
+		b.before(k.Pos.Offset, k.Pos.Line-len(k.Doc))
+		b.docs(k.Doc)
+		b.lines = append(b.lines, line{
+			cells: []string{k.Name.Name, k.Type.Name, modifiersString(k.Modifiers, nil)},
+			kind:  keyRow,
+			trail: p.trailing(k.End.Offset),
+		})
+		p.lastLine = k.End.Line
+	}
+	b.end(a.End.Offset - 1)
+	var inner strings.Builder
+	b.render(&inner, "  ")
+	sb.WriteString(inner.String())
+	sb.WriteString("}")
+	return sb.String()
 }

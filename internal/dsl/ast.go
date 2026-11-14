@@ -207,3 +207,96 @@ func (*Annotation) appItemNode()   {}
 func (*Field) memberNode()      {}
 func (*Relation) memberNode()   {}
 func (*Annotation) memberNode() {}
+
+// BlueprintDecl is the "blueprint" block of a blueprint manifest
+// (blueprint.esq).
+type BlueprintDecl struct {
+	Doc   []string
+	Name  Ident
+	Items []ManifestItem
+	Span
+}
+
+// ManifestItem is a line of a blueprint manifest: *VersionItem,
+// *DependsItem, *OptionDecl, *AnnotationDecl, *SlotItem, *GoRequireItem or
+// *HookItem.
+type ManifestItem interface {
+	manifestItemNode()
+	SourceSpan() Span
+}
+
+// VersionItem is `version "1.2.0"`.
+type VersionItem struct {
+	Version Value
+	Span
+}
+
+// DependsItem is "requires a, b" (Keyword "requires") or "after a, b"
+// (Keyword "after").
+type DependsItem struct {
+	Keyword Ident
+	Names   []Ident
+	Span
+}
+
+// OptionDecl declares an option of the blueprint: "option name type mods".
+type OptionDecl struct {
+	Doc       []string
+	Name      Ident
+	Type      Ident
+	Modifiers []*Modifier
+	Span
+}
+
+// AnnotationDecl declares the keys accepted by the blueprint's annotation on
+// one target: "annotation entity { key type mods ... }".
+type AnnotationDecl struct {
+	Doc    []string
+	Target Ident
+	Keys   []*AnnotationKeyDecl
+	Span
+}
+
+// AnnotationKeyDecl is one key of an annotation declaration.
+type AnnotationKeyDecl struct {
+	Doc       []string
+	Name      Ident
+	Type      Ident
+	Modifiers []*Modifier
+	Span
+}
+
+// SlotItem declares an extension point that the blueprint's templates open:
+// `slot "base.routes"`.
+type SlotItem struct {
+	Doc  []string
+	Name Value
+	Span
+}
+
+// GoRequireItem is a Go module the generated project needs:
+// `go_require "github.com/jackc/pgx/v5" "v5.7.0"`.
+type GoRequireItem struct {
+	Module  Value
+	Version Value
+	Span
+}
+
+// HookItem is `hook post-gen "hooks/sqlc" writes "internal/db/sqlc/**"`.
+type HookItem struct {
+	Event Ident
+	Path  Value
+	// Writes is a string or a list of strings; nil when absent.
+	Writes *Value
+	Span
+}
+
+func (*BlueprintDecl) declNode() {}
+
+func (*VersionItem) manifestItemNode()    {}
+func (*DependsItem) manifestItemNode()    {}
+func (*OptionDecl) manifestItemNode()     {}
+func (*AnnotationDecl) manifestItemNode() {}
+func (*SlotItem) manifestItemNode()       {}
+func (*GoRequireItem) manifestItemNode()  {}
+func (*HookItem) manifestItemNode()       {}

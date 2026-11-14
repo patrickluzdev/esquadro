@@ -3,13 +3,15 @@ package dsl
 import (
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
 )
 
 var (
-	topKeywords = []string{"app", "enum", "entity"}
-	appSettings = []string{"module", "blueprint"}
+	topKeywords      = []string{"app", "enum", "entity", "blueprint"}
+	appSettings      = []string{"module", "blueprint"}
+	manifestSettings = []string{"version", "requires", "after", "option", "annotation", "slot", "go_require", "hook"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -37,12 +39,14 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 				d = p.parseEnum()
 			case "entity":
 				d = p.parseEntity()
+			case "blueprint":
+				d = p.parseBlueprint()
 			}
 		}
 		if d == nil {
 			// A failed app/enum/entity has already reported and resynced.
 			if t.Kind != Name || !isTopKeyword(t.Text) {
-				e := p.errorf(t, "expected app, enum or entity, found %s", t.describe())
+				e := p.errorf(t, "expected app, enum, entity or blueprint, found %s", t.describe())
 				if t.Kind == Name {
 					e.Suggestion = didYouMean(t.Text, topKeywords)
 				}
@@ -219,7 +223,8 @@ func (p *parser) syncLine() {
 // like a keyword ("entity string") does not match.
 func (p *parser) atDeclStart() bool {
 	t := p.tok()
-	if t.Kind != Name || !isTopKeyword(t.Text) || p.i+2 >= len(p.toks) {
+	// "blueprint x {" is also a valid line inside an app block.
+	if t.Kind != Name || !isTopKeyword(t.Text) || t.Text == "blueprint" || p.i+2 >= len(p.toks) {
 		return false
 	}
 	name, after := p.toks[p.i+1], p.toks[p.i+2]
@@ -653,4 +658,171 @@ func (p *parser) parseAnnotation() *Annotation {
 			return nil
 		}
 	}
+}
+
+// ---- blueprint manifests ----
+
+func (p *parser) parseBlueprint() Decl {
+	doc := p.takeDoc()
+	start := p.advance() // "blueprint"
+	name, ok := p.expectIdent("blueprint name")
+	if !ok {
+		p.syncTop()
+		return nil
+	}
+	open, ok := p.expect(LBrace, "after blueprint name")
+	if !ok {
+		p.syncTop()
+		return nil
+	}
+	bp := &BlueprintDecl{Doc: doc, Name: name}
+	end := p.parseBlock(open, "blueprint "+name.Name, func() bool {
+		it := p.parseManifestItem()
+		if it != nil {
+			bp.Items = append(bp.Items, it)
+		}
+		return it != nil
+	})
+	bp.Span = Span{Pos: start.Pos, End: end}
+	return bp
+}
+
+func (p *parser) expectString(what string) (Value, bool) {
+	t := p.tok()
+	if t.Kind != String {
+		p.errorf(t, "expected %s as a string, found %s", what, t.describe())
+		return Value{}, false
+	}
+	p.advance()
+	return tokenValue(t), true
+}
+
+func (p *parser) parseManifestItem() ManifestItem {
+	doc := p.takeDoc()
+	t := p.tok()
+	if t.Kind != Name {
+		p.errorf(t, "expected a manifest setting (%s), found %s", strings.Join(manifestSettings, ", "), t.describe())
+		return nil
+	}
+	p.advance()
+	switch t.Text {
+	case "version":
+		v, ok := p.expectString("version")
+		if !ok {
+			return nil
+		}
+		return &VersionItem{Version: v, Pos: t.Pos, End: v.End}
+	case "requires", "after":
+		it := &DependsItem{Keyword: identOf(t)}
+		for {
+			n, ok := p.expectIdent("blueprint name after " + t.Text)
+			if !ok {
+				return nil
+			}
+			it.Names = append(it.Names, n)
+			if p.tok().Kind != Comma {
+				break
+			}
+			p.advance()
+		}
+		it.Span = Span{Pos: t.Pos, End: p.lastEnd}
+		return it
+	case "option":
+		name, ok := p.expectIdent("option name")
+		if !ok {
+			return nil
+		}
+		typ, ok := p.expectIdent("option type")
+		if !ok {
+			return nil
+		}
+		o := &OptionDecl{Doc: doc, Name: name, Type: typ}
+		if !p.parsePlainModifiers(&o.Modifiers) {
+			return nil
+		}
+		o.Span = Span{Pos: t.Pos, End: p.lastEnd}
+		return o
+	case "annotation":
+		target, ok := p.expectIdent("annotation target (app, entity, field or relation)")
+		if !ok {
+			return nil
+		}
+		open, ok := p.expect(LBrace, "after annotation target")
+		if !ok {
+			return nil
+		}
+		a := &AnnotationDecl{Doc: doc, Target: target}
+		end := p.parseBlock(open, "annotation "+target.Name, func() bool {
+			kdoc := p.takeDoc()
+			name, ok := p.expectIdent("annotation key name")
+			if !ok {
+				return false
+			}
+			typ, ok := p.expectIdent("type of key " + name.Name)
+			if !ok {
+				return false
+			}
+			k := &AnnotationKeyDecl{Doc: kdoc, Name: name, Type: typ}
+			if !p.parsePlainModifiers(&k.Modifiers) {
+				return false
+			}
+			k.Span = Span{Pos: name.Pos, End: p.lastEnd}
+			a.Keys = append(a.Keys, k)
+			return true
+		})
+		a.Span = Span{Pos: t.Pos, End: end}
+		return a
+	case "slot":
+		v, ok := p.expectString("slot name")
+		if !ok {
+			return nil
+		}
+		return &SlotItem{Doc: doc, Name: v, Pos: t.Pos, End: v.End}
+	case "go_require":
+		mod, ok := p.expectString("Go module path")
+		if !ok {
+			return nil
+		}
+		ver, ok := p.expectString("module version")
+		if !ok {
+			return nil
+		}
+		return &GoRequireItem{Module: mod, Version: ver, Pos: t.Pos, End: ver.End}
+	case "hook":
+		event, ok := p.expectIdent("hook event (pre-gen or post-gen)")
+		if !ok {
+			return nil
+		}
+		path, ok := p.expectString("hook path")
+		if !ok {
+			return nil
+		}
+		h := &HookItem{Event: event, Path: path, Pos: t.Pos, End: path.End}
+		if w := p.tok(); w.Kind == Name && w.Text == "writes" {
+			p.advance()
+			v, ok := p.parseValue("after writes")
+			if !ok {
+				return nil
+			}
+			h.Writes = &v
+			h.End = v.End
+		}
+		return h
+	}
+	p.errorf(t, "unknown manifest setting %q", t.Text).Suggestion = didYouMean(t.Text, manifestSettings)
+	return nil
+}
+
+// parsePlainModifiers parses modifiers and rejects annotations, which make no
+// sense on option and key declarations.
+func (p *parser) parsePlainModifiers(mods *[]*Modifier) bool {
+	var anns []*Annotation
+	if !p.parseModifiers(mods, &anns) {
+		return false
+	}
+	if len(anns) > 0 {
+		p.diags.Errorf(anns[0].Pos, anns[0].End, "annotations are not allowed here")
+		return false
+	}
+	return true
 }
