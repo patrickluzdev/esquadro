@@ -30,6 +30,9 @@ type Loader struct {
 	Builtin fs.FS
 	// ProjectDir is the folder local blueprint paths are relative to.
 	ProjectDir string
+	// HasBuiltinHook reports whether esquadro implements a built-in
+	// blueprint's hook. When nil, built-in hooks must exist as files.
+	HasBuiltinHook func(blueprint, path string) bool
 	// sources keeps every manifest read, for rendering diagnostics.
 	sources map[string][]byte
 }
@@ -139,6 +142,12 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		return nil, diags
 	}
 	for _, h := range m.Hooks {
+		if ref.Source == project.SourceBuiltin && l.HasBuiltinHook != nil {
+			if !l.HasBuiltinHook(m.Name, h.Path) {
+				diags.Errorf(h.Span.Pos, h.Span.End, "hook %s is not built into this esquadro", h.Path)
+			}
+			continue
+		}
 		if _, err := fs.Stat(fsys, h.Path); err != nil {
 			diags.Errorf(h.Span.Pos, h.Span.End, "hook %s does not exist in the blueprint folder", h.Path)
 		}

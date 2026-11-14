@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -38,6 +39,9 @@ type Action struct {
 	Reason string
 	// File is the generated file; nil for deletes.
 	File *compose.File
+	// ByHook names the post-gen hook that wrote the file, for conflicts on
+	// files hooks write: forcing lets the hook overwrite them.
+	ByHook string
 	// locked is the file's previous lock entry, if any.
 	locked *LockedFile
 }
@@ -45,6 +49,9 @@ type Action struct {
 // Plan is every planned change, sorted by path.
 type Plan struct {
 	Actions []Action
+	// hookFiles are the lock entries of files written by hooks, carried
+	// over until the hooks run again.
+	hookFiles map[string]LockedFile
 }
 
 // Conflicts returns the actions that would lose the user's work.
@@ -74,12 +81,13 @@ const (
 	reasonEditedGone = "edited since esquadro generated it, and is no longer generated"
 	reasonYours      = "yours: generated once, never updated"
 	reasonDeleted    = "yours, and you deleted it: esquadro does not bring it back"
+	reasonHookEdited = "edited since hook %s wrote it"
 )
 
 // MakePlan compares the generated files with the project folder and the
 // lock of the last generation.
 func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error) {
-	p := &Plan{}
+	p := &Plan{hookFiles: map[string]LockedFile{}}
 	generated := map[string]bool{}
 	for _, f := range res.Files {
 		generated[f.Path] = true
@@ -111,6 +119,20 @@ func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error)
 	}
 
 	for path, l := range lock.Files {
+		if l.Hook != "" && !generated[path] {
+			p.hookFiles[path] = l
+			old, err := readIfExists(projectDir, path)
+			if err != nil {
+				return nil, err
+			}
+			if old != nil && Hash(old) != l.Hash {
+				p.Actions = append(p.Actions, Action{
+					Path: path, Change: Conflict, Old: old, locked: &l, ByHook: l.Hook,
+					Reason: fmt.Sprintf(reasonHookEdited, l.Hook),
+				})
+			}
+			continue
+		}
 		if generated[path] || l.Once {
 			continue // a .once file no longer generated simply stays the user's
 		}

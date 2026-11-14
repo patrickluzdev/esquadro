@@ -3,6 +3,8 @@ package workspace
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,7 +53,7 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 				return err
 			}
 			moves = append(moves, move{staged, target})
-		case a.Change == Delete, a.Change == Conflict && a.New == nil:
+		case a.Change == Delete, a.Change == Conflict && a.New == nil && a.ByHook == "":
 			deletes = append(deletes, target)
 		}
 	}
@@ -72,6 +74,7 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 	}
 
 	lock := &Lock{Esquadro: esquadroVersion, Blueprints: blueprints, Files: map[string]LockedFile{}}
+	maps.Copy(lock.Files, p.hookFiles)
 	for _, a := range p.Actions {
 		if a.File == nil {
 			continue // deleted
@@ -129,4 +132,45 @@ func writeAtomic(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// TrackHookFiles records in the lockfile the files a post-gen hook wrote: every
+// file of the project matching its writes globs. Entries of that hook for
+// files that no longer exist are dropped. match is the glob matcher.
+func TrackHookFiles(projectDir, hook, blueprint string, writes []string, match func(patterns []string, name string) bool) error {
+	lock, err := ReadLock(projectDir)
+	if err != nil {
+		return err
+	}
+	for path, l := range lock.Files {
+		if l.Hook == hook {
+			delete(lock.Files, path)
+		}
+	}
+	err = filepath.WalkDir(projectDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(projectDir, p)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if rel == ".git" || rel == Dir {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !match(writes, rel) {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		lock.Files[rel] = LockedFile{Hash: Hash(data), Blueprint: blueprint, Hook: hook}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return writeAtomic(filepath.Join(projectDir, filepath.FromSlash(LockPath)), lock.encode())
 }

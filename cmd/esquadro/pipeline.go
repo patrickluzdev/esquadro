@@ -7,8 +7,12 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
+	"github.com/patrickluzdev/esquadro/internal/hook"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
+
+// builtinHooks are the hooks of the built-in blueprints, by hook.Key.
+var builtinHooks = map[string]hook.Func{}
 
 // loadedProject is a project read from its folder, with its blueprints
 // resolved.
@@ -51,7 +55,13 @@ func loadProject(cmd, dir string, stderr io.Writer) *loadedProject {
 	l := &loadedProject{
 		dir:     dir,
 		sources: sources,
-		loader:  &blueprint.Loader{Builtin: blueprints.FS, ProjectDir: dir},
+		loader: &blueprint.Loader{
+			Builtin:    blueprints.FS,
+			ProjectDir: dir,
+			HasBuiltinHook: func(bp, path string) bool {
+				return builtinHooks[hook.Key(bp, path)] != nil
+			},
+		},
 	}
 	p, diags := project.Load(sources...)
 	if !diags.HasErrors() {

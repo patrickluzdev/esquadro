@@ -45,6 +45,9 @@ type LockedFile struct {
 	Once      bool     `json:"once,omitempty"`
 	Replaced  []string `json:"replaced,omitempty"`
 	Slots     []Slot   `json:"slots,omitempty"`
+	// Hook names the post-gen hook that wrote the file; Template is then
+	// empty.
+	Hook string `json:"hook,omitempty"`
 }
 
 // Slot records who contributed to a slot in a file.

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -258,5 +259,36 @@ func TestMultiFileErrors(t *testing.T) {
 	}
 	if got != string(want) {
 		t.Errorf("output differs from %s\n--- got ---\n%s\n--- want ---\n%s", golden, got, want)
+	}
+}
+
+func TestDescribeIsPlainJSON(t *testing.T) {
+	p, diags, _ := load(t, "testdata/ok/shop.esq")
+	if len(diags) > 0 {
+		t.Fatal(diags)
+	}
+	data, err := json.MarshalIndent(p.Describe(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for _, want := range []string{
+		`"module": "github.com/example/shop"`,
+		`"snake": "sold_out"`,
+		`"kind": "enum"`,
+		`"target": "Category"`,
+		`"inverse": "products"`,
+		`"join_table": "product_tags"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("description missing %s", want)
+		}
+	}
+	var back Description
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.Entities[1].Fields[5].Default.Kind != DefaultEnum {
+		t.Errorf("default kind did not round-trip: %+v", back.Entities[1].Fields[5])
 	}
 }

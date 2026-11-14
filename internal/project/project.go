@@ -5,6 +5,8 @@
 package project
 
 import (
+	"fmt"
+
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/dsl"
 )
@@ -170,8 +172,8 @@ type Field struct {
 
 // Number is a numeric literal as written plus its value.
 type Number struct {
-	Text  string
-	Value float64
+	Text  string  `json:"text"`
+	Value float64 `json:"value"`
 }
 
 // DefaultKind is the kind of a default value.
@@ -185,11 +187,32 @@ const (
 
 // Default is a field's default value.
 type Default struct {
-	Kind DefaultKind
+	Kind DefaultKind `json:"kind"`
 	// Text is the literal (decoded string, number as written, true/false),
 	// "now", or the enum value name as written.
-	Text      string
-	EnumValue *EnumValue
+	Text      string     `json:"text"`
+	EnumValue *EnumValue `json:"-"`
+}
+
+var defaultKindNames = [...]string{"literal", "now", "enum"}
+
+// MarshalText writes the kind as a word, so descriptions read well.
+func (k DefaultKind) MarshalText() ([]byte, error) {
+	if int(k) < len(defaultKindNames) {
+		return []byte(defaultKindNames[k]), nil
+	}
+	return nil, fmt.Errorf("unknown default kind %d", int(k))
+}
+
+// UnmarshalText reads a kind written by MarshalText.
+func (k *DefaultKind) UnmarshalText(b []byte) error {
+	for i, n := range defaultKindNames {
+		if n == string(b) {
+			*k = DefaultKind(i)
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown default kind %q", b)
 }
 
 // RelationKind is the kind of a relation, seen from the entity that has it.

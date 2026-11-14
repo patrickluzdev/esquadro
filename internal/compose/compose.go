@@ -454,7 +454,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 			c.errorf(name, 0, "invalid template in file name: %s", cleanTemplateMsg(strings.TrimPrefix(err.Error(), "template: "+name+": ")))
 			return out
 		}
-		target, ok := cleanTarget(pb.String())
+		target, ok := CleanTarget(pb.String())
 		if !ok {
 			c.errorf(name, 0, "file name renders to %q, which is not a path inside the project", pb.String())
 			return out
@@ -491,9 +491,9 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	return out
 }
 
-// cleanTarget validates a rendered output path: relative, inside the
+// CleanTarget validates a generated file path: relative, inside the
 // project, not in .esquadro/ and without empty segments.
-func cleanTarget(p string) (string, bool) {
+func CleanTarget(p string) (string, bool) {
 	if p == "" || strings.HasPrefix(p, "/") || strings.Contains(p, "\\") || strings.Contains(p, "//") || strings.HasSuffix(p, "/") {
 		return "", false
 	}

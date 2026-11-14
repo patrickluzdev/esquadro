@@ -108,13 +108,13 @@ func load(t *testing.T, dir string) (*project.Project, *blueprint.Set) {
 func TestCleanTarget(t *testing.T) {
 	ok := map[string]string{"a.go": "a.go", "x/./y.go": "x/y.go", "x/../y.go": "y.go"}
 	for in, want := range ok {
-		if got, valid := cleanTarget(in); !valid || got != want {
-			t.Errorf("cleanTarget(%q) = %q, %v", in, got, valid)
+		if got, valid := CleanTarget(in); !valid || got != want {
+			t.Errorf("CleanTarget(%q) = %q, %v", in, got, valid)
 		}
 	}
 	for _, in := range []string{"", "/abs", "../x", "x/../../y", "a//b", "dir/", `a\b`, ".esquadro/lock.json", ".esquadro", "."} {
-		if _, valid := cleanTarget(in); valid {
-			t.Errorf("cleanTarget(%q) should be rejected", in)
+		if _, valid := CleanTarget(in); valid {
+			t.Errorf("CleanTarget(%q) should be rejected", in)
 		}
 	}
 }

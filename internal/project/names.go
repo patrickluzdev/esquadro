@@ -8,12 +8,12 @@ import (
 
 // Names holds every spelling of a name that templates need.
 type Names struct {
-	Raw    string // as written in the .esq file, e.g. "orderItem"
-	Label  string // human-readable, e.g. "Order item"
-	Pascal string // OrderItem, UserID
-	Camel  string // orderItem, userID
-	Snake  string // order_item, user_id
-	Kebab  string // order-item, user-id
+	Raw    string `json:"raw"`    // as written in the .esq file, e.g. "orderItem"
+	Label  string `json:"label"`  // human-readable, e.g. "Order item"
+	Pascal string `json:"pascal"` // OrderItem, UserID
+	Camel  string `json:"camel"`  // orderItem, userID
+	Snake  string `json:"snake"`  // order_item, user_id
+	Kebab  string `json:"kebab"`  // order-item, user-id
 }
 
 // commonInitialisms are kept upper-case in Pascal and Camel forms, following

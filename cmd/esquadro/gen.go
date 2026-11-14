@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/compose"
 	"github.com/patrickluzdev/esquadro/internal/diag"
+	"github.com/patrickluzdev/esquadro/internal/hook"
 	"github.com/patrickluzdev/esquadro/internal/version"
 	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
@@ -44,10 +47,19 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	res, templates, diags := compose.Compose(l.project, l.set)
+	diags = append(diags, hook.CheckOverlaps(l.set, res)...)
+	diags.Sort()
 	if len(diags) > 0 {
 		diag.Render(stderr, diags, l.source(templates.Get))
 	}
 	if diags.HasErrors() {
+		return 1
+	}
+
+	ctx := context.Background()
+	runner := &hook.Runner{ProjectDir: dir, Builtin: builtinHooks, Out: stderr}
+	if err := runner.PreGen(ctx, l.project, l.set, res, *dryRun); err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
 	}
 
@@ -62,6 +74,9 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	printPlan(stdout, plan, *dryRun)
+	for _, hk := range hook.Hooks(l.set, "post-gen") {
+		fmt.Fprintf(stdout, "%-9s %s  (after writing; may change %s)\n", "run", hook.ID(hk.Blueprint, hk.Hook), strings.Join(hk.Hook.Writes, ", "))
+	}
 
 	conflicts := plan.Conflicts()
 	if *dryRun {
@@ -87,6 +102,11 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		} else {
 			fmt.Fprintln(stderr, "esquadro gen:", err)
 		}
+		return 1
+	}
+	if err := runner.PostGen(ctx, l.project, l.set, res); err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
+		fmt.Fprintln(stderr, "The generated files were written; fix the hook and run esquadro gen again.")
 		return 1
 	}
 	return 0

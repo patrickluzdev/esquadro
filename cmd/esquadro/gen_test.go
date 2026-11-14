@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -150,5 +151,37 @@ func TestGenStopsOnTemplateErrors(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".esquadro")); !os.IsNotExist(err) {
 		t.Fatal("nothing may be written when templates fail")
+	}
+}
+
+func TestGenRunsPostGenHooks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("hook scripts are POSIX shell")
+	}
+	dir := demoProject(t)
+	os.WriteFile(filepath.Join(dir, "blueprints/demo/blueprint.esq"),
+		[]byte("blueprint demo {\n  version \"0.1.0\"\n  hook post-gen \"hooks/stamp\" writes \"gen/**\"\n}\n"), 0o644)
+	os.MkdirAll(filepath.Join(dir, "blueprints/demo/hooks"), 0o755)
+	os.WriteFile(filepath.Join(dir, "blueprints/demo/hooks/stamp"),
+		[]byte("#!/bin/sh\ncat >/dev/null\nmkdir -p gen\necho stamped > gen/stamp.txt\nprintf '{\"messages\":[{\"text\":\"stamped\"}]}'\n"), 0o755)
+
+	code, out, errOut := gen(t, "-dry-run", dir)
+	if code != 0 || !strings.Contains(out, "run       demo post-gen hooks/stamp  (after writing; may change gen/**)") {
+		t.Fatalf("dry run: exit %d\n%s%s", code, out, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gen")); !os.IsNotExist(err) {
+		t.Fatal("a dry run must not run post-gen hooks")
+	}
+
+	code, out, errOut = gen(t, dir)
+	if code != 0 || !strings.Contains(errOut, "demo post-gen hooks/stamp: info: stamped") {
+		t.Fatalf("exit %d\n%s%s", code, out, errOut)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, "gen/stamp.txt")); string(data) != "stamped\n" {
+		t.Fatalf("stamp = %q", data)
+	}
+	if code, out, _ := explain(t, "-C", dir, "gen/stamp.txt"); code != 0 ||
+		!strings.Contains(out, "written by    hook demo post-gen hooks/stamp") || !strings.Contains(out, "as generated") {
+		t.Fatalf("explain: %s", out)
 	}
 }
