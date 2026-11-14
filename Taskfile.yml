@@ -1,0 +1,32 @@
+version: '3'
+
+vars:
+  BINARY: esquadro
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the esquadro binary into bin/
+    cmds:
+      - go build -ldflags "-X github.com/patrickluz/esquadro/internal/version.Version={{.VERSION}}" -o bin/{{.BINARY}} ./cmd/esquadro
+
+  run:
+    desc: 'Run esquadro (e.g. task run -- version)'
+    cmds:
+      - go run ./cmd/esquadro {{.CLI_ARGS}}
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  lint:
+    desc: Check formatting and run go vet
+    cmds:
+      - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - go vet ./...
