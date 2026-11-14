@@ -36,12 +36,22 @@ tasks:
       - go test ./internal/dsl ./internal/model -run Golden -update
 
   fuzz:
-    desc: 'Fuzz the DSL parser (default 1m, e.g. task fuzz -- 5m)'
+    desc: 'Fuzz the DSL parser and formatter (default 1m each, e.g. task fuzz -- 5m)'
+    vars:
+      TIME: '{{.CLI_ARGS | default "1m"}}'
     cmds:
-      - go test ./internal/dsl -run '^$' -fuzz FuzzParse -fuzztime {{.CLI_ARGS | default "1m"}}
+      # A short minimize time keeps the fuzzer from pausing up to 60s on every
+      # new interesting input.
+      - go test ./internal/dsl -run '^$' -fuzz FuzzParse -fuzztime {{.TIME}} -fuzzminimizetime 1s
+      - go test ./internal/dsl -run '^$' -fuzz FuzzFormat -fuzztime {{.TIME}} -fuzzminimizetime 1s
 
   lint:
-    desc: Check formatting and run go vet
+    desc: Check formatting, run go vet and gopls checks
     cmds:
       - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - go vet ./...
+      # The same analyzers editors show (modernize, simplifications, unused
+      # parameters...). Fails on any finding, hints included.
+      - |
+        out=$(gopls check -severity=hint $(find . -name '*.go' -not -path './.git/*') 2>&1)
+        if [ -n "$out" ]; then echo "$out"; exit 1; fi

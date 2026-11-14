@@ -88,6 +88,9 @@ type Token struct {
 	Value string
 	Pos   diag.Pos
 	End   diag.Pos
+	// For doc comments: the token before it, see Comment.After.
+	after    Kind
+	afterEnd int
 }
 
 // describe renders a token for error messages, e.g. `name "foo"`.

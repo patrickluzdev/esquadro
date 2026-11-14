@@ -277,7 +277,7 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 	e.Fields = append(e.Fields, implicitField(implicitID, TypeUUID, nil))
 	for _, f := range d.Fields {
-		if fld := b.buildField(e, f); fld != nil {
+		if fld := b.buildField(f); fld != nil {
 			e.Fields = append(e.Fields, fld)
 		}
 	}
@@ -293,7 +293,7 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 var fieldModifiers = []string{"required", "unique", "min", "max", "pattern", "default"}
 
-func (b *builder) buildField(e *Entity, d *dsl.Field) *Field {
+func (b *builder) buildField(d *dsl.Field) *Field {
 	n := b.names(d.Name)
 	switch n.Snake {
 	case implicitID, implicitCreatedAt, implicitUpdatedAt:

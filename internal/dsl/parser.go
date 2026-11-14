@@ -1,6 +1,9 @@
 package dsl
 
 import (
+	"slices"
+	"sort"
+
 	"github.com/patrickluzdev/esquadro/internal/diag"
 )
 
@@ -49,15 +52,23 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 		}
 		f.Decls = append(f.Decls, d)
 	}
+	p.dropDoc()
+	if len(p.orphans) > 0 {
+		f.Comments = append(f.Comments, p.orphans...)
+		sort.SliceStable(f.Comments, func(i, j int) bool { return f.Comments[i].Pos.Offset < f.Comments[j].Pos.Offset })
+	}
 	diags.Sort()
 	return f, firstPerLine(diags)
 }
 
 type parser struct {
-	toks    []Token
-	i       int
-	diags   *diag.List
-	doc     []string
+	toks  []Token
+	i     int
+	diags *diag.List
+	doc   []Token
+	// orphans are doc comments that no node claimed (e.g. before a "}");
+	// they are kept as regular comments so the formatter never drops them.
+	orphans []Comment
 	lastEnd diag.Pos
 }
 
@@ -77,7 +88,7 @@ func (p *parser) advance() Token {
 
 func (p *parser) collectDocs() {
 	for p.toks[p.i].Kind == DocComment {
-		p.doc = append(p.doc, p.toks[p.i].Value)
+		p.doc = append(p.doc, p.toks[p.i])
 		p.i++
 		// The newline ending the doc comment is not significant.
 		if p.toks[p.i].Kind == Newline {
@@ -87,9 +98,20 @@ func (p *parser) collectDocs() {
 }
 
 func (p *parser) takeDoc() []string {
-	d := p.doc
+	var d []string
+	for _, t := range p.doc {
+		d = append(d, t.Value)
+	}
 	p.doc = nil
 	return d
+}
+
+// dropDoc turns pending doc comments into regular comments.
+func (p *parser) dropDoc() {
+	for _, t := range p.doc {
+		p.orphans = append(p.orphans, Comment{Text: t.Text, Pos: t.Pos, End: t.End, After: t.after, AfterEnd: t.afterEnd})
+	}
+	p.doc = nil
 }
 
 func (p *parser) skipNewlines() {
@@ -131,17 +153,10 @@ func (p *parser) expectIdent(what string) (Ident, bool) {
 }
 
 func identOf(t Token) Ident {
-	return Ident{Name: t.Text, Span: Span{Pos: t.Pos, End: t.End}}
+	return Ident{Name: t.Text, Pos: t.Pos, End: t.End}
 }
 
-func isTopKeyword(s string) bool {
-	for _, k := range topKeywords {
-		if k == s {
-			return true
-		}
-	}
-	return false
-}
+func isTopKeyword(s string) bool { return slices.Contains(topKeywords, s) }
 
 func didYouMean(name string, cands []string) string {
 	if s := diag.Suggest(name, cands); s != "" {
@@ -233,7 +248,7 @@ func (p *parser) parseBlock(open Token, what string, member func() bool) diag.Po
 		t := p.tok()
 		switch t.Kind {
 		case RBrace:
-			p.doc = nil
+			p.dropDoc()
 			p.advance()
 			return t.End
 		case EOF:
@@ -280,7 +295,7 @@ func (p *parser) parseApp() Decl {
 }
 
 func (p *parser) parseAppItem(app *AppDecl) bool {
-	p.takeDoc()
+	p.dropDoc()
 	t := p.tok()
 	if t.Kind == At {
 		a := p.parseAnnotation()
@@ -288,6 +303,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 			return false
 		}
 		app.Annotations = append(app.Annotations, a)
+		app.Items = append(app.Items, a)
 		return true
 	}
 	if t.Kind != Name {
@@ -304,12 +320,13 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 			return false
 		}
 		p.advance()
-		v := &Value{Kind: StringValue, Text: s.Value, Span: Span{Pos: s.Pos, End: s.End}}
+		v := tokenValue(s)
 		if app.Module != nil {
 			p.errorf(t, "module is already set at line %d", app.Module.Pos.Line)
 			return true
 		}
-		app.Module = v
+		app.Module = &v
+		app.Items = append(app.Items, &ModuleItem{Path: v, Pos: t.Pos, End: s.End})
 	case "blueprint":
 		p.advance()
 		r := p.tok()
@@ -318,7 +335,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 			return false
 		}
 		p.advance()
-		ref := &BlueprintRef{Ref: tokenValue(r), Span: Span{Pos: t.Pos, End: r.End}}
+		ref := &BlueprintRef{Ref: tokenValue(r), Pos: t.Pos, End: r.End}
 		if p.tok().Kind == LBrace {
 			open := p.advance()
 			ref.End = p.parseBlock(open, "blueprint options", func() bool {
@@ -330,6 +347,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 			})
 		}
 		app.Blueprints = append(app.Blueprints, ref)
+		app.Items = append(app.Items, ref)
 	default:
 		p.errorf(t, "unknown app setting %q", t.Text).Suggestion = didYouMean(t.Text, appSettings)
 		return false
@@ -338,17 +356,16 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 }
 
 func tokenValue(t Token) Value {
-	sp := Span{Pos: t.Pos, End: t.End}
-	switch t.Kind {
-	case String:
-		return Value{Kind: StringValue, Text: t.Value, Span: sp}
-	case Number:
-		return Value{Kind: NumberValue, Text: t.Text, Span: sp}
+	v := Value{Kind: IdentValue, Text: t.Text, Raw: t.Text, Pos: t.Pos, End: t.End}
+	switch {
+	case t.Kind == String:
+		v.Kind, v.Text = StringValue, t.Value
+	case t.Kind == Number:
+		v.Kind = NumberValue
+	case t.Text == "true" || t.Text == "false":
+		v.Kind = BoolValue
 	}
-	if t.Text == "true" || t.Text == "false" {
-		return Value{Kind: BoolValue, Text: t.Text, Span: sp}
-	}
-	return Value{Kind: IdentValue, Text: t.Text, Span: sp}
+	return v
 }
 
 // parseOption parses "key value".
@@ -361,7 +378,7 @@ func (p *parser) parseOption() *Option {
 	if !ok {
 		return nil
 	}
-	return &Option{Key: key, Value: v, Span: Span{Pos: key.Pos, End: v.End}}
+	return &Option{Key: key, Value: v, Pos: key.Pos, End: v.End}
 }
 
 func (p *parser) parseValue(context string) (Value, bool) {
@@ -372,7 +389,7 @@ func (p *parser) parseValue(context string) (Value, bool) {
 		return tokenValue(t), true
 	case LBrack:
 		p.advance()
-		list := Value{Kind: ListValue, Span: Span{Pos: t.Pos}}
+		list := Value{Kind: ListValue, Pos: t.Pos}
 		for {
 			p.skipNewlines()
 			if c := p.tok(); c.Kind == RBrack {
@@ -419,7 +436,7 @@ func (p *parser) parseEnum() Decl {
 		t := p.tok()
 		switch t.Kind {
 		case RBrace:
-			p.doc = nil
+			p.dropDoc()
 			p.advance()
 			e.Span = Span{Pos: start.Pos, End: t.End}
 			return e
@@ -490,9 +507,9 @@ func (p *parser) parseEntityOptions(ent *EntityDecl) bool {
 }
 
 func (p *parser) parseMember(ent *EntityDecl) bool {
-	doc := p.takeDoc()
 	t := p.tok()
 	if t.Kind == At {
+		p.dropDoc()
 		a := p.parseAnnotation()
 		if a == nil {
 			return false
@@ -505,6 +522,7 @@ func (p *parser) parseMember(ent *EntityDecl) bool {
 		p.errorf(t, "expected a field, relation or @annotation, found %s", t.describe())
 		return false
 	}
+	doc := p.takeDoc()
 	name := identOf(p.advance())
 
 	switch k := p.tok(); k.Kind {
@@ -565,7 +583,7 @@ func (p *parser) parseModifiers(mods *[]*Modifier, anns *[]*Annotation) bool {
 			*anns = append(*anns, a)
 		case Name:
 			p.advance()
-			m := &Modifier{Name: identOf(t), Span: Span{Pos: t.Pos, End: t.End}}
+			m := &Modifier{Name: identOf(t), Pos: t.Pos, End: t.End}
 			if p.tok().Kind == LParen {
 				m.HasParens = true
 				p.advance()
@@ -599,7 +617,7 @@ func (p *parser) parseAnnotation() *Annotation {
 	if !ok {
 		return nil
 	}
-	a := &Annotation{Name: name, Span: Span{Pos: at.Pos, End: name.End}}
+	a := &Annotation{Name: name, Pos: at.Pos, End: name.End}
 	if p.tok().Kind != LParen {
 		return a
 	}

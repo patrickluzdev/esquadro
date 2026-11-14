@@ -101,17 +101,21 @@ func dumpValue(v Value) string {
 func dumpMods(mods []*Modifier, anns []*Annotation) string {
 	var b strings.Builder
 	for _, m := range mods {
-		b.WriteString(" " + m.Name.Name)
+		b.WriteString(" ")
+		b.WriteString(m.Name.Name)
 		if m.HasParens {
 			parts := make([]string, len(m.Args))
 			for i, a := range m.Args {
 				parts[i] = dumpValue(a)
 			}
-			b.WriteString("(" + strings.Join(parts, ", ") + ")")
+			b.WriteString("(")
+			b.WriteString(strings.Join(parts, ", "))
+			b.WriteString(")")
 		}
 	}
 	for _, a := range anns {
-		b.WriteString(" " + dumpAnnotation(a))
+		b.WriteString(" ")
+		b.WriteString(dumpAnnotation(a))
 	}
 	return b.String()
 }

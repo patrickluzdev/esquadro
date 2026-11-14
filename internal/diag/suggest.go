@@ -12,13 +12,7 @@ func Suggest(name string, candidates []string) string {
 		return ""
 	}
 	lower := strings.ToLower(name)
-	maxDist := utf8.RuneCountInString(name) / 3
-	if maxDist < 1 {
-		maxDist = 1
-	}
-	if maxDist > 3 {
-		maxDist = 3
-	}
+	maxDist := min(max(utf8.RuneCountInString(name)/3, 1), 3)
 	best, bestDist := "", maxDist+1
 	for _, c := range candidates {
 		if c == name {

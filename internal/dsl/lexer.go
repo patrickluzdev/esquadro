@@ -14,6 +14,11 @@ type Comment struct {
 	Text string // including the "//" or "/* */" markers
 	Pos  diag.Pos
 	End  diag.Pos
+	// After is the kind of the last token before the comment and AfterEnd
+	// its end offset. A comment right after a node's last token, on the same
+	// line, is that node's trailing comment.
+	After    Kind
+	AfterEnd int
 }
 
 type lexer struct {
@@ -24,19 +29,24 @@ type lexer struct {
 	col      int
 	toks     []Token
 	comments []Comment
+	prevKind Kind // kind and end offset of the last token, for comments
+	prevEnd  int
 	diags    *diag.List
 }
 
 // lex splits src into tokens. Lexical errors are added to diags and produce
 // Illegal tokens, so the parser can keep going.
 func lex(file string, src []byte, diags *diag.List) ([]Token, []Comment) {
-	l := &lexer{src: src, file: file, line: 1, col: 1, diags: diags}
+	l := &lexer{src: src, file: file, line: 1, col: 1, diags: diags, prevKind: Newline}
 	if strings.HasPrefix(string(src), "\xef\xbb\xbf") {
 		l.off = 3
 	}
 	for {
 		t := l.next()
 		l.toks = append(l.toks, t)
+		if t.Kind != DocComment {
+			l.prevKind, l.prevEnd = t.Kind, t.End.Offset
+		}
 		if t.Kind == EOF {
 			return l.toks, l.comments
 		}
@@ -244,7 +254,7 @@ func (l *lexer) lineComment() {
 	for r := l.peek(0); r != -1 && r != '\n'; r = l.peek(0) {
 		l.advance()
 	}
-	l.comments = append(l.comments, Comment{Text: strings.TrimRight(string(l.src[start.Offset:l.off]), "\r"), Pos: start, End: l.pos()})
+	l.comments = append(l.comments, Comment{Text: strings.TrimRight(string(l.src[start.Offset:l.off]), "\r"), Pos: start, End: l.pos(), After: l.prevKind, AfterEnd: l.prevEnd})
 }
 
 func (l *lexer) blockComment() {
@@ -264,7 +274,7 @@ func (l *lexer) blockComment() {
 		}
 		l.advance()
 	}
-	l.comments = append(l.comments, Comment{Text: string(l.src[start.Offset:l.off]), Pos: start, End: l.pos()})
+	l.comments = append(l.comments, Comment{Text: string(l.src[start.Offset:l.off]), Pos: start, End: l.pos(), After: l.prevKind, AfterEnd: l.prevEnd})
 }
 
 func (l *lexer) docComment() Token {
@@ -273,6 +283,7 @@ func (l *lexer) docComment() Token {
 		l.advance()
 	}
 	t := l.tok(DocComment, start)
+	t.after, t.afterEnd = l.prevKind, l.prevEnd
 	t.Text = strings.TrimRight(t.Text, "\r")
 	v := strings.TrimPrefix(t.Text, "///")
 	t.Value = strings.TrimPrefix(v, " ")

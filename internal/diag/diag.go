@@ -225,10 +225,7 @@ func expandTabs(line string, col int) (string, int) {
 		runeIdx++
 	}
 	if at < 0 { // column past end of line (e.g. "unexpected end of line")
-		at = display + (col - runeIdx)
-		if at < display {
-			at = display
-		}
+		at = max(display+(col-runeIdx), display)
 	}
 	return b.String(), at
 }

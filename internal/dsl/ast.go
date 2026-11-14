@@ -44,6 +44,9 @@ type Value struct {
 	// Text is the decoded string, the number as written, "true"/"false" or
 	// the name. Empty for lists.
 	Text string
+	// Raw is the source text of the token, e.g. "\"a\\n\"" or "`a\n`" for
+	// strings, so the formatter can keep the original quoting. Empty for lists.
+	Raw  string
 	List []Value
 	Span
 }
@@ -81,6 +84,21 @@ type AppDecl struct {
 	Module      *Value
 	Blueprints  []*BlueprintRef
 	Annotations []*Annotation
+	// Items keeps module, blueprints and annotations in source order.
+	Items []AppItem
+	Span
+}
+
+// AppItem is an item of the app block: *ModuleItem, *BlueprintRef or
+// *Annotation.
+type AppItem interface {
+	appItemNode()
+	SourceSpan() Span
+}
+
+// ModuleItem is the "module <path>" line.
+type ModuleItem struct {
+	Path Value
 	Span
 }
 
@@ -181,6 +199,10 @@ func (s Span) SourceSpan() Span { return s }
 func (*AppDecl) declNode()    {}
 func (*EnumDecl) declNode()   {}
 func (*EntityDecl) declNode() {}
+
+func (*ModuleItem) appItemNode()   {}
+func (*BlueprintRef) appItemNode() {}
+func (*Annotation) appItemNode()   {}
 
 func (*Field) memberNode()      {}
 func (*Relation) memberNode()   {}

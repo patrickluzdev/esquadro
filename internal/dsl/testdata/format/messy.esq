@@ -1,0 +1,46 @@
+// Header comment.
+
+
+/// The shop.
+app shop {   // the app
+    module "github.com/example/shop"
+  /// orphan doc before a blueprint
+
+
+  blueprint base
+  blueprint postgres { pool_max 20
+  max_idle   5 // idle conns
+      }
+  blueprint "./blueprints/mine" { }
+  @admin( title "Shop" ,  dark )
+}
+enum Status{OPEN , CLOSED}
+enum Size {
+  /// Small.
+  S,M
+  L // large
+}
+entity Category{}
+entity Product ( plural "products" ) {
+  /// Product name.
+  name string required min( 3 ) max(120)
+  description text
+  price decimal required min(0) // never negative
+  status Status default(OPEN)
+
+
+
+  category -> Category ( name ) required
+  tags <-> Tag
+  sku string pattern(`^[A-Z]{3}-\d+$`) @admin(label "SKU")
+  // a standalone comment
+  @postgres(
+     index [name,status],
+     table "products"
+  )
+  /// orphan doc before the closing brace
+}   // end of Product
+entity Tag {
+  name string
+}
+// trailing comment at the end
