@@ -3,7 +3,7 @@ title: Tutorial
 description: Grow a shop's model step by step, and see what each change generates.
 ---
 
-This tutorial starts from `esquadro new` and grows the model of a shop: a new
+This tutorial starts from the `api` starter and grows the model of a shop: a new
 field, a new entity, a many-to-many relation, a second module, and an option.
 After each step you run the same two commands, and you will see what esquadro
 changed.
@@ -14,7 +14,7 @@ You need esquadro, Go, Task and Docker (see
 ## 1. Start
 
 ```sh
-esquadro new shop
+esquadro new -starter api shop
 cd shop
 task up
 task migrate

@@ -25,12 +25,13 @@ entity Product {
 }
 ```
 
-From a model like this, the default blueprints write a JSON API on
+From a model like this, the `api` starter's blueprints write a JSON API on
 PostgreSQL: the OpenAPI contract and its server, each entity's use cases,
 the migrations, Problem Details errors in the client's language, security
 headers, a rate limit, tests against a real Postgres, a `compose.yaml` to run
 it all locally, a container image and a CI. Blueprints are small and
-optional: a worker or a command line tool takes only what it needs.
+optional: the `worker` and `cli` starters, or a project built blueprint by
+blueprint, take only what they need.
 
 ## Install
 
@@ -46,14 +47,25 @@ supported yet.
 ## Start a project
 
 ```
-esquadro new shop
+esquadro doctor                    # Go, Task, Docker: what is missing, and how to get it
+esquadro new -starter api shop     # or -starter worker, -starter cli
 cd shop
 task up        # Postgres in Docker
 task migrate
 task run       # http://localhost:8080/docs
 ```
 
-Then change the `.esq` files in `esquadro/` and run `esquadro gen`. The
+Then change the `.esq` files in `esquadro/` and run `esquadro gen`. Without
+a starter, `esquadro new shop` writes the smallest project, and blueprints
+come with `esquadro add`:
+
+```
+esquadro blueprint list            # every blueprint, and those the project uses
+esquadro add worker                # add one, with what it requires
+esquadro remove worker
+esquadro blueprint new billing     # a blueprint of your own, with a test
+```
+ The
 [documentation](https://patrickluzdev.github.io/esquadro/) has a tutorial,
 the language, every blueprint and how to write your own.
 

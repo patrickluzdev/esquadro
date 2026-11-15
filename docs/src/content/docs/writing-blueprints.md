@@ -7,6 +7,20 @@ A blueprint is a folder. Writing one needs no Go: templates use Go's
 [text/template](https://pkg.go.dev/text/template), and the manifest is
 written in the same language as the model.
 
+## Start one
+
+In a project:
+
+```sh
+esquadro blueprint new billing
+```
+
+writes a working blueprint in `esquadro/blueprints/billing/`, adds it to the
+app, and gives it a test project. It has an option, a slot, a template for
+the whole project, one for each entity, one written once for the user, and
+code added to the app's Taskfile: change them to make it yours. Run
+`esquadro gen` to see what it generates in the project.
+
 ```
 billing/
   blueprint.esq          the manifest
@@ -19,7 +33,8 @@ billing/
     stamp
 ```
 
-Use it from a project with a path relative to `esquadro/`:
+`testdata/` holds its [test project](#testing) (`esquadro blueprint new`
+writes it). Use it from a project with a path relative to `esquadro/`:
 
 ```esquadro
 blueprint "./blueprints/billing" {
@@ -183,6 +198,24 @@ stdout:
 `previous` is the model of the last generation (`null` the first time): what
 a hook compares with to write, for example, a migration.
 
+## Testing
+
+A blueprint's test project is in `testdata/project/`: an `esquadro/` folder
+with an app that uses the blueprint, written `blueprint "../../.."` (its
+folder, from there), and a small model. `testdata/expected/` holds the files
+the blueprint generates for it.
+
+```sh
+esquadro blueprint test billing          # or a folder: esquadro blueprint test ./path
+esquadro blueprint test -update billing  # the new output is right: make it the expected one
+```
+
+`esquadro blueprint test` generates the test project in a temporary folder
+and compares the files the blueprint wrote with the expected ones, showing
+the differences. Run it in the blueprint's CI too. The files other
+blueprints write, with the code yours adds to their slots, are not compared:
+check those in the project with `esquadro gen -dry-run`.
+
 ## Publishing
 
 Push the blueprint to a git repository, in its root or a folder, and tag
@@ -194,5 +227,5 @@ blueprint "github.com/acme/blueprints/billing@v0.1.0"
 ```
 
 Users get the commit the tag names, pinned in their `esquadro/lock.json` until
-`esquadro gen -update`. If the blueprint has hooks, esquadro shows them and
+`esquadro blueprint update`. If the blueprint has hooks, esquadro shows them and
 asks before running them, once per commit: keep them short and readable.

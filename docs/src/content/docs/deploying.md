@@ -4,7 +4,9 @@ description: The container image and the CI esquadro generates, for any kind of 
 ---
 
 Two blueprints take a project from your machine to production. They work for
-any kind of app (an API, a worker, a command), and `esquadro new` adds both.
+any kind of app (an API, a worker, a command). The `api` and `worker`
+starters have both, `cli` has the CI; `esquadro add docker` adds the image to
+any project.
 
 ## The image: `docker`
 
@@ -17,7 +19,11 @@ image is around 30 MB.
 task docker:build                 # shop:dev
 docker run shop:dev               # the app's default command (serve, for an API)
 docker run shop:dev migrate       # any other command
+docker run shop:dev version       # dev, or the version it was built with
 ```
+
+The image's version comes from `docker build --build-arg VERSION=v1.2.0`; the
+CI below passes the tag's.
 
 The image runs in production mode (`SHOP_ENV=production`: JSON logs, no
 `/docs`), and is configured by environment variables, as the app is

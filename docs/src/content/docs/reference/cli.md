@@ -29,7 +29,86 @@ out, with their defaults, to change when you need to.
 List, inspect, update, write and test blueprints.
 
 ```
+Usage: esquadro blueprint <command> [arguments]
 
+Commands:
+  list     list the blueprints you can use, and those the project uses
+  info     show what a blueprint does: its options, slots and files
+  update   move blueprints from git to the latest commit of their ref
+  new      start a blueprint of your own in the project
+  test     generate a blueprint's test project and compare it with the expected output
+
+To add a blueprint to the project: esquadro add; to remove one: esquadro remove.
+```
+
+### esquadro blueprint list
+
+List the blueprints you can use, and those the project uses.
+
+```
+Usage: esquadro blueprint list [dir]
+
+Lists the built-in blueprints, by what they are for. In a project (dir,
+default: the current directory), marks those the app uses with *, and lists
+its blueprints from folders and git too.
+```
+
+### esquadro blueprint info
+
+Show what a blueprint does: its options, slots and files.
+
+```
+Usage: esquadro blueprint info <blueprint> [dir]
+
+Shows what a blueprint does, the blueprints it works with, its options,
+annotations and slots, and the files it generates. The blueprint is a
+built-in name, one of the project's in dir (default: the current directory),
+a local folder or a git source.
+```
+
+### esquadro blueprint update
+
+Move blueprints from git to the latest commit of their ref.
+
+```
+Usage: esquadro blueprint update [-trust] [<blueprint>[,...]] [dir]
+
+Moves the project's blueprints from git (all, or those named) to the commit
+their ref points to now, and generates. The lockfile keeps each one at its
+commit until then. Built-in blueprints come with esquadro: update esquadro.
+
+  -trust
+    	let the hooks of the new commits run without asking
+```
+
+### esquadro blueprint new
+
+Start a blueprint of your own in the project.
+
+```
+Usage: esquadro blueprint new <name> [dir]
+
+Starts a blueprint of your own in esquadro/blueprints/<name> of the project
+in dir (default: the current directory) and adds it to the app: a manifest,
+a template for the whole project and one for each entity, code added to the
+app's Taskfile, and a test project with what the blueprint generates for
+it, which esquadro blueprint test checks. Change them to make it yours.
+```
+
+### esquadro blueprint test
+
+Generate a blueprint's test project and compare it with the expected output.
+
+```
+Usage: esquadro blueprint test [-update] [blueprint]
+
+Generates the blueprint's test project (testdata/project) in a temporary
+folder and compares the files the blueprint wrote with testdata/expected.
+The blueprint is a folder, or a name of the project's esquadro/blueprints;
+by default, the current folder.
+
+  -update
+    	make the generated files the expected ones
 ```
 
 ## esquadro check

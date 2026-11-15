@@ -34,31 +34,47 @@ is blocked the first time; allow it with
 affected.
 :::
 
-Check it works:
+Check it works, and that you have what the projects need:
 
 ```sh
 esquadro version
+esquadro doctor
 ```
 
 The projects esquadro generates need [Go](https://go.dev/dl),
-[Task](https://taskfile.dev) to run their tasks, and
-[Docker](https://docs.docker.com/get-docker/) for the local database and the
-tests.
+[Task](https://taskfile.dev) to run their tasks, and, with a database,
+[Docker](https://docs.docker.com/get-docker/) for it and the tests.
+`esquadro doctor` checks each of them and says how to install what is
+missing; in a project, it checks what that project needs.
 
 ## Create a project
 
+A project starts from a **starter**, a set of blueprints with an example
+model:
+
 ```sh
-esquadro new shop
+esquadro new -starter api shop
 cd shop
 ```
 
+| Starter | What it is |
+|---|---|
+| `api` | A JSON API on PostgreSQL, with its contract, docs, image and CI, and a catalog to change |
+| `worker` | A background service on PostgreSQL: processes that run until it is stopped, with its image and CI |
+| `cli` | A command line tool: commands, configuration and CI, nothing else to start with |
+
+Without `-starter`, `esquadro new shop` writes the smallest project, a
+program with the `check` and `version` commands, and you
+[add blueprints](#add-what-you-need) as you need them.
+
 `esquadro new` writes the model in `esquadro/`, generates the project from it
-and, with the `git` blueprint, makes it a repository with a first commit:
+and, with the `git` blueprint, makes it a repository with a first commit. The
+`api` starter writes:
 
 ```
 shop/
   esquadro/            the model: app.esq and catalog.esq, edit these
-  cmd/shop/            the commands: serve (the default), migrate, check
+  cmd/shop/            the commands: serve (the default), migrate, check, version
   internal/catalog/    the module: its entities, rules and use cases
   internal/platform/   config, logging, the HTTP edge, Postgres
   migrations/          one migration per change in the model
@@ -107,3 +123,18 @@ task migrate
 That is the whole loop. The [tutorial](/esquadro/tutorial/) goes through it
 step by step, and [the language](/esquadro/language/files-and-modules/)
 describes everything a model can say.
+
+## Add what you need
+
+Blueprints come and go with a command, whatever the project started from:
+
+```sh
+esquadro blueprint list          # every blueprint, and those the project uses
+esquadro blueprint info worker   # what one does: options, slots, files
+esquadro add worker              # add it (and what it requires), and generate
+esquadro remove worker           # take it out: its generated files go too
+```
+
+`esquadro add` writes the blueprint in `esquadro/app.esq` with its options
+commented out at their defaults, ready to change. See
+[Blueprints](/esquadro/blueprints/overview/).

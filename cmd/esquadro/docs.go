@@ -248,8 +248,17 @@ func cliPage() string {
 			continue
 		}
 		var help bytes.Buffer
-		c.run([]string{"-h"}, io.Discard, &help)
+		c.run([]string{"-h"}, &help, &help)
 		fmt.Fprintf(&b, "```\n%s\n```\n\n", strings.TrimSpace(help.String()))
+		if c.name != "blueprint" {
+			continue
+		}
+		for _, sub := range blueprintCommands() {
+			help.Reset()
+			sub.run([]string{"-h"}, &help, &help)
+			fmt.Fprintf(&b, "### esquadro blueprint %s\n\n%s.\n\n```\n%s\n```\n\n", sub.name,
+				strings.ToUpper(sub.short[:1])+sub.short[1:], strings.TrimSpace(help.String()))
+		}
 	}
 	return strings.TrimRight(b.String(), "\n") + "\n"
 }
