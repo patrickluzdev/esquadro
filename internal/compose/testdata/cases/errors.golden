@@ -1,7 +1,7 @@
 builtin/badgo/templates/bad.go.tmpl: error: generated bad.go is not valid Go: 3:6: expected 'IDENT', found '{'
   = help: line 3 of the generated file is: func {
 
-builtin/badpath/templates/{{".."}}/x.txt.tmpl: error: file name renders to "../x.txt", which is not a path inside the project
+builtin/badpath/templates/{{`..`}}/x.txt.tmpl: error: file name renders to "../x.txt", which is not a path inside the project
 
 builtin/both/templates/{{.Entity.Snake}}-{{.Enum.Snake}}.txt.tmpl: error: a template path cannot use both .Enum and .Entity or .Relation
 
