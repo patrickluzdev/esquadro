@@ -88,13 +88,28 @@ func Write(w http.ResponseWriter, r *http.Request, p *Problem) {
 // default.
 var Languages = {{goStrings .Options.languages}}
 
-// TitleIn is p's title in lang: its translation when there is one, the
-// title it was written with (in English) otherwise.
+// TitleIn is p's title in lang: yours from translations.go, else the one
+// esquadro knows, else the title it was written with (in English).
 func TitleIn(lang string, p *Problem) string {
 	if t, ok := translations[lang][p.Code]; ok {
 		return t
 	}
+	if t, ok := knownTitles[lang][p.Code]; ok {
+		return t
+	}
 	return p.Title
+}
+
+// knownTitles are the titles esquadro translates, in the languages of
+// Languages it knows; translations.go takes precedence.
+var knownTitles = map[string]map[string]string{
+{{- range strs .Options.languages}}{{$lang := .}}{{if and (not (english $lang)) (translated $lang "internal")}}
+	{{quote $lang}}: {
+{{- range problems}}{{if translated $lang .Code}}
+		{{quote .Code}}: {{quote (translation $lang .Code)}},
+{{- end}}{{end}}
+	},
+{{- end}}{{end}}
 }
 
 // Negotiate picks from Languages the one an Accept-Language header prefers:

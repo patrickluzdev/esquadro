@@ -1,20 +1,23 @@
 {{- if .Entities -}}
 package edge
 
-// translations are the titles of the problems by language and code, for
-// every language of Languages but English, in which they are written. Yours
-// to change: esquadro wrote this file once and never changes it again, so
-// add a language here when you add it to the api blueprint's languages, and
-// a title when a blueprint adds a problem. A title missing here is answered
-// in English; the code is the same in every language.
+// translations are your titles of the problems, by language and code. They
+// take precedence over the ones esquadro knows (pt-BR and es, in edge.go),
+// and a title missing everywhere is answered in English; the code is the
+// same in every language. Yours to change: esquadro wrote this file once and
+// never changes it again.
+//
+// For a language esquadro does not know, add it to the api blueprint's
+// languages and its titles here, e.g.:
+//
+//	"fr": {"not_found": "Rien n'a été trouvé à cette adresse."},
 var translations = map[string]map[string]string{
-{{- range strs .Options.languages}}{{$lang := .}}{{if not (english $lang)}}
+{{- range strs .Options.languages}}{{$lang := .}}{{if and (not (english $lang)) (not (translated $lang "internal"))}}
 	{{quote $lang}}: {
 {{- range problems}}
-		{{quote .Code}}: {{quote (translation $lang .Code)}},{{if not (translated $lang .Code)}} // TODO: translate{{end}}
+		{{quote .Code}}: {{quote (translation $lang .Code)}}, // TODO: translate
 {{- end}}
 	},
-{{- end}}
-{{- end}}
+{{- end}}{{end}}
 }
 {{end -}}
