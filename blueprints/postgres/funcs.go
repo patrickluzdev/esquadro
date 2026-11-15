@@ -41,6 +41,9 @@ func TemplateFuncs() template.FuncMap {
 		"sampleImports":   sampleImports,
 		"mustRefuseEmpty": mustRefuseEmpty,
 		"initialisms":     project.Initialisms,
+		"link":            link,
+		"links":           links,
+		"manyToMany":      func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}
 }
 
@@ -438,4 +441,58 @@ func mustRefuseEmpty(e *project.Entity) bool {
 		}
 	}
 	return false
+}
+
+// ---- many-to-many ----
+
+// Link is a many-to-many relation as its join table sees it from one side.
+type Link struct {
+	Table string // the join table, with its schema
+	// Own and Other are the columns of this side's ID and the other side's.
+	Own, Other string
+	// OwnKey and OtherKey are their foreign keys; OtherKey is empty across
+	// modules, which share no foreign keys.
+	OwnKey, OtherKey string
+	// Declared is the side written in the .esq file, which links and
+	// unlinks; the other side only lists.
+	Declared bool
+	// Other is the other side's ID parameter in Go.
+	OtherParam string
+}
+
+// link is r's join table seen from r's side.
+func link(r *project.Relation, opts map[string]any) Link {
+	owner := r
+	if r.Inferred && r.Inverse != nil {
+		owner = r.Inverse
+	}
+	left, right := owner.Entity.Snake+"_id", owner.Target.Snake+"_id"
+	if left == right {
+		right = owner.Snake + "_id"
+	}
+	l := Link{Table: schemaOf(owner.Entity.Module, opts) + "." + owner.JoinTable, Declared: r == owner}
+	l.Own, l.Other = left, right
+	if !l.Declared {
+		l.Own, l.Other = right, left
+	}
+	l.OwnKey = owner.JoinTable + "_" + l.Own + "_fkey"
+	if !owner.CrossesModules() {
+		l.OtherKey = owner.JoinTable + "_" + l.Other + "_fkey"
+	}
+	l.OtherParam = r.Target.Camel + "ID"
+	if r.Target == r.Entity {
+		l.OtherParam = "otherID"
+	}
+	return l
+}
+
+// links are the many-to-many relations of an entity, both sides.
+func links(e *project.Entity) []*project.Relation {
+	var out []*project.Relation
+	for _, r := range e.Relations {
+		if r.Kind == project.ManyToMany {
+			out = append(out, r)
+		}
+	}
+	return out
 }

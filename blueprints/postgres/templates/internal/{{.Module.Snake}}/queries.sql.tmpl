@@ -24,5 +24,33 @@ RETURNING *;
 
 -- name: Delete{{$e.Pascal}} :execrows
 DELETE FROM {{$t}} WHERE id = @id;
+{{- range links $e}}{{$l := link . $.Options}}
+{{- if $l.Declared}}
+
+-- name: AddTo{{$e.Pascal}}{{.Pascal}} :exec
+INSERT INTO {{$l.Table}} ({{$l.Own}}, {{$l.Other}})
+VALUES (@own_id, @other_id)
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveFrom{{$e.Pascal}}{{.Pascal}} :exec
+DELETE FROM {{$l.Table}} WHERE {{$l.Own}} = @own_id AND {{$l.Other}} = @other_id;
+{{- end}}
+
+-- name: List{{$e.Pascal}}{{.Pascal}} :many
+{{- if .CrossesModules}}
+SELECT {{$l.Other}} FROM {{$l.Table}}
+WHERE {{$l.Own}} = @own_id
+  AND (sqlc.narg(after)::uuid IS NULL OR {{$l.Other}} > sqlc.narg(after)::uuid)
+ORDER BY {{$l.Other}}
+LIMIT sqlc.arg(page_size);
+{{- else}}
+SELECT sqlc.embed(target) FROM {{pgTable .Target $.Options}} target
+JOIN {{$l.Table}} link ON link.{{$l.Other}} = target.id
+WHERE link.{{$l.Own}} = @own_id
+  AND (sqlc.narg(after)::uuid IS NULL OR target.id > sqlc.narg(after)::uuid)
+ORDER BY target.id
+LIMIT sqlc.arg(page_size);
+{{- end}}
+{{- end}}
 {{- end}}
 {{end -}}

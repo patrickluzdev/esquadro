@@ -35,12 +35,9 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 }
 
 func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
-	after := uuid.Nil()
-	if cursor, ok := params.After.Get(); ok {
-		var err error
-		if after, err = uuid.Parse(cursor); err != nil {
-			return nil, edge.ErrInvalidRequest
-		}
+	after, err := cursorOf(params.After)
+	if err != nil {
+		return nil, err
 	}
 	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
 	if err != nil {
@@ -72,6 +69,44 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
 	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}})))
 }
+{{- range links $e}}{{$R := .Pascal}}{{$o := ogenName (linkParam .)}}
+
+func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R}}Params) (*apigen.{{if .CrossesModules}}{{$P}}{{$R}}{{else}}{{.Target.Pascal}}{{end}}Page, error) {
+	after, err := cursorOf(params.After)
+	if err != nil {
+		return nil, err
+	}
+	page, err := h.{{$p}}.List{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), after, params.Limit.Or(25))
+	if err != nil {
+		return nil, problemOf(err)
+	}
+{{- if .CrossesModules}}
+	answer := apigen.{{$P}}{{$R}}Page{Items: make([]ogenuuid.UUID, 0, len(page.IDs))}
+	for _, listed := range page.IDs {
+		answer.Items = append(answer.Items, ogenuuid.UUID(listed))
+	}
+{{- else}}
+	answer := apigen.{{.Target.Pascal}}Page{Items: make([]apigen.{{.Target.Pascal}}, 0, len(page.{{.Target.Plural.Pascal}}))}
+	for _, listed := range page.{{.Target.Plural.Pascal}} {
+		answer.Items = append(answer.Items, {{.Target.Camel}}Answer(listed))
+	}
+{{- end}}
+	if page.Next != uuid.Nil() {
+		answer.Next = apigen.NewOptString(page.Next.String())
+	}
+	return &answer, nil
+}
+{{- if not .Inferred}}
+
+func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{$R}}Params) error {
+	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
+}
+
+func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFrom{{$P}}{{$R}}Params) error {
+	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
+}
+{{- end}}
+{{- end}}
 
 // new{{$P}}Of reads a New{{$P}} as the contract writes it, with the fields
 // it could not read (a decimal that is no number), if any.
@@ -219,6 +254,19 @@ var apiFields = map[string]string{
 
 // problemOf turns the module's errors into the problems the API answers
 // with; other errors pass through.
+// cursorOf is the cursor of a list, the nil UUID for the first page.
+func cursorOf(after apigen.OptString) (uuid.UUID, error) {
+	cursor, ok := after.Get()
+	if !ok {
+		return uuid.Nil(), nil
+	}
+	id, err := uuid.Parse(cursor)
+	if err != nil {
+		return uuid.Nil(), edge.ErrInvalidRequest
+	}
+	return id, nil
+}
+
 func problemOf(err error) error {
 	switch {
 	case err == nil:

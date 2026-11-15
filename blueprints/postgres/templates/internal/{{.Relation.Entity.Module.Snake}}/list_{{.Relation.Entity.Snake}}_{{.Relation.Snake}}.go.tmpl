@@ -1,0 +1,44 @@
+{{- $rel := .Relation}}{{if manyToMany $rel}}{{$l := link $rel .Options}}{{$e := .Entity}}{{$m := .Module}}{{$t := $rel.Target}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{- if $rel.CrossesModules}}
+// {{$e.Pascal}}{{$rel.Pascal}}Page is a page of the IDs of the {{$rel.Snake}} of a {{lower $e.Label}},
+// {{$t.Plural.Snake}} of the {{$t.Module.Snake}} module, in the order they were created. Next
+// is the cursor of the next page, the nil UUID on the last one.
+type {{$e.Pascal}}{{$rel.Pascal}}Page struct {
+	IDs  []uuid.UUID
+	Next uuid.UUID
+}
+{{- end}}
+
+// List{{$e.Pascal}}{{$rel.Pascal}} returns up to limit of the {{$rel.Snake}} of the {{lower $e.Label}} whose id
+// is id (at most Max{{$t.Pascal}}Page){{if $rel.CrossesModules}}, as IDs{{end}}, after the one whose id is
+// after, or from the first when after is the nil UUID. It answers
+// Err{{$e.Pascal}}NotFound when there is no such {{lower $e.Label}}.
+{{- $page := printf "%sPage" $t.Pascal}}{{$items := $t.Plural.Pascal}}
+{{- if $rel.CrossesModules}}{{$page = printf "%s%sPage" $e.Pascal $rel.Pascal}}{{$items = "IDs"}}{{end}}
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id, after uuid.UUID, limit int) ({{$page}}, error) {
+	if _, err := {{$r}}.Read{{$e.Pascal}}(ctx, id); err != nil {
+		return {{$page}}{}, err
+	}
+	limit = min(max(limit, 1), Max{{if $rel.CrossesModules}}{{$e.Pascal}}{{else}}{{$t.Pascal}}{{end}}Page)
+	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.List{{$e.Pascal}}{{$rel.Pascal}}Params{
+		OwnID:    postgres.UUID(id),
+		After:    postgres.UUID(after),
+		PageSize: int32(limit + 1),
+	})
+	if err != nil {
+		return {{$page}}{}, err
+	}
+	page := {{$page}}{ {{$items}}: make([]{{if $rel.CrossesModules}}uuid.UUID{{else}}{{$t.Pascal}}{{end}}, 0, min(len(rows), limit)) }
+	for i, row := range rows {
+		if i == limit {
+			page.Next = page.{{$items}}[limit-1]{{if not $rel.CrossesModules}}.ID{{end}}
+			break
+		}
+		page.{{$items}} = append(page.{{$items}}, {{if $rel.CrossesModules}}postgres.ID(row){{else}}{{$t.Camel}}Of(row.{{sqlcModel $t .Options}}){{end}})
+	}
+	return page, nil
+}
+{{end -}}

@@ -53,5 +53,9 @@ type Product struct {
 func (Product) Audited() bool { return true }
 === notes.md  [core: notes.md.once.tmpl] once
 Notes for shop
+=== relations/category_products.txt  [core: relations/{{.Relation.Entity.Snake}}_{{.Relation.Snake}}.txt.tmpl]
+Category.products: one-to-many to Product (module catalog)
+=== relations/product_category.txt  [core: relations/{{.Relation.Entity.Snake}}_{{.Relation.Snake}}.txt.tmpl]
+Product.category: many-to-one to Category (module catalog)
 === static/logo.txt  [core: static/logo.txt]
 LOGO {{ not a template }}

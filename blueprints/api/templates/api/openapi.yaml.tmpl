@@ -132,6 +132,69 @@ paths:
           description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
+{{- range links $e}}{{$rel := .}}{{$other := linkParam .}}
+  /{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: list{{$e.Pascal}}{{.Pascal}}
+      summary: {{quote (printf "List the %s of a %s" (lower .Label) (lower $e.Label))}}
+      description: |
+        In pages, as the other lists{{if .CrossesModules}}; {{lower .Target.Plural.Label}} of
+        the {{.Target.Module.Snake}} module, by ID{{end}}.
+        Codes: `not_found` (404) when there is no such {{lower $e.Label}}.
+      tags: [{{$e.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/After"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: {{quote (printf "A page of the %s." (lower .Label))}}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{if .CrossesModules}}{{$e.Pascal}}{{.Pascal}}{{else}}{{.Target.Pascal}}{{end}}Page"
+        default:
+          $ref: "#/components/responses/Problem"
+{{- if not .Inferred}}
+  /{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}/{{"{"}}{{$other}}{{"}"}}:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: {{$other}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    put:
+      operationId: addTo{{$e.Pascal}}{{.Pascal}}
+      summary: {{quote (printf "Add to the %s of a %s" (lower .Label) (lower $e.Label))}}
+      description: |
+        Adding one already there changes nothing.
+        Codes: `not_found` (404) when there is no such record.
+      tags: [{{$e.Module.Snake}}]
+      responses:
+        "204":
+          description: Added.
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: removeFrom{{$e.Pascal}}{{.Pascal}}
+      summary: {{quote (printf "Remove from the %s of a %s" (lower .Label) (lower $e.Label))}}
+      description: |
+        Removing one that is not there changes nothing.
+      tags: [{{$e.Module.Snake}}]
+      responses:
+        "204":
+          description: Removed.
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
+{{- end}}
 {{- end}}
 {{- with slot "api.paths" .}}
 {{.}}
@@ -225,6 +288,16 @@ components:
           items:
             $ref: "#/components/schemas/{{.Pascal}}"
         next: {type: string, description: The cursor of the next page; absent on the last one.}
+{{- range links $e}}{{if .CrossesModules}}
+    {{$e.Pascal}}{{.Pascal}}Page:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {type: string, format: uuid}
+        next: {type: string, description: The cursor of the next page; absent on the last one.}
+{{- end}}{{end}}
 {{- end}}
 {{- with slot "api.schemas" .}}
 {{.}}

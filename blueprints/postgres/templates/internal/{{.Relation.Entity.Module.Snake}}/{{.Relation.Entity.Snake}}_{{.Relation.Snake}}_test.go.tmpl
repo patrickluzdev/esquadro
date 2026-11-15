@@ -1,0 +1,61 @@
+{{- $rel := .Relation}}{{if manyToMany $rel}}{{$l := link $rel .Options}}{{if $l.Declared}}{{$e := .Entity}}{{$m := .Module}}{{$p := $m.Snake}}{{$t := $rel.Target}}{{$r := lower (slice $m.Camel 0 1)}}
+{{- $same := not $rel.CrossesModules}}
+{{- if and (canSample $e) (or $rel.CrossesModules (canSample $t))}}
+package {{$p}}_test
+
+{{importBlock "context" "errors" "testing" "uuid" (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+func Test{{$e.Pascal}}{{$rel.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	owner, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- if $same}}
+	other, err := {{$r}}.Create{{$t.Pascal}}(ctx, given{{$t.Pascal}}(t, {{$r}}, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherID := other.ID
+{{- else}}
+	otherID := uuid.NewV7() // a {{lower $t.Label}} of the {{$t.Module.Snake}} module: no foreign key
+{{- end}}
+	for range 2 { // adding twice changes nothing
+		if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, otherID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page, err := {{$r}}.List{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.Nil(), 10)
+	if err != nil || len(page.{{if $same}}{{$t.Plural.Pascal}}{{else}}IDs{{end}}) != 1 || page.{{if $same}}{{$t.Plural.Pascal}}[0].ID{{else}}IDs[0]{{end}} != otherID {
+		t.Fatalf("listed %+v, %v", page, err)
+	}
+{{- with $rel.Inverse}}{{if manyToMany .}}
+	back, err := {{$r}}.List{{$t.Pascal}}{{.Pascal}}(ctx, otherID, uuid.Nil(), 10)
+	if err != nil || len(back.{{$e.Plural.Pascal}}) != 1 || back.{{$e.Plural.Pascal}}[0].ID != owner.ID {
+		t.Fatalf("listed back %+v, %v", back, err)
+	}
+{{- end}}{{end}}
+	for range 2 { // removing what is not there changes nothing
+		if err := {{$r}}.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, otherID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if page, err := {{$r}}.List{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.Nil(), 10); err != nil || page.Next != uuid.Nil() || len(page.{{if $same}}{{$t.Plural.Pascal}}{{else}}IDs{{end}}) != 0 {
+		t.Fatalf("after removing: %+v, %v", page, err)
+	}
+
+	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, uuid.NewV7(), otherID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("adding to a missing {{lower $e.Label}}: %v", err)
+	}
+{{- if $l.OtherKey}}
+	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.NewV7()); !errors.Is(err, {{$p}}.Err{{$t.Pascal}}NotFound) {
+		t.Fatalf("adding a missing {{lower $t.Label}}: %v", err)
+	}
+{{- end}}
+	if _, err := {{$r}}.List{{$e.Pascal}}{{$rel.Pascal}}(ctx, uuid.NewV7(), uuid.Nil(), 10); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("listing a missing {{lower $e.Label}}: %v", err)
+	}
+}
+{{- end}}{{end}}{{end -}}

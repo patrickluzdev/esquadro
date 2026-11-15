@@ -1,7 +1,7 @@
 {{- if .Entities -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" (and (linkTests .Entities) "uuid") (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
 // newTestServer serves the API on a database of its own, with every
 // middleware of package edge as the configuration sets it.
 func newTestServer(t *testing.T) *httptest.Server {
@@ -129,5 +129,52 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	}
 }
 {{- end}}
+{{- range links $e}}{{if and (canSampleAPI $e) (not .Inferred) (or .CrossesModules (canSampleAPI .Target))}}{{$R := .Pascal}}{{$o := ogenName (linkParam .)}}
+
+func TestAPI{{$P}}{{$R}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := newTestClient(t)
+
+	owner, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- if .CrossesModules}}
+	otherID := ogenuuid.UUID(uuid.NewV7()) // of the {{.Target.Module.Snake}} module: no foreign key
+{{- else}}
+	other, err := c.Create{{.Target.Pascal}}(ctx, givenAPI{{.Target.Pascal}}(t, c, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherID := other.ID
+{{- end}}
+	link := apigen.AddTo{{$P}}{{$R}}Params{ {{$id}}: owner.ID, {{$o}}: otherID }
+	if err := c.AddTo{{$P}}{{$R}}(ctx, link); err != nil {
+		t.Fatal(err)
+	}
+	page, err := c.List{{$P}}{{$R}}(ctx, apigen.List{{$P}}{{$R}}Params{ {{$id}}: owner.ID })
+	if err != nil || len(page.Items) != 1 || page.Items[0]{{if not .CrossesModules}}.ID{{end}} != otherID {
+		t.Fatalf("list: %+v, %v", page, err)
+	}
+{{- with .Inverse}}
+	back, err := c.List{{.Entity.Pascal}}{{.Pascal}}(ctx, apigen.List{{.Entity.Pascal}}{{.Pascal}}Params{ {{ogenName (printf "%sId" .Entity.Camel)}}: otherID })
+	if err != nil || len(back.Items) != 1 || back.Items[0].ID != owner.ID {
+		t.Fatalf("list back: %+v, %v", back, err)
+	}
+{{- end}}
+	if err := c.RemoveFrom{{$P}}{{$R}}(ctx, apigen.RemoveFrom{{$P}}{{$R}}Params(link)); err != nil {
+		t.Fatal(err)
+	}
+	if page, err := c.List{{$P}}{{$R}}(ctx, apigen.List{{$P}}{{$R}}Params{ {{$id}}: owner.ID }); err != nil || len(page.Items) != 0 {
+		t.Fatalf("list after removing: %+v, %v", page, err)
+	}
+	link.{{$id}} = ogenuuid.UUID(uuid.NewV7())
+	err = c.AddTo{{$P}}{{$R}}(ctx, link)
+	if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != 404 {
+		t.Fatalf("adding to a missing {{lower $e.Label}}: %v", err)
+	}
+}
+{{- end}}{{end}}
 {{- end}}
 {{end -}}

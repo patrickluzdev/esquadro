@@ -55,6 +55,18 @@ entity Product {
   name     string required min(2)
   stock    int    default(0)
   category > Category required
+  tags     <> Tag
+}
+
+entity Tag {
+  label string required
+}
+`)
+	write("orders.esq", `package orders
+
+entity Order {
+  number   string required
+  products <> Product
 }
 `)
 	if code, out, errOut := gen(t, dir); code != 0 {
@@ -99,7 +111,8 @@ entity Product {
 	// The tests esquadro generates run every use case against their own
 	// Postgres (testcontainers).
 	tests := run(nil, "go", "test", "-v", "./...")
-	for _, want := range []string{"--- PASS: TestCreateAndReadProduct", "--- PASS: TestAPIProducts", "--- PASS: TestAPIEdge", "--- PASS: TestCompressAnswersGzipToWhoAcceptsIt"} {
+	for _, want := range []string{"--- PASS: TestCreateAndReadProduct", "--- PASS: TestAPIProducts", "--- PASS: TestAPIEdge", "--- PASS: TestCompressAnswersGzipToWhoAcceptsIt",
+		"--- PASS: TestProductTags", "--- PASS: TestOrderProducts", "--- PASS: TestAPIProductTags", "--- PASS: TestAPIOrderProducts"} {
 		if !strings.Contains(tests, want) {
 			t.Fatalf("the generated tests did not run %s:\n%s", want, tests)
 		}

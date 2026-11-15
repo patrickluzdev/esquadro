@@ -35,8 +35,24 @@ func TemplateFuncs() template.FuncMap {
 		"translation":      func(lang, code string) string { t, _ := translation(lang, code); return t },
 		"translated":       func(lang, code string) bool { _, ok := translation(lang, code); return ok },
 		"english":          func(lang string) bool { base, _, _ := strings.Cut(lang, "-"); return strings.EqualFold(base, "en") },
-		"strs":             strs,
-		"goStrings":        goStrings,
+		"links": func(e *project.Entity) []*project.Relation {
+			var out []*project.Relation
+			for _, r := range e.Relations {
+				if r.Kind == project.ManyToMany {
+					out = append(out, r)
+				}
+			}
+			return out
+		},
+		"linkParam": func(r *project.Relation) string {
+			if r.Target == r.Entity {
+				return "otherId"
+			}
+			return r.Target.Camel + "Id"
+		},
+		"linkTests": linkTests,
+		"strs":      strs,
+		"goStrings": goStrings,
 	}
 }
 
@@ -271,6 +287,22 @@ func apiSampleImports(entities []*project.Entity) []string {
 		}
 	}
 	return out
+}
+
+// linkTests reports whether the API tests have a many-to-many relation to
+// test: a declared one whose records esquadro can write.
+func linkTests(entities []*project.Entity) bool {
+	for _, e := range entities {
+		if !canSampleAPI(e) {
+			continue
+		}
+		for _, r := range e.Relations {
+			if r.Kind == project.ManyToMany && !r.Inferred && (r.CrossesModules() || canSampleAPI(r.Target)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // modulePaths lists the import paths of the modules with entities.

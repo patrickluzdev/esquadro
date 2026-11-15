@@ -9,6 +9,7 @@
 //	  README.md.tmpl                         rendered once
 //	  internal/{{.Entity.Snake}}_gen.go.tmpl rendered once per entity
 //	  internal/{{.Enum.Snake}}_gen.go.tmpl   rendered once per enum
+//	  {{.Relation.Snake}}.go.tmpl            once per relation, each side
 //	  notes.md.once.tmpl                     owned by the user after creation
 //	  static/logo.png                        copied as is (no .tmpl)
 //	slots/
@@ -92,12 +93,15 @@ type Data struct {
 	Entities []*project.Entity
 	Enums    []*project.Enum
 	Modules  []*project.Module
-	// Entity is set in templates rendered per entity, Enum per enum and
-	// Module per module; per entity and per enum, Module is theirs. Slot
+	// Entity is set in templates rendered per entity (and per relation),
+	// Enum per enum and Module per module; per entity and per enum, Module is theirs. Slot
 	// contributions see their caller's values.
 	Entity *project.Entity
 	Enum   *project.Enum
 	Module *project.Module
+	// Relation is set in templates rendered per relation: each side of
+	// every relation, with Entity and Module those of its side.
+	Relation *project.Relation
 	// Options are the options of the blueprint whose template is running.
 	Options map[string]any
 	// Blueprint is the name of the blueprint whose template is running.
@@ -184,7 +188,7 @@ func (c *composer) templateError(file string, err error) {
 		col, _ := strconv.Atoi(m[3])
 		pos := diag.Pos{File: m[1], Line: line, Col: max(col, 1)}
 		d := c.diags.Errorf(pos, diag.Pos{}, "%s", cleanTemplateMsg(m[4]))
-		for _, v := range []string{"Entity", "Enum"} {
+		for _, v := range []string{"Entity", "Enum", "Relation"} {
 			if strings.Contains(m[4], "nil pointer evaluating *project."+v+".") {
 				d.Suggestion = fmt.Sprintf(".%s is only set in templates whose file name uses .%s (rendered once per %s) and in slots opened from them",
 					v, v, strings.ToLower(v))
@@ -409,9 +413,10 @@ func (c *composer) slot(name string, data Data) (string, error) {
 // ---- templates ----
 
 var (
-	entityRef = regexp.MustCompile(`\.Entity\b`)
-	enumRef   = regexp.MustCompile(`\.Enum\b`)
-	moduleRef = regexp.MustCompile(`\.Module\b`)
+	relationRef = regexp.MustCompile(`\.Relation\b`)
+	entityRef   = regexp.MustCompile(`\.Entity\b`)
+	enumRef     = regexp.MustCompile(`\.Enum\b`)
+	moduleRef   = regexp.MustCompile(`\.Module\b`)
 )
 
 func (c *composer) renderBlueprint(bp *blueprint.Blueprint) []*File {
@@ -436,11 +441,14 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	isTmpl := strings.HasSuffix(rel, tmplExt)
 	outPath := strings.TrimSuffix(strings.TrimSuffix(rel, onceExt), tmplExt)
 
-	perEntity, perEnum := entityRef.MatchString(outPath), enumRef.MatchString(outPath)
-	// .Entity.Module and .Enum.Module are per entity or enum, not per module.
-	perModule := !perEntity && !perEnum && moduleRef.MatchString(outPath)
-	if perEntity && perEnum {
-		c.errorf(name, 0, "a template path cannot use both .Entity and .Enum")
+	perRelation := relationRef.MatchString(outPath)
+	// .Relation.Entity is per relation; .Entity.Module and .Enum.Module are
+	// per entity or enum, not per module.
+	perEntity := !perRelation && entityRef.MatchString(outPath)
+	perEnum := enumRef.MatchString(outPath)
+	perModule := !perRelation && !perEntity && !perEnum && moduleRef.MatchString(outPath)
+	if (perEntity || perRelation) && perEnum {
+		c.errorf(name, 0, "a template path cannot use both .Enum and .Entity or .Relation")
 		return nil
 	}
 	pathTmpl, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(outPath)
@@ -466,6 +474,14 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	}
 	var datas []Data
 	switch {
+	case perRelation:
+		for _, e := range c.p.Entities {
+			for _, r := range e.Relations {
+				d := whole
+				d.Relation, d.Entity, d.Module = r, e, e.Module
+				datas = append(datas, d)
+			}
+		}
 	case perEntity:
 		for _, e := range c.p.Entities {
 			d := whole

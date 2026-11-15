@@ -14,10 +14,12 @@ enum Status { OPEN CLOSED }
 entity Product {
   name   string required
   status Status
+  category > Category
 
   @extra(audited)
 }
 
 entity Category {
-  name string
+  name     string
+  products < Product
 }
