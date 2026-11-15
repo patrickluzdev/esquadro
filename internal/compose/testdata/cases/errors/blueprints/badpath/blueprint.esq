@@ -1,3 +1,6 @@
 blueprint badpath {
   version "0.1.0"
+
+  /// A path out of the project, for the test: a template path must stay inside it.
+  option up string default("..")
 }

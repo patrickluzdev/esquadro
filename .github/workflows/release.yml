@@ -42,7 +42,7 @@ jobs:
         working-directory: editors/vscode
         run: |
           npm ci
-          npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+          npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
           npm test
           npm run compile
           npm run package
