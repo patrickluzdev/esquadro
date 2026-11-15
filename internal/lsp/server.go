@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -196,10 +197,7 @@ func (s *Server) check() {
 	s.checking.Lock()
 	defer s.checking.Unlock()
 	s.mu.Lock()
-	docs := make(map[string]string, len(s.docs))
-	for k, v := range s.docs {
-		docs[k] = v
-	}
+	docs := maps.Clone(s.docs)
 	s.mu.Unlock()
 
 	results := checkAll(docs, s.CacheDir)
