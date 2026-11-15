@@ -178,9 +178,9 @@ func goStrings(v any) string {
 	return b.String()
 }
 
-// goVersion is the release of the Go that built esquadro, without its
+// GoVersion is the release of the Go that built esquadro, without its
 // patch: go1.27.3 is 1.27.
-func goVersion() string {
+func GoVersion() string {
 	v := strings.TrimPrefix(runtime.Version(), "go")
 	parts := strings.SplitN(v, ".", 3)
 	if len(parts) < 2 {

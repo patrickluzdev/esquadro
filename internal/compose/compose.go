@@ -348,7 +348,7 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		"contains": strings.Contains,
 		// goVersion is the Go release that runs esquadro, e.g. 1.27, for
 		// files that name a Go toolchain (a Dockerfile, a CI workflow).
-		"goVersion":  goVersion,
+		"goVersion":  GoVersion,
 		"hasPrefix":  strings.HasPrefix,
 		"trimPrefix": strings.TrimPrefix,
 		"strs":       strs,

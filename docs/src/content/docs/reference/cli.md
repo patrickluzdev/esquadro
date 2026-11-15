@@ -44,6 +44,19 @@ semantic errors without generating anything. The project is the .esq files
 of dir's esquadro/ folder; blueprints are loaded as gen loads them.
 ```
 
+## esquadro doctor
+
+Check that the tools the project needs are installed.
+
+```
+Usage: esquadro doctor [dir]
+
+Checks that the tools esquadro and the project in dir (default: the current
+directory) need are installed (Go, git, Task, Docker, sqlc), that the
+project checks, and that its generated code is what the model generates;
+says how to fix what is not. Outside a project, it checks the tools only.
+```
+
 ## esquadro explain
 
 Tell where a generated file came from.
