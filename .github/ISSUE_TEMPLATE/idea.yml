@@ -1,0 +1,16 @@
+name: Idea
+description: A blueprint, an option or a change you would like.
+labels: [idea]
+body:
+  - type: textarea
+    id: why
+    attributes:
+      label: What you want to do
+      description: What you are building, and what esquadro makes hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How it could look
+      description: An .esq snippet, an option, a generated file... anything that helps.

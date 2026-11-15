@@ -1,0 +1,29 @@
+name: Bug
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: model
+    attributes:
+      label: The model
+      description: The smallest .esq files (app.esq and a module) that show it.
+      render: esquadro
+  - type: input
+    id: version
+    attributes:
+      label: esquadro version
+      description: The output of `esquadro version`.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system
+      placeholder: macOS 15, Ubuntu 24.04, Windows 11...
