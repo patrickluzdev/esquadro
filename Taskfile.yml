@@ -30,6 +30,11 @@ tasks:
     cmds:
       - go test ./...
 
+  e2e:
+    desc: Follow a generated project through its life against Postgres (needs Docker; minutes)
+    cmds:
+      - go test -tags e2e -run TestLifecycle -count 1 -timeout 30m -v ./cmd/esquadro
+
   test:update:
     desc: Rewrite golden files after an intended output change (review the diff!)
     cmds:
@@ -50,6 +55,7 @@ tasks:
     cmds:
       - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - go vet ./...
+      - go vet -tags e2e ./cmd/esquadro
       # The same analyzers editors show (modernize, simplifications, unused
       # parameters...). Fails on any finding, hints included.
       - |
