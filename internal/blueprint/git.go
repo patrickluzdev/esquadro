@@ -225,6 +225,10 @@ func extract(ctx context.Context, mirror, commit, dir string) error {
 		return err
 	}
 	untarErr := untar(out, tmp)
+	// The tar reader stops at the end-of-archive marker, but git pads the
+	// archive after it: read the rest, or git blocks on a full pipe (small
+	// on Windows) and Wait never returns.
+	_, _ = io.Copy(io.Discard, out)
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("git archive %s: %w: %s", commit, err, strings.TrimSpace(stderr.String()))
 	}
