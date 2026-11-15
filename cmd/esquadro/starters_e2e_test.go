@@ -45,8 +45,10 @@ func TestEveryKindOfProjectRuns(t *testing.T) {
 			e.esquadro(0, args...)
 			e.run(nil, "go", "vet", "./...")
 			e.run(nil, "go", "test", "./...")
-			e.run(nil, "go", "build", "-o", "bin/shop", "./cmd/shop")
-			if out := e.run(nil, "bin/shop", "version"); !strings.HasPrefix(out, "shop v0.0.0-") {
+			// The version as the Dockerfile and the CI set it: not from git,
+			// whose first commit needs a user.name the machine may not have.
+			e.run(nil, "go", "build", "-ldflags", "-X main.version=v1.2.3", "-o", "bin/shop", "./cmd/shop")
+			if out := e.run(nil, "bin/shop", "version"); out != "shop v1.2.3\n" {
 				t.Fatalf("version: %q", out)
 			}
 			if kind != "worker" {
