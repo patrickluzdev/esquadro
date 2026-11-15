@@ -33,6 +33,21 @@ func TestNewWritesTheEsqFiles(t *testing.T) {
 	}
 }
 
+func TestNewWritesTheGitBlueprintWithItsOption(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	var out, errOut bytes.Buffer
+	if code := run([]string{"new", "-module", "example.com/shop", "-no-gen", dir}, &out, &errOut); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	app, _ := os.ReadFile(filepath.Join(dir, "esquadro", "app.esq"))
+	if !strings.Contains(string(app), "  blueprint api\n  blueprint git {\n    initial_commit true\n  }\n}\n") {
+		t.Fatalf("app.esq:\n%s", app)
+	}
+	if code := run([]string{"check", dir}, &out, &errOut); code != 0 {
+		t.Fatalf("check: %s", errOut.String())
+	}
+}
+
 func TestNewRefuses(t *testing.T) {
 	full := filepath.Join(t.TempDir(), "shop")
 	if err := os.Mkdir(full, 0o755); err != nil {

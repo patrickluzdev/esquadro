@@ -143,6 +143,12 @@ func appFile(name, module string, chosen []string) string {
 	fmt.Fprintf(&b, "app %s {\n", strings.ReplaceAll(name, "-", "_"))
 	fmt.Fprintf(&b, "  module %q\n", module)
 	for _, bp := range chosen {
+		if bp == "git" {
+			// Written out so the option shows: false keeps the repository
+			// without the first commit.
+			b.WriteString("  blueprint git {\n    initial_commit true\n  }\n")
+			continue
+		}
 		fmt.Fprintf(&b, "  blueprint %s\n", bp)
 	}
 	b.WriteString("}\n")
