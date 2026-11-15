@@ -22,6 +22,7 @@ func commands() []command {
 		{"explain", "tell where a generated file came from", runExplain},
 		{"fmt", "format .esq files", runFmt},
 		{"gen", "generate the project", runGen},
+		{"lsp", "run the language server for editors", runLSP},
 		{"new", "create a project", runNew},
 		{"version", "print the esquadro version", runVersion},
 	}
