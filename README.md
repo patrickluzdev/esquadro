@@ -28,8 +28,9 @@ entity Product {
 From a model like this, the default blueprints write a JSON API on
 PostgreSQL: the OpenAPI contract and its server, each entity's use cases,
 the migrations, Problem Details errors in the client's language, security
-headers, a rate limit, tests against a real Postgres, and a `compose.yaml` to
-run it all locally.
+headers, a rate limit, tests against a real Postgres, a `compose.yaml` to run
+it all locally, a container image and a CI. Blueprints are small and
+optional: a worker or a command line tool takes only what it needs.
 
 ## Install
 

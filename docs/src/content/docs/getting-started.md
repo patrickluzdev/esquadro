@@ -63,7 +63,9 @@ shop/
   internal/platform/   config, logging, the HTTP edge, Postgres
   migrations/          one migration per change in the model
   api/openapi.yaml     the API's contract
-  compose.yaml         Postgres for development
+  compose.yaml         Postgres for development (and the app, in the app profile)
+  Dockerfile           the app's container image
+  .github/workflows/   the CI: tests, the generated code in step, the image
 ```
 
 Its module path comes from `git config github.user`

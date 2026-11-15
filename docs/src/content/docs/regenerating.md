@@ -16,6 +16,7 @@ is on disk:
 
 ```sh
 esquadro gen -dry-run      # what would change, with diffs, writing nothing
+esquadro gen -check        # exit 1 if anything would change: for CI
 esquadro gen -force        # overwrite the generated files you edited
 esquadro explain <file>    # which blueprint and template wrote a file
 ```
