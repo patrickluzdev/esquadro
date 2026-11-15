@@ -11,7 +11,7 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/hook"
 )
 
-// OgenVersion is the ogen that generates the server, as in studyloop.
+// OgenVersion is the ogen that generates the server.
 const OgenVersion = "v1.24.0"
 
 // Ogen is the post-gen hook "ogen": it generates internal/apigen from

@@ -15,8 +15,7 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/hook"
 )
 
-// SQLCImage is the sqlc image used when sqlc is not installed, as in
-// studyloop's "task gen:sqlc".
+// SQLCImage is the sqlc image used when sqlc is not installed.
 const SQLCImage = "sqlc/sqlc:1.31.1"
 
 // SQLC is the post-gen hook "sqlc": it runs sqlc generate with the installed

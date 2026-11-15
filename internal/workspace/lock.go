@@ -92,6 +92,11 @@ func ReadLock(projectDir string) (*Lock, error) {
 	return &l, nil
 }
 
+// WriteLock writes the project's lockfile.
+func WriteLock(projectDir string, l *Lock) error {
+	return writeAtomic(filepath.Join(projectDir, filepath.FromSlash(LockPath)), l.encode())
+}
+
 // encode returns the lockfile's contents: indented JSON with sorted keys, so
 // it diffs well in version control.
 func (l *Lock) encode() []byte {

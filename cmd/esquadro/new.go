@@ -31,7 +31,7 @@ var blueprintGroups = map[string]string{
 
 // groupTitles are the comments over each group.
 var groupTitles = map[string]string{
-	"base":  "the program and its modules",
+	"base":  "the program, its modules and how it runs",
 	"data":  "PostgreSQL: connection, migrations, use cases, tests and local services",
 	"api":   "the JSON API and what every request goes through",
 	"ship":  "the container image and the CI",

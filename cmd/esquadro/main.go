@@ -22,6 +22,7 @@ type command struct {
 func commands() []command {
 	return []command{
 		{"add", "add blueprints to the project", runAdd, false},
+		{"blueprint", "list, inspect, update, write and test blueprints", runBlueprint, false},
 		{"check", "check the project for errors", runCheck, false},
 		{"explain", "tell where a generated file came from", runExplain, false},
 		{"fmt", "format .esq files", runFmt, false},

@@ -146,7 +146,7 @@ func TestRemoveDropsTheCommentOfAnEmptyGroup(t *testing.T) {
 	if code, out, errOut := esq(t, "remove", "-no-gen", "cors", dir); code != 0 || !strings.Contains(out, "removed cors from app.esq") {
 		t.Fatalf("exit %d\n%s%s", code, out, errOut)
 	}
-	want := "  // the program and its modules\n  // mine: keep this\n  blueprint app\n  blueprint http\n}\n"
+	want := "  // the program, its modules and how it runs\n  // mine: keep this\n  blueprint app\n  blueprint http\n}\n"
 	if got := read(t, appEsq); !strings.HasSuffix(got, want) {
 		t.Fatalf("app.esq:\n%s", got)
 	}

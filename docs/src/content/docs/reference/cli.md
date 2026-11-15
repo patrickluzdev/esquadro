@@ -24,6 +24,14 @@ out, with their defaults, to change when you need to.
     	let the hooks of blueprints from git run without asking
 ```
 
+## esquadro blueprint
+
+List, inspect, update, write and test blueprints.
+
+```
+
+```
+
 ## esquadro check
 
 Check the project for errors.
