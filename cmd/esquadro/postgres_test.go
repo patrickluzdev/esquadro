@@ -119,7 +119,9 @@ entity OrderItem {
 	_, hostPort, _ := strings.Cut(strings.TrimSpace(strings.Split(string(port), "\n")[0]), ":")
 	url := "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:" + hostPort + "/shop?sslmode=disable"
 	deadline := time.Now().Add(60 * time.Second)
-	for exec.Command("docker", "exec", container, "psql", "-U", "postgres", "-d", "shop", "-c", "select 1").Run() != nil {
+	// Over TCP: the image's first, temporary server listens on the Unix
+	// socket only, and is restarted once the database is initialized.
+	for exec.Command("docker", "exec", container, "psql", "-h", "127.0.0.1", "-U", "postgres", "-d", "shop", "-c", "select 1").Run() != nil {
 		if time.Now().After(deadline) {
 			t.Fatal("Postgres did not start")
 		}

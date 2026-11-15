@@ -30,16 +30,11 @@ func TestMigrationsApplyToPostgres(t *testing.T) {
 	container := strings.TrimSpace(string(out))
 	t.Cleanup(func() { exec.Command("docker", "rm", "-f", container).Run() })
 
+	// The image first runs a temporary server, on the Unix socket only, to
+	// initialize the database, then restarts it: only an answer over TCP
+	// means the real server is up.
 	deadline := time.Now().Add(60 * time.Second)
-	for exec.Command("docker", "exec", container, "pg_isready", "-U", "postgres").Run() != nil {
-		if time.Now().After(deadline) {
-			t.Fatal("Postgres did not start")
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-	// pg_isready can answer before the server accepts SQL during initdb's
-	// restart; wait for a real query.
-	for psql(container, "SELECT 1;") != nil {
+	for exec.Command("docker", "exec", container, "psql", "-h", "127.0.0.1", "-U", "postgres", "-c", "SELECT 1").Run() != nil {
 		if time.Now().After(deadline) {
 			t.Fatal("Postgres does not accept queries")
 		}
