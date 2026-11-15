@@ -23,6 +23,12 @@ task editor:package                      # in the esquadro repository
 code --install-extension editors/vscode/esquadro-0.1.0.vsix
 ```
 
+`code --install-extension` installs into VS Code's default profile. If the
+folder opens in another profile (the profile's name shows in the window's
+title bar), install there too:
+`code --profile "<profile>" --install-extension editors/vscode/esquadro-0.1.0.vsix`,
+then run "Developer: Reload Window".
+
 ## Other editors
 
 Any editor with an LSP client can use the same server: run `esquadro lsp` for
