@@ -20,15 +20,18 @@ go install github.com/patrickluzdev/esquadro/cmd/esquadro@latest
 ```
 
 Or download a binary from the
-[releases](https://github.com/patrickluzdev/esquadro/releases): `.tar.gz`
-for macOS and Linux, `.zip` for Windows, for Intel and ARM.
+[releases](https://github.com/patrickluzdev/esquadro/releases), for macOS and
+Linux, Intel and ARM.
+
+:::note[Windows]
+Windows is not supported yet.
+:::
 
 :::note[Downloaded binaries]
 The binaries are not signed yet. On macOS, a binary downloaded with a browser
 is blocked the first time; allow it with
-`xattr -d com.apple.quarantine ./esquadro`. On Windows, SmartScreen may warn
-before the first run: choose **More info → Run anyway**. Homebrew and
-`go install` are not affected.
+`xattr -d com.apple.quarantine ./esquadro`. Homebrew and `go install` are not
+affected.
 :::
 
 Check it works:

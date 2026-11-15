@@ -181,8 +181,7 @@ stdout:
 ```
 
 `previous` is the model of the last generation (`null` the first time): what
-a hook compares with to write, for example, a migration. On Windows, a hook
-must be a program Windows runs directly (an `.exe`), not a shell script.
+a hook compares with to write, for example, a migration.
 
 ## Publishing
 

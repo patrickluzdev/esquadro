@@ -38,8 +38,9 @@ brew install patrickluzdev/tap/esquadro                      # macOS and Linux
 go install github.com/patrickluzdev/esquadro/cmd/esquadro@latest
 ```
 
-Or download a binary for macOS, Linux or Windows from the
-[releases](https://github.com/patrickluzdev/esquadro/releases).
+Or download a binary for macOS or Linux from the
+[releases](https://github.com/patrickluzdev/esquadro/releases). Windows is not
+supported yet.
 
 ## Start a project
 

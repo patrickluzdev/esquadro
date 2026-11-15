@@ -1,6 +1,6 @@
-# Releases esquadro from a tag (v0.1.0): binaries for macOS, Linux and
-# Windows, their checksums, the notes grouped by commit type, and the
-# Homebrew formula in patrickluzdev/homebrew-tap. Run by
+# Releases esquadro from a tag (v0.1.0): binaries for macOS and Linux
+# (Windows is not supported yet), their checksums, the notes grouped by
+# commit type, and the Homebrew formula in patrickluzdev/homebrew-tap. Run by
 # .github/workflows/release.yml; rehearse with:
 #   goreleaser release --snapshot --clean
 version: 2
@@ -13,7 +13,7 @@ builds:
     binary: esquadro
     env:
       - CGO_ENABLED=0
-    goos: [darwin, linux, windows]
+    goos: [darwin, linux]
     goarch: [amd64, arm64]
     flags:
       - -trimpath
@@ -23,9 +23,6 @@ builds:
 archives:
   - id: esquadro
     formats: [tar.gz]
-    format_overrides:
-      - goos: windows
-        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE

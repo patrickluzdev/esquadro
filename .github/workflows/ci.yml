@@ -32,19 +32,16 @@ jobs:
       - run: task docs:check
       - run: task docs:build
 
-  others:
-    name: tests (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  # Windows is not supported yet.
+  macos:
+    name: tests (macOS)
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
       - run: go vet ./...
-      # Without Docker (the runners have none for Linux containers): the
-      # tests that run Postgres are skipped with -short.
+      # Without Docker (the runners have none): the tests that run Postgres
+      # are skipped with -short.
       - run: go test -short ./...

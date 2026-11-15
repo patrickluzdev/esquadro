@@ -18,7 +18,7 @@ task docs          # the documentation site, locally
 ```
 
 Run `task lint test e2e` before opening a pull request; CI runs the same on
-Linux, macOS and Windows.
+Linux and macOS. Windows is not supported yet.
 
 ## Conventions
 
