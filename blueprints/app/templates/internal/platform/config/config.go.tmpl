@@ -1,0 +1,85 @@
+{{- $load := slot "app.config.load" . -}}
+{{- $number := contains $load "l.number(" -}}
+{{- $flag := contains $load "l.flag(" -}}
+{{- $list := contains $load "l.list(" -}}
+// Package config reads the service's configuration from the environment.
+package config
+
+{{importBlock (and (or $number $flag) "fmt") "os" (and (or $number $flag) "strconv") (and $list "strings")}}
+// Config is the service's configuration.
+type Config struct {
+	// Env is "production" in production; anything else is development.
+	Env string
+{{- with slot "app.config.fields" .}}
+{{.}}
+{{- end}}
+}
+
+// Load reads the configuration from environment variables, with defaults
+// that suit development.
+func Load() (Config, error) {
+	var l loader
+	c := Config{Env: l.text("{{upper .App.Snake}}_ENV", "development")}
+{{- with $load}}
+{{.}}
+{{- end}}
+	return c, l.err
+}
+
+// loader reads environment variables, keeping the first error.
+type loader struct{ err error }
+
+// text is the variable name, or fallback when it is unset or empty.
+func (l *loader) text(name, fallback string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return fallback
+}
+{{- if $number}}
+
+// number is the variable name as an integer, or fallback.
+func (l *loader) number(name string, fallback int) int {
+	v := l.text(name, "")
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil && l.err == nil {
+		l.err = fmt.Errorf("config: %s must be a number: %w", name, err)
+	}
+	return n
+}
+{{- end}}
+{{- if $flag}}
+
+// flag is the variable name as true or false, or fallback.
+func (l *loader) flag(name string, fallback bool) bool {
+	v := l.text(name, "")
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil && l.err == nil {
+		l.err = fmt.Errorf("config: %s must be true or false: %w", name, err)
+	}
+	return b
+}
+{{- end}}
+{{- if $list}}
+
+// list is the variable name as comma-separated values, or fallback.
+func (l *loader) list(name string, fallback []string) []string {
+	v := l.text(name, "")
+	if v == "" {
+		return fallback
+	}
+	var out []string
+	for item := range strings.SplitSeq(v, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+{{- end}}

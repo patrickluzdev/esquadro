@@ -1,0 +1,3 @@
+{{- if .Entities}}
+	c.Docs = l.flag("{{upper .App.Snake}}_DOCS", c.Env != "production")
+{{- end}}

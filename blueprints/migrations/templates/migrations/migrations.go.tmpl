@@ -1,0 +1,37 @@
+{{- if .Entities -}}
+// Package migrations holds the database migrations, written by esquadro from
+// each change in the .esq files and owned by you once written.
+package migrations
+
+import (
+	"context"
+	"database/sql"
+	"embed"
+	"fmt"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // the "pgx" driver goose uses through database/sql
+	"github.com/pressly/goose/v3"
+)
+
+// FS holds every migration, applied in order by goose.
+//
+//go:embed *.sql
+var FS embed.FS
+
+// Apply applies the migrations the database at url does not have yet.
+func Apply(ctx context.Context, url string) error {
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		return fmt.Errorf("migrations: %w", err)
+	}
+	defer db.Close()
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, FS)
+	if err != nil {
+		return fmt.Errorf("migrations: load: %w", err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		return fmt.Errorf("migrations: apply: %w", err)
+	}
+	return nil
+}
+{{end -}}

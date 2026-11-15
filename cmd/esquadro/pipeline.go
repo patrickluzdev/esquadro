@@ -7,10 +7,12 @@ import (
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints"
-	"github.com/patrickluzdev/esquadro/blueprints/api"
+	"github.com/patrickluzdev/esquadro/blueprints/app"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
-	"github.com/patrickluzdev/esquadro/blueprints/platform"
-	"github.com/patrickluzdev/esquadro/blueprints/postgres"
+	"github.com/patrickluzdev/esquadro/blueprints/i18n"
+	"github.com/patrickluzdev/esquadro/blueprints/migrations"
+	"github.com/patrickluzdev/esquadro/blueprints/rest"
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
@@ -20,17 +22,18 @@ import (
 
 // builtinHooks are the hooks of the built-in blueprints, by hook.Key.
 var builtinHooks = map[string]hook.Func{
-	hook.Key("platform", "go-mod"):     platform.GoMod,
-	hook.Key("postgres", "migrations"): postgres.Migrations,
-	hook.Key("postgres", "sqlc"):       postgres.SQLC,
-	hook.Key("api", "ogen"):            api.Ogen,
-	hook.Key("git", "init"):            git.Init,
+	hook.Key("app", "go-mod"):       app.GoMod,
+	hook.Key("migrations", "write"): migrations.Write,
+	hook.Key("store", "sqlc"):       store.SQLC,
+	hook.Key("rest", "ogen"):        rest.Ogen,
+	hook.Key("git", "init"):         git.Init,
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
-	"postgres": postgres.TemplateFuncs(),
-	"api":      api.TemplateFuncs(),
+	"store": store.TemplateFuncs(),
+	"rest":  rest.TemplateFuncs(),
+	"i18n":  i18n.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

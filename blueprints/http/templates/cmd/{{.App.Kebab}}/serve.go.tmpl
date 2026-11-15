@@ -1,0 +1,22 @@
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"{{.App.Module}}/internal/platform/server"
+)
+
+// serve answers HTTP on the configured port until ctx is canceled.
+func serve(ctx context.Context) error {
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	h, err := d.routes()
+	if err != nil {
+		return err
+	}
+	return server.Serve(ctx, fmt.Sprintf(":%d", d.config.Port), h, d.logger)
+}

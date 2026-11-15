@@ -1,0 +1,12 @@
+/// Storage in PostgreSQL: each module's queries, written for sqlc from the
+/// model and generated into internal/<module>/sqlgen, and each entity's use
+/// cases (create, read, list, update, delete, and adding to and removing
+/// from many-to-many relations) as methods of its module. With
+/// testcontainers, each use case gets tests against a real Postgres.
+blueprint store {
+  version "0.1.0"
+  requires domain, postgres, migrations
+  optional testcontainers
+
+  hook post-gen "sqlc" writes "internal/*/sqlgen/**"
+}

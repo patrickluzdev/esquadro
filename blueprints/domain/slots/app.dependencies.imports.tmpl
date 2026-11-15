@@ -1,0 +1,3 @@
+{{- range .Modules}}{{if .Entities}}
+	"{{$.App.Module}}/internal/{{.Snake}}"
+{{- end}}{{end}}

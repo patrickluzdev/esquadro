@@ -1,0 +1,87 @@
+{{- if .Entities -}}
+package edge
+
+import (
+	"mime"
+	"net/http"
+	"strings"
+)
+
+var (
+	// ErrInvalidRequest is a request that does not match the contract.
+	ErrInvalidRequest = &Problem{Status: 400, Code: "invalid_request", Title: "The request does not match the API's contract."}
+	// ErrMethodNotAllowed is a method the address does not take.
+	ErrMethodNotAllowed = &Problem{Status: 405, Code: "method_not_allowed", Title: "This address does not take that method."}
+	// ErrNotAcceptable is an Accept header that leaves out JSON.
+	ErrNotAcceptable = &Problem{Status: 406, Code: "not_acceptable", Title: "The API answers only in JSON."}
+	// ErrRequestTooLarge is a body over the limit.
+	ErrRequestTooLarge = &Problem{Status: 413, Code: "request_too_large", Title: "The request body is too large."}
+	// ErrUnsupportedMediaType is a body that is not JSON.
+	ErrUnsupportedMediaType = &Problem{Status: 415, Code: "unsupported_media_type", Title: "Send the request body as application/json."}
+	// ErrNotImplemented is an operation of the contract nobody implemented.
+	ErrNotImplemented = &Problem{Status: 501, Code: "not_implemented", Title: "The operation is not implemented."}
+)
+
+// Conflict is a request the current state of the records refuses.
+func Conflict(code, title string) *Problem { return &Problem{Status: 409, Code: code, Title: title} }
+
+// InvalidFields lists every field refused at once.
+func InvalidFields(fields []FieldProblem) *Problem {
+	return &Problem{Status: 422, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
+}
+
+// LimitBody refuses a body over max bytes with ErrRequestTooLarge; 0 turns
+// it off. Operations see a body cut at the limit fail to decode, which the
+// API answers with the same problem.
+func LimitBody(max int64) Middleware {
+	return func(next http.Handler) http.Handler {
+		if max <= 0 {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > max {
+				Write(w, r, ErrRequestTooLarge)
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, max)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// JSONOnly refuses, before the operation, an Accept header that leaves out
+// JSON (ErrNotAcceptable) and a body that is not JSON
+// (ErrUnsupportedMediaType).
+func JSONOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if accept := r.Header.Get("Accept"); accept != "" && !acceptsJSON(accept) {
+			Write(w, r, ErrNotAcceptable)
+			return
+		}
+		if r.ContentLength != 0 && r.Method != http.MethodGet && r.Method != http.MethodDelete {
+			media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if err != nil || media != "application/json" {
+				Write(w, r, ErrUnsupportedMediaType)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// acceptsJSON reports whether an Accept header takes JSON or Problem
+// Details.
+func acceptsJSON(accept string) bool {
+	for part := range strings.SplitSeq(accept, ",") {
+		media, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+		if strings.ReplaceAll(strings.TrimSpace(params), " ", "") == "q=0" {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(media)) {
+		case "*/*", "application/*", "application/json", "application/problem+json":
+			return true
+		}
+	}
+	return false
+}
+{{end -}}

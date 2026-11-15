@@ -1,0 +1,40 @@
+package edge
+
+import (
+	"net/http/httptest"
+	"testing"
+	"time"
+)
+
+func TestRateLimitRefusesPastTheLimit(t *testing.T) {
+	t.Parallel()
+	h := RateLimit(2, false)(noContent)
+	var codes []int
+	for range 3 {
+		codes = append(codes, serve(h, httptest.NewRequest("GET", "/", nil)).Code)
+	}
+	if codes[0] != 204 || codes[1] != 204 || codes[2] != 429 {
+		t.Fatalf("codes %v", codes)
+	}
+}
+
+func TestLimiterRefillsOverTime(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(0, 0)
+	l := newLimiter(60, func() time.Time { return now })
+	for range 60 {
+		if ok, _, _ := l.take("a"); !ok {
+			t.Fatal("refused within the limit")
+		}
+	}
+	if ok, _, wait := l.take("a"); ok || wait <= 0 || wait > time.Second {
+		t.Fatalf("over the limit: ok %v, wait %v", ok, wait)
+	}
+	if ok, _, _ := l.take("b"); !ok {
+		t.Fatal("another client was refused")
+	}
+	now = now.Add(time.Second)
+	if ok, _, _ := l.take("a"); !ok {
+		t.Fatal("not refilled after a second")
+	}
+}

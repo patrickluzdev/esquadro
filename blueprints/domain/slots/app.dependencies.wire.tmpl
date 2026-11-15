@@ -1,0 +1,7 @@
+{{- range .Modules}}{{if .Entities}}
+	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{
+{{- with slot "domain.deps.values" $}}
+{{.}}
+{{- end}}
+	})
+{{- end}}{{end}}

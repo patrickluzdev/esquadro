@@ -1,0 +1,2 @@
+	c.DatabaseURL = l.text("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/{{.App.Snake}}?sslmode=disable")
+	c.PoolMax = l.number("{{upper .App.Snake}}_POOL_MAX", {{.Options.pool_max}})

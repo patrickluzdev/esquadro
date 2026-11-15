@@ -2,14 +2,14 @@ package catalog
 
 app shop {
   module "github.com/example/shop"
-  blueprint platform
-  @platform(x 1)
+  blueprint app
+  @app(x 1)
 }
 
 entity Product {
   name     string @postgress(column x)
   price    decimal @postgres(column product_price)
-  status   string @platform(x)
+  status   string @app(x)
   sku      string @postgres(colum sku)
   code     string @postgres(column)
   category > Category @postgres(column cat)

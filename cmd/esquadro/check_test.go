@@ -16,7 +16,7 @@ const okProject = `package catalog
 
 app shop {
   module "github.com/example/shop"
-  blueprint platform
+  blueprint app
 }
 
 entity Product {
@@ -59,7 +59,7 @@ func TestCheckOK(t *testing.T) {
 
 func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
+	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint app\n}\n")
 	writeFile(t, dir, "esquadro/catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category > Category\n}\n")
 	writeFile(t, dir, "esquadro/category.esq", "package catalog\n\nentity Category {\n  name string\n}\n")
 
@@ -72,7 +72,7 @@ func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
+	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint app\n}\n")
 	writeFile(t, dir, "esquadro/catalog.esq", "package catalog\n\nentity Product {\n  name strng\n}\n")
 
 	code, out, errOut := check(t)
@@ -89,7 +89,7 @@ func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "esquadro/shop.esq", strings.Replace(okProject, "  blueprint platform\n", "", 1))
+	writeFile(t, dir, "esquadro/shop.esq", strings.Replace(okProject, "  blueprint app\n", "", 1))
 
 	code, out, errOut := check(t)
 	if code != 0 || !strings.HasPrefix(out, "ok:") {
@@ -158,7 +158,7 @@ entity Product {
 		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
 	}
 	for _, want := range []string{
-		"blueprint postgres requires platform",
+		"blueprint postgres requires app",
 		"option pool_max of blueprint postgres: expected a whole number",
 		`@postgres has no key "colum" on fields`,
 		`did you mean "column"?`,

@@ -1,0 +1,42 @@
+{{- if .Entities -}}
+package edge
+
+import (
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestLimitBodyRefusesALargeBody(t *testing.T) {
+	t.Parallel()
+	rec := serve(LimitBody(4)(noContent), httptest.NewRequest("POST", "/", strings.NewReader("12345")))
+	if rec.Code != 413 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestJSONOnlyRefusesOtherMedia(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		accept, contentType, body string
+		status                    int
+	}{
+		{"", "", "", 204},
+		{"application/json", "application/json; charset=utf-8", "{}", 204},
+		{"text/html", "", "", 406},
+		{"text/html, */*;q=0.1", "", "", 204},
+		{"", "text/plain", "x", 415},
+	} {
+		req := httptest.NewRequest("POST", "/", strings.NewReader(tc.body))
+		if tc.accept != "" {
+			req.Header.Set("Accept", tc.accept)
+		}
+		if tc.contentType != "" {
+			req.Header.Set("Content-Type", tc.contentType)
+		}
+		if rec := serve(JSONOnly(noContent), req); rec.Code != tc.status {
+			t.Errorf("%+v: %d", tc, rec.Code)
+		}
+	}
+}
+{{end -}}

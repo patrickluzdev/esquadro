@@ -1,6 +1,6 @@
 blueprint stripe {
   version "0.1.0"
-  requires platform, postgres
+  requires app, postgres
   optional admin
 
   option currency     string default("USD")

@@ -1,0 +1,6 @@
+{{- if .Entities}}
+  migrate:
+    desc: Apply the database migrations (DATABASE_URL)
+    cmds:
+      - go run ./cmd/{{.App.Kebab}} migrate
+{{- end}}

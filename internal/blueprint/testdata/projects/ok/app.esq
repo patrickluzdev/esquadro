@@ -8,6 +8,6 @@ app shop {
   blueprint postgres {
     pool_max 20
   }
-  blueprint platform
+  blueprint app
   @stripe(account "acct_1")
 }

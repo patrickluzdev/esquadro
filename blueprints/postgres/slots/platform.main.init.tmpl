@@ -1,9 +1,0 @@
-	pool, err := postgres.Open(ctx, cfg.DatabaseURL, cfg.PoolMax)
-	if err != nil {
-		return err
-	}
-	defer pool.Close()
-	deps.pool = pool
-{{- range .Modules}}{{if .Entities}}
-	deps.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{Pool: pool})
-{{- end}}{{end}}

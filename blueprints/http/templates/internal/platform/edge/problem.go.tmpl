@@ -1,0 +1,73 @@
+package edge
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strconv"
+)
+
+// Problem is an error the service answers with.
+type Problem struct {
+	Status int
+	Code   string
+	Title  string
+	Errors []FieldProblem
+}
+
+// FieldProblem is one field refused, named as the request names it.
+type FieldProblem struct {
+	Field string `json:"field"`
+	Code  string `json:"code"`
+}
+
+func (p *Problem) Error() string { return p.Code + ": " + p.Title }
+
+var (
+	// ErrNotFound is an address with nothing behind it.
+	ErrNotFound = &Problem{Status: 404, Code: "not_found", Title: "Nothing was found at this address."}
+	// ErrInternal is anything else, logged on the server.
+	ErrInternal = &Problem{Status: 500, Code: "internal", Title: "Something went wrong on our side."}
+)
+
+// NotFound is a record that does not exist.
+func NotFound(title string) *Problem { return &Problem{Status: 404, Code: "not_found", Title: title} }
+
+// Document is a problem as Problem Details (RFC 9457).
+type Document struct {
+	Type      string         `json:"type"`
+	Title     string         `json:"title"`
+	Status    int            `json:"status"`
+	Code      string         `json:"code"`
+	Errors    []FieldProblem `json:"errors,omitempty"`
+	RequestID string         `json:"requestId,omitempty"`
+}
+
+// DocumentOf is p as the request of ctx gets it, with its ID.
+func DocumentOf(ctx context.Context, p *Problem) Document {
+	title := p.Title
+{{- with slot "http.problem.title" .}}
+{{.}}
+{{- end}}
+	return Document{
+		Type:      "about:blank",
+		Title:     title,
+		Status:    p.Status,
+		Code:      p.Code,
+		Errors:    p.Errors,
+		RequestID: RequestIDOf(ctx),
+	}
+}
+
+// Write answers r with p.
+func Write(w http.ResponseWriter, r *http.Request, p *Problem) {
+	body, err := json.Marshal(DocumentOf(r.Context(), p))
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(p.Status)
+	_, _ = w.Write(body)
+}

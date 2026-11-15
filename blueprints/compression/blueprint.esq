@@ -1,0 +1,6 @@
+/// gzip for the clients that accept it, on JSON, YAML, HTML and text
+/// responses of more than 1 KB.
+blueprint compression {
+  version "0.1.0"
+  requires http
+}

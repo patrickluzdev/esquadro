@@ -20,13 +20,13 @@ testdata/projects/badmanifest/blueprints/bad/blueprint.esq:3:3: error: version i
 
 testdata/projects/badmanifest/blueprints/bad/blueprint.esq:4:12: error: blueprint Bad cannot depend on itself
   |
-4 |   requires Bad, platform, platform
+4 |   requires Bad, app, app
   |            ^^^
 
-testdata/projects/badmanifest/blueprints/bad/blueprint.esq:4:27: error: platform is already listed as a dependency
+testdata/projects/badmanifest/blueprints/bad/blueprint.esq:4:22: error: app is already listed as a dependency
   |
-4 |   requires Bad, platform, platform
-  |                           ^^^^^^^^
+4 |   requires Bad, app, app
+  |                      ^^^
 
 testdata/projects/badmanifest/blueprints/bad/blueprint.esq:6:12: error: unknown option type "strng"
   |

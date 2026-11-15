@@ -1,0 +1,7 @@
+{{- if .Entities}}
+	api, err := newAPI(d)
+	if err != nil {
+		return nil, err
+	}
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api))
+{{- end}}

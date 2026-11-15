@@ -1,0 +1,11 @@
+/// Tests against a real Postgres: package postgrestest starts one container
+/// per test binary, migrates a template database and gives each test a
+/// fresh copy. Blueprints that generate tests (store, rest) write them only
+/// with it. Tests need Docker.
+blueprint testcontainers {
+  version "0.1.0"
+  requires postgres, migrations
+
+  go_require "github.com/testcontainers/testcontainers-go" "v0.40.0"
+  go_require "github.com/testcontainers/testcontainers-go/modules/postgres" "v0.40.0"
+}

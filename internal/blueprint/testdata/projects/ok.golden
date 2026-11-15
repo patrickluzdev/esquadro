@@ -1,5 +1,5 @@
-order: platform(built-in) postgres(built-in) stripe(testdata/projects/ok/blueprints/stripe) audit(testdata/projects/ok/blueprints/audit)
-options platform: {port=8080}
+order: app(built-in) postgres(built-in) stripe(testdata/projects/ok/blueprints/stripe) audit(testdata/projects/ok/blueprints/audit)
+options app: {}
 options postgres: {pool_max=20, schemas=[]interface {}{}}
 options stripe: {currency="BRL", webhook_path="/webhooks/stripe"}
 options audit: {}

@@ -1,0 +1,48 @@
+// Command {{.App.Kebab}} runs {{.App.Label}}: {{.App.Kebab}} <command>.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+)
+
+func main() {
+	command := ""
+	if len(os.Args) > 1 {
+		command = os.Args[1]
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx, command)
+	stop()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// run runs a command until it ends or ctx is canceled by an interrupt.
+func run(ctx context.Context, command string) error {
+	switch command {
+	case "check":
+		return check(ctx)
+{{- with slot "app.commands" .}}
+{{.}}
+{{- end}}
+	}
+	return fmt.Errorf("unknown command %q", command)
+}
+
+// check opens every dependency and releases it: a way to see that the
+// configuration works, before a deploy for example.
+func check(ctx context.Context) error {
+	_, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	release()
+	fmt.Println("ok")
+	return nil
+}

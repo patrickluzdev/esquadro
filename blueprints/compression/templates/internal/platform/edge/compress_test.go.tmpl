@@ -1,0 +1,35 @@
+package edge
+
+import (
+	"compress/gzip"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestCompressAnswersGzipToWhoAcceptsIt(t *testing.T) {
+	t.Parallel()
+	big := strings.Repeat(`{"name":"x"}`, 200)
+	h := Compress(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, big)
+	}))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip, br")
+	rec := serve(h, req)
+	if rec.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("not compressed: %v", rec.Header())
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body, err := io.ReadAll(zr); err != nil || string(body) != big {
+		t.Fatalf("body %d bytes, %v", len(body), err)
+	}
+	if rec := serve(h, httptest.NewRequest("GET", "/", nil)); rec.Header().Get("Content-Encoding") != "" || rec.Body.String() != big {
+		t.Fatal("compressed for a client that did not ask")
+	}
+}

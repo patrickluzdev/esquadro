@@ -1,11 +1,13 @@
-/// PostgreSQL storage: migrations written from the change in the model,
-/// queries with sqlc, and each entity's use cases (create, read, list,
-/// update, delete) as methods of its module.
+/// The connection to PostgreSQL: a pgx pool opened with the service, from
+/// DATABASE_URL, and where each module's tables live. The annotations
+/// describe the tables to the blueprints that write their SQL (migrations,
+/// store).
 blueprint postgres {
-  version "0.1.0"
-  requires platform
+  version "0.2.0"
+  requires app
 
-  /// Maximum number of connections in the pool.
+  /// Maximum number of connections in the pool; <APP>_POOL_MAX overrides
+  /// it.
   option pool_max int default(10)
   /// Modules whose tables live in a Postgres schema of their own, named
   /// after the module; the others use public.
@@ -25,10 +27,4 @@ blueprint postgres {
   }
 
   go_require "github.com/jackc/pgx/v5" "v5.7.1"
-  go_require "github.com/pressly/goose/v3" "v3.24.1"
-  go_require "github.com/testcontainers/testcontainers-go" "v0.40.0"
-  go_require "github.com/testcontainers/testcontainers-go/modules/postgres" "v0.40.0"
-
-  hook pre-gen "migrations"
-  hook post-gen "sqlc" writes "internal/*/sqlgen/**"
 }

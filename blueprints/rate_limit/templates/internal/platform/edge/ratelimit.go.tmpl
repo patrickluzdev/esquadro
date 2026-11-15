@@ -1,0 +1,84 @@
+package edge
+
+import (
+	"math"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+)
+
+// ErrRateLimited is a client over the rate limit.
+var ErrRateLimited = &Problem{Status: 429, Code: "rate_limited", Title: "Too many requests; try again later."}
+
+// RateLimit lets each client make perMinute requests a minute, refilled
+// evenly, and answers ErrRateLimited with Retry-After past that. It counts
+// in memory, so it holds for one instance of the service; 0 turns it off.
+// trustProxy takes the client from X-Forwarded-For.
+func RateLimit(perMinute int, trustProxy bool) Middleware {
+	return func(next http.Handler) http.Handler {
+		if perMinute <= 0 {
+			return next
+		}
+		l := newLimiter(perMinute, time.Now)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ok, remaining, wait := l.take(ClientOf(r, trustProxy))
+			w.Header().Set("RateLimit-Limit", strconv.Itoa(perMinute))
+			w.Header().Set("RateLimit-Remaining", strconv.Itoa(remaining))
+			if !ok {
+				w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
+				Write(w, r, ErrRateLimited)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// limiter is a token bucket per client.
+type limiter struct {
+	mu      sync.Mutex
+	size    float64 // tokens of a full bucket: the requests of a minute
+	perSec  float64
+	now     func() time.Time
+	clients map[string]*bucket
+	swept   time.Time
+}
+
+type bucket struct {
+	tokens float64
+	at     time.Time
+}
+
+func newLimiter(perMinute int, now func() time.Time) *limiter {
+	return &limiter{size: float64(perMinute), perSec: float64(perMinute) / 60, now: now, clients: map[string]*bucket{}, swept: now()}
+}
+
+// take spends a token of the client, if it has one, and says how many are
+// left and, when none, how long until the next.
+func (l *limiter) take(client string) (bool, int, time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	if now.Sub(l.swept) > time.Minute {
+		// A bucket untouched for a minute is full again: forget it.
+		for c, b := range l.clients {
+			if now.Sub(b.at) > time.Minute {
+				delete(l.clients, c)
+			}
+		}
+		l.swept = now
+	}
+	b, ok := l.clients[client]
+	if !ok {
+		b = &bucket{tokens: l.size, at: now}
+		l.clients[client] = b
+	}
+	b.tokens = min(l.size, b.tokens+now.Sub(b.at).Seconds()*l.perSec)
+	b.at = now
+	if b.tokens < 1 {
+		return false, 0, time.Duration((1 - b.tokens) / l.perSec * float64(time.Second))
+	}
+	b.tokens--
+	return true, int(b.tokens), 0
+}

@@ -1,0 +1,12 @@
+/// A limit of requests a minute per client, answered with rate_limited (429)
+/// and Retry-After past it. It counts in memory: it holds for one instance
+/// of the service.
+blueprint rate_limit {
+  version "0.1.0"
+  requires http
+  optional i18n
+
+  /// Requests a minute each client may make; 0 turns the limit off.
+  /// <APP>_RATE_LIMIT overrides it.
+  option per_minute int default(120)
+}

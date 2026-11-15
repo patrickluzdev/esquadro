@@ -1,0 +1,7 @@
+	pool, err := postgres.Open(ctx, d.config.DatabaseURL, d.config.PoolMax)
+	if err != nil {
+		release()
+		return d, nil, err
+	}
+	opened = append(opened, pool.Close)
+	d.pool = pool

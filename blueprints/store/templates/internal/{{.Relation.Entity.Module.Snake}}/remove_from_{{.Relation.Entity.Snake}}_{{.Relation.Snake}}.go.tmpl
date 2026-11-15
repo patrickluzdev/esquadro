@@ -1,0 +1,14 @@
+{{- $rel := .Relation}}{{if manyToMany $rel}}{{$l := link $rel (optionsOf "postgres")}}{{if $l.Declared}}{{$e := .Entity}}{{$m := .Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// RemoveFrom{{$e.Pascal}}{{$rel.Pascal}} removes the {{lower $rel.Target.Label}} whose id is {{$l.OtherParam}}
+// from the {{$rel.Snake}} of the {{lower $e.Label}} whose id is id; removing one that is not
+// there changes nothing.
+func ({{$r}} *{{$m.Pascal}}) RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id, {{$l.OtherParam}} uuid.UUID) error {
+	return sqlgen.New({{$r}}.Pool).RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}Params{
+		OwnID:   postgres.UUID(id),
+		OtherID: postgres.UUID({{$l.OtherParam}}),
+	})
+}
+{{end}}{{end -}}

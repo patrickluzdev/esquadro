@@ -1,0 +1,19 @@
+/// The model of each module: its entities with the rules declared in the
+/// .esq files (NewX, Validate, WithDefaults), its enums, its errors, and the
+/// module itself, whose use cases other blueprints add as methods.
+blueprint domain {
+  version "0.1.0"
+  requires app
+
+  /// Import lines of each module's file, e.g. "errors".
+  slot "domain.module.imports"
+  /// Fields of each module's Deps, e.g. Pool *pgxpool.Pool.
+  slot "domain.module.deps"
+  /// Declarations in each module's var block of errors.
+  slot "domain.module.errors"
+  /// Fields of each module's Deps as the dependencies set them, e.g.
+  /// Pool: d.pool, (in cmd/<app>/dependencies.go).
+  slot "domain.deps.values"
+
+  go_require "github.com/shopspring/decimal" "v1.4.0"
+}

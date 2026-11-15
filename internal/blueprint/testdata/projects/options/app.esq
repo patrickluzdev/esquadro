@@ -1,6 +1,7 @@
 app shop {
   module "github.com/example/shop"
-  blueprint platform {
+  blueprint app
+  blueprint http {
     prot 9000
   }
   blueprint postgres {

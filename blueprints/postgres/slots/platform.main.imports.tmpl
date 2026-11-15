@@ -1,4 +1,0 @@
-	"{{.App.Module}}/internal/platform/postgres"
-{{- range .Modules}}{{if .Entities}}
-	"{{$.App.Module}}/internal/{{.Snake}}"
-{{- end}}{{end}}

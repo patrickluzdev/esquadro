@@ -1,0 +1,34 @@
+package main
+
+import (
+	"net/http"
+
+	"{{.App.Module}}/internal/platform/edge"
+{{- with slot "http.routes.imports" .}}
+{{.}}
+{{- end}}
+)
+
+// routes is what the service answers, behind the middleware every request
+// goes through; anything else is answered as not_found.
+func (d dependencies) routes() (http.Handler, error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+{{- with slot "http.routes" .}}
+{{.}}
+{{- end}}
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { edge.Write(w, r, edge.ErrNotFound) })
+	return edge.Chain(mux,
+		edge.Identify,
+{{- with slot "http.middleware.context" .}}
+{{.}}
+{{- end}}
+		edge.Log(d.logger, d.config.TrustProxy),
+		edge.Recover(d.logger),
+{{- with slot "http.middleware" .}}
+{{.}}
+{{- end}}
+	), nil
+}

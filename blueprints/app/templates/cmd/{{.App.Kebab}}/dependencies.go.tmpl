@@ -1,0 +1,46 @@
+{{- $open := slot "app.dependencies.open" . -}}
+package main
+
+import (
+	"context"
+	"log/slog"
+	"slices"
+
+	"{{.App.Module}}/internal/platform/config"
+	"{{.App.Module}}/internal/platform/logging"
+{{- with slot "app.dependencies.imports" .}}
+{{.}}
+{{- end}}
+)
+
+// dependencies are what the commands work with, built by open from the
+// configuration.
+type dependencies struct {
+	config config.Config
+	logger *slog.Logger
+{{- with slot "app.dependencies" .}}
+{{.}}
+{{- end}}
+}
+
+// open reads the configuration and builds the dependencies; release frees
+// what open opened, in reverse order.
+func open({{if $open}}ctx{{else}}_{{end}} context.Context) (d dependencies, release func(), err error) {
+	if d.config, err = config.Load(); err != nil {
+		return d, nil, err
+	}
+	d.logger = logging.New(d.config.Env)
+	var opened []func()
+	release = func() {
+		for _, free := range slices.Backward(opened) {
+			free()
+		}
+	}
+{{- with $open}}
+{{.}}
+{{- end}}
+{{- with slot "app.dependencies.wire" .}}
+{{.}}
+{{- end}}
+	return d, release, nil
+}

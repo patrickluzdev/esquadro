@@ -1,7 +1,7 @@
 blueprint Bad {
   version "1.0"
   version "2.0.0"
-  requires Bad, platform, platform
+  requires Bad, app, app
 
   option a strng
   option b int required default(1)

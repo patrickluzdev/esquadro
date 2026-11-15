@@ -1,0 +1,20 @@
+package edge
+
+import (
+	"net/http/httptest"
+	"testing"
+)
+
+func TestCORSAnswersAllowedOriginsOnly(t *testing.T) {
+	t.Parallel()
+	h := CORS([]string{"https://app.example.com"})(noContent)
+	for origin, allowed := range map[string]bool{"https://app.example.com": true, "https://evil.example.com": false} {
+		req := httptest.NewRequest("OPTIONS", "/", nil)
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		rec := serve(h, req)
+		if rec.Code != 204 || (rec.Header().Get("Access-Control-Allow-Origin") == origin) != allowed {
+			t.Errorf("preflight from %s: %d %v", origin, rec.Code, rec.Header())
+		}
+	}
+}

@@ -9,12 +9,23 @@ import (
 	"time"
 )
 
-// TestPostgresGeneratesAWorkingService generates a project with the platform,
-// postgres and api blueprints, checks that it builds and passes go vet, applies
+// TestPostgresGeneratesAWorkingService generates a project with every
+// built-in blueprint of a JSON API on Postgres, checks that it builds and passes go vet, applies
 // its migrations with its own migrate command against a real Postgres, and
 // runs the tests esquadro generated for it. It needs Docker (for Postgres, and for sqlc when it is
 // not installed) and the network (Go modules); it is skipped with -short or
 // without Docker.
+// every lists the blueprints of a JSON API on Postgres, as esquadro new does.
+var every = func() string {
+	var b strings.Builder
+	for bp := range strings.SplitSeq(defaultBlueprints, ",") {
+		b.WriteString("  blueprint ")
+		b.WriteString(bp)
+		b.WriteString("\n")
+	}
+	return b.String()
+}()
+
 func TestPostgresGeneratesAWorkingService(t *testing.T) {
 	if testing.Short() {
 		t.Skip("generates and runs a service against Postgres")
@@ -43,7 +54,7 @@ func TestPostgresGeneratesAWorkingService(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("esquadro/app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n  blueprint postgres\n  blueprint api\n}\n")
+	write("esquadro/app.esq", "app shop {\n  module \"example.com/shop\"\n"+every+"}\n")
 	write("esquadro/catalog.esq", `package catalog
 
 entity Category {

@@ -1,0 +1,10 @@
+/// Cross-origin requests: browsers on the allowed origins may call the API,
+/// and their preflight requests are answered.
+blueprint cors {
+  version "0.1.0"
+  requires http
+
+  /// Origins browsers may call the API from, or ["*"] for any; none lets
+  /// no origin in. <APP>_CORS_ORIGINS, comma separated, overrides it.
+  option origins list default([])
+}

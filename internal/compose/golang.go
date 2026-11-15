@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -150,4 +151,28 @@ func enumValues(e *project.Enum) string {
 		return strings.Join(names, "")
 	}
 	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+}
+
+// strs is a list option as strings.
+func strs(v any) []string {
+	list, _ := v.([]any)
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		out = append(out, fmt.Sprint(x))
+	}
+	return out
+}
+
+// goStrings is a Go []string literal of a list option, e.g. []string{"a"}.
+func goStrings(v any) string {
+	var b strings.Builder
+	b.WriteString("[]string{")
+	for i, s := range strs(v) {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(strconv.Quote(s))
+	}
+	b.WriteString("}")
+	return b.String()
 }

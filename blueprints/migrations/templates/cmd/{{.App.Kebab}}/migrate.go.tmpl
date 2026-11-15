@@ -1,0 +1,19 @@
+{{- if .Entities -}}
+package main
+
+import (
+	"context"
+
+	"{{.App.Module}}/internal/platform/config"
+	"{{.App.Module}}/migrations"
+)
+
+// migrate applies the database migrations the database does not have yet.
+func migrate(ctx context.Context) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	return migrations.Apply(ctx, cfg.DatabaseURL)
+}
+{{end -}}

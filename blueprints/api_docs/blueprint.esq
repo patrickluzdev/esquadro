@@ -1,0 +1,7 @@
+/// The contract and its documentation: api/openapi.yaml served at
+/// /api/openapi.yaml, and a page that documents it at /docs (Scalar),
+/// outside production unless <APP>_DOCS=true.
+blueprint api_docs {
+  version "0.1.0"
+  requires rest
+}

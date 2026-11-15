@@ -1,0 +1,11 @@
+/// Database migrations with goose: on each generation, the change in the
+/// model since the last one becomes a migration file of yours in
+/// migrations/, which the migrate command (task migrate) applies.
+blueprint migrations {
+  version "0.1.0"
+  requires app, postgres
+
+  go_require "github.com/pressly/goose/v3" "v3.24.1"
+
+  hook pre-gen "write"
+}

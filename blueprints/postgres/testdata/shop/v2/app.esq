@@ -1,7 +1,0 @@
-app shop {
-  module "github.com/example/shop"
-  blueprint platform
-  blueprint postgres {
-    schemas [orders]
-  }
-}

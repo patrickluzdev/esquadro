@@ -1,0 +1,19 @@
+package edge
+
+import (
+	"net/http/httptest"
+	"testing"
+)
+
+func TestSecureSetsTheHeadersOfAnAPI(t *testing.T) {
+	t.Parallel()
+	rec := serve(Secure(true)(noContent), httptest.NewRequest("GET", "/", nil))
+	for _, h := range []string{"X-Content-Type-Options", "X-Frame-Options", "Content-Security-Policy", "Referrer-Policy", "Cache-Control", "Strict-Transport-Security"} {
+		if rec.Header().Get(h) == "" {
+			t.Errorf("no %s", h)
+		}
+	}
+	if rec := serve(Secure(false)(noContent), httptest.NewRequest("GET", "/", nil)); rec.Header().Get("Strict-Transport-Security") != "" {
+		t.Error("HSTS without asking")
+	}
+}

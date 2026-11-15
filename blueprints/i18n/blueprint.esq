@@ -1,0 +1,12 @@
+/// Errors in the client's language: each request is answered in the
+/// language its Accept-Language prefers among the ones below (in
+/// Content-Language), and the title of every problem is translated; the code
+/// stays the same. esquadro knows pt-BR and es; translations.go, yours, adds
+/// or changes titles.
+blueprint i18n {
+  version "0.1.0"
+  requires http
+
+  /// Languages of the answers, the first being the default.
+  option languages list default(["en"])
+}

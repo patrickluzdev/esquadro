@@ -1,0 +1,38 @@
+package edge
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestNegotiatePicksTheLanguageAsked(t *testing.T) {
+	t.Parallel()
+	for header, want := range map[string]string{
+		"":                Languages[0],
+		"*":               Languages[0],
+		"xx-YY, zz;q=0.9": Languages[0],
+{{- range strs .Options.languages}}
+		{{quote .}}: {{quote .}},
+		{{quote (printf "xx;q=0.5, %s;q=0.8" .)}}: {{quote .}},
+{{- end}}
+	} {
+		if got := Negotiate(header); got != want {
+			t.Errorf("Negotiate(%q) = %q, want %q", header, got, want)
+		}
+	}
+}
+
+func TestProblemsAreTitledInTheRequestLanguage(t *testing.T) {
+	t.Parallel()
+	for _, lang := range Languages {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Accept-Language", lang)
+		h := Localize(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Write(w, r, ErrNotFound) }))
+		rec := serve(h, req)
+		if rec.Header().Get("Content-Language") != lang || !strings.Contains(rec.Body.String(), TitleIn(lang, ErrNotFound)) {
+			t.Errorf("%s: %v %s", lang, rec.Header(), rec.Body)
+		}
+	}
+}

@@ -1,0 +1,34 @@
+/// The base of every generated project: the command line and its commands,
+/// the dependencies they share, configuration from the environment,
+/// structured logging, the Taskfile, the README and go.mod.
+blueprint app {
+  version "0.2.0"
+
+  /// Fields of config.Config.
+  slot "app.config.fields"
+  /// Code in config.Load that fills those fields from the environment with
+  /// the loader l: l.text(name, "default"), l.number(name, 1),
+  /// l.flag(name, true) or l.list(name, []string{"a"}); c is the Config.
+  slot "app.config.load"
+  /// Cases of the command switch in run, each returning the command's
+  /// error, e.g. case "migrate": return migrate(ctx). The case "" is the
+  /// command run without arguments. The app's own command is check, which
+  /// opens every dependency to see that the configuration works.
+  slot "app.commands"
+  /// Imports of cmd/<app>/dependencies.go.
+  slot "app.dependencies.imports"
+  /// Fields of the dependencies struct.
+  slot "app.dependencies"
+  /// Code in open that opens a resource (a database pool...): d is the
+  /// dependencies, opened a list of functions that release what was opened,
+  /// and on failure it returns d, nil and the error after release().
+  slot "app.dependencies.open"
+  /// Code in open, after every resource is open, that builds what uses them
+  /// (each module...).
+  slot "app.dependencies.wire"
+  /// Tasks of Taskfile.esquadro.yml, indented by two spaces; a blank line
+  /// goes between contributions.
+  slot "app.tasks"
+
+  hook post-gen "go-mod" edits ["go.mod", "go.sum"]
+}

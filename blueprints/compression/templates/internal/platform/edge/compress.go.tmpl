@@ -1,0 +1,115 @@
+package edge
+
+import (
+	"compress/gzip"
+	"mime"
+	"net/http"
+	"strings"
+	"sync"
+)
+
+// compressAbove is the size under which a response is not worth compressing.
+const compressAbove = 1024
+
+var gzipWriters = sync.Pool{New: func() any { return gzip.NewWriter(nil) }}
+
+// Compress answers with gzip the clients that accept it, for JSON, YAML,
+// HTML and text responses of more than compressAbove bytes.
+func Compress(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding")
+		if !acceptsGzip(r.Header.Get("Accept-Encoding")) || r.Method == http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		cw := &compressor{ResponseWriter: w, status: http.StatusOK}
+		defer cw.close()
+		next.ServeHTTP(cw, r)
+	})
+}
+
+// acceptsGzip reports whether an Accept-Encoding header takes gzip.
+func acceptsGzip(header string) bool {
+	for part := range strings.SplitSeq(header, ",") {
+		coding, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+		if strings.EqualFold(strings.TrimSpace(coding), "gzip") {
+			return strings.ReplaceAll(strings.TrimSpace(params), " ", "") != "q=0"
+		}
+	}
+	return false
+}
+
+// compressor holds back the first bytes of a response until it knows
+// whether to compress it.
+type compressor struct {
+	http.ResponseWriter
+	status  int
+	held    []byte
+	decided bool
+	gz      *gzip.Writer
+}
+
+func (c *compressor) WriteHeader(status int) {
+	if !c.decided {
+		c.status = status
+	}
+}
+
+func (c *compressor) Write(b []byte) (int, error) {
+	if c.decided {
+		if c.gz != nil {
+			return c.gz.Write(b)
+		}
+		return c.ResponseWriter.Write(b)
+	}
+	c.held = append(c.held, b...)
+	if len(c.held) >= compressAbove {
+		if err := c.decide(); err != nil {
+			return 0, err
+		}
+	}
+	return len(b), nil
+}
+
+// decide starts the response, compressed when it is worth it, with what was
+// held back.
+func (c *compressor) decide() error {
+	c.decided = true
+	h := c.Header()
+	if len(c.held) >= compressAbove && h.Get("Content-Encoding") == "" && compressible(h.Get("Content-Type")) &&
+		c.status != http.StatusNoContent && c.status != http.StatusNotModified {
+		h.Del("Content-Length")
+		h.Set("Content-Encoding", "gzip")
+		c.gz = gzipWriters.Get().(*gzip.Writer)
+		c.gz.Reset(c.ResponseWriter)
+	}
+	c.ResponseWriter.WriteHeader(c.status)
+	held := c.held
+	c.held = nil
+	if c.gz != nil {
+		_, err := c.gz.Write(held)
+		return err
+	}
+	_, err := c.ResponseWriter.Write(held)
+	return err
+}
+
+func (c *compressor) close() {
+	if !c.decided {
+		_ = c.decide()
+	}
+	if c.gz != nil {
+		_ = c.gz.Close()
+		gzipWriters.Put(c.gz)
+		c.gz = nil
+	}
+}
+
+func (c *compressor) Unwrap() http.ResponseWriter { return c.ResponseWriter }
+
+// compressible reports whether a content type is text worth compressing.
+func compressible(contentType string) bool {
+	media, _, _ := mime.ParseMediaType(contentType)
+	return strings.HasPrefix(media, "text/") || strings.HasSuffix(media, "json") ||
+		strings.HasSuffix(media, "yaml") || media == "application/javascript"
+}

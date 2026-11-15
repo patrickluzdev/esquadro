@@ -1,0 +1,9 @@
+{{- if .Entities}}
+	mux.HandleFunc("GET /api/openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		_, _ = w.Write(contract.Contract)
+	})
+	if d.config.Docs {
+		mux.Handle("GET /docs", edge.Docs({{quote (or (index (optionsOf "rest") "title") .App.Label)}}, "/api/openapi.yaml"))
+	}
+{{- end}}

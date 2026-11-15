@@ -1,0 +1,99 @@
+package edge
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// Languages are the languages the service answers in; the first is the
+// default.
+var Languages = {{goStrings .Options.languages}}
+
+// languageKey is the context key of the request's language.
+type languageKey struct{}
+
+// Localize answers each request in the language its Accept-Language
+// prefers, which goes back in Content-Language.
+func Localize(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := Negotiate(r.Header.Get("Accept-Language"))
+		w.Header().Set("Content-Language", lang)
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), languageKey{}, lang)))
+	})
+}
+
+// LanguageOf is the language the request of ctx is answered in.
+func LanguageOf(ctx context.Context) string {
+	if lang, ok := ctx.Value(languageKey{}).(string); ok {
+		return lang
+	}
+	return Languages[0]
+}
+
+// TitleIn is p's title in lang: yours from translations.go, else the one
+// esquadro knows, else the title it was written with (in English).
+func TitleIn(lang string, p *Problem) string {
+	if t, ok := translations[lang][p.Code]; ok {
+		return t
+	}
+	if t, ok := knownTitles[lang][p.Code]; ok {
+		return t
+	}
+	return p.Title
+}
+
+// knownTitles are the titles esquadro translates, in the languages of
+// Languages it knows; translations.go takes precedence.
+var knownTitles = map[string]map[string]string{
+{{- range strs .Options.languages}}{{$lang := .}}{{if and (not (english $lang)) (translated $lang "internal")}}
+	{{quote $lang}}: {
+{{- range problems}}{{if and (uses .Blueprint) (translated $lang .Code)}}
+		{{quote .Code}}: {{quote (translation $lang .Code)}},
+{{- end}}{{end}}
+	},
+{{- end}}{{end}}
+}
+
+// Negotiate picks from Languages the one an Accept-Language header prefers:
+// an exact tag first, then one of the same language ("pt" or "pt-PT" for
+// "pt-BR"), and the default when none fits.
+func Negotiate(header string) string {
+	best, bestQ := Languages[0], 0.0
+	for part := range strings.SplitSeq(header, ",") {
+		tag, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+		q := 1.0
+		if v, ok := strings.CutPrefix(strings.TrimSpace(params), "q="); ok {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				q = f
+			}
+		}
+		if q <= bestQ || tag == "" {
+			continue
+		}
+		if lang, ok := match(tag); ok {
+			best, bestQ = lang, q
+		}
+	}
+	return best
+}
+
+// match finds the language of Languages a tag asks for.
+func match(tag string) (string, bool) {
+	if tag == "*" {
+		return Languages[0], true
+	}
+	for _, l := range Languages {
+		if strings.EqualFold(l, tag) {
+			return l, true
+		}
+	}
+	base, _, _ := strings.Cut(tag, "-")
+	for _, l := range Languages {
+		if lb, _, _ := strings.Cut(l, "-"); strings.EqualFold(lb, base) {
+			return l, true
+		}
+	}
+	return "", false
+}

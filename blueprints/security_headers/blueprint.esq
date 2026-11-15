@@ -1,0 +1,11 @@
+/// The headers an API should send (OWASP): no sniffing, no framing, no
+/// content loaded from it, no referrer, no caching, and HSTS when asked for.
+/// A handler may replace them for itself, as the documentation page does.
+blueprint security_headers {
+  version "0.1.0"
+  requires http
+
+  /// Send Strict-Transport-Security; only behind HTTPS. <APP>_HSTS
+  /// overrides it.
+  option hsts bool default(false)
+}

@@ -328,7 +328,8 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 
 func (c *composer) baseFuncs(self string) template.FuncMap {
 	return template.FuncMap{
-		"slot": c.slot,
+		"slot":      c.slot,
+		"slotParts": c.slotParts,
 		// optionsOf returns the options of another blueprint of the app,
 		// nil when the app does not use it: a blueprint that works on
 		// another one's data reads its settings.
@@ -344,6 +345,9 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		// annOf returns another blueprint's annotation values on a node.
 		"annOf":     func(name string, node any) map[string]any { return annOf(node)[name] },
 		"join":      func(sep string, items []string) string { return strings.Join(items, sep) },
+		"contains":  strings.Contains,
+		"strs":      strs,
+		"goStrings": goStrings,
 		"goType":    goType,
 		"goImports": goImports,
 		"quote":     strconv.Quote,
@@ -391,11 +395,19 @@ func annOf(node any) project.Ann {
 // slot renders every contribution to a slot with the caller's data and the
 // contributing blueprint's options.
 func (c *composer) slot(name string, data Data) (string, error) {
+	parts, err := c.slotParts(name, data)
+	return strings.Join(parts, "\n"), err
+}
+
+// slotParts renders every contribution to a slot, each without the blank
+// lines around it, for a template that joins them its own way (e.g. with a
+// blank line between YAML entries).
+func (c *composer) slotParts(name string, data Data) ([]string, error) {
 	if _, ok := c.declared[name]; !ok {
-		return "", fmt.Errorf("slot %q is not declared by any blueprint of this app", name)
+		return nil, fmt.Errorf("slot %q is not declared by any blueprint of this app", name)
 	}
 	if slices.Contains(c.stack, name) {
-		return "", &slotError{fmt.Errorf("slots open each other in a cycle: %s -> %s", strings.Join(c.stack, " -> "), name)}
+		return nil, &slotError{fmt.Errorf("slots open each other in a cycle: %s -> %s", strings.Join(c.stack, " -> "), name)}
 	}
 	c.stack = append(c.stack, name)
 	defer func() { c.stack = c.stack[:len(c.stack)-1] }()
@@ -409,11 +421,11 @@ func (c *composer) slot(name string, data Data) (string, error) {
 		var buf bytes.Buffer
 		if err := ct.tmpl.Execute(&buf, d); err != nil {
 			if inner, ok := errors.AsType[*slotError](err); ok {
-				return "", inner
+				return nil, inner
 			}
-			return "", &slotError{err}
+			return nil, &slotError{err}
 		}
-		out := strings.TrimRight(buf.String(), "\n")
+		out := strings.Trim(buf.String(), "\n")
 		if strings.TrimSpace(out) == "" {
 			continue
 		}
@@ -425,7 +437,7 @@ func (c *composer) slot(name string, data Data) (string, error) {
 	if c.cur != nil && len(use.Contributors) > 0 {
 		c.cur.Slots = append(c.cur.Slots, use)
 	}
-	return strings.Join(parts, "\n"), nil
+	return parts, nil
 }
 
 // optionalAbsent reports whether slot belongs, by its prefix, to a blueprint

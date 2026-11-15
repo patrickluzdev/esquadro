@@ -18,7 +18,7 @@ import (
 
 // defaultBlueprints are the blueprints of a new project: a JSON API on
 // Postgres.
-const defaultBlueprints = "platform,postgres,api"
+const defaultBlueprints = "app,domain,http,postgres,migrations,store,testcontainers,rest,api_docs,cors,security_headers,rate_limit,compression,i18n"
 
 var projectName = regexp.MustCompile(`^[a-z][a-z0-9]*([_-][a-z0-9]+)*$`)
 
