@@ -31,6 +31,7 @@ var builtinHooks = map[string]hook.Func{
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
+	"app":   app.TemplateFuncs(),
 	"store": store.TemplateFuncs(),
 	"rest":  rest.TemplateFuncs(),
 	"i18n":  i18n.TemplateFuncs(),

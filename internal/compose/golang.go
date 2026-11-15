@@ -2,6 +2,7 @@ package compose
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -175,4 +176,16 @@ func goStrings(v any) string {
 	}
 	b.WriteString("}")
 	return b.String()
+}
+
+// goVersion is the release of the Go that built esquadro, without its
+// patch: go1.27.3 is 1.27.
+func goVersion() string {
+	v := strings.TrimPrefix(runtime.Version(), "go")
+	parts := strings.SplitN(v, ".", 3)
+	if len(parts) < 2 {
+		return v
+	}
+	minor, _, _ := strings.Cut(parts[1], " ")
+	return parts[0] + "." + minor
 }

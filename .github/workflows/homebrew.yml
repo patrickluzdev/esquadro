@@ -1,0 +1,29 @@
+name: homebrew
+
+# Installs esquadro the way users do, from patrickluzdev/homebrew-tap, on
+# macOS and Linux: after each release, or by hand.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: brew install (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Homebrew on the PATH (Linux)
+        if: runner.os == 'Linux'
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+      - run: brew install patrickluzdev/tap/esquadro
+      - run: esquadro version
+      - name: A new project checks
+        run: |
+          esquadro new -no-git -no-gen -module example.com/demo demo
+          esquadro check demo

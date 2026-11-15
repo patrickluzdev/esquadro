@@ -1,0 +1,11 @@
+/// The project's CI on GitHub Actions, for any kind of app: go vet, the tests
+/// (the runner has Docker, for testcontainers), the build, and a check that
+/// the generated code is what the model generates (esquadro gen -check, with
+/// the esquadro version of the lockfile). With docker, it builds the image
+/// and, on tags v*, publishes it to GitHub's container registry
+/// (ghcr.io/<owner>/<repo>).
+blueprint github_actions {
+  version "0.1.0"
+  requires app
+  optional docker
+}

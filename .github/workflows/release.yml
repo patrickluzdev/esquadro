@@ -60,3 +60,7 @@ jobs:
         working-directory: editors/vscode
         continue-on-error: true
         run: npx ovsx publish --trusted-publishing esquadro-*.vsix
+
+  homebrew:
+    needs: release
+    uses: ./.github/workflows/homebrew.yml

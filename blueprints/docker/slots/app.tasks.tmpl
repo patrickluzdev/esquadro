@@ -1,0 +1,4 @@
+  docker:build:
+    desc: Build the app's image, {{.App.Kebab}}:dev
+    cmds:
+      - docker build -t {{.App.Kebab}}:dev .

@@ -46,7 +46,7 @@ func TestNewWritesTheGitBlueprintWithItsOption(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
 	app, _ := os.ReadFile(filepath.Join(dir, "esquadro", "app.esq"))
-	if !strings.Contains(string(app), "  blueprint i18n\n\n  // the repository\n  blueprint git {\n    initial_commit true\n  }\n}\n") {
+	if !strings.Contains(string(app), "  blueprint github_actions\n\n  // the repository\n  blueprint git {\n    initial_commit true\n  }\n}\n") {
 		t.Fatalf("app.esq:\n%s", app)
 	}
 	if code := run([]string{"check", dir}, &out, &errOut); code != 0 {

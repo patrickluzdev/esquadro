@@ -205,3 +205,25 @@ func TestGenSavesTheProjectForTheNextRun(t *testing.T) {
 		t.Fatalf("snapshot: %v\n%s", err, data)
 	}
 }
+
+func TestGenCheckFailsWhenTheModelChanged(t *testing.T) {
+	dir := demoProject(t)
+	if code, _, errOut := gen(t, "-check", dir); code != 1 || !strings.Contains(errOut, "run esquadro gen") {
+		t.Fatalf("never generated: exit %d, %q", code, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "catalog")); !os.IsNotExist(err) {
+		t.Fatal("-check wrote files")
+	}
+	if code, _, errOut := gen(t, dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	if code, out, errOut := gen(t, "-check", dir); code != 0 {
+		t.Fatalf("in step: exit %d\n%s%s", code, out, errOut)
+	}
+	esq := filepath.Join(dir, "esquadro", "shop.esq")
+	src, _ := os.ReadFile(esq)
+	os.WriteFile(esq, []byte(string(src)+"\nentity Tag {\n  label string\n}\n"), 0o644)
+	if code, out, _ := gen(t, "-check", dir); code != 1 || !strings.Contains(out, "create    catalog/tag.go") {
+		t.Fatalf("model changed: exit %d\n%s", code, out)
+	}
+}

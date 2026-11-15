@@ -343,9 +343,12 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		// entity, field or relation), or nil when it has none.
 		"ann": func(node any) map[string]any { return annOf(node)[self] },
 		// annOf returns another blueprint's annotation values on a node.
-		"annOf":      func(name string, node any) map[string]any { return annOf(node)[name] },
-		"join":       func(sep string, items []string) string { return strings.Join(items, sep) },
-		"contains":   strings.Contains,
+		"annOf":    func(name string, node any) map[string]any { return annOf(node)[name] },
+		"join":     func(sep string, items []string) string { return strings.Join(items, sep) },
+		"contains": strings.Contains,
+		// goVersion is the Go release that runs esquadro, e.g. 1.27, for
+		// files that name a Go toolchain (a Dockerfile, a CI workflow).
+		"goVersion":  goVersion,
 		"hasPrefix":  strings.HasPrefix,
 		"trimPrefix": strings.TrimPrefix,
 		"strs":       strs,

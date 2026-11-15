@@ -1,0 +1,25 @@
+{{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}
+{{- $port := 8080}}{{with optionsOf "http"}}{{$port = .port}}{{end}}
+{{- $env := slotParts "docker.compose.environment" .}}{{$deps := slotParts "docker.compose.depends_on" .}}
+  # The app itself, built from the Dockerfile; only with the app profile:
+  # docker compose --profile app up.
+  app:
+    container_name: {{$name}}-app
+    build: .
+    profiles: [app]
+{{- if uses "http"}}
+    ports:
+      - "{{$port}}:{{$port}}"
+{{- end}}
+{{- if $env}}
+    environment:
+{{- range $env}}
+{{.}}
+{{- end}}
+{{- end}}
+{{- if $deps}}
+    depends_on:
+{{- range $deps}}
+{{.}}
+{{- end}}
+{{- end}}

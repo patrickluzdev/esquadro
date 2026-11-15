@@ -53,7 +53,7 @@ without one. Prints the result unless -w or -check is given.
 Generate the project.
 
 ```
-Usage: esquadro gen [-dry-run] [-force] [-update] [-trust] [dir]
+Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]
 
 Generates the project in dir (default: the current directory) from its .esq
 files and blueprints. Generated files you edited are never overwritten
@@ -61,6 +61,8 @@ unless -force is given; if any would be, nothing is written. Blueprints from
 git stay at the commit the lockfile pins until -update; their hooks run
 only once you allow them, for each commit.
 
+  -check
+    	write nothing, and exit with status 1 if the files are not what the model generates (for CI)
   -dry-run
     	show what would change, with diffs, without writing anything
   -force
@@ -95,7 +97,7 @@ change, and generates the project from them; the git blueprint makes it a
 repository with a first commit.
 
   -blueprints string
-    	comma-separated blueprints of the app (default "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n")
+    	comma-separated blueprints of the app (default "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n,docker,github_actions")
   -module string
     	Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)
   -no-gen

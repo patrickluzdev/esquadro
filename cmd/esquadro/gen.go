@@ -20,11 +20,12 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("gen", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "show what would change, with diffs, without writing anything")
+	check := fs.Bool("check", false, "write nothing, and exit with status 1 if the files are not what the model generates (for CI)")
 	force := fs.Bool("force", false, "overwrite or delete generated files you edited")
 	update := fs.Bool("update", false, "resolve the versions of blueprints from git again, instead of the commits the lockfile pins")
 	trust := fs.Bool("trust", false, "let the hooks of blueprints from git run without asking")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run] [-force] [-update] [-trust] [dir]")
+		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]")
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Generates the project in dir (default: the current directory) from its .esq")
 		fmt.Fprintln(stderr, "files and blueprints. Generated files you edited are never overwritten")
@@ -73,7 +74,7 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx := context.Background()
 	runner := &hook.Runner{ProjectDir: dir, Builtin: builtinHooks, Out: stderr, Previous: previous}
-	if err := runner.PreGen(ctx, l.project, l.set, res, *dryRun); err != nil {
+	if err := runner.PreGen(ctx, l.project, l.set, res, *dryRun || *check); err != nil {
 		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
 	}
@@ -89,6 +90,14 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	printPlan(stdout, plan, *dryRun)
+	if *check {
+		n := plan.Count()
+		if pending := n[workspace.Create] + n[workspace.Update] + n[workspace.Delete] + n[workspace.Conflict]; pending > 0 {
+			fmt.Fprintf(stderr, "\nesquadro gen -check: the files are not what the model generates (%s); run esquadro gen\n", count(pending, "change", "changes"))
+			return 1
+		}
+		return 0
+	}
 	for _, hk := range hook.Hooks(l.set, "post-gen") {
 		changes := "changes no file of the project"
 		if globs := append(slices.Clone(hk.Hook.Writes), hk.Hook.Edits...); len(globs) > 0 {

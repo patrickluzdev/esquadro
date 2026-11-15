@@ -129,6 +129,29 @@ entity OrderItem {
 	}
 	run([]string{url}, "go", "run", "./cmd/shop", "migrate")
 
+	// The CI esquadro generates is a valid GitHub Actions workflow.
+	run(nil, "go", "run", "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12", ".github/workflows/ci.yml")
+
+	// The image builds, runs next to the database (in its network), and
+	// its health check passes.
+	image := "esquadro-test-" + filepath.Base(dir)
+	run(nil, "docker", "build", "-q", "-t", image, ".")
+	t.Cleanup(func() { exec.Command("docker", "rmi", "-f", image).Run() })
+	app := strings.TrimSpace(run(nil, "docker", "run", "-d", "--rm", "--network", "container:"+container,
+		"-e", "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/shop?sslmode=disable", "-e", "PORT=18197", image))
+	t.Cleanup(func() { exec.Command("docker", "rm", "-f", app).Run() })
+	for {
+		status, _ := exec.Command("docker", "inspect", "--format", "{{.State.Health.Status}}", app).Output()
+		if strings.TrimSpace(string(status)) == "healthy" {
+			break
+		}
+		if time.Now().After(deadline.Add(60 * time.Second)) {
+			logs, _ := exec.Command("docker", "logs", app).CombinedOutput()
+			t.Fatalf("the app's container is %s:\n%s", status, logs)
+		}
+		time.Sleep(time.Second)
+	}
+
 	// The tests esquadro generates run every use case against their own
 	// Postgres (testcontainers).
 	tests := run(nil, "go", "test", "-v", "./...")

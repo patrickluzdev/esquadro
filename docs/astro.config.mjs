@@ -28,7 +28,7 @@ export default defineConfig({
             { label: "Reference", items: [{ autogenerate: { directory: "blueprints/reference" } }] },
           ],
         },
-        { label: "Guides", items: ["regenerating", "writing-blueprints", "editors"] },
+        { label: "Guides", items: ["regenerating", "deploying", "writing-blueprints", "editors"] },
         { label: "Reference", items: ["reference/cli", "license"] },
       ],
     }),

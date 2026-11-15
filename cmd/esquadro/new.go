@@ -18,7 +18,7 @@ import (
 
 // defaultBlueprints are the blueprints of a new project: a JSON API on
 // Postgres.
-const defaultBlueprints = "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n"
+const defaultBlueprints = "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n,docker,github_actions"
 
 // blueprintGroups name what the built-in blueprints are for, as comments
 // over them in a new app.esq.
@@ -27,6 +27,7 @@ var blueprintGroups = map[string]string{
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
+	"docker": "ship", "github_actions": "ship",
 	"git": "tools",
 }
 
@@ -35,6 +36,7 @@ var groupTitles = map[string]string{
 	"base":  "the program, its modules and the HTTP server",
 	"data":  "PostgreSQL: connection, migrations, use cases, tests and local services",
 	"api":   "the JSON API and what every request goes through",
+	"ship":  "the container image and the CI",
 	"tools": "the repository",
 }
 

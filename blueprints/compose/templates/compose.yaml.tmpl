@@ -4,8 +4,10 @@
 # task up starts them, task down stops them.
 name: {{or .Options.name .App.Kebab}}
 services:
-{{- range $services}}
-{{.}}
+{{- range $i, $s := $services}}
+{{- if $i}}
+{{end}}
+{{$s}}
 {{- end}}
 {{- with slot "compose.volumes" .}}
 

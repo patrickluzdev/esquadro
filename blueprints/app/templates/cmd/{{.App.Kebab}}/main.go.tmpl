@@ -1,8 +1,10 @@
+{{- $cases := slot "app.commands" . -}}
 // Command {{.App.Kebab}} runs {{.App.Label}}: {{.App.Kebab}} <command>.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -28,11 +30,14 @@ func run(ctx context.Context, command string) error {
 	switch command {
 	case "check":
 		return check(ctx)
-{{- with slot "app.commands" .}}
+{{- with $cases}}
 {{.}}
 {{- end}}
 	}
-	return fmt.Errorf("unknown command %q", command)
+	if command == "" {
+		return errors.New("usage: {{.App.Kebab}} <command>; commands: {{commandNames $cases}}")
+	}
+	return fmt.Errorf("unknown command %q; commands: {{commandNames $cases}}", command)
 }
 
 // check opens every dependency and releases it: a way to see that the

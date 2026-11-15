@@ -6,7 +6,7 @@
 blueprint postgres {
   version "0.2.0"
   requires app
-  optional compose
+  optional compose, docker
 
   /// Maximum number of connections in the pool; <APP>_POOL_MAX overrides
   /// it.
