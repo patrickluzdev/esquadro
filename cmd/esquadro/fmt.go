@@ -10,6 +10,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/dsl"
+	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
 
 func runFmt(args []string, stdout, stderr io.Writer) int {
@@ -22,7 +23,8 @@ func runFmt(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Formats .esq files: aligned columns, two-space indentation, comments kept.")
 		fmt.Fprintln(stderr, "A path can be a file or a directory (its .esq files, not subdirectories).")
-		fmt.Fprintln(stderr, "The default path is the current directory. Prints the result unless -w or")
+		fmt.Fprintln(stderr, "The default path is the project's esquadro/ folder, or the current directory")
+		fmt.Fprintln(stderr, "without one. Prints the result unless -w or")
 		fmt.Fprintln(stderr, "-check is given.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
@@ -37,6 +39,9 @@ func runFmt(args []string, stdout, stderr io.Writer) int {
 	paths := fs.Args()
 	if len(paths) == 0 {
 		paths = []string{"."}
+		if info, err := os.Stat(workspace.Dir); err == nil && info.IsDir() {
+			paths = []string{workspace.Dir}
+		}
 	}
 
 	files, err := expandPaths(paths)

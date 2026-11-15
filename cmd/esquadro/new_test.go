@@ -16,7 +16,7 @@ func TestNewWritesTheEsqFiles(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
-	app, err := os.ReadFile(filepath.Join(dir, "app.esq"))
+	app, err := os.ReadFile(filepath.Join(dir, "esquadro", "app.esq"))
 	if err != nil {
 		t.Fatal(err)
 	}

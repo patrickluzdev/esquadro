@@ -92,7 +92,7 @@ func TestFirstGenerationCreatesEverything(t *testing.T) {
 	}
 	entries, _ := os.ReadDir(filepath.Join(p.dir, Dir))
 	if len(entries) != 1 || entries[0].Name() != "lock.json" {
-		t.Fatalf(".esquadro has leftovers: %v", entries)
+		t.Fatalf("esquadro/ has leftovers: %v", entries)
 	}
 }
 

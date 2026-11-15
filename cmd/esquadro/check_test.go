@@ -26,6 +26,9 @@ entity Product {
 
 func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -41,12 +44,9 @@ func check(t *testing.T, args ...string) (int, string, string) {
 func TestCheckOK(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", okProject)
-	writeFile(t, dir, "blueprint.esq", "not a project file")
-	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(dir, "sub"), "ignored.esq", "not read: subdirectories are not part of the project")
+	writeFile(t, dir, "esquadro/shop.esq", okProject)
+	writeFile(t, dir, "esquadro/blueprint.esq", "not a project file")
+	writeFile(t, dir, "esquadro/sub/ignored.esq", "not read: subdirectories are not part of the project")
 
 	code, out, errOut := check(t)
 	if code != 0 {
@@ -59,9 +59,9 @@ func TestCheckOK(t *testing.T) {
 
 func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
-	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category > Category\n}\n")
-	writeFile(t, dir, "category.esq", "package catalog\n\nentity Category {\n  name string\n}\n")
+	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
+	writeFile(t, dir, "esquadro/catalog.esq", "package catalog\n\nentity Product {\n  name string\n  category > Category\n}\n")
+	writeFile(t, dir, "esquadro/category.esq", "package catalog\n\nentity Category {\n  name string\n}\n")
 
 	code, out, errOut := check(t, dir)
 	if code != 0 || out != "ok: app shop (3 files, 2 entities, 0 enums, 1 blueprint)\n" {
@@ -72,8 +72,8 @@ func TestCheckMultipleFilesAndDirArgument(t *testing.T) {
 func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
-	writeFile(t, dir, "catalog.esq", "package catalog\n\nentity Product {\n  name strng\n}\n")
+	writeFile(t, dir, "esquadro/app.esq", "app shop {\n  module \"github.com/example/shop\"\n  blueprint platform\n}\n")
+	writeFile(t, dir, "esquadro/catalog.esq", "package catalog\n\nentity Product {\n  name strng\n}\n")
 
 	code, out, errOut := check(t)
 	if code != 1 || out != "" {
@@ -89,7 +89,7 @@ func TestCheckReportsErrorsWithFileNames(t *testing.T) {
 func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", strings.Replace(okProject, "  blueprint platform\n", "", 1))
+	writeFile(t, dir, "esquadro/shop.esq", strings.Replace(okProject, "  blueprint platform\n", "", 1))
 
 	code, out, errOut := check(t)
 	if code != 0 || !strings.HasPrefix(out, "ok:") {
@@ -103,15 +103,28 @@ func TestCheckPrintsWarningsButSucceeds(t *testing.T) {
 func TestCheckNoFiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	if code, _, errOut := check(t); code != 1 || !strings.Contains(errOut, "no .esq files in .") {
+	if code, _, errOut := check(t); code != 1 || !strings.Contains(errOut, "no esquadro/ folder with .esq files in .") {
 		t.Fatalf("empty dir: exit %d, %q", code, errOut)
+	}
+	writeFile(t, dir, "esquadro/notes.txt", "")
+	if code, _, errOut := check(t); code != 1 || !strings.Contains(errOut, "no .esq files in esquadro") {
+		t.Fatalf("empty esquadro/: exit %d, %q", code, errOut)
 	}
 	if code, _, errOut := check(t, "missing"); code != 1 || !strings.Contains(errOut, "missing") {
 		t.Fatalf("missing dir: exit %d, %q", code, errOut)
 	}
-	writeFile(t, dir, "shop.esq", okProject)
-	if code, _, errOut := check(t, "shop.esq"); code != 1 || !strings.Contains(errOut, "shop.esq is not a directory") {
+	writeFile(t, dir, "esquadro/shop.esq", okProject)
+	if code, _, errOut := check(t, "esquadro/shop.esq"); code != 1 || !strings.Contains(errOut, "shop.esq is not a directory") {
 		t.Fatalf("file argument: exit %d, %q", code, errOut)
+	}
+}
+
+func TestCheckPointsOldProjectsToEsquadroFolder(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	writeFile(t, dir, "shop.esq", okProject)
+	if code, _, errOut := check(t); code != 1 || !strings.Contains(errOut, "the .esq files go in esquadro/ now") {
+		t.Fatalf("exit %d, %q", code, errOut)
 	}
 }
 
@@ -127,7 +140,7 @@ func TestCheckBadArguments(t *testing.T) {
 func TestCheckValidatesBlueprints(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	writeFile(t, dir, "shop.esq", `package catalog
+	writeFile(t, dir, "esquadro/shop.esq", `package catalog
 
 app shop {
   module "github.com/example/shop"

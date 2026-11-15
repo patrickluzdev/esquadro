@@ -112,7 +112,7 @@ func TestCleanTarget(t *testing.T) {
 			t.Errorf("CleanTarget(%q) = %q, %v", in, got, valid)
 		}
 	}
-	for _, in := range []string{"", "/abs", "../x", "x/../../y", "a//b", "dir/", `a\b`, ".esquadro/lock.json", ".esquadro", "."} {
+	for _, in := range []string{"", "/abs", "../x", "x/../../y", "a//b", "dir/", `a\b`, "esquadro/lock.json", "esquadro", "."} {
 		if _, valid := CleanTarget(in); valid {
 			t.Errorf("CleanTarget(%q) should be rejected", in)
 		}

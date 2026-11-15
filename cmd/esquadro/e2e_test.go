@@ -62,11 +62,11 @@ func TestLifecycle(t *testing.T) {
 	e.write(generated, original)
 
 	// 4. The model changes: a new entity, a new column, a new default.
-	catalog := e.read(filepath.Join(dir, "catalog.esq"))
+	catalog := e.read(filepath.Join(dir, "esquadro", "catalog.esq"))
 	catalog = strings.Replace(catalog, "  status      Status default(ACTIVE)\n",
 		"  status      Status default(INACTIVE)\n  sku         string unique\n  brand       > Brand\n", 1)
 	catalog += "\n/// Who makes a product.\nentity Brand {\n  name string required\n}\n"
-	e.write(filepath.Join(dir, "catalog.esq"), catalog)
+	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	e.esquadro(0, "gen", dir)
 	migrations, _ := filepath.Glob(filepath.Join(dir, "migrations", "*.sql"))
 	if len(migrations) != 2 {

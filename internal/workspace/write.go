@@ -20,7 +20,7 @@ type Blueprint = LockedBlueprint
 //
 // Without force, a plan with conflicts writes nothing and returns
 // ErrConflicts. Otherwise every new content is first written to a staging
-// folder inside .esquadro/, then moved into place; files to delete are
+// folder inside esquadro/, then moved into place; files to delete are
 // removed, along with folders they leave empty; the lockfile is written
 // last, so an interrupted run never records files it did not write.
 func Write(projectDir string, p *Plan, force bool, esquadroVersion string, blueprints []Blueprint) error {
@@ -31,7 +31,7 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return err
 	}
-	staging, err := os.MkdirTemp(stateDir, "staging-")
+	staging, err := os.MkdirTemp(stateDir, ".staging-")
 	if err != nil {
 		return err
 	}

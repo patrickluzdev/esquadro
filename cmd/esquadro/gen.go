@@ -81,8 +81,11 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	}
 	printPlan(stdout, plan, *dryRun)
 	for _, hk := range hook.Hooks(l.set, "post-gen") {
-		fmt.Fprintf(stdout, "%-9s %s  (after writing; may change %s)\n", "run", hook.ID(hk.Blueprint, hk.Hook),
-			strings.Join(append(slices.Clone(hk.Hook.Writes), hk.Hook.Edits...), ", "))
+		changes := "changes no file of the project"
+		if globs := append(slices.Clone(hk.Hook.Writes), hk.Hook.Edits...); len(globs) > 0 {
+			changes = "may change " + strings.Join(globs, ", ")
+		}
+		fmt.Fprintf(stdout, "%-9s %s  (after writing; %s)\n", "run", hook.ID(hk.Blueprint, hk.Hook), changes)
 	}
 
 	conflicts := plan.Conflicts()
@@ -111,15 +114,16 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		}
 		return 1
 	}
+	// The files, migrations included, now follow this project: the next
+	// generation compares with it. Saved before the post-gen hooks, which
+	// may commit it; they get the previous project from memory.
+	if err := workspace.WriteSnapshot(dir, l.project.Describe()); err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
+		return 1
+	}
 	if err := runner.PostGen(ctx, l.project, l.set, res); err != nil {
 		fmt.Fprintln(stderr, "esquadro gen:", err)
 		fmt.Fprintln(stderr, "The generated files were written; fix the hook and run esquadro gen again.")
-		return 1
-	}
-	// Last, and only when everything worked: the next generation compares
-	// the project with this one.
-	if err := workspace.WriteSnapshot(dir, l.project.Describe()); err != nil {
-		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
 	}
 	return 0

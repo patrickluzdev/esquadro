@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/patrickluzdev/esquadro/internal/project"
+	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
 
 // manifestName is the blueprint manifest file, which is not a project file.
@@ -59,6 +60,8 @@ func count(n int, one, many string) string {
 
 // projectFiles lists the .esq files of the project in dir, sorted, without
 // blueprint manifests.
+// projectFiles lists the .esq files of the project in dir: those of its
+// esquadro/ folder.
 func projectFiles(dir string) ([]string, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -67,7 +70,14 @@ func projectFiles(dir string) ([]string, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", dir)
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, "*.esq"))
+	model := filepath.Join(dir, workspace.Dir)
+	if _, err := os.Stat(model); err != nil {
+		if old, _ := filepath.Glob(filepath.Join(dir, "*.esq")); len(old) > 0 {
+			return nil, fmt.Errorf("the .esq files go in %s/ now: move them there (and .esquadro/lock.json and model.json, if any)", model)
+		}
+		return nil, fmt.Errorf("no %s/ folder with .esq files in %s; esquadro new creates a project", workspace.Dir, dir)
+	}
+	matches, err := filepath.Glob(filepath.Join(model, "*.esq"))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +88,7 @@ func projectFiles(dir string) ([]string, error) {
 		}
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .esq files in %s", dir)
+		return nil, fmt.Errorf("no .esq files in %s", model)
 	}
 	sort.Strings(files)
 	return files, nil

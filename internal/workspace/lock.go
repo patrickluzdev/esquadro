@@ -17,8 +17,10 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
-// Dir is the folder, inside the project, where esquadro keeps its state.
-const Dir = ".esquadro"
+// Dir is the folder, inside the project, of everything esquadro reads and
+// keeps: the .esq files, local blueprints, the lockfile and the snapshot.
+// The rest of the project is the generated code.
+const Dir = "esquadro"
 
 // LockPath is the lockfile's path relative to the project.
 const LockPath = Dir + "/lock.json"

@@ -22,7 +22,7 @@ func demoProject(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	write("shop.esq", `package catalog
+	write("esquadro/shop.esq", `package catalog
 
 app shop {
   module "github.com/example/shop"
@@ -37,9 +37,9 @@ entity Category {
   name string
 }
 `)
-	write("blueprints/demo/blueprint.esq", "blueprint demo {\n  version \"0.1.0\"\n}\n")
-	write("blueprints/demo/templates/catalog/{{.Entity.Snake}}.go.tmpl", "package catalog\n\n// {{.Entity.Pascal}} is generated.\ntype {{.Entity.Pascal}} struct{}\n")
-	write("blueprints/demo/templates/README.md.once.tmpl", "# {{.App.Pascal}}\n")
+	write("esquadro/blueprints/demo/blueprint.esq", "blueprint demo {\n  version \"0.1.0\"\n}\n")
+	write("esquadro/blueprints/demo/templates/catalog/{{.Entity.Snake}}.go.tmpl", "package catalog\n\n// {{.Entity.Pascal}} is generated.\ntype {{.Entity.Pascal}} struct{}\n")
+	write("esquadro/blueprints/demo/templates/README.md.once.tmpl", "# {{.App.Pascal}}\n")
 	return dir
 }
 
@@ -69,7 +69,7 @@ func TestGenWritesThenRespectsEdits(t *testing.T) {
 			t.Errorf("stdout missing %q:\n%s", want, out)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".esquadro/lock.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "esquadro/lock.json")); err != nil {
 		t.Fatal("no lockfile")
 	}
 
@@ -81,7 +81,7 @@ func TestGenWritesThenRespectsEdits(t *testing.T) {
 	// An edited file stops the next generation that would change it.
 	product := filepath.Join(dir, "catalog/product.go")
 	os.WriteFile(product, []byte("package catalog\n\n// mine\n"), 0o644)
-	tmpl := filepath.Join(dir, "blueprints/demo/templates/catalog/{{.Entity.Snake}}.go.tmpl")
+	tmpl := filepath.Join(dir, "esquadro/blueprints/demo/templates/catalog/{{.Entity.Snake}}.go.tmpl")
 	os.WriteFile(tmpl, []byte("package catalog\n\n// {{.Entity.Pascal}} is generated, v2.\ntype {{.Entity.Pascal}} struct{}\n"), 0o644)
 
 	code, out, errOut = gen(t, dir)
@@ -123,7 +123,7 @@ func TestGenDeletesFilesOfRemovedEntities(t *testing.T) {
 	if code, _, errOut := gen(t, dir); code != 0 {
 		t.Fatal(errOut)
 	}
-	esq := filepath.Join(dir, "shop.esq")
+	esq := filepath.Join(dir, "esquadro", "shop.esq")
 	src, _ := os.ReadFile(esq)
 	os.WriteFile(esq, []byte(strings.Replace(string(src), "entity Category {\n  name string\n}\n", "", 1)), 0o644)
 
@@ -146,12 +146,12 @@ func TestExplainUnknownFile(t *testing.T) {
 
 func TestGenStopsOnTemplateErrors(t *testing.T) {
 	dir := demoProject(t)
-	os.WriteFile(filepath.Join(dir, "blueprints/demo/templates/README.md.once.tmpl"), []byte("{{.App.Nope}}\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "esquadro/blueprints/demo/templates/README.md.once.tmpl"), []byte("{{.App.Nope}}\n"), 0o644)
 	code, _, errOut := gen(t, dir)
 	if code != 1 || !strings.Contains(errOut, "README.md.once.tmpl:1:") {
 		t.Fatalf("exit %d, %q", code, errOut)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".esquadro")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "esquadro", "lock.json")); !os.IsNotExist(err) {
 		t.Fatal("nothing may be written when templates fail")
 	}
 }
@@ -161,10 +161,10 @@ func TestGenRunsPostGenHooks(t *testing.T) {
 		t.Skip("hook scripts are POSIX shell")
 	}
 	dir := demoProject(t)
-	os.WriteFile(filepath.Join(dir, "blueprints/demo/blueprint.esq"),
+	os.WriteFile(filepath.Join(dir, "esquadro/blueprints/demo/blueprint.esq"),
 		[]byte("blueprint demo {\n  version \"0.1.0\"\n  hook post-gen \"hooks/stamp\" writes \"gen/**\"\n}\n"), 0o644)
-	os.MkdirAll(filepath.Join(dir, "blueprints/demo/hooks"), 0o755)
-	os.WriteFile(filepath.Join(dir, "blueprints/demo/hooks/stamp"),
+	os.MkdirAll(filepath.Join(dir, "esquadro/blueprints/demo/hooks"), 0o755)
+	os.WriteFile(filepath.Join(dir, "esquadro/blueprints/demo/hooks/stamp"),
 		[]byte("#!/bin/sh\ncat >/dev/null\nmkdir -p gen\necho stamped > gen/stamp.txt\nprintf '{\"messages\":[{\"text\":\"stamped\"}]}'\n"), 0o755)
 
 	code, out, errOut := gen(t, "-dry-run", dir)
@@ -190,7 +190,7 @@ func TestGenRunsPostGenHooks(t *testing.T) {
 
 func TestGenSavesTheProjectForTheNextRun(t *testing.T) {
 	dir := demoProject(t)
-	snapshot := filepath.Join(dir, ".esquadro/model.json")
+	snapshot := filepath.Join(dir, "esquadro/model.json")
 	if code, _, errOut := gen(t, "-dry-run", dir); code != 0 {
 		t.Fatal(errOut)
 	}

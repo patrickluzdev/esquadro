@@ -549,13 +549,14 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 }
 
 // CleanTarget validates a generated file path: relative, inside the
-// project, not in .esquadro/ and without empty segments.
+// project, not in esquadro/ (esquadro's own folder) and without empty
+// segments.
 func CleanTarget(p string) (string, bool) {
 	if p == "" || strings.HasPrefix(p, "/") || strings.Contains(p, "\\") || strings.Contains(p, "//") || strings.HasSuffix(p, "/") {
 		return "", false
 	}
 	c := path.Clean(p)
-	if c == "." || c == ".." || strings.HasPrefix(c, "../") || c == ".esquadro" || strings.HasPrefix(c, ".esquadro/") {
+	if c == "." || c == ".." || strings.HasPrefix(c, "../") || c == "esquadro" || strings.HasPrefix(c, "esquadro/") {
 		return "", false
 	}
 	return c, true

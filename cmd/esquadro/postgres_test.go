@@ -43,8 +43,8 @@ func TestPostgresGeneratesAWorkingService(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n  blueprint postgres\n  blueprint api\n}\n")
-	write("catalog.esq", `package catalog
+	write("esquadro/app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n  blueprint postgres\n  blueprint api\n}\n")
+	write("esquadro/catalog.esq", `package catalog
 
 entity Category {
   name     string required unique
@@ -62,7 +62,7 @@ entity Tag {
   label string required
 }
 `)
-	write("orders.esq", `package orders
+	write("esquadro/orders.esq", `package orders
 
 entity Order {
   number   string required

@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
 
 // defaultBlueprints are the blueprints of a new project: a JSON API on
@@ -25,13 +27,14 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	module := flags.String("module", "", "Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)")
 	bps := flags.String("blueprints", defaultBlueprints, "comma-separated blueprints of the app")
-	noGit := flags.Bool("no-git", false, "do not create a git repository")
+	noGit := flags.Bool("no-git", false, "leave out the git blueprint: no repository, no first commit")
 	noGen := flags.Bool("no-gen", false, "write the .esq files only, without generating")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: esquadro new [-module path] [-blueprints list] [-no-git] [-no-gen] <name>")
 		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Creates the folder <name> with app.esq, an example module to change,")
-		fmt.Fprintln(stderr, "a git repository, and the project generated from them.")
+		fmt.Fprintln(stderr, "Creates the folder <name> with esquadro/app.esq and an example module to")
+		fmt.Fprintln(stderr, "change, and generates the project from them; the git blueprint makes it a")
+		fmt.Fprintln(stderr, "repository with a first commit.")
 		fmt.Fprintln(stderr)
 		flags.PrintDefaults()
 	}
@@ -71,6 +74,9 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 	if *module == "" {
 		*module = defaultModule(name)
 	}
+	if !*noGit {
+		chosen = append(chosen, "git")
+	}
 	if err := emptyDir(dir); err != nil {
 		fmt.Fprintf(stderr, "esquadro new: %v\n", err)
 		return 1
@@ -80,20 +86,18 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		"app.esq":     appFile(name, *module, chosen),
 		"catalog.esq": exampleModule,
 	}
+	model := filepath.Join(dir, workspace.Dir)
+	if err := os.MkdirAll(model, 0o755); err != nil {
+		fmt.Fprintf(stderr, "esquadro new: %v\n", err)
+		return 1
+	}
 	for file, content := range files {
-		if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(model, file), []byte(content), 0o644); err != nil {
 			fmt.Fprintf(stderr, "esquadro new: %v\n", err)
 			return 1
 		}
 	}
-	fmt.Fprintf(stdout, "created %s/ with app.esq and catalog.esq (module %s)\n", dir, *module)
-	if !*noGit {
-		if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
-			fmt.Fprintf(stderr, "esquadro new: git init: %v\n%s", err, out)
-			return 1
-		}
-		fmt.Fprintln(stdout, "created a git repository")
-	}
+	fmt.Fprintf(stdout, "created %s/ with app.esq and catalog.esq (module %s)\n", model, *module)
 	if !*noGen {
 		if code := runGen([]string{dir}, stdout, stderr); code != 0 {
 			fmt.Fprintf(stderr, "esquadro new: the .esq files are in %s/; fix the problem above and run esquadro gen there\n", dir)
@@ -101,7 +105,7 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprintf(stdout, "Next: cd %s, change catalog.esq (or add modules) and run esquadro gen.\n", dir)
+	fmt.Fprintf(stdout, "Next: cd %s, change %s/catalog.esq (or add modules there) and run esquadro gen.\n", dir, workspace.Dir)
 	if strings.Contains(*bps, "postgres") {
 		fmt.Fprintln(stdout, "To run it: task db, task migrate, task run.")
 	}

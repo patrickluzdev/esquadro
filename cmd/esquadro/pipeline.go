@@ -3,16 +3,19 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/blueprints/api"
+	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/platform"
 	"github.com/patrickluzdev/esquadro/blueprints/postgres"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
 	"github.com/patrickluzdev/esquadro/internal/project"
+	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
 
 // builtinHooks are the hooks of the built-in blueprints, by hook.Key.
@@ -21,6 +24,7 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("postgres", "migrations"): postgres.Migrations,
 	hook.Key("postgres", "sqlc"):       postgres.SQLC,
 	hook.Key("api", "ogen"):            api.Ogen,
+	hook.Key("git", "init"):            git.Init,
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
@@ -72,7 +76,7 @@ func loadProject(cmd, dir string, stderr io.Writer) *loadedProject {
 		sources: sources,
 		loader: &blueprint.Loader{
 			Builtin:    blueprints.FS,
-			ProjectDir: dir,
+			ProjectDir: filepath.Join(dir, workspace.Dir),
 			HasBuiltinHook: func(bp, path string) bool {
 				return builtinHooks[hook.Key(bp, path)] != nil
 			},

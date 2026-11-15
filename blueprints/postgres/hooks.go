@@ -35,7 +35,7 @@ func Migrations(_ context.Context, in hook.Input) (hook.Output, error) {
 			return out, err
 		}
 		if len(existing) > 0 && !holds(existing, m.File()) {
-			return out, fmt.Errorf("%s/ has migrations, but .esquadro/model.json, the project they were written from, is missing; "+
+			return out, fmt.Errorf("%s/ has migrations, but esquadro/model.json, the project they were written from, is missing; "+
 				"restore it from version control (or, if a first generation failed, delete those migrations), or esquadro would write the whole schema again", MigrationsDir)
 		}
 	}

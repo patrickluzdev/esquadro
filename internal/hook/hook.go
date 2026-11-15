@@ -104,23 +104,26 @@ func ID(bp *blueprint.Blueprint, h *blueprint.Hook) string {
 }
 
 // Hooks returns the hooks of an event in generation order, except that
-// post-gen hooks that write files (generators, such as sqlc) run before those
-// that only edit files (tidy-ups, such as go mod tidy), which need the
-// generated code to be there.
+// post-gen hooks that write files (generators, such as sqlc) run first, then
+// those that only edit files (tidy-ups, such as go mod tidy), which need the
+// generated code to be there, and last those that change no file of the
+// project (such as a commit), which need it finished.
 func Hooks(set *blueprint.Set, event string) []Hooked {
-	var writers, editors []Hooked
+	var writers, editors, others []Hooked
 	for _, bp := range set.Blueprints {
 		for _, h := range bp.Manifest.Hooks {
 			switch {
 			case h.Event != event:
 			case event == "post-gen" && len(h.Writes) == 0 && len(h.Edits) > 0:
 				editors = append(editors, Hooked{bp, h})
+			case event == "post-gen" && len(h.Writes) == 0:
+				others = append(others, Hooked{bp, h})
 			default:
 				writers = append(writers, Hooked{bp, h})
 			}
 		}
 	}
-	return append(writers, editors...)
+	return slices.Concat(writers, editors, others)
 }
 
 // Hooked is a hook with its blueprint.
@@ -343,7 +346,7 @@ type stamp struct {
 	mod  int64
 }
 
-// stamps lists the project's files, skipping .git and .esquadro.
+// stamps lists the project's files, skipping .git and esquadro.
 func stamps(dir string) (map[string]stamp, error) {
 	out := map[string]stamp{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {

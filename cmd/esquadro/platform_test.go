@@ -28,12 +28,15 @@ func TestPlatformGeneratesAWorkingProject(t *testing.T) {
 	}
 	dir := t.TempDir()
 	write := func(name, content string) {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	write("app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n}\n")
-	write("catalog.esq", `package catalog
+	write("esquadro/app.esq", "app shop {\n  module \"example.com/shop\"\n  blueprint platform\n}\n")
+	write("esquadro/catalog.esq", `package catalog
 
 /// Where a product is in its life.
 enum Stage { DRAFT LIVE SOLD_OUT }
@@ -60,7 +63,7 @@ entity Tag {
   name string required
 }
 `)
-	write("orders.esq", `package orders
+	write("esquadro/orders.esq", `package orders
 
 entity Order {
   number    string required

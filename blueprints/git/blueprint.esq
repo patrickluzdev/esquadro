@@ -1,0 +1,14 @@
+/// A git repository for the project: created on the first generation, with
+/// everything generated in a first commit, made as the user git knows. Later
+/// generations commit nothing: review the diff and commit when you want.
+blueprint git {
+  version "0.1.0"
+  after platform, postgres, api
+
+  /// Commit everything on the first generation.
+  option initial_commit bool default(true)
+  /// Message of the first commit.
+  option message string default("chore: generate project with esquadro")
+
+  hook post-gen "init"
+}
