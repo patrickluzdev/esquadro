@@ -1,0 +1,198 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Esquadro",
+  "scopeName": "source.esquadro",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#annotations"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#modifiers"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#relations"
+    },
+    {
+      "include": "#names"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.documentation.esquadro",
+          "match": "///.*$"
+        },
+        {
+          "name": "comment.line.double-slash.esquadro",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.esquadro",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.esquadro",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.esquadro",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "annotations": {
+      "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.annotation.esquadro"
+        },
+        "2": {
+          "name": "entity.name.function.decorator.esquadro"
+        }
+      }
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(package)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.package.esquadro"
+            },
+            "2": {
+              "name": "entity.name.namespace.esquadro"
+            }
+          }
+        },
+        {
+          "match": "\\b(app|entity|enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.esquadro"
+            },
+            "2": {
+              "name": "entity.name.type.esquadro"
+            }
+          }
+        },
+        {
+          "match": "^\\s*(blueprint)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.blueprint.esquadro"
+            },
+            "2": {
+              "name": "entity.name.type.blueprint.esquadro"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.esquadro",
+          "match": "\\b(module|blueprint|version|requires|optional|option|annotation|slot|go_require|hook|writes|edits)\\b"
+        },
+        {
+          "name": "keyword.other.event.esquadro",
+          "match": "\\b(pre-gen|post-gen)\\b"
+        }
+      ]
+    },
+    "types": {
+      "name": "support.type.esquadro",
+      "match": "\\b(string|text|int|int64|decimal|bool|time|date|uuid|json)\\b"
+    },
+    "modifiers": {
+      "name": "storage.modifier.esquadro",
+      "match": "\\b(required|unique|min|max|pattern|default|on_delete)\\b"
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.esquadro",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.on-delete.esquadro",
+          "match": "\\b(cascade|restrict|set_null)\\b"
+        },
+        {
+          "name": "constant.numeric.esquadro",
+          "match": "-?\\b[0-9]+(\\.[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.other.enum.esquadro",
+          "match": "\\b[A-Z][A-Z0-9]*(_[A-Z0-9]+)+\\b|\\b[A-Z]{2,}[0-9]*\\b"
+        }
+      ]
+    },
+    "relations": {
+      "match": "(?<=\\s)(<>|<|>|-)(?=\\s+[A-Za-z_])",
+      "name": "keyword.operator.relation.esquadro"
+    },
+    "names": {
+      "patterns": [
+        {
+          "name": "entity.name.type.reference.esquadro",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "match": "^\\s*(?!(?:app|package|entity|enum|module|blueprint|version|requires|optional|option|annotation|slot|go_require|hook)\\b)([a-z_][A-Za-z0-9_]*)(?=\\s)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.esquadro"
+            }
+          }
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.braces.esquadro",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.brackets.esquadro",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.section.parens.esquadro",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.separator.esquadro",
+          "match": "[,.]"
+        }
+      ]
+    }
+  }
+}

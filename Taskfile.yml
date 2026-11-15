@@ -35,6 +35,22 @@ tasks:
     cmds:
       - go test -tags e2e -run TestLifecycle -count 1 -timeout 30m -v ./cmd/esquadro
 
+  editor:test:
+    desc: Test the VS Code extension's grammar
+    dir: editors/vscode
+    cmds:
+      - npm ci --silent
+      - npm test
+
+  editor:package:
+    desc: Build the VS Code extension into editors/vscode/esquadro-<version>.vsix
+    dir: editors/vscode
+    cmds:
+      - npm ci --silent
+      - npm test
+      - npm run compile
+      - npm run package
+
   test:update:
     desc: Rewrite golden files after an intended output change (review the diff!)
     cmds:

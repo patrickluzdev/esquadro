@@ -1,0 +1,50 @@
+// SYNTAX TEST "source.esquadro" "a model with every construct"
+/// A shop to try esquadro with.
+// <--------- comment.line.documentation.esquadro
+app shop {
+// <-- storage.type.esquadro
+//  ^^^^ entity.name.type.esquadro
+  module "example.com/shop"
+//^^^^^^ keyword.other.esquadro
+//       ^^^^^^^^^^^^^^^^^^ string.quoted.double.esquadro
+  blueprint rest {
+//^^^^^^^^^ keyword.other.blueprint.esquadro
+//          ^^^^ entity.name.type.blueprint.esquadro
+    max_body_kb 512
+//  ^^^^^^^^^^^ variable.other.property.esquadro
+//              ^^^ constant.numeric.esquadro
+  }
+  blueprint "github.com/acme/stripe@v1.0.0"
+//^^^^^^^^^ keyword.other.esquadro
+}
+package catalog
+// <------ keyword.other.package.esquadro
+//      ^^^^^^^ entity.name.namespace.esquadro
+enum Status { ACTIVE INACTIVE }
+// <--- storage.type.esquadro
+//   ^^^^^^ entity.name.type.esquadro
+//            ^^^^^^ constant.other.enum.esquadro
+entity Product {
+// <----- storage.type.esquadro
+//     ^^^^^^^ entity.name.type.esquadro
+  name     string  required min(2) // shown in lists
+//^^^^ variable.other.property.esquadro
+//         ^^^^^^ support.type.esquadro
+//                 ^^^^^^^^ storage.modifier.esquadro
+//                          ^^^ storage.modifier.esquadro
+//                              ^ constant.numeric.esquadro
+//                                 ^^^^^^^^ comment.line.double-slash.esquadro
+  status   Status  default(ACTIVE)
+//         ^^^^^^ entity.name.type.reference.esquadro
+//                 ^^^^^^^ storage.modifier.esquadro
+//                         ^^^^^^ constant.other.enum.esquadro
+  category > Category required on_delete(cascade)
+//         ^ keyword.operator.relation.esquadro
+//           ^^^^^^^^ entity.name.type.reference.esquadro
+//                                       ^^^^^^^ constant.language.on-delete.esquadro
+  tags     <> Tag
+//         ^^ keyword.operator.relation.esquadro
+  @postgres(index [name, status])
+//^ punctuation.definition.annotation.esquadro
+// ^^^^^^^^ entity.name.function.decorator.esquadro
+}

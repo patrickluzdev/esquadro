@@ -1,0 +1,73 @@
+{
+  "name": "esquadro",
+  "displayName": "Esquadro",
+  "description": "Syntax highlighting, live errors and formatting for Esquadro's .esq files.",
+  "version": "0.1.0",
+  "publisher": "patrickluzdev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/patrickluzdev/esquadro"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "esquadro",
+        "aliases": [
+          "Esquadro",
+          "esquadro"
+        ],
+        "extensions": [
+          ".esq"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "esquadro",
+        "scopeName": "source.esquadro",
+        "path": "./syntaxes/esquadro.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Esquadro",
+      "properties": {
+        "esquadro.path": {
+          "type": "string",
+          "default": "esquadro",
+          "description": "The esquadro command, which the extension runs as `esquadro lsp`: a name on the PATH or an absolute path."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[esquadro]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "patrickluzdev.esquadro"
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "test": "vscode-tmgrammar-test \"test/**/*.esq\"",
+    "package": "vsce package --skip-license"
+  },
+  "dependencies": {
+    "vscode-languageclient": "11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/vscode": "1.91.0",
+    "@vscode/vsce": "4.1.0",
+    "typescript": "6.0.3",
+    "vscode-tmgrammar-test": "0.1.3"
+  }
+}

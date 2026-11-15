@@ -1,0 +1,24 @@
+// SYNTAX TEST "source.esquadro" "a blueprint manifest"
+blueprint stripe {
+// <-------- keyword.other.blueprint.esquadro
+//        ^^^^^^ entity.name.type.blueprint.esquadro
+  version "1.0.0"
+//^^^^^^^ keyword.other.esquadro
+//        ^^^^^^^ string.quoted.double.esquadro
+  requires app, http
+//^^^^^^^^ keyword.other.esquadro
+  optional i18n
+//^^^^^^^^ keyword.other.esquadro
+  option currency string default("BRL")
+//^^^^^^ keyword.other.esquadro
+//                ^^^^^^ support.type.esquadro
+//                       ^^^^^^^ storage.modifier.esquadro
+  slot "stripe.routes"
+//^^^^ keyword.other.esquadro
+  go_require "github.com/stripe/stripe-go" "v80.0.0"
+//^^^^^^^^^^ keyword.other.esquadro
+  hook post-gen "hooks/stamp" writes "stamp.txt"
+//^^^^ keyword.other.esquadro
+//     ^^^^^^^^ keyword.other.event.esquadro
+//                            ^^^^^^ keyword.other.esquadro
+}
