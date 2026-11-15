@@ -30,7 +30,7 @@ func TestTutorial(t *testing.T) {
 	model := func(name string) string { return filepath.Join(dir, "esquadro", name) }
 
 	// 1. Start.
-	e.esquadro(0, "new", "-module", "example.com/shop", dir)
+	e.esquadro(0, "new", "-starter", "api", "-module", "example.com/shop", dir)
 	db := e.postgres()
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
 	// step regenerates, migrates and serves, as the tutorial does after each

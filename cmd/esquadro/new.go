@@ -7,23 +7,21 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/workspace"
 )
 
-// defaultBlueprints are the blueprints of a new project: a JSON API on
-// Postgres.
-const defaultBlueprints = "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n,docker,github_actions"
-
 // blueprintGroups name what the built-in blueprints are for, as comments
-// over them in a new app.esq.
+// over them in an app.esq written from a list of blueprints.
 var blueprintGroups = map[string]string{
-	"app": "base", "domain": "base", "http": "base",
+	"app": "base", "domain": "base", "http": "base", "worker": "base",
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
@@ -33,7 +31,7 @@ var blueprintGroups = map[string]string{
 
 // groupTitles are the comments over each group.
 var groupTitles = map[string]string{
-	"base":  "the program, its modules and the HTTP server",
+	"base":  "the program and its modules",
 	"data":  "PostgreSQL: connection, migrations, use cases, tests and local services",
 	"api":   "the JSON API and what every request goes through",
 	"ship":  "the container image and the CI",
@@ -46,15 +44,22 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("new", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	module := flags.String("module", "", "Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)")
-	bps := flags.String("blueprints", defaultBlueprints, "comma-separated blueprints of the app")
+	starter := flags.String("starter", "", "start from a starter: "+strings.Join(starterNames(), ", "))
+	bps := flags.String("blueprints", "", "comma-separated blueprints of the app, instead of a starter (default: app)")
 	noGit := flags.Bool("no-git", false, "leave out the git blueprint: no repository, no first commit")
 	noGen := flags.Bool("no-gen", false, "write the .esq files only, without generating")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: esquadro new [-module path] [-blueprints list] [-no-git] [-no-gen] <name>")
+		fmt.Fprintln(stderr, "Usage: esquadro new [-starter name | -blueprints list] [-module path] [-no-git] [-no-gen] <name>")
 		fmt.Fprintln(stderr)
-		fmt.Fprintln(stderr, "Creates the folder <name> with esquadro/app.esq and an example module to")
-		fmt.Fprintln(stderr, "change, and generates the project from them; the git blueprint makes it a")
-		fmt.Fprintln(stderr, "repository with a first commit.")
+		fmt.Fprintln(stderr, "Creates the folder <name> with esquadro/app.esq and generates the project.")
+		fmt.Fprintln(stderr, "Without -starter, the project is the smallest one: the app blueprint, and")
+		fmt.Fprintln(stderr, "git, which makes it a repository with a first commit; add blueprints with")
+		fmt.Fprintln(stderr, "esquadro add. A starter is a project to begin from, with its blueprints")
+		fmt.Fprintln(stderr, "listed in app.esq and an example model:")
+		fmt.Fprintln(stderr)
+		for _, st := range starterNames() {
+			fmt.Fprintf(stderr, "  %-8s %s\n", st, starterAbout(st))
+		}
 		fmt.Fprintln(stderr)
 		flags.PrintDefaults()
 	}
@@ -81,30 +86,47 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "esquadro new: %q is not a project name: use lower-case letters and digits, words joined by - or _ (e.g. shop, my-shop)\n", name)
 		return 2
 	}
-	var chosen []string
-	for b := range strings.SplitSeq(*bps, ",") {
-		if b = strings.TrimSpace(b); b != "" {
-			chosen = append(chosen, b)
-		}
-	}
-	if len(chosen) == 0 {
-		fmt.Fprintln(stderr, "esquadro new: -blueprints is empty")
+	if *starter != "" && *bps != "" {
+		fmt.Fprintln(stderr, "esquadro new: give -starter or -blueprints, not both")
 		return 2
+	}
+	if *starter != "" && !slices.Contains(starterNames(), *starter) {
+		fmt.Fprintf(stderr, "esquadro new: there is no starter %q; the starters are %s\n", *starter, strings.Join(starterNames(), ", "))
+		return 2
+	}
+	chosen := []string{"app"}
+	if *bps != "" {
+		chosen = nil
+		for b := range strings.SplitSeq(*bps, ",") {
+			if b = strings.TrimSpace(b); b != "" {
+				chosen = append(chosen, b)
+			}
+		}
+		if len(chosen) == 0 {
+			fmt.Fprintln(stderr, "esquadro new: -blueprints is empty")
+			return 2
+		}
 	}
 	if *module == "" {
 		*module = defaultModule(name)
-	}
-	if !*noGit {
-		chosen = append(chosen, "git")
 	}
 	if err := emptyDir(dir); err != nil {
 		fmt.Fprintf(stderr, "esquadro new: %v\n", err)
 		return 1
 	}
 
-	files := map[string]string{
-		"app.esq":     appFile(name, *module, chosen),
-		"catalog.esq": exampleModule,
+	var files map[string]string
+	if *starter != "" {
+		var err error
+		if files, err = starterFiles(*starter, name, *module, !*noGit); err != nil {
+			fmt.Fprintf(stderr, "esquadro new: %v\n", err)
+			return 1
+		}
+	} else {
+		if !*noGit {
+			chosen = append(chosen, "git")
+		}
+		files = map[string]string{"app.esq": appFile(name, *module, chosen, *bps == "")}
 	}
 	model := filepath.Join(dir, workspace.Dir)
 	if err := os.MkdirAll(model, 0o755); err != nil {
@@ -117,7 +139,8 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
-	fmt.Fprintf(stdout, "created %s/ with app.esq and catalog.esq (module %s)\n", model, *module)
+	names := slices.Sorted(maps.Keys(files))
+	fmt.Fprintf(stdout, "created %s/ with %s (module %s)\n", model, strings.Join(names, ", "), *module)
 	if !*noGen {
 		if code := runGen([]string{dir}, stdout, stderr); code != 0 {
 			fmt.Fprintf(stderr, "esquadro new: the .esq files are in %s/; fix the problem above and run esquadro gen there\n", dir)
@@ -125,11 +148,24 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprintf(stdout, "Next: cd %s, change %s/catalog.esq (or add modules there) and run esquadro gen.\n", dir, workspace.Dir)
-	if strings.Contains(*bps, "postgres") {
-		fmt.Fprintln(stdout, "To run it: task up (with compose), task migrate, task run; README.md has the rest.")
-	}
+	fmt.Fprint(stdout, nextSteps(dir, files))
 	return 0
+}
+
+// nextSteps tells what to do with the new project.
+func nextSteps(dir string, files map[string]string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Next: cd %s\n", dir)
+	if len(files) == 1 {
+		b.WriteString("  esquadro blueprint list    the blueprints you can add\n")
+		b.WriteString("  esquadro add <blueprint>   add one to esquadro/app.esq and generate\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "  change the model in %s/ (one .esq file per module) and run esquadro gen\n", workspace.Dir)
+	if strings.Contains(files["app.esq"], "blueprint compose") {
+		b.WriteString("  task up, task migrate and task run start it locally; README.md has the rest\n")
+	}
+	return b.String()
 }
 
 // defaultModule is github.com/<user>/<name> when git knows the GitHub user.
@@ -155,16 +191,19 @@ func emptyDir(dir string) error {
 	return nil
 }
 
-// appFile is the app.esq of a new project.
-func appFile(name, module string, chosen []string) string {
+// appFile is the app.esq of a project made of a list of blueprints; hint
+// adds how to add more, for the smallest project.
+func appFile(name, module string, chosen []string, hint bool) string {
 	var b strings.Builder
-	label := strings.NewReplacer("-", " ", "_", " ").Replace(name)
-	fmt.Fprintf(&b, "/// %s%s, generated by esquadro.\n", strings.ToUpper(label[:1]), label[1:])
+	fmt.Fprintf(&b, "/// %s, generated by esquadro.\n", label(name))
 	fmt.Fprintf(&b, "app %s {\n", strings.ReplaceAll(name, "-", "_"))
 	fmt.Fprintf(&b, "  module %q\n", module)
 	group := "-"
+	if hint {
+		b.WriteString("\n")
+	}
 	for _, bp := range chosen {
-		if g := blueprintGroups[bp]; g != group {
+		if g := blueprintGroups[bp]; !hint && g != group {
 			group = g
 			b.WriteString("\n")
 			if title := groupTitles[g]; title != "" {
@@ -179,33 +218,15 @@ func appFile(name, module string, chosen []string) string {
 		}
 		fmt.Fprintf(&b, "  blueprint %s\n", bp)
 	}
+	if hint {
+		b.WriteString("\n  // Add more with esquadro add <blueprint>; see them with esquadro blueprint list.\n")
+	}
 	b.WriteString("}\n")
 	return b.String()
 }
 
-// exampleModule is the module a new project starts with: small, but with a
-// relation, an enum and rules, to change or delete.
-const exampleModule = `// An example module: change it, delete it, or add files like it, one per
-// module. Run esquadro gen after each change; esquadro check finds mistakes.
-package catalog
-
-enum Status {
-  ACTIVE
-  INACTIVE
+// label is the project's name as words: my-shop is My shop.
+func label(name string) string {
+	l := strings.NewReplacer("-", " ", "_", " ").Replace(name)
+	return strings.ToUpper(l[:1]) + l[1:]
 }
-
-/// A group of products.
-entity Category {
-  name     string required unique min(2) max(60)
-  products < Product
-}
-
-/// Something the store sells.
-entity Product {
-  name        string  required min(2) max(120)
-  description text
-  price       decimal required min(0)
-  status      Status  default(ACTIVE)
-  category    > Category required
-}
-`

@@ -1,0 +1,18 @@
+// An example module: change it, delete it, or add files like it, one per
+// module. Run esquadro gen after each change; esquadro check finds mistakes.
+// The worker's processes are in cmd/<app>/processes.go.
+package billing
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+/// What a customer owes.
+entity Invoice {
+  number string        required unique max(30)
+  amount decimal       required min(0)
+  due_on date          required
+  status InvoiceStatus default(PENDING)
+}

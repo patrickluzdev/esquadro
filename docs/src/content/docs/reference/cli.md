@@ -90,20 +90,28 @@ does. It speaks the Language Server Protocol on stdin and stdout.
 Create a project.
 
 ```
-Usage: esquadro new [-module path] [-blueprints list] [-no-git] [-no-gen] <name>
+Usage: esquadro new [-starter name | -blueprints list] [-module path] [-no-git] [-no-gen] <name>
 
-Creates the folder <name> with esquadro/app.esq and an example module to
-change, and generates the project from them; the git blueprint makes it a
-repository with a first commit.
+Creates the folder <name> with esquadro/app.esq and generates the project.
+Without -starter, the project is the smallest one: the app blueprint, and
+git, which makes it a repository with a first commit; add blueprints with
+esquadro add. A starter is a project to begin from, with its blueprints
+listed in app.esq and an example model:
+
+  api      A JSON API on PostgreSQL, with its contract, docs, image and CI, and a catalog to change.
+  worker   A background service on PostgreSQL: processes that run until it is stopped, with its image and CI.
+  cli      A command line tool: commands, configuration and CI, nothing else to start with.
 
   -blueprints string
-    	comma-separated blueprints of the app (default "app,domain,http,postgres,migrations,store,testcontainers,compose,rest,api_docs,cors,security_headers,rate_limit,compression,i18n,docker,github_actions")
+    	comma-separated blueprints of the app, instead of a starter (default: app)
   -module string
     	Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)
   -no-gen
     	write the .esq files only, without generating
   -no-git
     	leave out the git blueprint: no repository, no first commit
+  -starter string
+    	start from a starter: api, worker, cli
 ```
 
 ## esquadro version

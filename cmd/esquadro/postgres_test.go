@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,13 +16,11 @@ import (
 // runs the tests esquadro generated for it. It needs Docker (for Postgres, and for sqlc when it is
 // not installed) and the network (Go modules); it is skipped with -short or
 // without Docker.
-// every lists the blueprints of a JSON API on Postgres, as esquadro new does.
+// every lists the blueprints of the api starter.
 var every = func() string {
 	var b strings.Builder
-	for bp := range strings.SplitSeq(defaultBlueprints, ",") {
-		b.WriteString("  blueprint ")
-		b.WriteString(bp)
-		b.WriteString("\n")
+	for _, bp := range starterBlueprints("api") {
+		fmt.Fprintf(&b, "  blueprint %s\n", bp)
 	}
 	return b.String()
 }()

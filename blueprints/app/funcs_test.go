@@ -4,10 +4,10 @@ import "testing"
 
 func TestCommandNames(t *testing.T) {
 	cases := "\tcase \"\", \"serve\":\n\t\treturn serve(ctx)\n\tcase \"migrate\":\n\t\treturn migrate(ctx)\n"
-	if got := commandNames(cases); got != "check, migrate, serve" {
+	if got := commandNames(cases); got != "check, migrate, serve, version" {
 		t.Fatalf("got %q", got)
 	}
-	if got := commandNames(""); got != "check" {
+	if got := commandNames(""); got != "check, version" {
 		t.Fatalf("no cases: %q", got)
 	}
 }

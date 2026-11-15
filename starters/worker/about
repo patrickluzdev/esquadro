@@ -1,0 +1,1 @@
+A background service on PostgreSQL: processes that run until it is stopped, with its image and CI.

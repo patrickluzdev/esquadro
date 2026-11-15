@@ -13,8 +13,10 @@ COPY . .
 {{- with slot "docker.build" .}}
 {{.}}
 {{- end}}
+# The app's version, for its version command: docker build --build-arg VERSION=v1.2.3.
+ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/{{$app}} ./cmd/{{$app}}
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/{{$app}} ./cmd/{{$app}}
 
 # No shell, no package manager, no root: only the binary.
 FROM gcr.io/distroless/static-debian12:nonroot

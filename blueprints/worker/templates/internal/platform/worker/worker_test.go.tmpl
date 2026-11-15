@@ -1,0 +1,55 @@
+package worker
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func TestRunStopsEveryProcessWhenAsked(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	var stopped atomic.Int32
+	wait := func(ctx context.Context) error {
+		<-ctx.Done()
+		stopped.Add(1)
+		return nil
+	}
+	done := make(chan error)
+	go func() { done <- Run(ctx, quiet, Process{"a", wait}, Process{"b", wait}) }()
+	cancel()
+	if err := <-done; err != nil || stopped.Load() != 2 {
+		t.Fatalf("err %v, %d stopped", err, stopped.Load())
+	}
+}
+
+func TestRunStopsTheOthersWhenOneFails(t *testing.T) {
+	boom := errors.New("boom")
+	wait := func(ctx context.Context) error { <-ctx.Done(); return nil }
+	fail := func(context.Context) error { return boom }
+	if err := Run(t.Context(), quiet, Process{"waits", wait}, Process{"fails", fail}); !errors.Is(err, boom) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestEveryRunsRightAwayAndAtEachInterval(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	var calls atomic.Int32
+	done := make(chan error)
+	go func() {
+		done <- Every(5*time.Millisecond, quiet, func(context.Context) error {
+			if calls.Add(1) == 3 {
+				cancel()
+			}
+			return errors.New("logged, not fatal")
+		})(ctx)
+	}()
+	if err := <-done; err != nil || calls.Load() < 3 {
+		t.Fatalf("err %v, %d calls", err, calls.Load())
+	}
+}

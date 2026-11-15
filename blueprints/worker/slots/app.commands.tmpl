@@ -1,0 +1,6 @@
+{{- if uses "http"}}
+	case "run":
+{{- else}}
+	case "", "run":
+{{- end}}
+		return runWorker(ctx)

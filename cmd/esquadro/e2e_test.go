@@ -39,7 +39,7 @@ func TestLifecycle(t *testing.T) {
 	e := &lifecycle{t: t, dir: dir}
 
 	// 1. A new project, generated.
-	e.esquadro(0, "new", "-module", "example.com/shop", dir)
+	e.esquadro(0, "new", "-starter", "api", "-module", "example.com/shop", dir)
 	e.run(nil, "go", "vet", "./...")
 
 	// 2. Running against Postgres, with records.

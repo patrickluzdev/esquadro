@@ -1,0 +1,30 @@
+package main
+
+import (
+	"context"
+
+	"{{.App.Module}}/internal/platform/worker"
+{{- with slot "worker.imports" .}}
+{{.}}
+{{- end}}
+)
+
+// runWorker runs the app's processes, yours (processes.go) and those of
+// its blueprints, until ctx is canceled.
+func runWorker(ctx context.Context) error {
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return worker.Run(ctx, d.logger, append(d.processes(), d.blueprintProcesses()...)...)
+}
+
+// blueprintProcesses are the processes the app's blueprints run.
+func (d dependencies) blueprintProcesses() []worker.Process {
+	return []worker.Process{
+{{- with slot "worker.processes" .}}
+{{.}}
+{{- end}}
+	}
+}

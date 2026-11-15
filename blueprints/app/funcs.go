@@ -15,8 +15,9 @@ func TemplateFuncs() template.FuncMap {
 var caseName = regexp.MustCompile(`"([a-z][a-z0-9-]*)"`)
 
 // commandNames lists the commands of the switch cases blueprints contribute
-// to app.commands (case "", "serve": ... case "migrate": ...), sorted, for
-// the message of a command that does not exist.
+// to app.commands (case "", "serve": ... case "migrate": ...), with the
+// app's own check and version, sorted, for the message of a command that
+// does not exist.
 func commandNames(cases string) string {
 	var names []string
 	for line := range strings.SplitSeq(cases, "\n") {
@@ -26,7 +27,7 @@ func commandNames(cases string) string {
 			}
 		}
 	}
-	names = append(names, "check")
+	names = append(names, "check", "version")
 	slices.Sort(names)
 	return strings.Join(slices.Compact(names), ", ")
 }

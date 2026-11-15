@@ -1,0 +1,21 @@
+package main
+
+import (
+	"context"
+	"time"
+
+	"{{.App.Module}}/internal/platform/worker"
+)
+
+// processes are the work the run command does, side by side, until the app
+// is asked to stop. This file is yours: esquadro wrote it once and leaves
+// it alone. Replace the example with your work; a process runs until its
+// context ends, and worker.Every runs one at an interval.
+func (d dependencies) processes() []worker.Process {
+	return []worker.Process{
+		{Name: "heartbeat", Run: worker.Every(time.Minute, d.logger, func(context.Context) error {
+			d.logger.Info("the worker is alive")
+			return nil
+		})},
+	}
+}
