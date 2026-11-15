@@ -63,8 +63,12 @@ func TestLifecycle(t *testing.T) {
 
 	// 4. The model changes: a new entity, a new column, a new default.
 	catalog := e.read(filepath.Join(dir, "esquadro", "catalog.esq"))
-	catalog = strings.Replace(catalog, "  status      Status default(ACTIVE)\n",
+	before := catalog
+	catalog = strings.Replace(catalog, "  status      Status  default(ACTIVE)\n",
 		"  status      Status default(INACTIVE)\n  sku         string unique\n  brand       > Brand\n", 1)
+	if catalog == before {
+		t.Fatal("the example module changed: update the line this test replaces")
+	}
 	catalog += "\n/// Who makes a product.\nentity Brand {\n  name string required\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	e.esquadro(0, "gen", dir)

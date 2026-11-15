@@ -28,6 +28,10 @@ func TestNewWritesTheEsqFiles(t *testing.T) {
 	if code := run([]string{"check", dir}, &out, &errOut); code != 0 {
 		t.Fatalf("check: %s", errOut.String())
 	}
+	// And formatted as esquadro fmt writes it.
+	if code := run([]string{"fmt", "-check", filepath.Join(dir, "esquadro")}, &out, &errOut); code != 0 {
+		t.Fatalf("fmt: %s", errOut.String())
+	}
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 		t.Fatal("-no-git created a repository")
 	}

@@ -174,10 +174,10 @@ entity Category {
 
 /// Something the store sells.
 entity Product {
-  name        string required min(2) max(120)
+  name        string  required min(2) max(120)
   description text
   price       decimal required min(0)
-  status      Status default(ACTIVE)
+  status      Status  default(ACTIVE)
   category    > Category required
 }
 `
