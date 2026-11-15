@@ -1,5 +1,6 @@
-{{- $port := "5432"}}{{range strs (index (optionsOf "compose") "ports")}}{{if hasPrefix . "postgres:"}}{{$port = trimPrefix . "postgres:"}}{{end}}{{end}}
+{{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}{{$port := "5432"}}{{range strs (index (optionsOf "compose") "ports")}}{{if hasPrefix . "postgres:"}}{{$port = trimPrefix . "postgres:"}}{{end}}{{end}}
   postgres:
+    container_name: {{$name}}-postgres
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: postgres

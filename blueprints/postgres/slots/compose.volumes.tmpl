@@ -1,1 +1,2 @@
   postgres-data:
+    name: {{or (index (optionsOf "compose") "name") .App.Kebab}}-postgres-data
