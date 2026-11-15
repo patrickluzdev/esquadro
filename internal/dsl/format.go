@@ -351,14 +351,19 @@ func (p *printer) app(out *strings.Builder, d *AppDecl) {
 
 func (p *printer) blueprintRef(r *BlueprintRef) string {
 	head := "blueprint " + valueString(r.Ref)
-	if len(r.Options) == 0 {
-		// An empty "{ }" is dropped; comments inside it move after the line.
+	innerComments := p.ci < len(p.comments) && p.comments[p.ci].Pos.Offset < r.End.Offset
+	if len(r.Options) == 0 && !innerComments {
+		// An empty "{ }" is dropped.
 		return head
+	}
+	first := r.End.Offset - 1
+	if len(r.Options) > 0 {
+		first = r.Options[0].Pos.Offset
 	}
 	var sb strings.Builder
 	sb.WriteString(head)
 	sb.WriteString(" {")
-	sb.WriteString(p.headerTrail(r.Pos.Line, r.Options[0].Pos.Offset))
+	sb.WriteString(p.headerTrail(r.Pos.Line, first))
 	sb.WriteString("\n")
 	p.lastLine = r.Pos.Line
 	b := &body{p: p}

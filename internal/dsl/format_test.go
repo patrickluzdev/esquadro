@@ -103,3 +103,15 @@ func FuzzFormat(f *testing.F) {
 		}
 	})
 }
+
+func TestFormatKeepsABlueprintBlockOfComments(t *testing.T) {
+	src := "app shop {\n  module \"x\"\n\n  blueprint http {\n    // port 8080\n    // trust_proxy false\n  }\n  blueprint cors {}\n}\n"
+	f, diags := Parse("app.esq", []byte(src))
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	want := "app shop {\n  module \"x\"\n\n  blueprint http {\n    // port 8080\n    // trust_proxy false\n  }\n  blueprint cors\n}\n"
+	if got := string(Format(f)); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+}

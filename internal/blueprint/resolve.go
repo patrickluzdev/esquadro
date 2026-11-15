@@ -131,7 +131,7 @@ func (r *resolver) options(b *Blueprint) map[string]any {
 			out[s.Name] = s.Default
 		case s.Required:
 			r.errorf(b.Ref.RefSpan, "option %s of blueprint %s is required", s.Name, m.Name).
-				Suggestion = fmt.Sprintf("add it: blueprint %s { %s %s }", refString(b.Ref), s.Name, example(s.Type))
+				Suggestion = fmt.Sprintf("add it: blueprint %s { %s %s }", refString(b.Ref), s.Name, Example(s.Type))
 		}
 	}
 	return out
@@ -329,7 +329,7 @@ func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name 
 		if arg.Value == nil {
 			if key.Type != TypeBool {
 				r.errorf(arg.Key.Span, "key %s of @%s needs a value", key.Name, name).
-					Suggestion = fmt.Sprintf("e.g. %s %s", key.Name, example(key.Type))
+					Suggestion = fmt.Sprintf("e.g. %s %s", key.Name, Example(key.Type))
 				ok = false
 				continue
 			}
@@ -359,7 +359,7 @@ func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name 
 			vals[k.Name] = k.Default
 		case k.Required:
 			r.errorf(a.Span, "@%s needs key %s", name, k.Name).
-				Suggestion = fmt.Sprintf("e.g. @%s(%s %s)", name, k.Name, example(k.Type))
+				Suggestion = fmt.Sprintf("e.g. @%s(%s %s)", name, k.Name, Example(k.Type))
 			ok = false
 		}
 	}
@@ -398,7 +398,8 @@ func (r *resolver) checkFieldNames(v dsl.Value, e *project.Entity) bool {
 	return ok
 }
 
-func example(t ValueType) string {
+// Example is a value of type t, for messages and placeholders.
+func Example(t ValueType) string {
 	switch t {
 	case TypeString:
 		return `"text"`

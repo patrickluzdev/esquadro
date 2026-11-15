@@ -77,6 +77,12 @@ func loadProject(cmd, dir string, stderr io.Writer, update bool) *loadedProject 
 		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
 		return nil
 	}
+	return loadSources(cmd, dir, sources, stderr, update)
+}
+
+// loadSources is loadProject with the project's files given, as read or as
+// they would be after a change.
+func loadSources(cmd, dir string, sources []project.Source, stderr io.Writer, update bool) *loadedProject {
 	lock, err := workspace.ReadLock(dir)
 	if err != nil {
 		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)

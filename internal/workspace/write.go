@@ -105,7 +105,14 @@ func entry(a Action, hash string) LockedFile {
 // removeEmptyParents removes dir and its parents while they are empty,
 // stopping at the project folder.
 func removeEmptyParents(projectDir, dir string) {
-	root := filepath.Clean(projectDir)
+	// Absolute, so that a project in "." is handled as any other.
+	root, err := filepath.Abs(projectDir)
+	if err != nil {
+		return
+	}
+	if dir, err = filepath.Abs(dir); err != nil {
+		return
+	}
 	for {
 		dir = filepath.Clean(dir)
 		if dir == root || !strings.HasPrefix(dir, root+string(filepath.Separator)) {

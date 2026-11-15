@@ -21,12 +21,14 @@ type command struct {
 
 func commands() []command {
 	return []command{
+		{"add", "add blueprints to the project", runAdd, false},
 		{"check", "check the project for errors", runCheck, false},
 		{"explain", "tell where a generated file came from", runExplain, false},
 		{"fmt", "format .esq files", runFmt, false},
 		{"gen", "generate the project", runGen, false},
 		{"lsp", "run the language server for editors", runLSP, false},
 		{"new", "create a project", runNew, false},
+		{"remove", "remove blueprints from the project", runRemove, false},
 		{"version", "print the esquadro version", runVersion, false},
 		{"docs", "write the reference pages of the documentation site", runDocs, true},
 	}
