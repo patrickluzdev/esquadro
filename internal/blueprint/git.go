@@ -214,6 +214,7 @@ func extract(ctx context.Context, mirror, commit, dir string) error {
 
 	cmd := exec.CommandContext(ctx, "git", "archive", "--format=tar", commit)
 	cmd.Dir = mirror
+	cmd.Env = gitEnv()
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.StdoutPipe()
@@ -285,6 +286,7 @@ func untar(r io.Reader, dir string) error {
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = gitEnv()
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
@@ -294,4 +296,11 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(out.String()), nil
+}
+
+// gitEnv is the environment git runs in: it never asks for a password or
+// anything else on the terminal, so a repository that needs credentials
+// fails at once instead of waiting for an answer that will not come.
+func gitEnv() []string {
+	return append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
 }

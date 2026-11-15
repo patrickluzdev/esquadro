@@ -49,7 +49,7 @@ func greetRepo(t *testing.T) (string, func(version string)) {
 	write("1.0.0")
 	git("add", ".")
 	git("commit", "-q", "-m", "1.0.0")
-	return "file://" + dir, func(version string) {
+	return blueprintFileURL(dir), func(version string) {
 		write(version)
 		git("commit", "-q", "-am", version)
 	}
@@ -109,4 +109,14 @@ func TestGenWithABlueprintFromGit(t *testing.T) {
 	if second := locked(); read("greeting.txt") != "hello from 2.0.0\n" || read("stamp.txt") != "2.0.0\n" || second.Commit == first.Commit || !second.Trusted {
 		t.Fatalf("updated: %q %+v", read("greeting.txt"), second)
 	}
+}
+
+// blueprintFileURL is the file:// URL of a local repository: file:///C:/...
+// on Windows.
+func blueprintFileURL(dir string) string {
+	p := filepath.ToSlash(dir)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return "file://" + p
 }

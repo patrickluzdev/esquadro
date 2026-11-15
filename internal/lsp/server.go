@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -303,16 +304,27 @@ func (s *Server) format(uri string) []textEdit {
 	return []textEdit{{Range: Range{End: newText(src).end()}, NewText: out}}
 }
 
-// pathOf is the absolute path of a file:// URI.
+// pathOf is the absolute path of a file:// URI. On Windows the URI's path
+// is /c:/Users/..., and editors may write the drive in lower case: the path
+// is C:\Users\..., as the file system lists it.
 func pathOf(uri string) (string, bool) {
 	u, err := url.Parse(uri)
 	if err != nil || u.Scheme != "file" {
 		return "", false
 	}
-	return filepath.Clean(filepath.FromSlash(u.Path)), true
+	p := u.Path
+	if len(p) >= 3 && p[0] == '/' && p[2] == ':' {
+		p = strings.ToUpper(p[1:2]) + p[2:]
+	}
+	return filepath.Clean(filepath.FromSlash(p)), true
 }
 
-// uriOf is the file:// URI of an absolute path.
+// uriOf is the file:// URI of an absolute path: file:///C:/Users/... for
+// a Windows path.
 func uriOf(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }

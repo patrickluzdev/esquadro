@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -255,7 +256,8 @@ func TestUpdateKeepsFileMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, _ := os.Stat(filepath.Join(p.dir, "run.sh"))
-	if info.Mode().Perm() != 0o755 {
+	// Windows has no Unix permissions to keep.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o755 {
 		t.Fatalf("mode = %v", info.Mode().Perm())
 	}
 }

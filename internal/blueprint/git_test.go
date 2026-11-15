@@ -62,7 +62,7 @@ func gitRepo(t *testing.T) (string, func(version string) string) {
 	run("add", ".")
 	run("commit", "-q", "-m", "v1")
 	run("tag", "v1")
-	return "file://" + dir, func(version string) string {
+	return fileURL(dir), func(version string) string {
 		write(version)
 		run("commit", "-q", "-am", version)
 		return run("rev-parse", "HEAD")
@@ -147,4 +147,14 @@ func TestGitOfflineReadsOnlyTheCache(t *testing.T) {
 	if _, _, err := offline.Checkout(ctx, source); !errors.Is(err, ErrNotFetched) {
 		t.Fatalf("unknown commit: %v", err)
 	}
+}
+
+// fileURL is the file:// URL git clones a local repository from:
+// file:///C:/... on Windows.
+func fileURL(dir string) string {
+	p := filepath.ToSlash(dir)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return "file://" + p
 }

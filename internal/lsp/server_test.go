@@ -212,3 +212,16 @@ func TestPositionsCountUTF16(t *testing.T) {
 		t.Fatalf("apply = %q", got)
 	}
 }
+
+func TestURIsOfWindowsPaths(t *testing.T) {
+	// Editors on Windows send the drive in lower case, its colon escaped.
+	if p, ok := pathOf("file:///c%3A/Users/me/esquadro/app.esq"); !ok || !strings.HasPrefix(filepath.ToSlash(p), "C:/Users/me/esquadro/app.esq") {
+		t.Fatalf("pathOf = %q, %v", p, ok)
+	}
+	if u := uriOf("/home/me/app.esq"); u != "file:///home/me/app.esq" {
+		t.Fatalf("uriOf = %q", u)
+	}
+	if p, _ := pathOf(uriOf("/home/me/app.esq")); p != filepath.FromSlash("/home/me/app.esq") {
+		t.Fatalf("round trip = %q", p)
+	}
+}

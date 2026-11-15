@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -47,7 +48,8 @@ func TestFmtWrite(t *testing.T) {
 	if string(got) != tidy {
 		t.Fatalf("file not formatted:\n%s", got)
 	}
-	if info, _ := os.Stat(filepath.Join(dir, "shop.esq")); info.Mode().Perm() != 0o600 {
+	// Windows has no Unix permissions to keep.
+	if info, _ := os.Stat(filepath.Join(dir, "shop.esq")); runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("mode changed to %v", info.Mode().Perm())
 	}
 	entries, _ := os.ReadDir(dir)
