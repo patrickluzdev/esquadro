@@ -68,6 +68,12 @@ entity Order {
   number   string required
   products <> Product
 }
+
+entity OrderItem {
+  quantity   int  required
+  product_id uuid required
+  order      > Order required
+}
 `)
 	if code, out, errOut := gen(t, dir); code != 0 {
 		t.Fatalf("gen: exit %d\n%s%s", code, out, errOut)

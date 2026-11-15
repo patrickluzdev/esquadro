@@ -229,7 +229,7 @@ func apiSample(f *project.Field, i string) string {
 		}
 		return fmt.Sprintf("fmt.Sprintf(\"%s %%0%dd\", %s)", word, digits, i)
 	case project.TypeUUID:
-		return `uuid.MustParse(fmt.Sprintf("00000000-0000-0000-0000-%012d", ` + i + `))`
+		return "ogenuuid.UUID(uuid.NewV7())"
 	case project.TypeInt, project.TypeInt64, project.TypeDecimal:
 		n := "1"
 		if f.Min != nil {
@@ -268,7 +268,8 @@ func apiSampleImports(entities []*project.Entity) []string {
 		}
 		for _, r := range keys(e) {
 			if r.Required && r.Target.Module != e.Module {
-				add("github.com/google/uuid")
+				add("uuid")
+				add("ogenuuid github.com/google/uuid")
 			}
 		}
 		for _, f := range inRequest(e) {
@@ -277,7 +278,7 @@ func apiSampleImports(entities []*project.Entity) []string {
 			}
 			s := apiSample(f, "i")
 			for prefix, imp := range map[string]string{
-				"fmt.": "fmt", "strings.": "strings", "uuid.": "github.com/google/uuid",
+				"fmt.": "fmt", "strings.": "strings", "uuid.": "uuid", "ogenuuid.": "ogenuuid github.com/google/uuid",
 				"time.": "time", "jx.": "github.com/go-faster/jx",
 			} {
 				if strings.Contains(s, prefix) {
