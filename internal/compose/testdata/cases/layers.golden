@@ -53,6 +53,8 @@ type Product struct {
 func (Product) Audited() bool { return true }
 === notes.md  [core: notes.md.once.tmpl] once
 Notes for shop
+=== options_of.txt  [core: options_of.txt.tmpl]
+extra prefix /api, ghost map[]
 === relations/category_products.txt  [core: relations/{{.Relation.Entity.Snake}}_{{.Relation.Snake}}.txt.tmpl]
 Category.products: one-to-many to Product (module catalog)
 === relations/product_category.txt  [core: relations/{{.Relation.Entity.Snake}}_{{.Relation.Snake}}.txt.tmpl]

@@ -38,6 +38,10 @@ type Input struct {
 	Project   project.Description `json:"project"`
 	// Options are the blueprint's options, defaults included.
 	Options map[string]any `json:"options"`
+	// Blueprints are the options of every blueprint of the app, by name:
+	// a blueprint that works on another one's data reads its settings here
+	// (e.g. the schemas of postgres).
+	Blueprints map[string]map[string]any `json:"blueprints"`
 	// Files are the paths generated from templates in this run.
 	Files []string `json:"files"`
 	// GoRequires are the Go modules every blueprint of the project needs.
@@ -229,7 +233,7 @@ func (r *Runner) input(p *project.Project, set *blueprint.Set, res *compose.Resu
 	}
 	return Input{
 		Event: hk.Hook.Event, Blueprint: hk.Blueprint.Manifest.Name, Project: p.Describe(),
-		Options: set.Options[hk.Blueprint.Manifest.Name], Files: files, GoRequires: reqs,
+		Options: set.Options[hk.Blueprint.Manifest.Name], Blueprints: set.Options, Files: files, GoRequires: reqs,
 		ProjectDir: dir, Previous: r.Previous, DryRun: dryRun,
 	}
 }

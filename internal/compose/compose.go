@@ -329,6 +329,10 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 func (c *composer) baseFuncs(self string) template.FuncMap {
 	return template.FuncMap{
 		"slot": c.slot,
+		// optionsOf returns the options of another blueprint of the app,
+		// nil when the app does not use it: a blueprint that works on
+		// another one's data reads its settings.
+		"optionsOf": func(name string) map[string]any { return c.set.Options[name] },
 		// uses reports whether the app uses a blueprint, for what a
 		// template writes only alongside it.
 		"uses": func(name string) bool {
