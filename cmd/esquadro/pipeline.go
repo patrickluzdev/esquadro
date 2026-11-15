@@ -44,6 +44,8 @@ type loadedProject struct {
 	loader  *blueprint.Loader
 	project *project.Project
 	set     *blueprint.Set
+	// lock is the lockfile of the last generation.
+	lock *workspace.Lock
 }
 
 // source returns a project file or a blueprint manifest by name, for
@@ -68,11 +70,27 @@ func (l *loadedProject) source(extra func(string) []byte) diag.SourceFunc {
 // loadProject reads and validates the project in dir and resolves its
 // blueprints, printing every diagnostic to stderr. It returns nil when there
 // are errors.
-func loadProject(cmd, dir string, stderr io.Writer) *loadedProject {
+func loadProject(cmd, dir string, stderr io.Writer, update bool) *loadedProject {
 	sources, err := readProject(dir)
 	if err != nil {
 		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
 		return nil
+	}
+	lock, err := workspace.ReadLock(dir)
+	if err != nil {
+		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
+		return nil
+	}
+	cache, err := blueprint.DefaultCacheDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
+		return nil
+	}
+	pinned := map[string]string{}
+	for _, b := range lock.Blueprints {
+		if b.Source != "" && b.Commit != "" {
+			pinned[b.Source] = b.Commit
+		}
 	}
 	l := &loadedProject{
 		dir:     dir,
@@ -83,7 +101,9 @@ func loadProject(cmd, dir string, stderr io.Writer) *loadedProject {
 			HasBuiltinHook: func(bp, path string) bool {
 				return builtinHooks[hook.Key(bp, path)] != nil
 			},
+			Git: &blueprint.Git{CacheDir: cache, Pinned: pinned, Update: update},
 		},
+		lock: lock,
 	}
 	p, diags := project.Load(sources...)
 	if !diags.HasErrors() {

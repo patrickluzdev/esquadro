@@ -1,6 +1,7 @@
 package blueprint
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -20,8 +21,14 @@ type Blueprint struct {
 	FS  fs.FS
 	Ref *project.BlueprintRef
 	// Location is where the blueprint came from, for messages:
-	// "built-in", or the folder path.
+	// "built-in", the folder path, or the git source with its commit.
 	Location string
+	// Dir is the blueprint's folder on disk, where its hooks run from;
+	// empty for a built-in one.
+	Dir string
+	// Source and Commit are, for a blueprint from git, the source as the
+	// app writes it and the commit used.
+	Source, Commit string
 }
 
 // Loader finds blueprints.
@@ -33,6 +40,8 @@ type Loader struct {
 	// HasBuiltinHook reports whether esquadro implements a built-in
 	// blueprint's hook. When nil, built-in hooks must exist as files.
 	HasBuiltinHook func(blueprint, path string) bool
+	// Git fetches blueprints from git; without it, they are refused.
+	Git *Git
 	// sources keeps every manifest read, for rendering diagnostics.
 	sources map[string][]byte
 }
@@ -71,9 +80,11 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	}
 
 	var (
-		fsys     fs.FS
-		location string
-		file     string
+		fsys           fs.FS
+		location       string
+		file           string
+		dir            string
+		source, commit string
 	)
 	switch ref.Source {
 	case project.SourceBuiltin:
@@ -96,7 +107,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		location = "built-in"
 		file = "builtin/" + ref.Ref + "/" + ManifestFile
 	case project.SourceLocal:
-		dir := ref.Ref
+		dir = ref.Ref
 		if !filepath.IsAbs(dir) {
 			dir = filepath.Join(l.ProjectDir, dir)
 		}
@@ -116,9 +127,20 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		location = dir
 		file = filepath.Join(dir, ManifestFile)
 	case project.SourceGit:
-		errAtRef("blueprints from git are not supported yet").
-			Suggestion = "clone it into a folder and use the local path, e.g. blueprint \"./blueprints/name\""
-		return nil, diags
+		if l.Git == nil {
+			errAtRef("blueprints from git are not available here")
+			return nil, diags
+		}
+		var err error
+		dir, commit, err = l.Git.Checkout(context.Background(), ref.Ref)
+		if err != nil {
+			errAtRef("blueprint %s: %v", ref.Ref, err)
+			return nil, diags
+		}
+		source = ref.Ref
+		fsys = os.DirFS(dir)
+		location = ref.Ref + " (" + commit[:min(12, len(commit))] + ")"
+		file = filepath.Join(dir, ManifestFile)
 	}
 
 	src, err := fs.ReadFile(fsys, ManifestFile)
@@ -155,7 +177,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location}, diags
+	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location, Dir: dir, Source: source, Commit: commit}, diags
 }
 
 func joinNames(names []string) string {

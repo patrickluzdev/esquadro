@@ -21,11 +21,10 @@ testdata/projects/deps/app.esq:5:13: error: blueprint folder testdata/projects/d
 5 |   blueprint "./blueprints/missing"
   |             ^^^^^^^^^^^^^^^^^^^^^^
 
-testdata/projects/deps/app.esq:6:13: error: blueprints from git are not supported yet
+testdata/projects/deps/app.esq:6:13: error: blueprints from git are not available here
   |
 6 |   blueprint "github.com/acme/esquadro-stripe@v1.0.0"
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  = help: clone it into a folder and use the local path, e.g. blueprint "./blueprints/name"
 
 testdata/projects/deps/app.esq:8:13: error: blueprint mine (from testdata/projects/deps/blueprints/also-mine) has the same name as the one at line 7
   |

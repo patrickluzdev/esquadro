@@ -38,7 +38,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		dir = fs.Arg(0)
 	}
 
-	l := loadProject("check", dir, stderr)
+	l := loadProject("check", dir, stderr, false)
 	if l == nil {
 		return 1
 	}

@@ -21,12 +21,16 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "show what would change, with diffs, without writing anything")
 	force := fs.Bool("force", false, "overwrite or delete generated files you edited")
+	update := fs.Bool("update", false, "resolve the versions of blueprints from git again, instead of the commits the lockfile pins")
+	trust := fs.Bool("trust", false, "let the hooks of blueprints from git run without asking")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run] [-force] [dir]")
+		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run] [-force] [-update] [-trust] [dir]")
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Generates the project in dir (default: the current directory) from its .esq")
 		fmt.Fprintln(stderr, "files and blueprints. Generated files you edited are never overwritten")
-		fmt.Fprintln(stderr, "unless -force is given; if any would be, nothing is written.")
+		fmt.Fprintln(stderr, "unless -force is given; if any would be, nothing is written. Blueprints from")
+		fmt.Fprintln(stderr, "git stay at the commit the lockfile pins until -update; their hooks run")
+		fmt.Fprintln(stderr, "only once you allow them, for each commit.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
 	}
@@ -43,8 +47,13 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		dir = fs.Arg(0)
 	}
 
-	l := loadProject("gen", dir, stderr)
+	l := loadProject("gen", dir, stderr, *update)
 	if l == nil {
+		return 1
+	}
+	trusted, err := trustHooks(l.set, l.lock, *trust, stderr)
+	if err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
 	}
 	res, templates, diags := compose.ComposeWith(l.project, l.set, builtinFuncs)
@@ -104,7 +113,10 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 
 	var bps []workspace.Blueprint
 	for _, b := range l.set.Blueprints {
-		bps = append(bps, workspace.Blueprint{Name: b.Manifest.Name, Version: b.Manifest.Version, Location: b.Location})
+		bps = append(bps, workspace.Blueprint{
+			Name: b.Manifest.Name, Version: b.Manifest.Version, Location: b.Location,
+			Source: b.Source, Commit: b.Commit, Trusted: trusted[b.Manifest.Name],
+		})
 	}
 	if err := workspace.Write(dir, plan, *force, version.String(), bps); err != nil {
 		if errors.Is(err, workspace.ErrConflicts) {

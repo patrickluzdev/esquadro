@@ -38,6 +38,12 @@ type LockedBlueprint struct {
 	Name     string `json:"name"`
 	Version  string `json:"version"`
 	Location string `json:"location"`
+	// Source and Commit pin a blueprint from git: the next generation uses
+	// Commit for Source until esquadro gen -update.
+	Source string `json:"source,omitempty"`
+	Commit string `json:"commit,omitempty"`
+	// Trusted records that the user let the blueprint's hooks run at Commit.
+	Trusted bool `json:"trusted,omitempty"`
 }
 
 // LockedFile is a file written by the last generation.

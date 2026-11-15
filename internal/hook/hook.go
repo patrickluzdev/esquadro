@@ -275,7 +275,7 @@ func (r *Runner) run(ctx context.Context, hk Hooked, in Input) (Output, error) {
 const maxOutput = 64 << 20
 
 func (r *Runner) exec(ctx context.Context, hk Hooked, in Input) (Output, error) {
-	path := filepath.Join(hk.Blueprint.Location, filepath.FromSlash(hk.Hook.Path))
+	path := filepath.Join(hk.Blueprint.Dir, filepath.FromSlash(hk.Hook.Path))
 	info, err := os.Stat(path)
 	if err != nil {
 		return Output{}, err
