@@ -233,8 +233,8 @@ type VersionItem struct {
 	Span
 }
 
-// DependsItem is "requires a, b" (Keyword "requires") or "after a, b"
-// (Keyword "after").
+// DependsItem is "requires a, b" (Keyword "requires") or "optional a, b"
+// (Keyword "optional").
 type DependsItem struct {
 	Keyword Ident
 	Names   []Ident

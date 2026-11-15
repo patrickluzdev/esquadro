@@ -2,7 +2,7 @@ blueprint stripe @2:1-25:2
   doc "Payments with Stripe."
   version "0.1.0"
   requires platform, postgres
-  after admin
+  optional admin
   option currency string default("USD") @8:3-8:44
     doc "ISO currency code."
   option webhook_path string default("/webhooks/stripe") @9:3-9:57

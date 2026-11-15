@@ -1,4 +1,4 @@
 blueprint b {
   version "0.1.0"
-  after a
+  optional a
 }

@@ -1,7 +1,7 @@
 blueprint stripe {
   version "0.1.0"
   requires platform, postgres
-  after admin
+  optional admin
 
   option currency     string default("USD")
   option webhook_path string default("/webhooks/stripe")

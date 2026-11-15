@@ -51,11 +51,16 @@ var targets = []Target{TargetApp, TargetEntity, TargetField, TargetRelation}
 
 // Manifest is a validated blueprint manifest.
 type Manifest struct {
-	Name     string
-	Version  string
-	Doc      []string
+	Name    string
+	Version string
+	Doc     []string
+	// Requires are the blueprints this one needs: an app without them is an
+	// error.
 	Requires []Dep
-	After    []Dep
+	// Optional are the blueprints this one works with when the app has
+	// them: it comes after them, and its contributions to their slots are
+	// dropped when they are missing.
+	Optional []Dep
 	Options  []*Spec
 	// Annotations maps each target to the keys the blueprint accepts there.
 	Annotations map[Target]*AnnotationSpec
@@ -233,7 +238,7 @@ func (v *validator) manifest(f *dsl.File) *Manifest {
 					if it.Keyword.Name == "requires" {
 						m.Requires = append(m.Requires, d)
 					} else {
-						m.After = append(m.After, d)
+						m.Optional = append(m.Optional, d)
 					}
 				}
 			}

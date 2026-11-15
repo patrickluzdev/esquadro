@@ -59,3 +59,5 @@ Category.products: one-to-many to Product (module catalog)
 Product.category: many-to-one to Category (module catalog)
 === static/logo.txt  [core: static/logo.txt]
 LOGO {{ not a template }}
+=== uses.txt  [core: uses.txt.tmpl]
+extra true, ghost false

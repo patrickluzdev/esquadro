@@ -2,7 +2,7 @@
 blueprint stripe {
   version "0.1.0"
   requires platform, postgres
-  after admin
+  optional admin
 
   /// ISO currency code.
   option currency     string default("USD")

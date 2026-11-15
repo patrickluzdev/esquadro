@@ -265,6 +265,11 @@ func (c *composer) loadContributions(bp *blueprint.Blueprint) {
 			slot = dir
 		}
 		name := display(bp, p)
+		if _, ok := c.declared[slot]; !ok && c.optionalAbsent(bp, slot) {
+			// A slot of an optional blueprint the app does not use: the
+			// contribution has nowhere to go, and that is fine.
+			return nil
+		}
 		if _, ok := c.declared[slot]; !ok {
 			var names []string
 			for n := range c.declared {
@@ -273,8 +278,12 @@ func (c *composer) loadContributions(bp *blueprint.Blueprint) {
 			sort.Strings(names)
 			msg := fmt.Sprintf("contribution to slot %q, which no blueprint of this app declares", slot)
 			sug := diag.Suggest(slot, names)
-			if sug != "" {
+			owner, _, _ := strings.Cut(slot, ".")
+			switch {
+			case sug != "":
 				msg += fmt.Sprintf(` (did you mean "%s"?)`, sug)
+			case !slices.ContainsFunc(c.set.Blueprints, func(b *blueprint.Blueprint) bool { return b.Manifest.Name == owner }):
+				msg += fmt.Sprintf("; if it is for blueprint %s when the app uses it, list it in %s's manifest: optional %s", owner, bp.Manifest.Name, owner)
 			}
 			c.errorf(name, 0, "%s", msg)
 			return nil
@@ -320,6 +329,11 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 func (c *composer) baseFuncs(self string) template.FuncMap {
 	return template.FuncMap{
 		"slot": c.slot,
+		// uses reports whether the app uses a blueprint, for what a
+		// template writes only alongside it.
+		"uses": func(name string) bool {
+			return slices.ContainsFunc(c.set.Blueprints, func(b *blueprint.Blueprint) bool { return b.Manifest.Name == name })
+		},
 		// ann returns this blueprint's annotation values on a node (app,
 		// entity, field or relation), or nil when it has none.
 		"ann": func(node any) map[string]any { return annOf(node)[self] },
@@ -408,6 +422,16 @@ func (c *composer) slot(name string, data Data) (string, error) {
 		c.cur.Slots = append(c.cur.Slots, use)
 	}
 	return strings.Join(parts, "\n"), nil
+}
+
+// optionalAbsent reports whether slot belongs, by its prefix, to a blueprint
+// bp lists as optional and the app does not use.
+func (c *composer) optionalAbsent(bp *blueprint.Blueprint, slot string) bool {
+	owner, _, _ := strings.Cut(slot, ".")
+	if !slices.ContainsFunc(bp.Manifest.Optional, func(d blueprint.Dep) bool { return d.Name == owner }) {
+		return false
+	}
+	return !slices.ContainsFunc(c.set.Blueprints, func(b *blueprint.Blueprint) bool { return b.Manifest.Name == owner })
 }
 
 // ---- templates ----

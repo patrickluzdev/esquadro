@@ -11,7 +11,7 @@ import (
 var (
 	topKeywords      = []string{"package", "app", "enum", "entity", "blueprint"}
 	appSettings      = []string{"module", "blueprint"}
-	manifestSettings = []string{"version", "requires", "after", "option", "annotation", "slot", "go_require", "hook"}
+	manifestSettings = []string{"version", "requires", "optional", "option", "annotation", "slot", "go_require", "hook"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -719,7 +719,7 @@ func (p *parser) parseManifestItem() ManifestItem {
 			return nil
 		}
 		return &VersionItem{Version: v, Pos: t.Pos, End: v.End}
-	case "requires", "after":
+	case "requires", "optional":
 		it := &DependsItem{Keyword: identOf(t)}
 		for {
 			n, ok := p.expectIdent("blueprint name after " + t.Text)

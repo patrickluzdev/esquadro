@@ -25,9 +25,11 @@ builtin/parse/templates/broken.txt.tmpl:3:1: error: unclosed action started at b
 3 | 
   | ^
 
+builtin/undeclared/slots/absent.things.tmpl: error: contribution to slot "absent.things", which no blueprint of this app declares; if it is for blueprint absent when the app uses it, list it in undeclared's manifest: optional absent
+
 builtin/undeclared/slots/undeclared.route.tmpl: error: contribution to slot "undeclared.route", which no blueprint of this app declares (did you mean "undeclared.routes"?)
 
-9 errors
+10 errors
 
 === same.txt  [collide: same.txt]
 a

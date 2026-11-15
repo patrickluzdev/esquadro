@@ -142,7 +142,7 @@ func (r *resolver) options(b *Blueprint) map[string]any {
 func (r *resolver) order() []*Blueprint {
 	deps := map[*Blueprint][]*Blueprint{}
 	for _, b := range r.loaded {
-		for _, d := range slices.Concat(b.Manifest.Requires, b.Manifest.After) {
+		for _, d := range slices.Concat(b.Manifest.Requires, b.Manifest.Optional) {
 			if dep := r.byName[d.Name]; dep != nil {
 				deps[b] = append(deps[b], dep)
 			}
