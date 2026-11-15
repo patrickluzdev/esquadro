@@ -42,6 +42,12 @@ type Loader struct {
 	HasBuiltinHook func(blueprint, path string) bool
 	// Git fetches blueprints from git; without it, they are refused.
 	Git *Git
+	// Overlay holds manifests to read instead of the disk, by absolute
+	// path: those open, maybe unsaved, in an editor.
+	Overlay map[string][]byte
+	// unfetched counts the blueprints from git the cache does not have
+	// (Offline): annotations and requires cannot be checked without them.
+	unfetched int
 	// sources keeps every manifest read, for rendering diagnostics.
 	sources map[string][]byte
 }
@@ -133,6 +139,11 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		}
 		var err error
 		dir, commit, err = l.Git.Checkout(context.Background(), ref.Ref)
+		if errors.Is(err, ErrNotFetched) {
+			l.unfetched++
+			diags.Warnf(ref.RefSpan.Pos, ref.RefSpan.End, "%v; annotations and requires are not checked until then", err)
+			return nil, diags
+		}
 		if err != nil {
 			errAtRef("blueprint %s: %v", ref.Ref, err)
 			return nil, diags
@@ -144,6 +155,11 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	}
 
 	src, err := fs.ReadFile(fsys, ManifestFile)
+	if dir != "" {
+		if abs, aerr := filepath.Abs(filepath.Join(dir, ManifestFile)); aerr == nil && l.Overlay[abs] != nil {
+			src, err = l.Overlay[abs], nil
+		}
+	}
 	if err != nil {
 		errAtRef("%s has no %s", location, ManifestFile).Suggestion = "every blueprint folder needs a manifest"
 		return nil, diags

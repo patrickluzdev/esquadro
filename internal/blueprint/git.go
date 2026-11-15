@@ -71,7 +71,13 @@ type Git struct {
 	Pinned map[string]string
 	// Update resolves every ref again, ignoring Pinned.
 	Update bool
+	// Offline never clones nor fetches: a source works only at the commit
+	// Pinned records, when the cache has it. The editor works this way.
+	Offline bool
 }
+
+// ErrNotFetched is a source the cache does not have, in Offline mode.
+var ErrNotFetched = errors.New("blueprint not fetched yet: run esquadro gen")
 
 // DefaultCacheDir is ESQUADRO_CACHE/git, or the user's cache folder's
 // esquadro/git.
@@ -100,6 +106,9 @@ func (g *Git) Checkout(ctx context.Context, source string) (dir, commit string, 
 	key := hex.EncodeToString(sum[:8])
 	mirror := filepath.Join(g.CacheDir, "repos", key)
 
+	if g.Offline {
+		return g.cached(ctx, source, src, mirror, key)
+	}
 	fetched := false
 	if _, err := os.Stat(mirror); errors.Is(err, fs.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(mirror), 0o755); err != nil {
@@ -152,13 +161,33 @@ func (g *Git) Checkout(ctx context.Context, source string) (dir, commit string, 
 		commit = out
 	}
 
+	return g.unpacked(ctx, src, mirror, key, commit)
+}
+
+// cached is Checkout without the network: the pinned commit, from its
+// checkout or from the mirror.
+func (g *Git) cached(ctx context.Context, source string, src GitSource, mirror, key string) (string, string, error) {
+	commit := g.Pinned[source]
+	if commit == "" {
+		return "", "", ErrNotFetched
+	}
+	checkout := filepath.Join(g.CacheDir, "checkouts", key, commit)
+	if _, err := os.Stat(checkout); err != nil && !hasCommit(ctx, mirror, commit) {
+		return "", "", ErrNotFetched
+	}
+	return g.unpacked(ctx, src, mirror, key, commit)
+}
+
+// unpacked returns the blueprint's folder in the checkout of commit,
+// extracting it from the mirror first when needed.
+func (g *Git) unpacked(ctx context.Context, src GitSource, mirror, key, commit string) (string, string, error) {
 	checkout := filepath.Join(g.CacheDir, "checkouts", key, commit)
 	if _, err := os.Stat(checkout); errors.Is(err, fs.ErrNotExist) {
 		if err := extract(ctx, mirror, commit, checkout); err != nil {
 			return "", "", err
 		}
 	}
-	dir = filepath.Join(checkout, filepath.FromSlash(src.Dir))
+	dir := filepath.Join(checkout, filepath.FromSlash(src.Dir))
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return "", "", fmt.Errorf("%s has no folder %s at %s", src.Repo, src.Dir, src.Ref)
 	}

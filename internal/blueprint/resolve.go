@@ -60,6 +60,7 @@ func (r *resolver) errorf(s dsl.Span, format string, args ...any) *diag.Diagnost
 func (r *resolver) resolve() {
 	r.byName = map[string]*Blueprint{}
 	r.failed = map[string]bool{}
+	r.l.unfetched = 0
 	for _, ref := range r.p.App.Blueprints {
 		b, diags := r.l.Load(ref)
 		r.diags = append(r.diags, diags...)
@@ -80,7 +81,7 @@ func (r *resolver) resolve() {
 
 	for _, b := range r.loaded {
 		for _, d := range b.Manifest.Requires {
-			if r.byName[d.Name] == nil && !r.failed[d.Name] {
+			if r.byName[d.Name] == nil && !r.failed[d.Name] && r.l.unfetched == 0 {
 				r.errorf(b.Ref.RefSpan, "blueprint %s requires %s", b.Manifest.Name, d.Name).
 					Suggestion = "add to the app: blueprint " + d.Name
 			}
@@ -251,7 +252,9 @@ func (r *resolver) annotate(anns []*dsl.Annotation, t Target, e *project.Entity)
 		seen[name] = a
 		b := r.byName[name]
 		if b == nil {
-			if !r.failed[name] {
+			// With a blueprint from git not fetched yet, the annotation may
+			// be its own.
+			if !r.failed[name] && r.l.unfetched == 0 {
 				r.unknownAnnotation(a)
 			}
 			continue

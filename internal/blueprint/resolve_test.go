@@ -151,3 +151,47 @@ func TestBuiltinBlueprintsAreValid(t *testing.T) {
 // anyHook stands in for the registry of built-in hooks, which lives in the
 // command; cmd/esquadro checks that every built-in hook is registered.
 func anyHook(string, string) bool { return true }
+
+// loadSources resolves a project from in-memory .esq sources with l.
+func loadSources(t *testing.T, l *Loader, src string) (*Set, diag.List) {
+	t.Helper()
+	p, diags := project.Load(project.Source{Name: "app.esq", Src: []byte(src)})
+	if diags.HasErrors() {
+		t.Fatalf("project: %v", diags)
+	}
+	return Resolve(p, l)
+}
+
+func TestResolveWithABlueprintFromGitNotFetched(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "needs"), 0o755)
+	os.WriteFile(filepath.Join(dir, "needs", ManifestFile), []byte("blueprint needs {\n  version \"1.0.0\"\n  requires stripe\n}\n"), 0o644)
+	l := &Loader{
+		Builtin: blueprints.FS, HasBuiltinHook: anyHook, ProjectDir: dir,
+		Git: &Git{CacheDir: t.TempDir(), Offline: true},
+	}
+	src := "package catalog\n\napp shop {\n  module \"example.com/shop\"\n  blueprint \"github.com/acme/stripe@v1\"\n  blueprint \"./needs\"\n}\n\nentity Product {\n  name string @stripe(sellable true)\n}\n"
+	_, diags := loadSources(t, l, src)
+	if diags.HasErrors() || len(diags) != 1 || !strings.Contains(diags[0].Message, "not fetched yet") {
+		t.Fatalf("diags = %v", diags)
+	}
+	// The same loader, once nothing is missing, reports again.
+	src = strings.Replace(src, "  blueprint \"github.com/acme/stripe@v1\"\n", "", 1)
+	if _, diags := loadSources(t, l, src); !diags.HasErrors() {
+		t.Fatal("unknown annotation and requires were not reported")
+	}
+}
+
+func TestLoaderReadsTheManifestFromTheOverlay(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "mine"), 0o755)
+	manifest := filepath.Join(dir, "mine", ManifestFile)
+	os.WriteFile(manifest, []byte("blueprint mine {\n  version \"1.0.0\"\n}\n"), 0o644)
+	abs, _ := filepath.Abs(manifest)
+	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook, ProjectDir: dir,
+		Overlay: map[string][]byte{abs: []byte("blueprint mine {\n  version \"1.0.0\"\n  option color string default(\"blue\")\n}\n")}}
+	set, diags := loadSources(t, l, "app shop {\n  module \"example.com/shop\"\n  blueprint \"./mine\"\n}\n")
+	if diags.HasErrors() || set.Options["mine"]["color"] != "blue" {
+		t.Fatalf("options %v, diags %v", set.Options, diags)
+	}
+}

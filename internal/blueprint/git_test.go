@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,5 +112,39 @@ func TestGitCheckoutPinsAndUpdates(t *testing.T) {
 	}
 	if _, _, err := g.Checkout(ctx, url+"//other@v1"); err == nil || !strings.Contains(err.Error(), "has no folder other") {
 		t.Fatalf("missing folder: %v", err)
+	}
+}
+
+func TestGitOfflineReadsOnlyTheCache(t *testing.T) {
+	url, _ := gitRepo(t)
+	ctx := context.Background()
+	cache := t.TempDir()
+	source := url + "//bp@v1"
+
+	offline := &Git{CacheDir: cache, Offline: true, Pinned: map[string]string{}}
+	if _, _, err := offline.Checkout(ctx, source); !errors.Is(err, ErrNotFetched) {
+		t.Fatalf("nothing cached: %v", err)
+	}
+	online := &Git{CacheDir: cache, Pinned: map[string]string{}}
+	_, commit, err := online.Checkout(ctx, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Not pinned: the editor does not resolve refs.
+	if _, _, err := offline.Checkout(ctx, source); !errors.Is(err, ErrNotFetched) {
+		t.Fatalf("not pinned: %v", err)
+	}
+	offline.Pinned[source] = commit
+	if dir, got, err := offline.Checkout(ctx, source); err != nil || got != commit || !strings.Contains(manifestVersion(t, dir), "1.0.0") {
+		t.Fatalf("pinned and cached: %s, %v", got, err)
+	}
+	// The mirror has the commit, its files were never extracted: extracted.
+	os.RemoveAll(filepath.Join(cache, "checkouts"))
+	if _, got, err := offline.Checkout(ctx, source); err != nil || got != commit {
+		t.Fatalf("extracted from the mirror: %s, %v", got, err)
+	}
+	offline.Pinned[source] = strings.Repeat("0", 40)
+	if _, _, err := offline.Checkout(ctx, source); !errors.Is(err, ErrNotFetched) {
+		t.Fatalf("unknown commit: %v", err)
 	}
 }
