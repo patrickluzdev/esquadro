@@ -1,0 +1,3 @@
+# Keep LF everywhere: golden files and generated code are compared byte by byte.
+* text=auto eol=lf
+*.vsix binary
