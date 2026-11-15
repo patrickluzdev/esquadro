@@ -9,6 +9,9 @@ on:
 
 permissions:
   contents: write
+  # The Marketplace and Open VSX check this workflow's identity (OIDC,
+  # trusted publishing) instead of a token.
+  id-token: write
 
 jobs:
   ci:
@@ -47,11 +50,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" editors/vscode/esquadro-*.vsix
-      - name: Publish the extension
+      - name: Publish the extension to the VS Code Marketplace
         working-directory: editors/vscode
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: |
-          npx vsce publish --packagePath esquadro-*.vsix
-          npx ovsx publish esquadro-*.vsix
+        run: npx vsce publish --oidc --packagePath esquadro-*.vsix
+      # Until the patrickluzdev namespace is verified on Open VSX (claimed once
+      # the extension is on the Marketplace), this may fail without failing
+      # the release.
+      - name: Publish the extension to Open VSX
+        working-directory: editors/vscode
+        continue-on-error: true
+        run: npx ovsx publish --trusted-publishing esquadro-*.vsix
