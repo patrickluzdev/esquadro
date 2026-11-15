@@ -1,2 +1,3 @@
-	c.DatabaseURL = l.text("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/{{.App.Snake}}?sslmode=disable")
+{{- $port := "5432"}}{{range strs (index (optionsOf "compose") "ports")}}{{if hasPrefix . "postgres:"}}{{$port = trimPrefix . "postgres:"}}{{end}}{{end}}
+	c.DatabaseURL = l.text("DATABASE_URL", "postgres://postgres:postgres@localhost:{{$port}}/{{.App.Snake}}?sslmode=disable")
 	c.PoolMax = l.number("{{upper .App.Snake}}_POOL_MAX", {{.Options.pool_max}})

@@ -1,0 +1,22 @@
+/// The services the project needs to run locally, in compose.yaml for
+/// Docker Compose: task up starts them and waits until they are ready, task
+/// down stops them (docker compose down -v also deletes their data). Other
+/// blueprints add their services; the containers are named after the
+/// project's folder, or after name.
+blueprint compose {
+  version "0.1.0"
+  requires app
+
+  /// Compose project name, which prefixes the containers; the folder's name
+  /// when empty.
+  option name string default("")
+  /// Ports the services listen on locally, as "service:port", e.g.
+  /// ["postgres:5433"] when another project already uses 5432.
+  option ports list default([])
+
+  /// Services of compose.yaml, indented by two spaces; a blank line goes
+  /// between contributions.
+  slot "compose.services"
+  /// Named volumes of compose.yaml, indented by two spaces.
+  slot "compose.volumes"
+}

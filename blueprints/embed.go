@@ -11,6 +11,7 @@ import "embed"
 //go:embed domain/blueprint.esq all:domain/templates domain/slots
 //go:embed http/blueprint.esq all:http/templates http/slots
 //go:embed postgres/blueprint.esq all:postgres/templates postgres/slots
+//go:embed compose/blueprint.esq all:compose/templates compose/slots
 //go:embed migrations/blueprint.esq all:migrations/templates migrations/slots
 //go:embed store/blueprint.esq all:store/templates store/slots
 //go:embed testcontainers/blueprint.esq all:testcontainers/templates

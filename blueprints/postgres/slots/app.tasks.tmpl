@@ -1,6 +1,0 @@
-
-  db:
-    desc: Start a Postgres for development on localhost:5432
-    cmds:
-      # Starts the container again when it already exists (after a restart).
-      - docker start {{.App.Kebab}}-postgres 2>/dev/null || docker run -d --name {{.App.Kebab}}-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB={{.App.Snake}} -p 5432:5432 postgres:17-alpine

@@ -102,6 +102,8 @@ entity OrderItem {
 	}
 	run(nil, "go", "build", "./...")
 	run(nil, "go", "vet", "./...")
+	// compose.yaml is YAML gofmt never sees: Docker Compose checks it.
+	run(nil, "docker", "compose", "config", "-q")
 
 	out, err := exec.Command("docker", "run", "-d", "--rm", "-e", "POSTGRES_PASSWORD=postgres", "-e", "POSTGRES_DB=shop",
 		"-p", "127.0.0.1::5432", "postgres:17-alpine").Output()

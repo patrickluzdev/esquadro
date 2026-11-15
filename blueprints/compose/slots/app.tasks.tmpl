@@ -1,0 +1,11 @@
+{{- if slotParts "compose.services" .}}
+  up:
+    desc: Start the local services (compose.yaml) and wait until they are ready
+    cmds:
+      - docker compose up -d --wait
+
+  down:
+    desc: Stop the local services; docker compose down -v also deletes their data
+    cmds:
+      - docker compose down
+{{- end}}

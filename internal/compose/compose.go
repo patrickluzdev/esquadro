@@ -343,14 +343,16 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		// entity, field or relation), or nil when it has none.
 		"ann": func(node any) map[string]any { return annOf(node)[self] },
 		// annOf returns another blueprint's annotation values on a node.
-		"annOf":     func(name string, node any) map[string]any { return annOf(node)[name] },
-		"join":      func(sep string, items []string) string { return strings.Join(items, sep) },
-		"contains":  strings.Contains,
-		"strs":      strs,
-		"goStrings": goStrings,
-		"goType":    goType,
-		"goImports": goImports,
-		"quote":     strconv.Quote,
+		"annOf":      func(name string, node any) map[string]any { return annOf(node)[name] },
+		"join":       func(sep string, items []string) string { return strings.Join(items, sep) },
+		"contains":   strings.Contains,
+		"hasPrefix":  strings.HasPrefix,
+		"trimPrefix": strings.TrimPrefix,
+		"strs":       strs,
+		"goStrings":  goStrings,
+		"goType":     goType,
+		"goImports":  goImports,
+		"quote":      strconv.Quote,
 		// rawQuote writes s as a Go raw string when it can, which regexps
 		// read best in.
 		"rawQuote": func(s string) string {

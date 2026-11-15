@@ -1,10 +1,12 @@
 /// The connection to PostgreSQL: a pgx pool opened with the service, from
-/// DATABASE_URL, and where each module's tables live. The annotations
-/// describe the tables to the blueprints that write their SQL (migrations,
-/// store).
+/// DATABASE_URL, and where each module's tables live. With compose, a
+/// Postgres for development in compose.yaml, which the default DATABASE_URL
+/// points at. The annotations describe the tables to the blueprints that
+/// write their SQL (migrations, store).
 blueprint postgres {
   version "0.2.0"
   requires app
+  optional compose
 
   /// Maximum number of connections in the pool; <APP>_POOL_MAX overrides
   /// it.
