@@ -14,17 +14,21 @@ type command struct {
 	name  string
 	short string
 	run   func(args []string, stdout, stderr io.Writer) int
+	// hidden keeps a command out of the help: it is for esquadro's own
+	// development.
+	hidden bool
 }
 
 func commands() []command {
 	return []command{
-		{"check", "check the project for errors", runCheck},
-		{"explain", "tell where a generated file came from", runExplain},
-		{"fmt", "format .esq files", runFmt},
-		{"gen", "generate the project", runGen},
-		{"lsp", "run the language server for editors", runLSP},
-		{"new", "create a project", runNew},
-		{"version", "print the esquadro version", runVersion},
+		{"check", "check the project for errors", runCheck, false},
+		{"explain", "tell where a generated file came from", runExplain, false},
+		{"fmt", "format .esq files", runFmt, false},
+		{"gen", "generate the project", runGen, false},
+		{"lsp", "run the language server for editors", runLSP, false},
+		{"new", "create a project", runNew, false},
+		{"version", "print the esquadro version", runVersion, false},
+		{"docs", "write the reference pages of the documentation site", runDocs, true},
 	}
 }
 
@@ -52,7 +56,9 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
 	for _, c := range commands() {
-		fmt.Fprintf(w, "  %-10s %s\n", c.name, c.short)
+		if !c.hidden {
+			fmt.Fprintf(w, "  %-10s %s\n", c.name, c.short)
+		}
 	}
 }
 

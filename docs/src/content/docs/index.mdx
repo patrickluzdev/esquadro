@@ -1,0 +1,47 @@
+---
+title: Esquadro
+description: Generate Go projects from a model, with blueprints.
+template: splash
+hero:
+  tagline: Describe your modules and entities in a few lines. Esquadro writes an idiomatic Go project, and keeps it in step with the model as it changes.
+  actions:
+    - text: Get started
+      link: /esquadro/getting-started/
+      icon: right-arrow
+    - text: Tutorial
+      link: /esquadro/tutorial/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+```esquadro
+package catalog
+
+/// Something the store sells.
+entity Product {
+  name     string  required min(2) max(120)
+  price    decimal required min(0)
+  category > Category required
+  tags     <> Tag
+}
+```
+
+<CardGrid>
+  <Card title="A model, not boilerplate" icon="pencil">
+    Entities, fields, rules and relations in `.esq` files; the code, the
+    migrations and the API contract follow from them.
+  </Card>
+  <Card title="Code you would write" icon="seti:go">
+    Modules by domain, one file per use case, no runtime magic. Generated code
+    passes `go vet` and `gopls` clean.
+  </Card>
+  <Card title="Regenerate safely" icon="random">
+    Change the model and run `esquadro gen` again: new migrations are written,
+    and your own edits are never overwritten.
+  </Card>
+  <Card title="Blueprints" icon="puzzle">
+    Small blueprints, each one capability, combine into a project: Postgres,
+    migrations, a JSON API, CORS, rate limits... or write your own.
+  </Card>
+</CardGrid>

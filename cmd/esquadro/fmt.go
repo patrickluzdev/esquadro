@@ -24,8 +24,7 @@ func runFmt(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Formats .esq files: aligned columns, two-space indentation, comments kept.")
 		fmt.Fprintln(stderr, "A path can be a file or a directory (its .esq files, not subdirectories).")
 		fmt.Fprintln(stderr, "The default path is the project's esquadro/ folder, or the current directory")
-		fmt.Fprintln(stderr, "without one. Prints the result unless -w or")
-		fmt.Fprintln(stderr, "-check is given.")
+		fmt.Fprintln(stderr, "without one. Prints the result unless -w or -check is given.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
 	}

@@ -29,6 +29,8 @@ jobs:
       - run: task test
       - run: task e2e
       - run: task editor:test
+      - run: task docs:check
+      - run: task docs:build
 
   others:
     name: tests (${{ matrix.os }})

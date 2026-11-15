@@ -31,9 +31,9 @@ tasks:
       - go test ./...
 
   e2e:
-    desc: Follow a generated project through its life against Postgres (needs Docker; minutes)
+    desc: Follow a generated project through its life, and the tutorial step by step, against Postgres (needs Docker; minutes)
     cmds:
-      - go test -tags e2e -run TestLifecycle -count 1 -timeout 30m -v ./cmd/esquadro
+      - go test -tags e2e -run 'TestLifecycle|TestTutorial' -count 1 -timeout 30m -v ./cmd/esquadro
 
   editor:test:
     desc: Test the VS Code extension's grammar
@@ -50,6 +50,31 @@ tasks:
       - npm test
       - npm run compile
       - npm run package
+
+  docs:gen:
+    desc: Write the documentation's reference pages (blueprints, CLI) from esquadro itself
+    cmds:
+      - go run ./cmd/esquadro docs docs/src/content/docs
+
+  docs:check:
+    desc: Fail when the documentation's reference pages are out of date
+    cmds:
+      - task: docs:gen
+      - git diff --exit-code -- docs/src/content/docs
+
+  docs:
+    desc: Serve the documentation site locally, with live reload
+    dir: docs
+    cmds:
+      - npm ci --silent
+      - npx astro dev
+
+  docs:build:
+    desc: Build the documentation site into docs/dist
+    dir: docs
+    cmds:
+      - npm ci --silent
+      - npx astro build
 
   test:update:
     desc: Rewrite golden files after an intended output change (review the diff!)

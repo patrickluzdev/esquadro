@@ -22,8 +22,8 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Usage: esquadro check [dir]")
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Checks the project in dir (default: the current directory) for syntax and")
-		fmt.Fprintln(stderr, "semantic errors without generating anything. Every .esq file in dir except")
-		fmt.Fprintln(stderr, "blueprint.esq is part of the project; subdirectories are not read.")
+		fmt.Fprintln(stderr, "semantic errors without generating anything. The project is the .esq files")
+		fmt.Fprintln(stderr, "of dir's esquadro/ folder; blueprints are loaded as gen loads them.")
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
