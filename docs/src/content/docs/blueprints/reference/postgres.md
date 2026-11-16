@@ -16,7 +16,7 @@ blueprint postgres
 ## Works with
 
 - **Requires** [app](../app/): the app must use them too.
-- **Works with** [compose](../compose/), [docker](../docker/) when the app uses them.
+- **Works with** [compose](../compose/), [docker](../docker/), [http](../http/) when the app uses them.
 
 ## Options
 

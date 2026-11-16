@@ -12,7 +12,7 @@ blueprint postgres {
   /// The most connections the pool opens.
   env POOL_MAX int prefixed default("{{.Options.pool_max}}")
   requires app
-  optional compose, docker
+  optional compose, docker, http
 
   /// Maximum number of connections in the pool; <APP>_POOL_MAX overrides
   /// it.

@@ -31,10 +31,17 @@ sets the ones production requires (`esquadro env list` shows them), or the
 app refuses to start, saying which are missing (see
 [Environment variables](/esquadro/language/environment/)). With `http`, it
 exposes the port and checks its own health (`shop health`, which asks
-`/healthz`).
+`/healthz`). Point a load balancer or Kubernetes' readiness probe at
+`/readyz`, which answers `503 not_ready` while the database does not.
+
+The CI publishes the image for `linux/amd64` and `linux/arm64` (ARM servers
+cost less): the Dockerfile compiles for each platform on the CI's own, so
+both build about as fast as one.
 
 With `compose`, the app is also a service of `compose.yaml`, in the `app`
-profile, so that `task up` keeps starting only what the app needs:
+profile, so that `task up` keeps starting only what the app needs. It runs as
+development, with `.env.development`, and next to it its `worker` (the jobs
+and emails), when the app has one:
 
 ```sh
 docker compose --profile app up -d --build    # everything in containers

@@ -27,7 +27,7 @@ func Trace(next http.Handler) http.Handler {
 	})
 	return otelhttp.NewHandler(named, "http.request",
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return spanName(r) }),
-		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" }),
+		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" && r.URL.Path != "/readyz" }),
 	)
 }
 

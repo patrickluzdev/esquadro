@@ -16,6 +16,7 @@ func TemplateFuncs() template.FuncMap {
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
+		"has":           slices.Contains[[]string],
 		// goElems is a []string literal without its type, for the values of
 		// a map: {"a", "b"}.
 		"goElems": func(items []string) string {

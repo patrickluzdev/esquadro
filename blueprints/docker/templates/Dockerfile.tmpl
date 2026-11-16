@@ -5,7 +5,10 @@
 # to the docker.build and docker.runtime slots from a blueprint, or write a
 # Dockerfile of your own and remove the docker blueprint.
 
-FROM golang:{{goVersion}} AS build
+# The build runs on the machine's platform and compiles for the image's:
+# docker buildx build --platform linux/amd64,linux/arm64 builds both, fast.
+FROM --platform=$BUILDPLATFORM golang:{{goVersion}} AS build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum* ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
@@ -16,7 +19,7 @@ COPY . .
 # The app's version, for its version command: docker build --build-arg VERSION=v1.2.3.
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/{{$app}} ./cmd/{{$app}}
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/{{$app}} ./cmd/{{$app}}
 
 # No shell, no package manager, no root: only the binary.
 FROM gcr.io/distroless/static-debian12:nonroot

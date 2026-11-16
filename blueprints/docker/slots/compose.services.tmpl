@@ -33,3 +33,37 @@
 {{.}}
 {{- end}}
 {{- end}}
+{{- if uses "worker"}}
+
+  # Its background work (jobs, emails), with the same image and settings.
+  worker:
+    container_name: {{$name}}-worker
+    build: .
+    profiles: [app]
+    command: ["run"]
+{{- if uses "http"}}
+    # The image's health check asks the HTTP server, which the worker is not.
+    healthcheck:
+      disable: true
+{{- end}}
+{{- if uses "env"}}
+    env_file:
+      - path: .env.{{index .Environments 0}}
+        required: false
+{{- end}}
+{{- if or $env (uses "env")}}
+    environment:
+{{- if uses "env"}}
+      APP_ENV: {{index .Environments 0}}
+{{- end}}
+{{- range $env}}
+{{.}}
+{{- end}}
+{{- end}}
+{{- if $deps}}
+    depends_on:
+{{- range $deps}}
+{{.}}
+{{- end}}
+{{- end}}
+{{- end}}

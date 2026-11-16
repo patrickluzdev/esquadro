@@ -52,6 +52,7 @@ var Problems = []Problem{
 	{"rate_limited", "rate_limit", "Too many requests; try again later."},
 	{"too_many_attempts", "security", "Too many attempts. Try again later."},
 	{"internal", "http", "Something went wrong on our side."},
+	{"not_ready", "http", "The service is not ready."},
 	{"not_implemented", "rest", "The operation is not implemented."},
 	{"provider_not_configured", "security", "Signing in this way is not set up."},
 }
@@ -70,6 +71,7 @@ var translations = map[string]map[string]string{
 		"invalid_fields":            "Alguns campos não são válidos.",
 		"rate_limited":              "Requisições demais; tente de novo mais tarde.",
 		"internal":                  "Algo deu errado do nosso lado.",
+		"not_ready":                 "O serviço ainda não está pronto.",
 		"not_implemented":           "A operação não foi implementada.",
 		"bad_request":               "A requisição não é um JSON válido no formato esperado.",
 		"invalid_redirect":          "O app não pode mandar ninguém para esse endereço.",
@@ -97,6 +99,7 @@ var translations = map[string]map[string]string{
 		"invalid_fields":            "Algunos campos no son válidos.",
 		"rate_limited":              "Demasiadas solicitudes; inténtelo más tarde.",
 		"internal":                  "Algo salió mal de nuestro lado.",
+		"not_ready":                 "El servicio todavía no está listo.",
 		"not_implemented":           "La operación no está implementada.",
 		"bad_request":               "La solicitud no es un JSON válido con la forma esperada.",
 		"invalid_redirect":          "La app no puede enviar a nadie a esa dirección.",

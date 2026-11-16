@@ -74,8 +74,9 @@ which the generated table does not name, needs someone signed in.
 
 ## Signing in
 
-The routes of each realm are under `/identity/<realm>/` (the `path` option).
-Every JSON name is snake_case.
+The routes of each realm are under `/identity/<realm>/` (the `path` option),
+described by `/identity/openapi.yaml`; with `api_docs`, `/identity/docs` shows
+them as `/docs` shows the API. Every JSON name is snake_case.
 
 | Route | |
 |---|---|

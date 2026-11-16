@@ -26,6 +26,9 @@ func (p *Problem) Error() string { return p.Code + ": " + p.Title }
 var (
 	// ErrNotFound is an address with nothing behind it.
 	ErrNotFound = &Problem{Status: 404, Code: "not_found", Title: "Nothing was found at this address."}
+	// ErrNotReady is a service that cannot serve yet: a dependency, such as
+	// the database, does not answer.
+	ErrNotReady = &Problem{Status: 503, Code: "not_ready", Title: "The service is not ready."}
 	// ErrInternal is anything else, logged on the server.
 	ErrInternal = &Problem{Status: 500, Code: "internal", Title: "Something went wrong on our side."}
 )

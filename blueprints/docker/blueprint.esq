@@ -4,7 +4,9 @@
 /// the app's default command; give another one after the image's name, e.g.
 /// docker run <image> migrate. With http, it exposes the port and checks
 /// /healthz; with compose, the app becomes a service of compose.yaml in the
-/// app profile.
+/// app profile, as development, with its worker when it has one. The build
+/// compiles for each platform without emulation: linux/amd64 and
+/// linux/arm64 alike.
 blueprint docker {
   version "0.1.0"
   requires app

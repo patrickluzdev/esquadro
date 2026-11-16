@@ -1,0 +1,32 @@
+package main
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// ready answers /readyz: 204 when the service can serve, 503 not_ready when
+// a dependency does not answer, for a load balancer to send it no
+// requests. /healthz only says the process lives.
+func (d dependencies) ready(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	for _, c := range []struct {
+		name  string
+		check func(context.Context) error
+	}{
+{{- with slot "http.ready" .}}
+{{.}}
+{{- end}}
+	} {
+		if err := c.check(ctx); err != nil {
+			d.logger.WarnContext(ctx, "not ready", "dependency", c.name, "error", err)
+			edge.Write(w, r, edge.ErrNotReady)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

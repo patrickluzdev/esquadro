@@ -1,0 +1,10 @@
+{{- if realms .Entities -}}
+package security
+
+import _ "embed"
+
+// Contract is the OpenAPI document of the identity routes.
+//
+//go:embed openapi.yaml
+var Contract []byte
+{{end -}}

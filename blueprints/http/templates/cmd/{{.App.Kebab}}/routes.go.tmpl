@@ -16,6 +16,7 @@ func (d dependencies) routes() (http.Handler, error) {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
+	mux.HandleFunc("GET /readyz", d.ready)
 {{- with slot "http.routes" .}}
 {{.}}
 {{- end}}
