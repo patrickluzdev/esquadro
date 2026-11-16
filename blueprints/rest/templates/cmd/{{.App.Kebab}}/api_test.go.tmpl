@@ -1,7 +1,7 @@
 {{- if and .Entities (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {
@@ -321,6 +321,55 @@ func TestAPI{{$P}}{{$R}}(t *testing.T) {
 {{- end}}
 {{- $first := ""}}{{range .Entities}}{{if and (not $first) (canSampleAPI .)}}{{$first = .Pascal}}{{end}}{{end}}
 {{- range .Entities}}{{if eq .Pascal $first}}
+
+// TestAPIFields reads a {{lower .Label}} with only the fields asked for, alone and
+// in a list, and refuses a field it does not have.
+func TestAPIFields(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := c.Create{{.Pascal}}(ctx, givenAPI{{.Pascal}}(t, c, 1), apigen.Create{{.Pascal}}Params{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(path string) (int, map[string]any) {
+		t.Helper()
+		res, err := http.Get(srv.URL + "/api/v1/{{.Plural.Kebab}}" + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var body map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&body)
+		return res.StatusCode, body
+	}
+	keys := func(m map[string]any) string {
+		var out []string
+		for k := range m {
+			out = append(out, k)
+		}
+		slices.Sort(out)
+		return strings.Join(out, ",")
+	}
+	if status, body := get("/" + created.ID.String() + "?fields=created_at"); status != 200 || keys(body) != "created_at,id,version" {
+		t.Fatalf("one with fields: %d %v", status, body)
+	}
+	status, body := get("?fields=created_at")
+	items, _ := body["items"].([]any)
+	if status != 200 || len(items) == 0 {
+		t.Fatalf("a list with fields: %d %v", status, body)
+	}
+	if item, _ := items[0].(map[string]any); keys(item) != "created_at,id,version" {
+		t.Fatalf("a list with fields: %v", item)
+	}
+	if status, _ := get("/" + created.ID.String() + "?fields=nope"); status != 400 {
+		t.Fatalf("a field it does not have: %d, want 400", status)
+	}
+}
 
 // TestAPIIdempotency sends a {{lower .Label}} with an Idempotency-Key again: the same
 // answer, one record; another body with the key is refused; two at once

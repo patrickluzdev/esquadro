@@ -46,6 +46,7 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 	}
 	edge.SetETag(ctx, found.Version)
 	answer := {{.Camel}}Answer(found)
+	{{.Camel}}Only(&answer, params.Fields)
 	return &answer, nil
 }
 
@@ -147,7 +148,9 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- end}}
 	answer := apigen.{{$P}}Page{Items: make([]apigen.{{$P}}, 0, len(page.{{.Plural.Pascal}}))}
 	for _, listed := range page.{{.Plural.Pascal}} {
-		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
+		item := {{.Camel}}Answer(listed)
+		{{.Camel}}Only(&item, params.Fields)
+		answer.Items = append(answer.Items, item)
 	}
 {{- if has $pag "page"}}
 	if q.Page > 0 {
@@ -480,31 +483,19 @@ func refuse{{$P}}(n New{{$P}}, unread []FieldError) error {
 func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 	a := apigen.{{$P}}{
 		ID:        ogenuuid.UUID(x.ID),
-		CreatedAt: x.CreatedAt,
-		UpdatedAt: x.UpdatedAt,
 		Version:   x.Version,
-{{- range inRequest $e}}{{if .Required}}{{$g := ogenName (jsonName .)}}
-{{- if eq .Type "decimal"}}
-		{{$g}}: x.{{.Pascal}}.String(),
-{{- else if eq .Type "uuid"}}
-		{{$g}}: ogenuuid.UUID(x.{{.Pascal}}),
-{{- else if eq .Type "json"}}
-		{{$g}}: jx.Raw(x.{{.Pascal}}),
-{{- else if eq .Type "enum"}}
-		{{$g}}: apigen.{{enumName .Enum}}(x.{{.Pascal}}),
-{{- else}}
-		{{$g}}: x.{{.Pascal}},
-{{- end}}
-{{- end}}{{end}}
-{{- range keys $e}}{{if .Required}}
-		{{ogenName (keyName .)}}: ogenuuid.UUID(x.{{.Pascal}}ID),
-{{- end}}{{end}}
+		CreatedAt: apigen.NewOptDateTime(x.CreatedAt),
+		UpdatedAt: apigen.NewOptDateTime(x.UpdatedAt),
 	}
-{{- range inRequest $e}}{{if not .Required}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}
+{{- range inRequest $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}{{$req := .Required}}
 {{- if or (eq .Type "string") (eq .Type "text")}}
+{{- if not $req}}
 	if {{$x}} != "" {
-		a.{{$g}} = apigen.NewOptString({{$x}})
+{{- end}}
+	a.{{$g}} = apigen.NewOptString({{$x}})
+{{- if not $req}}
 	}
+{{- end}}
 {{- else if eq .Type "int"}}
 	a.{{$g}} = apigen.NewOptInt({{$x}})
 {{- else if eq .Type "int64"}}
@@ -513,34 +504,74 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 	a.{{$g}} = apigen.NewOptBool({{$x}})
 {{- else if eq .Type "decimal"}}
 	a.{{$g}} = apigen.NewOptString({{$x}}.String())
-{{- else if eq .Type "time"}}
+{{- else if or (eq .Type "time") (eq .Type "date")}}
+{{- if not $req}}
 	if !{{$x}}.IsZero() {
-		a.{{$g}} = apigen.NewOptDateTime({{$x}})
+{{- end}}
+	a.{{$g}} = apigen.NewOpt{{if eq .Type "time"}}DateTime{{else}}Date{{end}}({{$x}})
+{{- if not $req}}
 	}
-{{- else if eq .Type "date"}}
-	if !{{$x}}.IsZero() {
-		a.{{$g}} = apigen.NewOptDate({{$x}})
-	}
+{{- end}}
 {{- else if eq .Type "uuid"}}
+{{- if not $req}}
 	if {{$x}} != uuid.Nil() {
-		a.{{$g}} = apigen.NewOptUUID(ogenuuid.UUID({{$x}}))
+{{- end}}
+	a.{{$g}} = apigen.NewOptUUID(ogenuuid.UUID({{$x}}))
+{{- if not $req}}
 	}
+{{- end}}
 {{- else if eq .Type "json"}}
 	if len({{$x}}) > 0 {
 		a.{{$g}} = jx.Raw({{$x}})
 	}
 {{- else if eq .Type "enum"}}
+{{- if not $req}}
 	if {{$x}} != "" {
-		a.{{$g}} = apigen.NewOpt{{enumName .Enum}}(apigen.{{enumName .Enum}}({{$x}}))
+{{- end}}
+	a.{{$g}} = apigen.NewOpt{{enumName .Enum}}(apigen.{{enumName .Enum}}({{$x}}))
+{{- if not $req}}
 	}
 {{- end}}
-{{- end}}{{end}}
-{{- range keys $e}}{{if not .Required}}
+{{- end}}
+{{- end}}
+{{- range keys $e}}
+{{- if not .Required}}
 	if x.{{.Pascal}}ID != uuid.Nil() {
-		a.{{ogenName (keyName .)}} = apigen.NewOptUUID(ogenuuid.UUID(x.{{.Pascal}}ID))
+{{- end}}
+	a.{{ogenName (keyName .)}} = apigen.NewOptUUID(ogenuuid.UUID(x.{{.Pascal}}ID))
+{{- if not .Required}}
 	}
-{{- end}}{{end}}
+{{- end}}
+{{- end}}
 	return a
+}
+
+// {{.Camel}}Only leaves in a only the fields asked for, with id and
+// version; none asked for, every one.
+func {{.Camel}}Only(a *apigen.{{$P}}, fields []apigen.{{$P}}Field) {
+	if len(fields) == 0 {
+		return
+	}
+	asked := map[apigen.{{$P}}Field]bool{}
+	for _, f := range fields {
+		asked[f] = true
+	}
+{{- range inRequest $e}}
+	if !asked[{{quote (jsonName .)}}] {
+		edge.Unset(&a.{{ogenName (jsonName .)}})
+	}
+{{- end}}
+{{- range keys $e}}
+	if !asked[{{quote (keyName .)}}] {
+		edge.Unset(&a.{{ogenName (keyName .)}})
+	}
+{{- end}}
+	if !asked["created_at"] {
+		edge.Unset(&a.CreatedAt)
+	}
+	if !asked["updated_at"] {
+		edge.Unset(&a.UpdatedAt)
+	}
 }
 {{- end}}
 

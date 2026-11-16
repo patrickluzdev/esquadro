@@ -105,6 +105,12 @@ var (
 // PATCH sends as null.
 func Emptied[T any](*T) *T { return new(T) }
 
+// Unset leaves out of an answer the field p points at.
+func Unset[T any](p *T) {
+	var zero T
+	*p = zero
+}
+
 type headersKey struct{}
 
 // ResponseHeaders lets an operation set headers of its response that the

@@ -66,6 +66,13 @@ paths:
 {{- end}}
       tags: [{{.Module.Snake}}]
       parameters:
+        - name: fields
+          in: query
+          required: false
+          style: form
+          explode: false
+          description: Only these fields, comma-separated; `id` and `version` always come.
+          schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Field"}}
 {{- if has $pag "cursor"}}
         - $ref: "#/components/parameters/After"
         - $ref: "#/components/parameters/Limit"
@@ -148,6 +155,14 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{.Module.Snake}}]
+      parameters:
+        - name: fields
+          in: query
+          required: false
+          style: form
+          explode: false
+          description: Only these fields, comma-separated; `id` and `version` always come.
+          schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Field"}}
       responses:
         "200":
           description: {{quote (printf "The %s." (lower .Label))}}
@@ -395,10 +410,13 @@ components:
 {{- range .Entities}}{{$e := .}}
     {{.Pascal}}:
       type: object
-{{- with .Doc}}
-      description: {{quote (join " " .)}}
+      description: |
+{{- range .Doc}}
+        {{.}}
 {{- end}}
-      required: [id{{range inRequest $e}}{{if .Required}}, {{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}, {{keyName .}}{{end}}{{end}}, version, created_at, updated_at]
+        Every field comes unless `fields` asks for some: then only those, with
+        `id` and `version`.
+      required: [id, version]
       properties:
         id: {type: string, format: uuid}
 {{- range inRequest $e}}
@@ -410,6 +428,10 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         version: {type: integer, description: "Goes up with each change: the ETag, and what If-Match sends back."}
+    {{.Pascal}}Field:
+      type: string
+      description: A field of a {{lower .Label}} that `fields` may ask for.
+      enum: [{{range inRequest $e}}{{quote (jsonName .)}}, {{end}}{{range keys $e}}{{quote (keyName .)}}, {{end}}"created_at", "updated_at"]
     New{{.Pascal}}:
       type: object
 {{- $req := false}}{{range inRequest $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}{{range keys $e}}{{if keyInRequest $.Entities $e .}}{{$req = true}}{{end}}{{end}}
