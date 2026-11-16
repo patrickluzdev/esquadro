@@ -1,4 +1,4 @@
-{{- if realms .Entities -}}
+{{- if and (realms .Entities) (not (uses "rest")) -}}
 package security
 
 import _ "embed"

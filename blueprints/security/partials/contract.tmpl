@@ -1,0 +1,323 @@
+{{- /* The identity routes in the contract: the document of their own
+without the rest blueprint, part of api/openapi.yaml with it. */ -}}
+{{- define "identity-tags"}}
+{{- range realms .Entities}}
+  - name: {{.Name}}
+{{- end}}
+{{- end}}
+{{- define "identity-paths"}}{{$p := .Options.path}}
+{{- range $r := realms .Entities}}
+{{- if has $r.Providers "password"}}
+  {{$p}}/{{$r.Name}}/sign-up:
+    post:
+      tags: [{{$r.Name}}]
+      summary: {{if eq $r.Signup "open"}}Sign up{{else}}"Sign up (closed: answers signup_closed)"{{end}}
+      description: |
+        Answers 202 whether the email had an account or not, so that sign-up
+        does not tell who has one.{{if ne $r.VerifyEmail "off"}} Sends the verification link to the email.{{end}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/IdentityCredentials"
+                - type: object
+                  properties:
+                    password:
+                      type: string
+                      minLength: {{or $r.PasswordMin $.Options.password_min}}
+                      maxLength: {{or $r.PasswordMax $.Options.password_max}}
+{{- if uses "rest"}}
+                - $ref: "#/components/schemas/New{{$r.Entity.Pascal}}"
+{{- else}}
+                - type: object
+                  description: The fields of the {{$r.Name}}, as the API creates one.
+                  additionalProperties: true
+{{- end}}
+      responses:
+        "202": {description: Signed up, or the email had an account.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/sign-in:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Sign in with an email and a password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityCredentials"}
+      responses:
+        "200":
+          description: Signed in; with a cookie, unless cookie is false.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentitySession"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/Problem"}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
+  {{$p}}/{{$r.Name}}/sign-out:
+    post:
+      tags: [{{$r.Name}}]
+      summary: End this session
+      responses:
+        "204": {description: Signed out.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/session:
+    get:
+      tags: [{{$r.Name}}]
+      summary: Who signed in
+      responses:
+        "200":
+          description: The principal, its roles and permissions, and the CSRF token.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentitySession"}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/token:
+    post:
+      tags: [{{$r.Name}}]
+      summary: A short JWT, for other services
+      description: Checked with /.well-known/jwks.json; its audience is the realm.
+      responses:
+        "200":
+          description: The token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: {type: string}
+                  expires_at: {type: string, format: date-time}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/sessions:
+    get:
+      tags: [{{$r.Name}}]
+      summary: The account's sessions, its devices
+      responses:
+        "200":
+          description: The sessions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/IdentityDevice"}
+        default: {$ref: "#/components/responses/Problem"}
+    delete:
+      tags: [{{$r.Name}}]
+      summary: End every other session (needs a recent sign-in)
+      responses:
+        "204": {description: Ended.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/sessions/{id}:
+    delete:
+      tags: [{{$r.Name}}]
+      summary: End one session
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: Ended.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/password:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Change the password; ends the other sessions
+      description: Without a password yet (signed in with a provider), current_password is left out and a recent sign-in is needed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                current_password: {type: string}
+                new_password: {type: string}
+      responses:
+        "204": {description: Changed.}
+        default: {$ref: "#/components/responses/Problem"}
+{{- if ne $r.VerifyEmail "off"}}
+  {{$p}}/{{$r.Name}}/verify-email/send:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Send the verification link again
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityEmailRequest"}
+      responses:
+        "202": {description: Sent, if the email has an account to verify.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/verify-email:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Verify the email with the token of its link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityToken"}
+      responses:
+        "204": {description: Verified.}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
+{{- if $r.PasswordReset}}
+  {{$p}}/{{$r.Name}}/password/forgot:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Send a link that sets a new password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityEmailRequest"}
+      responses:
+        "202": {description: Sent, if the email has an account.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/password/reset:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Set a new password with the token of its link; ends every session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: {type: string}
+                new_password: {type: string}
+      responses:
+        "204": {description: Set.}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
+  {{$p}}/{{$r.Name}}/email:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Change the email; a link to the new one confirms it (needs a recent sign-in)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityEmailRequest"}
+      responses:
+        "202": {description: Sent, if no other account has the email.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/email/confirm:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Confirm the new email with the token of its link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IdentityToken"}
+      responses:
+        "204": {description: Changed.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/providers:
+    get:
+      tags: [{{$r.Name}}]
+      summary: The ways the account signs in
+      responses:
+        "200":
+          description: The linked providers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider: {type: string}
+                    created_at: {type: string, format: date-time}
+        default: {$ref: "#/components/responses/Problem"}
+{{- range $r.Providers}}{{if ne . "password"}}
+  {{$p}}/{{$r.Name}}/oauth/{{.}}:
+    get:
+      tags: [{{$r.Name}}]
+      summary: Sign in with {{.}}
+      description: Sends the browser to {{.}}, and back to redirect, signed in, or with ?error=<code>.
+      parameters:
+        - {name: redirect, in: query, schema: {type: string}, description: "A path of the app, or an address of redirect_urls."}
+      responses:
+        "302": {description: To the provider.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/providers/{{.}}:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Link {{.}} to the account (needs a recent sign-in)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect: {type: string}
+      responses:
+        "200":
+          description: The address to send the browser to.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: {type: string}
+        default: {$ref: "#/components/responses/Problem"}
+    delete:
+      tags: [{{$r.Name}}]
+      summary: Unlink {{.}}, unless it is the only way left to sign in
+      responses:
+        "204": {description: Unlinked.}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}{{end}}
+  {{$p}}/{{$r.Name}}:
+    delete:
+      tags: [{{$r.Name}}]
+      summary: Delete the account (needs a recent sign-in)
+      responses:
+        "204": {description: Deleted.}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
+{{- end}}
+{{- define "identity-schemas"}}
+    IdentityCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string}
+        redirect: {type: string, description: The page of the app the verification link opens.}
+        cookie: {type: boolean, description: "false answers session_token instead of a cookie."}
+    IdentitySession:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        realm: {type: string}
+        roles: {type: array, items: {type: string}}
+        permissions: {type: array, items: {type: string}}
+        expires_at: {type: string, format: date-time}
+        csrf_token: {type: string}
+        session_token: {type: string}
+    IdentityDevice:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        current: {type: boolean}
+        created_at: {type: string, format: date-time}
+        last_seen_at: {type: string, format: date-time}
+        ip_address: {type: string}
+        user_agent: {type: string}
+    IdentityEmailRequest:
+      type: object
+      properties:
+        email: {type: string, format: email}
+        redirect: {type: string, description: The page of the app the link opens.}
+    IdentityToken:
+      type: object
+      required: [token]
+      properties:
+        token: {type: string}
+{{- end}}

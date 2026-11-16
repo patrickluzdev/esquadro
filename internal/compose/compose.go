@@ -46,6 +46,7 @@ import (
 const (
 	templatesDir = "templates"
 	slotsDir     = "slots"
+	partialsDir  = "partials"
 	tmplExt      = ".tmpl"
 	filesDir     = "files"
 	onceExt      = ".once.tmpl"
@@ -342,6 +343,19 @@ func (c *composer) parse(bp *blueprint.Blueprint, name, p string) *template.Temp
 	if err != nil {
 		c.templateError(name, err)
 		return nil
+	}
+	// The blueprint's partials: templates its templates and slots share,
+	// each {{define}}d in a file of partials/ and used with {{template}}.
+	partials, _ := fs.Glob(bp.FS, partialsDir+"/*.tmpl")
+	for _, p := range partials {
+		src, err := fs.ReadFile(bp.FS, p)
+		if err == nil {
+			_, err = t.New(display(bp, p)).Parse(string(src))
+		}
+		if err != nil {
+			c.templateError(display(bp, p), err)
+			return nil
+		}
 	}
 	return t
 }
