@@ -4,6 +4,7 @@
   "description": "Syntax highlighting, live errors and formatting for Esquadro's .esq files.",
   "version": "0.1.0",
   "publisher": "patrickluzdev",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/patrickluzdev/esquadro"
@@ -58,7 +59,7 @@
   "scripts": {
     "compile": "tsc -p .",
     "test": "vscode-tmgrammar-test \"test/**/*.esq\"",
-    "package": "vsce package --skip-license"
+    "package": "cp ../../LICENSE LICENSE && vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "11.0.0"
