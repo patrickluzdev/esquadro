@@ -98,9 +98,9 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 {{- end}}{{end}}
 {{- range keys $e}}{{if .Required}}
 {{- if eq .Target.Module $e.Module}}
-		{{ogenName (printf "%sId" .Camel)}}: {{.Camel}}.ID,
+		{{ogenName (keyName .)}}: {{.Camel}}.ID,
 {{- else}}
-		{{ogenName (printf "%sId" .Camel)}}: ogenuuid.UUID(uuid.NewV7()), // another module: no foreign key
+		{{ogenName (keyName .)}}: ogenuuid.UUID(uuid.NewV7()), // another module: no foreign key
 {{- end}}
 {{- end}}{{end}}
 	}

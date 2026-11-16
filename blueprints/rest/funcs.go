@@ -19,7 +19,7 @@ func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"jsonName":         jsonName,
 		"accessLine":       accessLine,
-		"keyName":          func(r *project.Relation) string { return r.Camel + "Id" },
+		"keyName":          keyName,
 		"ogenName":         ogenName,
 		"schema":           schema,
 		"enumName":         enumName,
@@ -53,14 +53,37 @@ func TemplateFuncs() template.FuncMap {
 
 // jsonName is a field's property name in the contract: camelCase, as the
 // rest of a JSON API.
-func jsonName(f *project.Field) string { return f.Camel }
+// jsonName is a field's name in the API's JSON: snake_case.
+func jsonName(f *project.Field) string { return f.Snake }
+
+// keyName is the name in the API's JSON of the key of a relation, the id of
+// its record: category_id.
+func keyName(r *project.Relation) string { return r.Snake + "_id" }
 
 // ogenInitialisms are the names ogen writes in capitals when they are the
 // whole name or its first word ("id" is ID, but "productId" is ProductId).
 var ogenInitialisms = []string{"id", "url", "uri", "api", "http", "https", "json", "xml", "uuid", "ip", "sql", "html"}
 
-// ogenName is the Go name ogen gives a property or parameter.
+// ogenName is the Go name ogen gives a property or parameter: each word of
+// a snake_case name capitalized, an initialism in capitals (category_id is
+// CategoryID); in a camelCase one, only a first word that is an
+// initialism.
 func ogenName(name string) string {
+	if strings.Contains(name, "_") {
+		var b strings.Builder
+		for word := range strings.SplitSeq(name, "_") {
+			if word == "" {
+				continue
+			}
+			if slices.Contains(ogenInitialisms, word) {
+				b.WriteString(strings.ToUpper(word))
+				continue
+			}
+			b.WriteString(strings.ToUpper(word[:1]))
+			b.WriteString(word[1:])
+		}
+		return b.String()
+	}
 	end := len(name)
 	for i, r := range name {
 		if i > 0 && unicode.IsUpper(r) {
@@ -160,7 +183,7 @@ func apiFieldNames(m *project.Module) []FieldName {
 			add(f.Snake, jsonName(f))
 		}
 		for _, r := range keys(e) {
-			add(r.Snake, r.Camel+"Id")
+			add(r.Snake, keyName(r))
 		}
 	}
 	slices.SortFunc(out, func(a, b FieldName) int { return strings.Compare(a.Domain, b.Domain) })

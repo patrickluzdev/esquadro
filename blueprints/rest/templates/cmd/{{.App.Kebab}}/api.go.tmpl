@@ -83,7 +83,7 @@ func (a api) NewError(ctx context.Context, err error) *apigen.ProblemStatusCode 
 		p.Response.Errors = nil
 	}
 	if doc.RequestID != "" {
-		p.Response.RequestId = apigen.NewOptString(doc.RequestID)
+		p.Response.RequestID = apigen.NewOptString(doc.RequestID)
 	}
 	return p
 }

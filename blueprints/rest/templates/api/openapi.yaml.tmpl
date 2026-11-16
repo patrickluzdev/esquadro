@@ -24,7 +24,7 @@ info:
     `invalid_value`, `not_found` (a related record that does not exist) and
     `taken` (a unique value already used),{{if uses "rate_limit"}} `rate_limited` (429, with
     Retry-After){{end}} and `internal` (500). Every response carries X-Request-Id,
-    which errors repeat as `requestId`.
+    which errors repeat as `request_id`. Every JSON name is snake_case.
 servers:
   - url: /api/v1
 tags:
@@ -267,7 +267,7 @@ components:
           description: With `invalid_fields`, every field refused.
           items:
             $ref: "#/components/schemas/FieldProblem"
-        requestId: {type: string, description: The request's X-Request-Id.}
+        request_id: {type: string, description: The request's X-Request-Id.}
     FieldProblem:
       type: object
       required: [field, code]
@@ -285,29 +285,29 @@ components:
 {{- with .Doc}}
       description: {{quote (join " " .)}}
 {{- end}}
-      required: [id{{range inRequest $e}}{{if .Required}}, {{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}, {{.Camel}}Id{{end}}{{end}}, createdAt, updatedAt]
+      required: [id{{range inRequest $e}}{{if .Required}}, {{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}, {{keyName .}}{{end}}{{end}}, created_at, updated_at]
       properties:
         id: {type: string, format: uuid}
 {{- range inRequest $e}}
         {{jsonName .}}: {{schema .}}
 {{- end}}
 {{- range keys $e}}
-        {{.Camel}}Id: {type: string, format: uuid}
+        {{keyName .}}: {type: string, format: uuid}
 {{- end}}
-        createdAt: {type: string, format: date-time}
-        updatedAt: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
     New{{.Pascal}}:
       type: object
 {{- $req := false}}{{range inRequest $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}{{range keys $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}
 {{- if $req}}
-      required: [{{$first := true}}{{range inRequest $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{.Camel}}Id{{end}}{{end}}]
+      required: [{{$first := true}}{{range inRequest $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{keyName .}}{{end}}{{end}}]
 {{- end}}
       properties:
 {{- range inRequest $e}}
         {{jsonName .}}: {{schema .}}
 {{- end}}
 {{- range keys $e}}
-        {{.Camel}}Id: {type: string, format: uuid}
+        {{keyName .}}: {type: string, format: uuid}
 {{- end}}
 {{- if and (not (inRequest $e)) (not (keys $e))}} {}
 {{- end}}

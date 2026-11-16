@@ -40,7 +40,7 @@ type Document struct {
 	Status    int            `json:"status"`
 	Code      string         `json:"code"`
 	Errors    []FieldProblem `json:"errors,omitempty"`
-	RequestID string         `json:"requestId,omitempty"`
+	RequestID string         `json:"request_id,omitempty"`
 }
 
 // DocumentOf is p as the request of ctx gets it, with its ID.

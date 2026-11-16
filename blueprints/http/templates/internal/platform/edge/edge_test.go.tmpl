@@ -43,7 +43,7 @@ func TestWriteAnswersProblemDetails(t *testing.T) {
 	t.Parallel()
 	rec := serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Write(w, r, ErrNotFound) }), httptest.NewRequest("GET", "/", nil))
 	if rec.Code != 404 || rec.Header().Get("Content-Type") != "application/problem+json" ||
-		!strings.Contains(rec.Body.String(), `"requestId":"`+rec.Header().Get("X-Request-Id")+`"`) {
+		!strings.Contains(rec.Body.String(), `"request_id":"`+rec.Header().Get("X-Request-Id")+`"`) {
 		t.Fatalf("%d %v %s", rec.Code, rec.Header(), rec.Body)
 	}
 }

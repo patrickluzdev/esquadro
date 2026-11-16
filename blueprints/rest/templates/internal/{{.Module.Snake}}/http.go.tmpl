@@ -152,7 +152,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 {{- end}}
 {{- end}}
 {{- end}}
-{{- range keys $e}}{{$g := ogenName (printf "%sId" .Camel)}}
+{{- range keys $e}}{{$g := ogenName (keyName .)}}
 {{- if .Required}}
 	n.{{.Pascal}}ID = uuid.UUID(req.{{$g}})
 {{- else}}
@@ -198,7 +198,7 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 {{- end}}
 {{- end}}{{end}}
 {{- range keys $e}}{{if .Required}}
-		{{ogenName (printf "%sId" .Camel)}}: ogenuuid.UUID(x.{{.Pascal}}ID),
+		{{ogenName (keyName .)}}: ogenuuid.UUID(x.{{.Pascal}}ID),
 {{- end}}{{end}}
 	}
 {{- range inRequest $e}}{{if not .Required}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}
@@ -238,7 +238,7 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 {{- end}}{{end}}
 {{- range keys $e}}{{if not .Required}}
 	if x.{{.Pascal}}ID != uuid.Nil() {
-		a.{{ogenName (printf "%sId" .Camel)}} = apigen.NewOptUUID(ogenuuid.UUID(x.{{.Pascal}}ID))
+		a.{{ogenName (keyName .)}} = apigen.NewOptUUID(ogenuuid.UUID(x.{{.Pascal}}ID))
 	}
 {{- end}}{{end}}
 	return a
