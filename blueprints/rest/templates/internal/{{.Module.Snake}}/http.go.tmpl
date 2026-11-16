@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -48,29 +48,24 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 }
 
 func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
-	after, err := cursorOf(params.After)
-	if err != nil {
-		return nil, err
-	}
+	q := {{$P}}Query{After: params.After.Or(""), Limit: params.Limit.Or(25)}
 {{- if $pol}}
-	var page {{$P}}Page
 	scope := {{$P}}Policy{}.List(ctx)
 {{- if ownerColumn $.Entities $e}}
 	owner, owned := scope.Owner()
-{{- end}}
-	switch {
-	case scope.All():
-		page, err = h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
-{{- if ownerColumn $.Entities $e}}
-	case owned:
-		page, err = h.{{$p}}.List{{.Plural.Pascal}}OwnedBy(ctx, owner, after, params.Limit.Or(25))
-{{- end}}
-	default:
+	if owned {
+		q.Owner = owner
+	}
+	if !scope.All() && !owned {
 		return nil, security.Refusal(ctx)
 	}
 {{- else}}
-	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
+	if !scope.All() {
+		return nil, security.Refusal(ctx)
+	}
 {{- end}}
+{{- end}}
+	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, q)
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -78,8 +73,8 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 	for _, listed := range page.{{.Plural.Pascal}} {
 		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
 	}
-	if page.Next != uuid.Nil() {
-		answer.Next = apigen.NewOptString(page.Next.String())
+	if page.Next != "" {
+		answer.Next = apigen.NewOptString(page.Next)
 	}
 	return &answer, nil
 }
@@ -168,9 +163,15 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 		answer.Items = append(answer.Items, {{.Target.Camel}}Answer(listed))
 	}
 {{- end}}
+{{- if .CrossesModules}}
 	if page.Next != uuid.Nil() {
 		answer.Next = apigen.NewOptString(page.Next.String())
 	}
+{{- else}}
+	if page.Next != "" {
+		answer.Next = apigen.NewOptString(page.Next)
+	}
+{{- end}}
 	return &answer, nil
 }
 {{- if not .Inferred}}
@@ -354,9 +355,11 @@ var apiFields = map[string]string{
 {{- end}}
 }
 
-// problemOf turns the module's errors into the problems the API answers
-// with; other errors pass through.
-// cursorOf is the cursor of a list, the nil UUID for the first page.
+{{- $links := false}}{{range $m.Entities}}{{if links .}}{{$links = true}}{{end}}{{end}}
+{{- if $links}}
+
+// cursorOf is the cursor of a relation's list, the nil UUID for the first
+// page.
 func cursorOf(after apigen.OptString) (uuid.UUID, error) {
 	cursor, ok := after.Get()
 	if !ok {
@@ -368,11 +371,16 @@ func cursorOf(after apigen.OptString) (uuid.UUID, error) {
 	}
 	return id, nil
 }
+{{- end}}
 
+// problemOf turns the module's errors into the problems the API answers
+// with; other errors pass through.
 func problemOf(err error) error {
 	switch {
 	case err == nil:
 		return nil
+	case errors.Is(err, postgres.ErrBadCursor), errors.Is(err, postgres.ErrBadSort):
+		return edge.ErrInvalidRequest
 {{- range $m.Entities}}
 	case errors.Is(err, Err{{.Pascal}}NotFound):
 		return edge.NotFound({{quote (printf "No such %s." (lower .Label))}})

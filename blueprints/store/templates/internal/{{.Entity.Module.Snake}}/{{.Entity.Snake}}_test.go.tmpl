@@ -11,7 +11,7 @@ func Test{{$e.Pascal}}UseCases(t *testing.T) {
 }
 {{- else}}
 
-{{importBlock "context" "errors" "testing" "uuid" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+{{importBlock "context" "errors" "testing" "uuid" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
 // given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
 // first; i tells records apart. Change the values freely: esquadro wrote
 // them from the rules in the .esq file.
@@ -55,67 +55,100 @@ func TestCreateAndRead{{$e.Pascal}}(t *testing.T) {
 	}
 }
 
-func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
-
-	want := map[uuid.UUID]bool{}
-	for i := range 3 {
-		created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		want[created.ID] = true
-	}
-	seen := map[uuid.UUID]bool{}
-	after := uuid.Nil()
-	for {
-		page, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, after, 2)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, listed := range page.{{$e.Plural.Pascal}} {
-			if seen[listed.ID] || !want[listed.ID] {
-				t.Fatalf("%s listed twice or never created", listed.ID)
-			}
-			seen[listed.ID] = true
-		}
-		if page.Next == uuid.Nil() {
-			break
-		}
-		after = page.Next
-	}
-	if len(seen) != len(want) {
-		t.Fatalf("listed %d of %d", len(seen), len(want))
-	}
-}
-
-{{with ownerField .Entities $e}}func TestList{{$e.Plural.Pascal}}OwnedBy(t *testing.T) {
+func TestList{{$e.Plural.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
 
 	var created []{{$p}}.{{$e.Pascal}}
-	for i := range 2 {
+	for i := range 3 {
 		x, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
 		if err != nil {
 			t.Fatal(err)
 		}
 		created = append(created, x)
 	}
-	for _, x := range created {
-		page, err := {{$r}}.List{{$e.Plural.Pascal}}OwnedBy(ctx, x.{{.}}, uuid.Nil(), 10)
+	list := func(q {{$p}}.{{$e.Pascal}}Query) {{$p}}.{{$e.Pascal}}Page {
+		t.Helper()
+		page, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, q)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(page.{{$e.Plural.Pascal}}) != 1 || page.{{$e.Plural.Pascal}}[0].ID != x.ID {
-			t.Fatalf("the {{$e.Plural.Snake}} of %s: %+v", x.{{.}}, page.{{$e.Plural.Pascal}})
+		return page
+	}
+
+	// The newest first, by default.
+	if first := list({{$p}}.{{$e.Pascal}}Query{Limit: 1}); len(first.{{$e.Plural.Pascal}}) != 1 || first.{{$e.Plural.Pascal}}[0].ID != created[2].ID {
+		t.Fatalf("the default order: %+v", first.{{$e.Plural.Pascal}})
+	}
+
+	// Every order, both ways, a page at a time by cursor: each one once.
+	for _, sort := range {{$p}}.{{$e.Pascal}}Sorts {
+		if sort == "relevance" {
+			continue
 		}
+		seen := map[uuid.UUID]bool{}
+		after := ""
+		for {
+			page := list({{$p}}.{{$e.Pascal}}Query{Sort: sort, Limit: 2, After: after})
+			for _, listed := range page.{{$e.Plural.Pascal}} {
+				if seen[listed.ID] {
+					t.Fatalf("%s: %s listed twice", sort, listed.ID)
+				}
+				seen[listed.ID] = true
+			}
+			if page.Next == "" {
+				break
+			}
+			after = page.Next
+		}
+		if len(seen) != len(created) {
+			t.Fatalf("%s: listed %d of %d", sort, len(seen), len(created))
+		}
+	}
+
+	// By page: numbered, with the total.
+	if p1, p2 := list({{$p}}.{{$e.Pascal}}Query{Page: 1, PerPage: 2}), list({{$p}}.{{$e.Pascal}}Query{Page: 2, PerPage: 2}); len(p1.{{$e.Plural.Pascal}}) != 2 || len(p2.{{$e.Plural.Pascal}}) != 1 || p1.Total != 3 || p1.Next != "" {
+		t.Fatalf("pages: %d and %d of %d", len(p1.{{$e.Plural.Pascal}}), len(p2.{{$e.Plural.Pascal}}), p1.Total)
+	}
+
+	// A cursor of another order is refused.
+	ascending := list({{$p}}.{{$e.Pascal}}Query{Sort: "created_at", Limit: 1})
+	if _, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, {{$p}}.{{$e.Pascal}}Query{After: ascending.Next}); !errors.Is(err, postgres.ErrBadCursor) {
+		t.Fatalf("a cursor of another order: %v", err)
+	}
+
+	// By creation date.
+	since := created[1].CreatedAt
+	if page := list({{$p}}.{{$e.Pascal}}Query{Filter: {{$p}}.{{$e.Pascal}}Filter{CreatedAtMin: &since}, Limit: 10}); len(page.{{$e.Plural.Pascal}}) != 2 {
+		t.Fatalf("created since the second: %d", len(page.{{$e.Plural.Pascal}}))
+	}
+{{- with ownerField .Entities $e}}
+
+	// The owner's only, for security's owner rule.
+	if page := list({{$p}}.{{$e.Pascal}}Query{Owner: created[0].{{.}}, Limit: 10}); len(page.{{$e.Plural.Pascal}}) != 1 || page.{{$e.Plural.Pascal}}[0].ID != created[0].ID {
+		t.Fatalf("the owner's: %+v", page.{{$e.Plural.Pascal}})
+	}
+{{- end}}
+{{- with searchField $e}}
+
+	// A search finds the record its text came from.
+	found := false
+	for _, x := range list({{$p}}.{{$e.Pascal}}Query{Search: created[1].{{.}}, Limit: 10}).{{$e.Plural.Pascal}} {
+		found = found || x.ID == created[1].ID
+	}
+	if created[1].{{.}} != "" && !found {
+		t.Fatalf("a search of %q did not find it", created[1].{{.}})
+	}
+{{- end}}
+
+	// Without pagination, past the limit: Next says there were more.
+	if page := list({{$p}}.{{$e.Pascal}}Query{Limit: 2, Unpaged: true}); len(page.{{$e.Plural.Pascal}}) != 2 || page.Next == "" {
+		t.Fatalf("unpaged past its limit: %d, next %q", len(page.{{$e.Plural.Pascal}}), page.Next)
 	}
 }
 
-{{end}}func TestUpdate{{$e.Pascal}}(t *testing.T) {
+func TestUpdate{{$e.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})

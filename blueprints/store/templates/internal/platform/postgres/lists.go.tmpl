@@ -1,0 +1,67 @@
+{{- if .Entities -}}
+package postgres
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"uuid"
+)
+
+// Lists' errors: a cursor that is not one of the list's order, and an
+// order the list does not take.
+var (
+	ErrBadCursor = errors.New("postgres: not a cursor of this list and order")
+	ErrBadSort   = errors.New("postgres: not an order of this list")
+)
+
+// Opt is v as a parameter, by to, or NULL without it: an optional filter.
+func Opt[T, P any](v *T, to func(T) P) P {
+	if v == nil {
+		var null P
+		return null
+	}
+	return to(*v)
+}
+
+// Strings is a list of values as text, NULL without any: the values of an
+// enum a list filters by.
+func Strings[T ~string](v []T) []string {
+	if len(v) == 0 {
+		return nil
+	}
+	out := make([]string, len(v))
+	for i, s := range v {
+		out[i] = string(s)
+	}
+	return out
+}
+
+// cursor is where a page ended: its order, the value it ordered by, and
+// the id that breaks ties.
+type cursor struct {
+	Sort  string    `json:"s"`
+	Value string    `json:"v"`
+	ID    uuid.UUID `json:"i"`
+}
+
+// EncodeCursor is the cursor of a page that ended at the record id, whose
+// value of the order sort was value: opaque to the client.
+func EncodeCursor(sort, value string, id uuid.UUID) string {
+	b, _ := json.Marshal(cursor{Sort: sort, Value: value, ID: id})
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// DecodeCursor is the value and the id of a cursor of the order sort.
+func DecodeCursor(s, sort string) (string, uuid.UUID, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return "", uuid.Nil(), ErrBadCursor
+	}
+	var c cursor
+	if json.Unmarshal(b, &c) != nil || c.Sort != sort || c.ID == uuid.Nil() {
+		return "", uuid.Nil(), ErrBadCursor
+	}
+	return c.Value, c.ID, nil
+}
+{{end -}}

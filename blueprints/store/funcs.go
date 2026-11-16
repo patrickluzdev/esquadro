@@ -19,6 +19,30 @@ import (
 // opts is always the template's .Options, the postgres blueprint's options.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"listFilters":  ListFilters,
+		"listSorts":    ListSorts,
+		"searchFields": SearchFields,
+		// searchField is the Go field of e's first searched field.
+		"searchField": func(e *project.Entity) string {
+			for _, f := range e.Fields {
+				if on, _ := f.Ann["store"]["search"].(bool); on {
+					return f.Pascal
+				}
+			}
+			return ""
+		},
+		"listImports": listImports,
+		"listWhere":   ListWhere,
+		"rank":        Rank,
+		"sqlcName":    func(s string) string { return names(s).Pascal },
+		"list":        func(items ...string) []string { return items },
+		"dict": func(kv ...any) map[string]any {
+			m := map[string]any{}
+			for i := 0; i+1 < len(kv); i += 2 {
+				m[kv[i].(string)] = kv[i+1]
+			}
+			return m
+		},
 		"pgTable":   pgTable,
 		"pgColumn":  pgColumn,
 		"sqlcModel": sqlcModel,

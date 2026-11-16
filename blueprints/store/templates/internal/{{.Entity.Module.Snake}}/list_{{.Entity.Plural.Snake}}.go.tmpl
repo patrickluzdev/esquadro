@@ -1,60 +1,192 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$pg := optionsOf "postgres"}}
+{{- $fs := listFilters $e}}{{$ss := listSorts $e $pg}}{{$search := searchFields $e}}{{$own := ownerColumn .Entities $e -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "github.com/jackc/pgx/v5/pgtype" (listImports .Entities $e $pg) (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Max{{$e.Pascal}}Page is the most {{$e.Plural.Snake}} a page holds.
 const Max{{$e.Pascal}}Page = 100
 
-// {{$e.Pascal}}Page is a page of {{$e.Plural.Snake}} in the order they were created
-// (their IDs are UUID v7, which sort by time). Next is the cursor of the next
-// page, the nil UUID on the last one.
+// {{$e.Pascal}}Sorts are the orders a list of {{$e.Plural.Snake}} takes; - is
+// descending, and -created_at, the newest first, the default.
+var {{$e.Pascal}}Sorts = []string{ {{- range $i, $s := $ss}}{{if $i}}, {{end}}"{{$s.Key}}", "-{{$s.Key}}"{{end}}{{if $search}}, "relevance"{{end -}} }
+
+// {{$e.Pascal}}Filter narrows a list of {{$e.Plural.Snake}}: each field left at its zero
+// value does not.
+type {{$e.Pascal}}Filter struct {
+{{- range $fs}}
+{{- if eq .Kind "range"}}
+	// {{.Field}}Min and {{.Field}}Max bound {{.Name}}, inclusive.
+	{{.Field}}Min, {{.Field}}Max *{{.Go}}
+{{- else if eq .Kind "in"}}
+	// {{.Field}} lists the {{.Name}} values to keep.
+	{{.Field}} []{{.Go}}
+{{- else if eq .Go "uuid.UUID"}}
+	{{.Field}} uuid.UUID
+{{- else}}
+	{{.Field}} *{{.Go}}
+{{- end}}
+{{- end}}
+}
+
+// {{$e.Pascal}}Query is a list of {{$e.Plural.Snake}} to read.
+type {{$e.Pascal}}Query struct {
+	Filter {{$e.Pascal}}Filter
+{{- if $search}}
+	// Search is text to search for in {{join ", " $search}}; with it, the
+	// default order is relevance.
+	Search string
+{{- end}}
+	// Sort is one of {{$e.Pascal}}Sorts; empty is the default.
+	Sort string
+	// After is the cursor of the page before (Next); Limit, how many a page
+	// holds. Empty After is the first page.
+	After string
+	Limit int
+	// Page and PerPage page by number instead, from 1; Page 0 pages by
+	// cursor.
+	Page, PerPage int
+	// Unpaged lists up to Limit, past Max{{$e.Pascal}}Page: a list without
+	// pagination, whose Next then tells there were more.
+	Unpaged bool
+{{- if $own}}
+	// Owner lists only the {{$e.Plural.Snake}} that belong to it, for security's
+	// owner rule; the nil UUID lists them all.
+	Owner uuid.UUID
+{{- end}}
+}
+
+// {{$e.Pascal}}Page is a page of {{$e.Plural.Snake}}.
 type {{$e.Pascal}}Page struct {
 	{{$e.Plural.Pascal}} []{{$e.Pascal}}
-	Next uuid.UUID
+	// Next is the cursor of the next page, empty on the last one; by
+	// cursor only.
+	Next string
+	// Total is how many {{$e.Plural.Snake}} the query has in all; by page only.
+	Total int64
 }
 
-// List{{$e.Plural.Pascal}} returns up to limit {{$e.Plural.Snake}} (at most
-// Max{{$e.Pascal}}Page) created after the one whose id is after, or from the
-// first when after is the nil UUID.
-func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after uuid.UUID, limit int) ({{$e.Pascal}}Page, error) {
-	limit = min(max(limit, 1), Max{{$e.Pascal}}Page)
-	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Plural.Pascal}}(ctx, sqlgen.List{{$e.Plural.Pascal}}Params{
-		After:    postgres.UUID(after),
-		PageSize: int32(limit + 1),
-	})
-	if err != nil {
-		return {{$e.Pascal}}Page{}, err
-	}
-	return {{$e.Camel}}PageOf(rows, limit), nil
-}
-{{- if ownerColumn .Entities $e}}
-
-// List{{$e.Plural.Pascal}}OwnedBy is List{{$e.Plural.Pascal}} of the {{$e.Plural.Snake}} that belong to
-// owner, for security's owner rule.
-func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}OwnedBy(ctx context.Context, owner, after uuid.UUID, limit int) ({{$e.Pascal}}Page, error) {
-	limit = min(max(limit, 1), Max{{$e.Pascal}}Page)
-	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Plural.Pascal}}OwnedBy(ctx, sqlgen.List{{$e.Plural.Pascal}}OwnedByParams{
-		OwnerID:  postgres.UUID(owner),
-		After:    postgres.UUID(after),
-		PageSize: int32(limit + 1),
-	})
-	if err != nil {
-		return {{$e.Pascal}}Page{}, err
-	}
-	return {{$e.Camel}}PageOf(rows, limit), nil
-}
+// List{{$e.Plural.Pascal}} reads a list of {{$e.Plural.Snake}}: filtered, searched and ordered as q
+// says, a page at a time.
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, q {{$e.Pascal}}Query) ({{$e.Pascal}}Page, error) {
+	sort := q.Sort
+	if sort == "" {
+		sort = "-created_at"
+{{- if $search}}
+		if q.Search != "" {
+			sort = "relevance"
+		}
 {{- end}}
+	}
+	size := q.Limit
+	if q.Page > 0 {
+		size = q.PerPage
+	}
+	size = max(size, 1)
+	if !q.Unpaged {
+		size = min(size, Max{{$e.Pascal}}Page)
+	}
+	skip := 0
+	if q.Page > 0 {
+		skip = (q.Page - 1) * size
+	}
+	var afterValue pgtype.Text
+	var afterID pgtype.UUID
+	if q.After != "" {
+		value, id, err := postgres.DecodeCursor(q.After, sort)
+		if err != nil {
+			return {{$e.Pascal}}Page{}, err
+		}
+		afterValue, afterID = pgtype.Text{String: value, Valid: true}, postgres.UUID(id)
+	}
+	f := q.Filter
+	_ = f
+	qs := sqlgen.New({{$r}}.Pool)
+	var page {{$e.Pascal}}Page
+	switch sort {
+{{- range $ss}}{{$s := .}}
+{{- range $dir := list "Asc" "Desc"}}
+	case "{{if eq $dir "Desc"}}-{{end}}{{$s.Key}}":
+		rows, err := qs.List{{$e.Plural.Pascal}}By{{$s.Pascal}}{{$dir}}(ctx, sqlgen.List{{$e.Plural.Pascal}}By{{$s.Pascal}}{{$dir}}Params{
+{{- template "filters" (dict "fs" $fs "own" $own "search" $search)}}
+			AfterValue: afterValue,
+			AfterID:    afterID,
+			PageSize:   int32(size + 1),
+			Skip:       int32(skip),
+		})
+		if err != nil {
+			return {{$e.Pascal}}Page{}, err
+		}
+		page = {{$e.Camel}}PageOf(rows, size, func(x {{$e.Pascal}}) string { return postgres.EncodeCursor(sort, {{$s.Value}}, x.ID) })
+{{- end}}
+{{- end}}
+{{- if $search}}
+	case "relevance":
+		rows, err := qs.List{{$e.Plural.Pascal}}ByRelevance(ctx, sqlgen.List{{$e.Plural.Pascal}}ByRelevanceParams{
+{{- template "filters" (dict "fs" $fs "own" $own "search" $search)}}
+			AfterValue: afterValue,
+			AfterID:    afterID,
+			PageSize:   int32(size + 1),
+			Skip:       int32(skip),
+		})
+		if err != nil {
+			return {{$e.Pascal}}Page{}, err
+		}
+		page.{{$e.Plural.Pascal}} = make([]{{$e.Pascal}}, 0, min(len(rows), size))
+		for i, row := range rows {
+			if i == size {
+				last := rows[size-1]
+				page.Next = postgres.EncodeCursor(sort, strconv.FormatFloat(float64(last.Rank), 'g', -1, 32), postgres.ID(last.{{sqlcModel $e $pg}}.ID))
+				break
+			}
+			page.{{$e.Plural.Pascal}} = append(page.{{$e.Plural.Pascal}}, {{$e.Camel}}Of(row.{{sqlcModel $e $pg}}))
+		}
+{{- end}}
+	default:
+		return {{$e.Pascal}}Page{}, postgres.ErrBadSort
+	}
+	if q.Page > 0 {
+		page.Next = ""
+		total, err := qs.Count{{$e.Plural.Pascal}}(ctx, sqlgen.Count{{$e.Plural.Pascal}}Params{
+{{- template "filters" (dict "fs" $fs "own" $own "search" $search)}}
+		})
+		if err != nil {
+			return {{$e.Pascal}}Page{}, err
+		}
+		page.Total = total
+	}
+	return page, nil
+}
 
-// {{$e.Camel}}PageOf is a page of up to limit rows, with the cursor of the
-// next when there is one more.
-func {{$e.Camel}}PageOf(rows []sqlgen.{{sqlcModel $e (optionsOf "postgres")}}, limit int) {{$e.Pascal}}Page {
-	page := {{$e.Pascal}}Page{ {{$e.Plural.Pascal}}: make([]{{$e.Pascal}}, 0, min(len(rows), limit)) }
+// {{$e.Camel}}PageOf is a page of up to size rows, with the cursor of the
+// next one when there is one more.
+func {{$e.Camel}}PageOf(rows []sqlgen.{{sqlcModel $e $pg}}, size int, cursor func({{$e.Pascal}}) string) {{$e.Pascal}}Page {
+	page := {{$e.Pascal}}Page{ {{- $e.Plural.Pascal}}: make([]{{$e.Pascal}}, 0, min(len(rows), size)) }
 	for i, row := range rows {
-		if i == limit {
-			page.Next = page.{{$e.Plural.Pascal}}[limit-1].ID
+		if i == size {
+			page.Next = cursor(page.{{$e.Plural.Pascal}}[size-1])
 			break
 		}
 		page.{{$e.Plural.Pascal}} = append(page.{{$e.Plural.Pascal}}, {{$e.Camel}}Of(row))
 	}
 	return page
 }
+{{- define "filters"}}
+{{- if .own}}
+			OwnerID: postgres.UUID(q.Owner),
+{{- end}}
+{{- if .search}}
+			Q: postgres.Text(q.Search),
+{{- end}}
+{{- range .fs}}
+{{- if eq .Kind "range"}}
+			{{sqlcName (printf "%s_min" .Name)}}: postgres.Opt(f.{{.Field}}Min, {{.Conv}}),
+			{{sqlcName (printf "%s_max" .Name)}}: postgres.Opt(f.{{.Field}}Max, {{.Conv}}),
+{{- else if eq .Kind "in"}}
+			{{sqlcName .Name}}: postgres.Strings(f.{{.Field}}),
+{{- else if eq .Go "uuid.UUID"}}
+			{{sqlcName .Name}}: postgres.UUID(f.{{.Field}}),
+{{- else}}
+			{{sqlcName .Name}}: postgres.Opt(f.{{.Field}}, {{.Conv}}),
+{{- end}}
+{{- end}}
+{{- end}}

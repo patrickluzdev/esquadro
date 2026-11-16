@@ -34,7 +34,7 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Contex
 	page := {{$page}}{ {{$items}}: make([]{{if $rel.CrossesModules}}uuid.UUID{{else}}{{$t.Pascal}}{{end}}, 0, min(len(rows), limit)) }
 	for i, row := range rows {
 		if i == limit {
-			page.Next = page.{{$items}}[limit-1]{{if not $rel.CrossesModules}}.ID{{end}}
+			page.Next = page.{{$items}}[limit-1]{{if not $rel.CrossesModules}}.ID.String(){{end}}
 			break
 		}
 		page.{{$items}} = append(page.{{$items}}, {{if $rel.CrossesModules}}postgres.ID(row){{else}}{{$t.Camel}}Of(row.{{sqlcModel $t (optionsOf "postgres")}}){{end}})

@@ -10,21 +10,32 @@ RETURNING *;
 -- name: Get{{$e.Pascal}} :one
 SELECT * FROM {{$t}} WHERE id = @id;
 
--- name: List{{$e.Plural.Pascal}} :many
-SELECT * FROM {{$t}}
-WHERE sqlc.narg(after)::uuid IS NULL OR id > sqlc.narg(after)::uuid
-ORDER BY id
-LIMIT sqlc.arg(page_size);
+{{- $where := listWhere $.Entities $e (optionsOf "postgres") $.Options.search_language}}
+{{- range listSorts $e (optionsOf "postgres")}}{{$s := .}}
+{{- range $dir := list "Asc" "Desc"}}
 
-{{- with ownerColumn $.Entities $e}}
-
--- name: List{{$e.Plural.Pascal}}OwnedBy :many
+-- name: List{{$e.Plural.Pascal}}By{{$s.Pascal}}{{$dir}} :many
 SELECT * FROM {{$t}}
-WHERE {{.}} = @owner_id
-  AND (sqlc.narg(after)::uuid IS NULL OR id > sqlc.narg(after)::uuid)
-ORDER BY id
-LIMIT sqlc.arg(page_size);
+{{$where}}
+  AND (sqlc.narg(after_id)::uuid IS NULL OR ({{$s.Column}}, id) {{if eq $dir "Asc"}}>{{else}}<{{end}} (sqlc.narg(after_value)::text::{{$s.Cast}}, sqlc.narg(after_id)::uuid))
+ORDER BY {{$s.Column}}{{if eq $dir "Desc"}} DESC{{end}}, id{{if eq $dir "Desc"}} DESC{{end}}
+LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(skip);
 {{- end}}
+{{- end}}
+{{- if searchFields $e}}
+
+-- name: List{{$e.Plural.Pascal}}ByRelevance :many
+SELECT sqlc.embed(x), {{rank $.Options.search_language}} AS rank
+FROM {{$t}} x
+{{$where}}
+  AND (sqlc.narg(after_id)::uuid IS NULL OR ({{rank $.Options.search_language}}, id) < (sqlc.narg(after_value)::text::real, sqlc.narg(after_id)::uuid))
+ORDER BY rank DESC, id DESC
+LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(skip);
+{{- end}}
+
+-- name: Count{{$e.Plural.Pascal}} :one
+SELECT count(*) FROM {{$t}}
+{{$where}};
 
 -- name: Update{{$e.Pascal}} :one
 UPDATE {{$t}}

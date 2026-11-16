@@ -43,7 +43,7 @@ func Test{{$e.Pascal}}{{$rel.Pascal}}(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if page, err := {{$r}}.List{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.Nil(), 10); err != nil || page.Next != uuid.Nil() || len(page.{{if $same}}{{$t.Plural.Pascal}}{{else}}IDs{{end}}) != 0 {
+	if page, err := {{$r}}.List{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.Nil(), 10); err != nil || page.Next != {{if $same}}""{{else}}uuid.Nil(){{end}} || len(page.{{if $same}}{{$t.Plural.Pascal}}{{else}}IDs{{end}}) != 0 {
 		t.Fatalf("after removing: %+v, %v", page, err)
 	}
 
