@@ -79,6 +79,13 @@ func Require(ctx context.Context, permission string) error {
 	return ErrForbidden
 }
 
+// SignedIn reports whether someone of realm signed in to the request of
+// ctx.
+func SignedIn(ctx context.Context, realm string) bool {
+	_, ok := PrincipalIn(ctx, realm)
+	return ok
+}
+
 // Who is whom the request of ctx comes from, as "realm:id", or "" for no
 // one: what the API's idempotency keys belong to.
 func Who(ctx context.Context) string {

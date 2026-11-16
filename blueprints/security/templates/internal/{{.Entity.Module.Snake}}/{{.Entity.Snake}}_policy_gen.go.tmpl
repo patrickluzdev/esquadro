@@ -37,6 +37,17 @@ func ({{$R}}) {{$op}}(ctx context.Context, x {{$e.Pascal}}) bool {
 	return {{allowExpr (rulesOf $.Entities $e (lower $op)) (printf "security.Owns(ctx, %q, x.%s)" (or (and $o $o.Realm) "") $field)}}
 }
 {{end}}
+// CanCreate reports whether the request of ctx may create some
+// {{$e.Plural.Snake}}, for a client to offer it{{if and $o $o.Relation}}: with the owner rule, its own{{end}}. A Create
+// written in {{$e.Snake}}_policy.go needs a CanCreate that agrees with it.
+func ({{$R}}) CanCreate(ctx context.Context) bool {
+{{- if and $o $o.Relation}}
+	return {{allowExpr (rulesOf .Entities $e "create") (printf "security.SignedIn(ctx, %q)" $o.Realm)}}
+{{- else}}
+	return {{allowExpr (rulesOf .Entities $e "create") "false"}}
+{{- end}}
+}
+
 // Create reports whether the request of ctx may create n.
 func ({{$R}}) Create(ctx context.Context, n New{{$e.Pascal}}) bool {
 {{- if and $o $o.Relation}}

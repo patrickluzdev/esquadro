@@ -277,6 +277,19 @@ func (e *lifecycle) ownerScenario(product string) {
 		e.t.Fatalf("the review after carla's update: %v", kept)
 	}
 
+	// What each may do, as the API tells the screens: Carla changes and
+	// deletes her review; Davi may write reviews of his own, but not hers;
+	// no one signed in may not write any.
+	if can := fmt.Sprint(e.request("GET", path, "", carla, 200).body["can"]); can != "[update delete]" {
+		e.t.Fatalf("carla's review: can %s", can)
+	}
+	if can := fmt.Sprint(e.request("GET", "/api/v1/reviews", "", davi, 200).body["can"]); can != "[create]" {
+		e.t.Fatalf("davi's reviews: can %s", can)
+	}
+	if can := fmt.Sprint(e.request("GET", "/api/v1/products", "", nil, 200).body["can"]); can != "[]" {
+		e.t.Fatalf("the products, to no one: can %s", can)
+	}
+
 	// A PATCH changes only the text. The review comes with its product and
 	// only the fields asked for; its customer only to whom may read
 	// customers (staff), not to Carla.

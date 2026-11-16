@@ -10,8 +10,9 @@ package {{$m.Snake}}
 //		return p.{{$e.Camel}}Rules.Update(ctx, x) && ...
 //	}
 //
-// The API asks it before each operation on {{$e.Plural.Snake}}; ask it in your
-// own code too.
+// The API asks it before each operation on {{$e.Plural.Snake}}, and tells clients
+// what each person may do (can); ask it in your own code too. Writing
+// Create, write CanCreate too, so that clients offer what Create allows.
 type {{$e.Pascal}}Policy struct {
 	{{$e.Camel}}Rules
 }

@@ -18,6 +18,9 @@ generated or written by hand, builds on:
   `x-maximum`, and in its description.
 - Each list's filters, orders and pages, the fields `fields` may ask for, the
   relations `include` may answer, and every error code.
+- What the person may do: `can` on each record (`update`, `delete`) and on
+  each list (`create`), as the [policies](/esquadro/security/#policies)
+  decide; every action without security.
 
 ## The rules, and the API that checks them
 

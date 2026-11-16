@@ -2,9 +2,9 @@
 package main
 
 {{importBlock "context" "encoding/json" "io" "net/http" "strings" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
-// call answers the status of a request as who, and the IDs of the list it
-// answered, if any.
-func call(t *testing.T, method, url, who string) (int, map[string]bool) {
+// call answers the status of a request as who, the IDs of the list it
+// answered, if any, and the actions it says who may take (can).
+func call(t *testing.T, method, url, who string) (int, map[string]bool, string) {
 	t.Helper()
 	var body io.Reader
 	if method == "PATCH" {
@@ -23,13 +23,16 @@ func call(t *testing.T, method, url, who string) (int, map[string]bool) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	var page struct{ Items []struct{ ID string } }
+	var page struct {
+		Items []struct{ ID string }
+		Can   []string
+	}
 	_ = json.NewDecoder(res.Body).Decode(&page)
 	ids := map[string]bool{}
 	for _, item := range page.Items {
 		ids[item.ID] = true
 	}
-	return res.StatusCode, ids
+	return res.StatusCode, ids, strings.Join(page.Can, ",")
 }
 
 // as is the context of a request that comes from who.
@@ -89,13 +92,27 @@ func TestAPIAccess(t *testing.T) {
 				}
 {{- end}}
 			}
-			if got, _ := call(t, "GET", url+"/"+stored.ID.String(), who); got != want {
-				t.Errorf("get as %s: %d, want %d", who, got, want)
+			gotOne, _, canOne := call(t, "GET", url+"/"+stored.ID.String(), who)
+			if gotOne != want {
+				t.Errorf("get as %s: %d, want %d", who, gotOne, want)
+			}
+			var wantCan []string
+			if policy.Update(as(who), stored) {
+				wantCan = append(wantCan, "update")
+			}
+			if policy.Delete(as(who), stored) {
+				wantCan = append(wantCan, "delete")
+			}
+			if read && canOne != strings.Join(wantCan, ",") {
+				t.Errorf("can as %s: %q, want %q", who, canOne, strings.Join(wantCan, ","))
 			}
 
 			scope := policy.List(as(who))
 			owner, owned := scope.Owner()
-			got, ids := call(t, "GET", url, who)
+			got, ids, can := call(t, "GET", url, who)
+			if wantCreate := policy.CanCreate(as(who)); got == http.StatusOK && (can == "create") != wantCreate {
+				t.Errorf("the list's can as %s: %q, want create %v", who, can, wantCreate)
+			}
 			switch {
 			case !scope.All() && !owned:
 				if got != refused(who) {
@@ -113,12 +130,12 @@ func TestAPIAccess(t *testing.T) {
 			// Refusals only: a change let through would change what the
 			// next one sees.
 			if read && !policy.Update(as(who), stored) {
-				if got, _ := call(t, "PATCH", url+"/"+stored.ID.String(), who); got != refused(who) {
+				if got, _, _ := call(t, "PATCH", url+"/"+stored.ID.String(), who); got != refused(who) {
 					t.Errorf("patch as %s: %d, want %d", who, got, refused(who))
 				}
 			}
 			if read && !policy.Delete(as(who), stored) {
-				if got, _ := call(t, "DELETE", url+"/"+stored.ID.String(), who); got != refused(who) {
+				if got, _, _ := call(t, "DELETE", url+"/"+stored.ID.String(), who); got != refused(who) {
 					t.Errorf("delete as %s: %d, want %d", who, got, refused(who))
 				}
 			}

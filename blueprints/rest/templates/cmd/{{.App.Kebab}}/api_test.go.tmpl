@@ -355,7 +355,7 @@ func TestAPIFields(t *testing.T) {
 		slices.Sort(out)
 		return strings.Join(out, ",")
 	}
-	if status, body := get("/" + created.ID.String() + "?fields=created_at"); status != 200 || keys(body) != "created_at,id,version" {
+	if status, body := get("/" + created.ID.String() + "?fields=created_at"); status != 200 || keys(body) != "can,created_at,id,version" {
 		t.Fatalf("one with fields: %d %v", status, body)
 	}
 	status, body := get("?fields=created_at")
@@ -363,7 +363,7 @@ func TestAPIFields(t *testing.T) {
 	if status != 200 || len(items) == 0 {
 		t.Fatalf("a list with fields: %d %v", status, body)
 	}
-	if item, _ := items[0].(map[string]any); keys(item) != "created_at,id,version" {
+	if item, _ := items[0].(map[string]any); keys(item) != "can,created_at,id,version" {
 		t.Fatalf("a list with fields: %v", item)
 	}
 	if status, _ := get("/" + created.ID.String() + "?fields=nope"); status != 400 {
@@ -487,8 +487,8 @@ func TestAPIInclude(t *testing.T) {
 		t.Errorf("{{.Snake}}: %v, want an empty list", body[{{quote .Snake}}])
 	}
 {{- else if .Required}}
-	if related, _ := body[{{quote .Snake}}].(map[string]any); len(related) != 3 || related["created_at"] == nil {
-		t.Errorf("{{.Snake}}: %v, want its id, version and created_at", body[{{quote .Snake}}])
+	if related, _ := body[{{quote .Snake}}].(map[string]any); len(related) != 4 || related["created_at"] == nil {
+		t.Errorf("{{.Snake}}: %v, want its id, version, can and created_at", body[{{quote .Snake}}])
 	}
 {{- end}}
 {{- end}}

@@ -434,9 +434,13 @@ components:
 {{- end}}
         Every field comes unless `fields` asks for some: then only those, with
         `id` and `version`.
-      required: [id, version]
+      required: [id, version, can]
       properties:
         id: {type: string, format: uuid}
+        can:
+          type: array
+          description: What the request's person may do with it, as the API decides.
+          items: {type: string, enum: ["update", "delete"]}
 {{- range inRequest $e}}
         {{jsonName .}}: {{schema .}}
 {{- end}}
@@ -496,8 +500,12 @@ components:
 {{- end}}
     {{.Pascal}}Page:
       type: object
-      required: [items]
+      required: [items, can]
       properties:
+        can:
+          type: array
+          description: What the request's person may do with the list, as the API decides.
+          items: {type: string, enum: ["create"]}
         items:
           type: array
           items:

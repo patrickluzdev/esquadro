@@ -108,6 +108,12 @@ Ask the policy in your own code too: `sales.OrderPolicy{}.Update(ctx, order)`.
 The generated tests check the model's rules; `TestAPIAccess` checks that the
 API answers as the policy that runs says, yours included.
 
+The API also tells clients what the person may do, so that a screen offers
+only that: each record comes with `"can": ["update", "delete"]` (its policy's
+`Update` and `Delete`), and each list with `"can": ["create"]` (its
+`CanCreate`: may this person create some?). Writing `Create` in your policy,
+write `CanCreate` too, so that the two agree.
+
 Each operation of the API answers `401 unauthorized` to a request without a
 session or token that may not, and `403 forbidden` to one with a session;
 its description in `openapi.yaml` says who may. In your own code,
