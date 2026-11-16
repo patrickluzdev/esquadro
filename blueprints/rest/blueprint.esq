@@ -30,9 +30,9 @@ blueprint rest {
   /// without it).
   option if_match name default(optional)
   /// Whether a POST needs an Idempotency-Key: optional (a retry with it
-  /// answers the same) or required (428 without it); and how long a key
-  /// answers retries.
+  /// answers the same) or required (428 without it).
   option idempotency name default(optional)
+  /// How many hours an Idempotency-Key answers retries.
   option idempotency_hours int default(24)
 
   annotation entity {

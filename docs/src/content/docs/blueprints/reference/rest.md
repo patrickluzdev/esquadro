@@ -27,8 +27,8 @@ blueprint rest
 | `pagination` | list | `["cursor", "page"]` | How lists page, unless an entity says otherwise: cursor (after, limit, next), page (page, per_page, total) or both; [] lists every record, up to unpaged_max. |
 | `unpaged_max` | int | `1000` | The most records a list without pagination answers; above it, the list answers too_many_records. |
 | `if_match` | name | `"optional"` | Whether changing or deleting a record needs If-Match with the ETag it was read with: optional (it is checked when sent) or required (428 without it). |
-| `idempotency` | name | `"optional"` | Whether a POST needs an Idempotency-Key: optional (a retry with it answers the same) or required (428 without it); and how long a key answers retries. |
-| `idempotency_hours` | int | `24` |  |
+| `idempotency` | name | `"optional"` | Whether a POST needs an Idempotency-Key: optional (a retry with it answers the same) or required (428 without it). |
+| `idempotency_hours` | int | `24` | How many hours an Idempotency-Key answers retries. |
 
 ```esquadro
 blueprint rest {

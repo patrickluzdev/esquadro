@@ -174,6 +174,7 @@ func TestLifecycle(t *testing.T) {
 	}
 
 	e.ownerScenario(added["id"].(string))
+	e.safeWrites(added, category["id"].(string), brand["id"].(string))
 
 	// 6. Its own tests pass on the new model.
 	e.run(nil, "go", "test", "./...")
@@ -274,6 +275,35 @@ func (e *lifecycle) ownerScenario(product string) {
 	kept := e.request("PUT", path, `{"text":"Still great","product_id":"`+product+`","customer_id":"`+daviID+`"}`, carla, 200).body
 	if kept["customer_id"] != carlaID || kept["text"] != "Still great" {
 		e.t.Fatalf("the review after carla's update: %v", kept)
+	}
+}
+
+// safeWrites checks If-Match and Idempotency-Key through the running
+// service: an old version is refused, and a POST sent again makes one
+// record.
+func (e *lifecycle) safeWrites(product map[string]any, category, brand string) {
+	e.t.Helper()
+	admin := map[string]string{"Authorization": e.auth}
+	path := "/api/v1/products/" + product["id"].(string)
+	read := e.request("GET", path, "", admin, 200)
+	etag := read.header.Get("ETag")
+	if etag != fmt.Sprintf(`"%v"`, read.body["version"]) {
+		e.t.Fatalf("ETag %q, version %v", etag, read.body["version"])
+	}
+	change := fmt.Sprintf(`{"name":"Emma","price":"13.00","category_id":%q,"brand_id":%q,"sku":"EM-1"}`, category, brand)
+	withETag := map[string]string{"Authorization": e.auth, "If-Match": etag}
+	e.request("PUT", path, change, withETag, 200)
+	// Someone changed it since that ETag: refused, nothing lost.
+	if refused := e.request("PUT", path, change, withETag, 412); refused.body["code"] != "precondition_failed" {
+		e.t.Fatalf("an old ETag: %v", refused.body)
+	}
+
+	// The same POST twice, as a retry: one brand.
+	withKey := map[string]string{"Authorization": e.auth, "Idempotency-Key": "e2e-brand-1"}
+	first := e.request("POST", "/api/v1/brands", `{"name":"Zeta"}`, withKey, 201)
+	again := e.request("POST", "/api/v1/brands", `{"name":"Zeta"}`, withKey, 201)
+	if first.body["id"] != again.body["id"] || again.header.Get("Idempotent-Replayed") != "true" {
+		e.t.Fatalf("a retry made another brand: %v, %v", first.body, again.body)
 	}
 }
 
