@@ -1,3 +1,5 @@
+		edge.CORS(d.config.CORSOrigins),
+		edge.Secure(d.config.HSTS),
 {{- if realms .Entities}}
-		d.security.Authenticate([]string{ {{- range $i, $r := realms .Entities}}{{if $i}}, {{end}}"{{$r.Name}}"{{end -}} }, {{goStrings (strs .Options.origins)}}),
+		d.security.Authenticate([]string{ {{- range $i, $r := realms .Entities}}{{if $i}}, {{end}}"{{$r.Name}}"{{end -}} }, d.config.CORSOrigins),
 {{- end}}

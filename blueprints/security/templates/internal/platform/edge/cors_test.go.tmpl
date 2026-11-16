@@ -16,5 +16,14 @@ func TestCORSAnswersAllowedOriginsOnly(t *testing.T) {
 		if rec.Code != 204 || (rec.Header().Get("Access-Control-Allow-Origin") == origin) != allowed {
 			t.Errorf("preflight from %s: %d %v", origin, rec.Code, rec.Header())
 		}
+		if allowed && rec.Header().Get("Access-Control-Allow-Credentials") != "true" {
+			t.Errorf("an allowed origin sends its cookies: %v", rec.Header())
+		}
+	}
+	// Any origin, but without cookies.
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://any.example.com")
+	if rec := serve(CORS([]string{"*"})(noContent), req); rec.Header().Get("Access-Control-Allow-Origin") != "*" || rec.Header().Get("Access-Control-Allow-Credentials") != "" {
+		t.Errorf("any origin: %v", rec.Header())
 	}
 }

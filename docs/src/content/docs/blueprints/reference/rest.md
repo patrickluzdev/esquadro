@@ -16,7 +16,7 @@ blueprint rest
 ## Works with
 
 - **Requires** [http](../http/), [store](../store/): the app must use them too.
-- **Works with** [i18n](../i18n/), [rate_limit](../rate_limit/), [security_headers](../security_headers/), [testcontainers](../testcontainers/) when the app uses them.
+- **Works with** [i18n](../i18n/), [rate_limit](../rate_limit/), [testcontainers](../testcontainers/) when the app uses them.
 
 ## Options
 

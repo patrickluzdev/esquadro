@@ -74,7 +74,7 @@ func TestAPIEdge(t *testing.T) {
 			res.Header.Get("Content-Type") != "application/problem+json" {
 			t.Errorf("%s %s: %d %+v (%v), want %d %s", tc.method, tc.path, res.StatusCode, doc, err, tc.status, tc.code)
 		}
-		if {{if uses "security_headers"}}res.Header.Get("X-Content-Type-Options") != "nosniff" || {{end}}res.Header.Get("X-Request-Id") != doc.RequestID {
+		if {{if uses "security"}}res.Header.Get("X-Content-Type-Options") != "nosniff" || {{end}}res.Header.Get("X-Request-Id") != doc.RequestID {
 			t.Errorf("%s %s: headers %v", tc.method, tc.path, res.Header)
 		}
 	}

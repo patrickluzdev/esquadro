@@ -5,8 +5,10 @@ import (
 	"slices"
 )
 
-// CORS lets browsers on origins call the API, answering their preflight
-// requests; "*" is any origin. Without origins, it lets none in.
+// CORS lets browsers on origins call the app, answering their preflight
+// requests; "*" is any origin, but then without cookies. Without origins,
+// it lets none in. An allowed origin sends its cookies, and the CSRF token
+// of its session.
 func CORS(origins []string) Middleware {
 	return func(next http.Handler) http.Handler {
 		if len(origins) == 0 {
@@ -27,13 +29,14 @@ func CORS(origins []string) Middleware {
 					h.Set("Access-Control-Allow-Origin", "*")
 				} else {
 					h.Set("Access-Control-Allow-Origin", origin)
+					h.Set("Access-Control-Allow-Credentials", "true")
 				}
 				h.Set("Access-Control-Expose-Headers", "X-Request-Id, Content-Language, RateLimit-Limit, RateLimit-Remaining, Retry-After")
 			}
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				if allowed {
 					h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
-					h.Set("Access-Control-Allow-Headers", "Accept, Accept-Language, Authorization, Content-Type, X-Request-Id")
+					h.Set("Access-Control-Allow-Headers", "Accept, Accept-Language, Authorization, Content-Type, X-CSRF-Token, X-Request-Id")
 					h.Set("Access-Control-Max-Age", "600")
 				}
 				w.WriteHeader(http.StatusNoContent)

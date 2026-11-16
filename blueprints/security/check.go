@@ -186,7 +186,39 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 
 	options(p, set, &diags)
 	maintenance(p, set, realms, &diags)
+	needs(p, set, realms, &diags)
 	return diags
+}
+
+// needs checks what realms need: identities are kept in PostgreSQL, with
+// their own migrations, and principals are entities.
+func needs(p *project.Project, set *blueprint.Set, realms []*Realm, diags *diag.List) {
+	ref := securityRef(p)
+	if len(realms) == 0 || ref == nil {
+		return
+	}
+	var missing []string
+	for _, name := range []string{"domain", "postgres", "migrations"} {
+		if set.Get(name) == nil {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		diags.Errorf(ref.Pos, ref.Pos, "%s marked @security(principal), but security keeps identities with blueprints %s, which the app does not use", realms[0].Entity.Raw, strings.Join(missing, ", ")).
+			Suggestion = "blueprint " + missing[0]
+	}
+	if origins := names(set.Options["security"]["origins"]); slices.Contains(origins, "*") {
+		diags.Warnf(ref.Pos, ref.Pos, `origins ["*"] lets any site call the app, but browsers then send no cookies: pages of other origins sign in with tokens ("cookie": false), or list their origins`)
+	}
+}
+
+func securityRef(p *project.Project) *project.BlueprintRef {
+	for _, r := range p.App.Blueprints {
+		if r.Name == "security" {
+			return r
+		}
+	}
+	return nil
 }
 
 // maintenance warns when nothing cleans up the expired sessions and links:
@@ -195,23 +227,16 @@ func maintenance(p *project.Project, set *blueprint.Set, realms []*Realm, diags 
 	if len(realms) == 0 || set.Get("jobs") != nil || set.Get("worker") != nil {
 		return
 	}
-	for _, r := range p.App.Blueprints {
-		if r.Name == "security" {
-			diags.Warnf(r.Pos, r.Pos, "nothing cleans up expired sessions and email links, nor rotates the signing keys: add blueprint jobs or worker, or run %s security cleanup on a schedule", p.App.Kebab).
-				Suggestion = "blueprint worker"
-		}
+	if r := securityRef(p); r != nil {
+		diags.Warnf(r.Pos, r.Pos, "nothing cleans up expired sessions and email links, nor rotates the signing keys: add blueprint jobs or worker, or run %s security cleanup on a schedule", p.App.Kebab).
+			Suggestion = "blueprint worker"
 	}
 }
 
 // options checks the blueprint's own options, in the app block.
 func options(p *project.Project, set *blueprint.Set, diags *diag.List) {
 	opts := set.Options["security"]
-	var ref *project.BlueprintRef
-	for _, r := range p.App.Blueprints {
-		if r.Name == "security" {
-			ref = r
-		}
-	}
+	ref := securityRef(p)
 	if opts == nil || ref == nil {
 		return
 	}

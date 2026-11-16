@@ -54,6 +54,13 @@ type Loader struct {
 
 // Source returns the contents of a manifest read by the loader, for
 // rendering diagnostics, or nil.
+// Retired are built-in blueprints that are no more, with what replaces
+// them.
+var Retired = map[string]string{
+	"cors":             "blueprint security answers CORS; replace it with blueprint security, with its origins option",
+	"security_headers": "blueprint security sends the security headers; replace it with blueprint security, with its hsts option",
+}
+
 func (l *Loader) Source(file string) []byte { return l.sources[file] }
 
 // BuiltinNames lists the built-in blueprints.
@@ -102,6 +109,10 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 			}
 		}
 		if fsys == nil {
+			if msg, ok := Retired[ref.Ref]; ok {
+				errAtRef("blueprint %s is no more: %s", ref.Ref, msg)
+				return nil, diags
+			}
 			e := errAtRef("unknown built-in blueprint %q", ref.Ref)
 			if s := didYouMean(ref.Ref, l.BuiltinNames()); s != "" {
 				e.Suggestion = s

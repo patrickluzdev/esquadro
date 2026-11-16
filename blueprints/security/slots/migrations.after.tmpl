@@ -1,4 +1,6 @@
+{{- if realms .Entities}}
 	// The security tables, as this version of esquadro has them.
 	if err := securitymigrations.Apply(ctx, db); err != nil {
 		return err
 	}
+{{- end}}

@@ -1,3 +1,4 @@
+{{- if realms .Entities -}}
 // Package migrations holds the migrations of the security tables, which
 // come with esquadro: a new version of the security blueprint may add one.
 package migrations
@@ -31,3 +32,4 @@ func Apply(ctx context.Context, db *sql.DB) error {
 	}
 	return nil
 }
+{{end -}}

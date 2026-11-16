@@ -11,7 +11,7 @@ blueprint rest {
   /// The largest request body the API reads, in KB; 0 is no limit.
   env MAX_BODY_KB int prefixed field(MaxBodyKB) default("{{.Options.max_body_kb}}")
   requires http, store
-  optional i18n, rate_limit, security_headers, testcontainers
+  optional i18n, rate_limit, testcontainers
 
   /// Title of the API in the contract; the app's name when empty.
   option title string default("")

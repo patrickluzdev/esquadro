@@ -1,1 +1,3 @@
+{{- if realms .Entities}}
 	securitymigrations "{{.App.Module}}/internal/platform/security/migrations"
+{{- end}}

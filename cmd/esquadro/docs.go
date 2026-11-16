@@ -51,7 +51,7 @@ func runDocs(args []string, _, stderr io.Writer) int {
 var blueprintOrder = []string{
 	"app", "env", "domain", "http", "worker", "jobs",
 	"postgres", "migrations", "store", "testcontainers", "compose",
-	"rest", "api_docs", "security", "cors", "security_headers", "rate_limit", "compression", "i18n",
+	"rest", "api_docs", "security", "rate_limit", "compression", "i18n",
 	"observability",
 	"docker", "github_actions",
 	"git", "branching",

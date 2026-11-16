@@ -17,8 +17,6 @@ import "embed"
 //go:embed testcontainers/blueprint.esq all:testcontainers/templates
 //go:embed rest/blueprint.esq all:rest/templates rest/slots
 //go:embed api_docs/blueprint.esq all:api_docs/templates api_docs/slots
-//go:embed cors/blueprint.esq all:cors/templates cors/slots
-//go:embed security_headers/blueprint.esq all:security_headers/templates security_headers/slots
 //go:embed rate_limit/blueprint.esq all:rate_limit/templates rate_limit/slots
 //go:embed compression/blueprint.esq all:compression/templates compression/slots
 //go:embed i18n/blueprint.esq all:i18n/templates i18n/slots

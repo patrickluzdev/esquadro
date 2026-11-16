@@ -81,7 +81,7 @@ func TestAddGoesBeforeGit(t *testing.T) {
 	if code, _, errOut := esq(t, "new", "-no-gen", "-module", "example.com/shop", dir); code != 0 {
 		t.Fatal(errOut)
 	}
-	if code, _, errOut := esq(t, "add", "-no-gen", "cors", dir); code != 0 {
+	if code, _, errOut := esq(t, "add", "-no-gen", "rate_limit", dir); code != 0 {
 		t.Fatal(errOut)
 	}
 	got := read(t, filepath.Join(dir, "esquadro", "app.esq"))
@@ -142,8 +142,8 @@ func TestAddAndRemoveALocalBlueprint(t *testing.T) {
 }
 
 func TestRemoveDropsTheCommentOfAnEmptyGroup(t *testing.T) {
-	dir, appEsq := smallProject(t, "app,http,cors")
-	if code, out, errOut := esq(t, "remove", "-no-gen", "cors", dir); code != 0 || !strings.Contains(out, "removed cors from app.esq") {
+	dir, appEsq := smallProject(t, "app,http,compression")
+	if code, out, errOut := esq(t, "remove", "-no-gen", "compression", dir); code != 0 || !strings.Contains(out, "removed compression from app.esq") {
 		t.Fatalf("exit %d\n%s%s", code, out, errOut)
 	}
 	want := "  // the program, its modules and how it runs\n  // mine: keep this\n  blueprint app\n  blueprint http\n}\n"
@@ -163,7 +163,7 @@ func TestRemoveRefuses(t *testing.T) {
 		msg  string
 	}{
 		{[]string{"remove", "-no-gen", "postgres", dir}, "migrations requires postgres"},
-		{[]string{"remove", "-no-gen", "cors", dir}, "the app has no blueprint cors"},
+		{[]string{"remove", "-no-gen", "compression", dir}, "the app has no blueprint compression"},
 	} {
 		if code, _, errOut := esq(t, tc.args...); code != 1 || !strings.Contains(errOut, tc.msg) {
 			t.Errorf("%v: exit %d, %q", tc.args, code, errOut)

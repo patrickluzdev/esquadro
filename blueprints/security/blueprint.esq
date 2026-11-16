@@ -6,19 +6,24 @@
 /// principal's id: passwords (Argon2id), Google and GitHub sign-in, sessions
 /// in cookies, short JWTs with /.well-known/jwks.json, email verification and
 /// password reset. Each entity says who may list, read, create, update or
-/// delete it. Without a principal, it sends the security headers and answers
-/// CORS, as cors and security_headers did.
+/// delete it. Without a principal, it only sends the security headers and
+/// answers CORS.
 blueprint security {
   version "0.1.0"
-  requires app, env, domain, http, postgres, migrations
-  optional jobs, worker, rest, api_docs, i18n, observability, testcontainers, compose, docker
+  requires app, env, http
+  optional domain, postgres, migrations, jobs, worker, rest, api_docs, i18n, observability, testcontainers, compose, docker
 
   /// Signs CSRF tokens and encrypts the JWT signing keys; esquadro
   /// generates one for development.
-  env SECURITY_SECRET string secret required generate(32)
+  env SECURITY_SECRET string secret required generate(32) when("{{if realms .Entities}}true{{end}}")
   /// With the pepper option, the key every password hash is mixed with;
   /// kept out of the database. Changing it means resetting every password.
-  env SECURITY_PEPPER string secret required when("{{if .Options.pepper}}true{{end}}")
+  env SECURITY_PEPPER string secret required when("{{if and (realms .Entities) .Options.pepper}}true{{end}}")
+  /// The origins browsers may call the app from, comma-separated; * is any,
+  /// without cookies.
+  env CORS_ORIGINS list prefixed field(CORSOrigins) default("{{join \",\" (strs .Options.origins)}}")
+  /// Send Strict-Transport-Security, behind HTTPS only.
+  env HSTS bool prefixed field(HSTS) default("{{.Options.hsts}}")
   /// The OAuth client of the app at Google (console.cloud.google.com, APIs &
   /// Services, Credentials), for the realms that sign in with Google; its
   /// redirect URI is <public_url><path>/<realm>/oauth/google/callback.
@@ -38,9 +43,10 @@ blueprint security {
   /// The prefix of the identity routes: /identity/<realm>/sign-in.
   option path string default("/identity")
   /// The origins browsers may call the app from; "*" is any, but never with
-  /// cookies.
+  /// cookies. <APP>_CORS_ORIGINS, comma separated, overrides it.
   option origins list default([])
-  /// Send Strict-Transport-Security, behind HTTPS only.
+  /// Send Strict-Transport-Security, behind HTTPS only. <APP>_HSTS
+  /// overrides it.
   option hsts bool default(false)
   /// The address of the app, for the links of emails and the OAuth callbacks.
   option public_url string default("http://localhost:8080")

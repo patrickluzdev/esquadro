@@ -28,7 +28,7 @@ needs and drops a line to lose a capability. The built-in ones:
 |---|---|
 | The program and how it runs | [app](reference/app/), [env](reference/env/), [domain](reference/domain/), [http](reference/http/), [worker](reference/worker/), [jobs](reference/jobs/) |
 | PostgreSQL | [postgres](reference/postgres/), [migrations](reference/migrations/), [store](reference/store/), [testcontainers](reference/testcontainers/), [compose](reference/compose/) |
-| The JSON API | [rest](reference/rest/), [api_docs](reference/api_docs/), [cors](reference/cors/), [security_headers](reference/security_headers/), [rate_limit](reference/rate_limit/), [compression](reference/compression/), [i18n](reference/i18n/) |
+| The JSON API | [rest](reference/rest/), [api_docs](reference/api_docs/), [security](reference/security/), [rate_limit](reference/rate_limit/), [compression](reference/compression/), [i18n](reference/i18n/) |
 | Running it in production | [observability](reference/observability/) (see [Observability](/esquadro/observability/)), [docker](reference/docker/), [github_actions](reference/github_actions/) (see [Deploying](/esquadro/deploying/)) |
 | The repository | [git](reference/git/), [branching](reference/branching/) (see [Branching](/esquadro/branching/)) |
 
@@ -75,7 +75,7 @@ generating.
   `postgres` adds its service to `compose.yaml` only with `compose`;
   `rate_limit` answers in the client's language only with `i18n`.
 - **Slots**: the points where a blueprint lets others add code, such as
-  `http.middleware` or `app.commands`. That is how `cors` puts itself in the
+  `http.middleware` or `app.commands`. That is how `compression` puts itself in the
   HTTP server's chain without the server knowing it.
 
 ## Configuring them

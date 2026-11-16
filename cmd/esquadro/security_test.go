@@ -142,3 +142,36 @@ func TestSecurityMaintenance(t *testing.T) {
 		t.Fatalf("no warning:\n%s", errOut)
 	}
 }
+
+// cors and security_headers became part of security: a project that still
+// names them is told what to write instead.
+func TestRetiredBlueprints(t *testing.T) {
+	for name, option := range map[string]string{"cors": "origins", "security_headers": "hsts"} {
+		dir, appEsq := smallProject(t, "app,env,http")
+		src := strings.Replace(read(t, appEsq), "  blueprint http\n", "  blueprint http\n  blueprint "+name+"\n", 1)
+		os.WriteFile(appEsq, []byte(src), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if code != 1 || !strings.Contains(errOut, "blueprint "+name+" is no more") || !strings.Contains(errOut, "with its "+option+" option") {
+			t.Errorf("%s: exit %d\n%s", name, code, errOut)
+		}
+	}
+}
+
+// Without a principal, security only answers CORS and sends the headers:
+// no database needed.
+func TestSecurityWithoutPrincipals(t *testing.T) {
+	dir, _ := smallProject(t, "app,env,http,security")
+	if code, out, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatalf("gen: %s%s", out, errOut)
+	}
+	routes := read(t, filepath.Join(dir, "cmd", "shop", "routes.go"))
+	if !strings.Contains(routes, "edge.CORS(d.config.CORSOrigins)") || !strings.Contains(routes, "edge.Secure(d.config.HSTS)") || strings.Contains(routes, "Authenticate") {
+		t.Fatalf("routes.go:\n%s", routes)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "internal", "platform", "security")); err == nil {
+		t.Fatal("a security package without principals")
+	}
+	if strings.Contains(read(t, filepath.Join(dir, ".env.example")), "SECURITY_SECRET") {
+		t.Fatal("SECURITY_SECRET without principals")
+	}
+}
