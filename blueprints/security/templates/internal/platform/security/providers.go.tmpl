@@ -1,0 +1,129 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+)
+
+// Provider is a sign-in with another account: an OAuth 2.0 client of the
+// app at a provider, and how to read who signed in there.
+type Provider struct {
+	ClientID, ClientSecret string
+	AuthURL, TokenURL      string
+	Scopes                 []string
+	// Profile reads who signed in, with a client that sends the access
+	// token.
+	Profile func(ctx context.Context, client *http.Client) (Profile, error)
+}
+
+// Profile is who signed in at a provider.
+type Profile struct {
+	// Subject is the account's id at the provider: it never changes, unlike
+	// the email.
+	Subject       string
+	Email         string
+	EmailVerified bool
+	Name          string
+}
+
+// Google signs in with Google, by OpenID Connect: the profile is read from
+// its userinfo endpoint, over TLS, with the access token the token
+// endpoint answered.
+func Google(clientID, clientSecret string) Provider {
+	return OpenIDProvider(clientID, clientSecret,
+		"https://accounts.google.com/o/oauth2/v2/auth", "https://oauth2.googleapis.com/token",
+		"https://openidconnect.googleapis.com/v1/userinfo")
+}
+
+// OpenIDProvider is a provider that speaks OpenID Connect, with its
+// endpoints.
+func OpenIDProvider(clientID, clientSecret, authURL, tokenURL, userinfoURL string) Provider {
+	return Provider{
+		ClientID: clientID, ClientSecret: clientSecret, AuthURL: authURL, TokenURL: tokenURL,
+		Scopes: []string{"openid", "email", "profile"},
+		Profile: func(ctx context.Context, client *http.Client) (Profile, error) {
+			var info struct {
+				Sub           string `json:"sub"`
+				Email         string `json:"email"`
+				EmailVerified any    `json:"email_verified"`
+				Name          string `json:"name"`
+			}
+			if err := getJSON(ctx, client, userinfoURL, &info); err != nil {
+				return Profile{}, err
+			}
+			// Some providers answer email_verified as a string.
+			verified := info.EmailVerified == true || info.EmailVerified == "true"
+			return Profile{Subject: info.Sub, Email: info.Email, EmailVerified: verified, Name: info.Name}, nil
+		},
+	}
+}
+
+// GitHub signs in with GitHub, by OAuth 2.0: the profile is the user, and
+// its primary email when GitHub verified it.
+func GitHub(clientID, clientSecret string) Provider {
+	return GitHubProvider(clientID, clientSecret, "https://github.com/login/oauth/authorize",
+		"https://github.com/login/oauth/access_token", "https://api.github.com")
+}
+
+// GitHubProvider is GitHub at other addresses, such as GitHub Enterprise.
+func GitHubProvider(clientID, clientSecret, authURL, tokenURL, api string) Provider {
+	return Provider{
+		ClientID: clientID, ClientSecret: clientSecret, AuthURL: authURL, TokenURL: tokenURL,
+		Scopes: []string{"read:user", "user:email"},
+		Profile: func(ctx context.Context, client *http.Client) (Profile, error) {
+			var user struct {
+				ID    int64  `json:"id"`
+				Login string `json:"login"`
+				Name  string `json:"name"`
+			}
+			if err := getJSON(ctx, client, api+"/user", &user); err != nil {
+				return Profile{}, err
+			}
+			var emails []struct {
+				Email    string `json:"email"`
+				Primary  bool   `json:"primary"`
+				Verified bool   `json:"verified"`
+			}
+			if err := getJSON(ctx, client, api+"/user/emails", &emails); err != nil {
+				return Profile{}, err
+			}
+			p := Profile{Subject: strconv.FormatInt(user.ID, 10), Name: user.Name}
+			if p.Name == "" {
+				p.Name = user.Login
+			}
+			for _, e := range emails {
+				if e.Primary {
+					p.Email, p.EmailVerified = e.Email, e.Verified
+				}
+			}
+			return p, nil
+		},
+	}
+}
+
+// getJSON reads JSON from url into v.
+func getJSON(ctx context.Context, client *http.Client, url string, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("security: %s answered %s", url, res.Status)
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(nil, res.Body, 1<<20)).Decode(v); err != nil {
+		return errors.Join(errors.New("security: a profile that is not JSON"), err)
+	}
+	return nil
+}
+{{end -}}

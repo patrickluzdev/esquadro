@@ -59,7 +59,11 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | Variable | Type | Value | |
 |---|---|---|---|
 | `SECURITY_SECRET` | string, secret, required outside development | generated in development | Signs CSRF tokens and encrypts the JWT signing keys; esquadro generates one for development. |
-| `SECURITY_PEPPER` | string, secret | - | With the pepper option, the key every password hash is mixed with; kept out of the database. Changing it means resetting every password. |
+| `SECURITY_PEPPER` | string, secret, required outside development | - | With the pepper option, the key every password hash is mixed with; kept out of the database. Changing it means resetting every password. |
+| `SECURITY_GOOGLE_CLIENT_ID` | string, required outside development | - | The OAuth client of the app at Google (console.cloud.google.com, APIs & Services, Credentials), for the realms that sign in with Google; its redirect URI is &lt;public_url>&lt;path>/&lt;realm>/oauth/google/callback. |
+| `SECURITY_GOOGLE_CLIENT_SECRET` | string, secret, required outside development | - |  |
+| `SECURITY_GITHUB_CLIENT_ID` | string, required outside development | - | The OAuth app at GitHub (Settings, Developer settings, OAuth Apps), for the realms that sign in with GitHub; its callback URL is &lt;public_url>&lt;path>/&lt;realm>/oauth/github/callback. |
+| `SECURITY_GITHUB_CLIENT_SECRET` | string, secret, required outside development | - |  |
 
 ## Annotations
 
@@ -92,3 +96,4 @@ An annotation is written `@security(key value)` on the element.
 - `golang.org/x/crypto` v0.58.0
 - `golang.org/x/text` v0.43.0
 - `github.com/go-jose/go-jose/v4` v4.1.7
+- `golang.org/x/oauth2` v0.37.0

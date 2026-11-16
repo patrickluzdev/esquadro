@@ -30,6 +30,7 @@ CREATE TABLE {{$identities}} (
 CREATE TABLE {{$credentials}} (
   id                       uuid PRIMARY KEY,
   identity_id              uuid NOT NULL REFERENCES {{$identities}} (id) ON DELETE CASCADE,
+  realm                    text NOT NULL,
   provider                 text NOT NULL,
   subject                  text NOT NULL,
   password_hash            text,
@@ -41,7 +42,8 @@ CREATE TABLE {{$credentials}} (
   scope                    text,
   created_at               timestamptz NOT NULL DEFAULT now(),
   updated_at               timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (provider, subject)
+  -- An account at a provider signs in to one identity per realm.
+  UNIQUE (realm, provider, subject)
 );
 CREATE INDEX ON {{$credentials}} (identity_id);
 

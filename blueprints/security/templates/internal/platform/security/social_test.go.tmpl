@@ -1,0 +1,194 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+package security
+
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"sync"
+	"testing"
+)
+
+// fakeProvider is an OAuth 2.0 provider for the tests: it gives a code
+// for the PKCE challenge it was sent, and answers the profile it is set to.
+type fakeProvider struct {
+	srv       *httptest.Server
+	mu        sync.Mutex
+	challenge string
+	profile   map[string]any
+}
+
+func newFakeProvider(t *testing.T) *fakeProvider {
+	f := &fakeProvider{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		sum := sha256.Sum256([]byte(r.Form.Get("code_verifier")))
+		f.mu.Lock()
+		challenge := f.challenge
+		f.mu.Unlock()
+		if r.Form.Get("code") != "good" || base64.RawURLEncoding.EncodeToString(sum[:]) != challenge {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
+	})
+	mux.HandleFunc("GET /userinfo", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer at" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(f.profile)
+	})
+	f.srv = httptest.NewServer(mux)
+	t.Cleanup(f.srv.Close)
+	return f
+}
+
+func (f *fakeProvider) provider() Provider {
+	return OpenIDProvider("client", "secret", f.srv.URL+"/auth", f.srv.URL+"/token", f.srv.URL+"/userinfo")
+}
+
+// signedInAs sets who signs in at the provider next.
+func (f *fakeProvider) signedInAs(sub, email string, verified bool, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.profile = map[string]any{"sub": sub, "email": email, "email_verified": verified, "name": name}
+}
+
+// social goes to the provider from start (a GET of the sign-in, or the url
+// a link answered) and back, with the code: the callback's answer.
+func (f *flow) social(start answer, headers ...string) answer {
+	f.t.Helper()
+	to := start.header.Get("Location")
+	if to == "" {
+		to = start.str("url")
+	}
+	u, err := url.Parse(to)
+	if err != nil || !strings.HasPrefix(to, f.fake.srv.URL+"/auth") {
+		f.t.Fatalf("not sent to the provider: %d %q %v", start.status, to, start.body)
+	}
+	q := u.Query()
+	if q.Get("code_challenge_method") != "S256" || q.Get("redirect_uri") != "http://test.example/identity/person/oauth/fake/callback" {
+		f.t.Fatalf("auth url: %s", to)
+	}
+	f.fake.mu.Lock()
+	f.fake.challenge = q.Get("code_challenge")
+	f.fake.mu.Unlock()
+	state, _, _ := strings.Cut(start.header.Get("Set-Cookie"), ";")
+	return f.call("GET", "/identity/person/oauth/fake/callback?code=good&state="+url.QueryEscape(q.Get("state")), nil, append(headers, "Cookie: "+state)...)
+}
+
+func sessionCookie(a answer) string {
+	for _, c := range a.header.Values("Set-Cookie") {
+		if strings.HasPrefix(c, "test_person_session=") {
+			v, _, _ := strings.Cut(c, ";")
+			return "Cookie: " + v
+		}
+	}
+	return ""
+}
+
+func TestSocialSignUpAndSignIn(t *testing.T) {
+	f := newFlow(t)
+	f.fake.signedInAs("g-1", "Ana@Example.com", true, "Ana")
+
+	back := f.social(f.call("GET", "/identity/person/oauth/fake?redirect=/app", nil))
+	if back.status != http.StatusFound || back.header.Get("Location") != "/app" || sessionCookie(back) == "" {
+		t.Fatalf("sign-up: %d %v %v", back.status, back.header, back.body)
+	}
+	if len(f.people) != 1 {
+		t.Fatalf("%d people", len(f.people))
+	}
+	me := f.call("GET", "/identity/person/session", nil, sessionCookie(back))
+	f.expect(me, 200, "")
+
+	// The second time, the same account signs in.
+	again := f.social(f.call("GET", "/identity/person/oauth/fake?redirect=https://app.example/signed-in/home", nil))
+	if again.header.Get("Location") != "https://app.example/signed-in/home" || len(f.people) != 1 {
+		t.Fatalf("sign-in: %v, %d people", again.header, len(f.people))
+	}
+
+	// The account has no password yet, and the provider is its only way in.
+	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+	cookie := sessionCookie(again)
+	csrf := "X-CSRF-Token: " + f.call("GET", "/identity/person/session", nil, cookie).str("csrfToken")
+	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 409, "last_credential")
+
+	// It sets a first password, with a recent sign-in instead of the
+	// current one; then the provider may go.
+	f.expect(f.call("POST", "/identity/person/password", map[string]string{"newPassword": password}, cookie, csrf), 204, "")
+	f.signIn(password)
+	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 204, "")
+}
+
+func TestSocialRefusals(t *testing.T) {
+	f := newFlow(t)
+	f.fake.signedInAs("g-1", "ana@example.com", true, "Ana")
+
+	// Only the app's paths and redirect_urls.
+	f.expect(f.call("GET", "/identity/person/oauth/fake?redirect=https://evil.example/", nil), 400, "invalid_redirect")
+	f.expect(f.call("GET", "/identity/person/oauth/fake?redirect=//evil.example/", nil), 400, "invalid_redirect")
+
+	// The callback finishes only in the browser that started, once.
+	start := f.call("GET", "/identity/person/oauth/fake?redirect=/app", nil)
+	u, _ := url.Parse(start.header.Get("Location"))
+	state := u.Query().Get("state")
+	callback := "/identity/person/oauth/fake/callback?code=good&state=" + url.QueryEscape(state)
+	f.expect(f.call("GET", callback, nil), 403, "csrf")
+	if first := f.call("GET", callback, nil, "Cookie: test_person_oauth="+state); first.status != http.StatusFound {
+		t.Fatalf("the first use: %d", first.status)
+	}
+	f.expect(f.call("GET", callback, nil, "Cookie: test_person_oauth="+state), 403, "csrf")
+
+	// An account with the email whose email is not verified is not taken
+	// over: its owner signs in and links the provider.
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
+	refused := f.social(f.call("GET", "/identity/person/oauth/fake?redirect=/app", nil))
+	if refused.header.Get("Location") != "/app?error=account_exists" || sessionCookie(refused) != "" {
+		t.Fatalf("account_exists: %v", refused.header)
+	}
+
+	// Without a name, the entity cannot be made.
+	f.fake.signedInAs("g-2", "bia@example.com", true, "")
+	if l := f.social(f.call("GET", "/identity/person/oauth/fake", nil)).header.Get("Location"); l != "/?error=signup_incomplete" {
+		t.Fatalf("signup_incomplete: %s", l)
+	}
+	f.fake.signedInAs("g-3", "", false, "Caio")
+	if l := f.social(f.call("GET", "/identity/person/oauth/fake", nil)).header.Get("Location"); l != "/?error=email_missing" {
+		t.Fatalf("email_missing: %s", l)
+	}
+}
+
+func TestSocialLinkAndUnlink(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
+	cookie, csrf := f.signIn(password)
+
+	// Linked from the account, a provider of another email signs in to it.
+	f.fake.signedInAs("g-9", "ana.work@example.com", false, "Ana")
+	linked := f.social(f.call("POST", "/identity/person/providers/fake", map[string]string{"redirect": "/settings"}, cookie, csrf), cookie)
+	if linked.header.Get("Location") != "/settings" {
+		t.Fatalf("link: %v", linked.header)
+	}
+	list := f.call("GET", "/identity/person/providers", nil, cookie)
+	if !strings.Contains(list.raw, `"fake"`) || !strings.Contains(list.raw, `"password"`) {
+		t.Fatalf("providers: %s", list.raw)
+	}
+	if sessionCookie(f.social(f.call("GET", "/identity/person/oauth/fake", nil))) == "" {
+		t.Fatal("the linked provider did not sign in")
+	}
+
+	// Unlinking leaves the password; the password, alone, stays.
+	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 204, "")
+	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 404, "not_found")
+}
+{{end -}}

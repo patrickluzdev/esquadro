@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -24,7 +25,8 @@ import (
 // Realm is a kind of principal, with the entity it is and how it signs in.
 type Realm struct {
 	Name        string
-	Signup      string // open, invite or closed
+	Providers   []string // password, google, github
+	Signup      string   // open, invite or closed
 	VerifyEmail string // required, optional or off
 	Policy      PasswordPolicy
 	// Create makes the principal (the entity) from the fields of a sign-up
@@ -37,12 +39,25 @@ type Realm struct {
 
 // Routes are the identity routes of each realm, under prefix:
 // <prefix>/<realm>/sign-up, sign-in, sign-out, session, token, sessions,
-// password, and the account itself.
+// password, oauth/<provider>, providers, and the account itself.
 func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
+	s.prefix = prefix
 	for _, r := range realms {
 		base := prefix + "/" + r.Name
-		mux.HandleFunc("POST "+base+"/sign-up", s.signUp(r))
-		mux.HandleFunc("POST "+base+"/sign-in", s.signIn(r))
+		if slices.Contains(r.Providers, "password") {
+			mux.HandleFunc("POST "+base+"/sign-up", s.signUp(r))
+			mux.HandleFunc("POST "+base+"/sign-in", s.signIn(r))
+		}
+		for _, name := range r.Providers {
+			if name == "password" {
+				continue
+			}
+			mux.HandleFunc("GET "+base+"/oauth/"+name, s.oauthStart(r, name))
+			mux.HandleFunc("GET "+base+"/oauth/"+name+"/callback", s.oauthCallback(r, name))
+			mux.HandleFunc("POST "+base+"/providers/"+name, s.linkStart(r, name))
+			mux.HandleFunc("DELETE "+base+"/providers/"+name, s.unlink(r, name))
+		}
+		mux.HandleFunc("GET "+base+"/providers", s.providers(r))
 		mux.HandleFunc("POST "+base+"/sign-out", s.signOut(r))
 		mux.HandleFunc("GET "+base+"/session", s.session(r))
 		mux.HandleFunc("POST "+base+"/token", s.token(r))
@@ -133,8 +148,8 @@ func (s *Security) createAccount(ctx context.Context, realm Realm, email, passwo
 	if err != nil || tag.RowsAffected() == 0 {
 		return false, err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, provider, subject, password_hash) VALUES ($1, $2, 'password', $3, $4)`,
-		uuid.NewV7(), id, id.String(), hash); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)`,
+		uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
 		return false, err
 	}
 	// The principal is made by its module; if anything fails after, it is
@@ -225,16 +240,24 @@ func (s *Security) passwordOf(ctx context.Context, realm, email string) (uuid.UU
 // startSession opens a session and answers it: in a cookie, with the CSRF
 // token the app sends back, or as a token in the body.
 func (s *Security) startSession(w http.ResponseWriter, r *http.Request, realm string, id uuid.UUID, cookie bool) {
-	ctx := r.Context()
-	token, ses, err := s.StartSession(ctx, s.db, id, clientIP(r), r.UserAgent())
+	answer, err := s.openSession(w, r, realm, id, cookie)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
+	writeJSON(w, answer)
+}
+
+// openSession opens a session, set in a cookie or left in the answer.
+func (s *Security) openSession(w http.ResponseWriter, r *http.Request, realm string, id uuid.UUID, cookie bool) (sessionAnswer, error) {
+	ctx := r.Context()
+	token, ses, err := s.StartSession(ctx, s.db, id, clientIP(r), r.UserAgent())
+	if err != nil {
+		return sessionAnswer{}, err
+	}
 	roles, err := s.Roles(ctx, s.db, id)
 	if err != nil {
-		s.fail(w, r, err)
-		return
+		return sessionAnswer{}, err
 	}
 	s.event(ctx, "sign_in", realm, id.String(), true)
 	answer := sessionAnswer{ID: id, Realm: realm, Roles: roles, ExpiresAt: ses.ExpiresAt}
@@ -244,7 +267,7 @@ func (s *Security) startSession(w http.ResponseWriter, r *http.Request, realm st
 	} else {
 		answer.SessionToken = token
 	}
-	writeJSON(w, answer)
+	return answer, nil
 }
 
 // sessionAnswer is who signed in.
@@ -397,7 +420,14 @@ func (s *Security) changePassword(realm Realm) http.HandlerFunc {
 			s.fail(w, r, err)
 			return
 		}
-		if ok, _, err := s.hasher.Verify(in.Current, hash); err != nil || !ok {
+		// Who signed in only with a provider sets a first password with a
+		// recent sign-in instead of the current one.
+		if hash == "" {
+			if s.now().Sub(p.AuthenticatedAt) >= 10*time.Minute {
+				edge.Write(w, r, ErrReauthenticate)
+				return
+			}
+		} else if ok, _, err := s.hasher.Verify(in.Current, hash); err != nil || !ok {
 			edge.Write(w, r, ErrInvalidCredentials)
 			return
 		}
@@ -418,7 +448,8 @@ func (s *Security) changePassword(realm Realm) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(ctx)
-		if _, err := tx.Exec(ctx, `UPDATE {{$credentials}} SET password_hash = $2, updated_at = now() WHERE identity_id = $1 AND provider = 'password'`, p.ID, again); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)
+			ON CONFLICT (realm, provider, subject) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`, uuid.NewV7(), p.ID, realm.Name, p.ID.String(), again); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -508,10 +539,14 @@ func (s *Security) fail(w http.ResponseWriter, r *http.Request, err error) {
 		edge.Write(w, r, p)
 		return
 	}
-	if s.logger != nil {
-		s.logger.ErrorContext(r.Context(), "security", "error", err)
-	}
+	s.logError(r.Context(), err)
 	edge.Write(w, r, edge.ErrInternal)
+}
+
+func (s *Security) logError(ctx context.Context, err error) {
+	if s.logger != nil {
+		s.logger.ErrorContext(ctx, "security", "error", err)
+	}
 }
 
 // event logs what happened to an identity, for audit and alerts; never a

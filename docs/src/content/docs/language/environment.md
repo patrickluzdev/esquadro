@@ -57,6 +57,7 @@ A declaration is `NAME type modifiers`. The types are `string`, `int`,
 | `generate(32)` | a secret esquadro generates for development, in `.env.development` |
 | `prefixed` | the name starts with the app's: `POOL_MAX` is `SHOP_POOL_MAX` |
 | `field(Name)` | the field of `config.Config` that holds it, when its name says otherwise |
+| `when("{{...}}")` | in a blueprint, the variable exists only when the template renders to something other than empty or `false`: `when("{{if .Options.pepper}}true{{end}}")` |
 
 Each blueprint's reference page lists the variables it declares. `APP_NAME`
 names the app in its logs and telemetry (`shop` by default).

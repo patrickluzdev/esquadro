@@ -18,11 +18,22 @@ blueprint security {
   env SECURITY_SECRET string secret required generate(32)
   /// With the pepper option, the key every password hash is mixed with;
   /// kept out of the database. Changing it means resetting every password.
-  env SECURITY_PEPPER string secret
+  env SECURITY_PEPPER string secret required when("{{if .Options.pepper}}true{{end}}")
+  /// The OAuth client of the app at Google (console.cloud.google.com, APIs &
+  /// Services, Credentials), for the realms that sign in with Google; its
+  /// redirect URI is <public_url><path>/<realm>/oauth/google/callback.
+  env SECURITY_GOOGLE_CLIENT_ID string required when("{{if usesProvider .Entities \"google\"}}true{{end}}")
+  env SECURITY_GOOGLE_CLIENT_SECRET string secret required when("{{if usesProvider .Entities \"google\"}}true{{end}}")
+  /// The OAuth app at GitHub (Settings, Developer settings, OAuth Apps),
+  /// for the realms that sign in with GitHub; its callback URL is
+  /// <public_url><path>/<realm>/oauth/github/callback.
+  env SECURITY_GITHUB_CLIENT_ID string required when("{{if usesProvider .Entities \"github\"}}true{{end}}")
+  env SECURITY_GITHUB_CLIENT_SECRET string secret required when("{{if usesProvider .Entities \"github\"}}true{{end}}")
 
   go_require "golang.org/x/crypto" "v0.58.0"
   go_require "golang.org/x/text" "v0.43.0"
   go_require "github.com/go-jose/go-jose/v4" "v4.1.7"
+  go_require "golang.org/x/oauth2" "v0.37.0"
 
   /// The prefix of the identity routes: /identity/<realm>/sign-in.
   option path string default("/identity")

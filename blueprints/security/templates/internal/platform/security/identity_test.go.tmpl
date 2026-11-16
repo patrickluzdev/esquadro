@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 	"uuid"
+
+	"{{.App.Module}}/internal/platform/edge"
 )
 
 // flow is the identity routes on a fresh database, with a realm open to
@@ -21,17 +23,27 @@ type flow struct {
 	s       *Security
 	now     *time.Time
 	handler http.Handler
+	fake    *fakeProvider
 	mu      sync.Mutex
 	people  map[uuid.UUID]string
 }
 
 func newFlow(t *testing.T) *flow {
 	s, now := testSecurity(t)
-	f := &flow{t: t, s: s, now: now, people: map[uuid.UUID]string{}}
+	f := &flow{t: t, s: s, now: now, people: map[uuid.UUID]string{}, fake: newFakeProvider(t)}
+	s.cfg.PublicURL = "http://test.example"
+	s.cfg.RedirectURLs = []string{"https://app.example/signed-in"}
+	s.cfg.Providers = map[string]Provider{"fake": f.fake.provider()}
 	policy := PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists"}
 	person := Realm{
-		Name: "person", Signup: "open", VerifyEmail: "optional", Policy: policy,
-		Validate: func(json.RawMessage) error { return nil },
+		Name: "person", Providers: []string{"password", "fake"}, Signup: "open", VerifyEmail: "optional", Policy: policy,
+		Validate: func(fields json.RawMessage) error {
+			var in struct{ Name string }
+			if json.Unmarshal(fields, &in) != nil || in.Name == "" {
+				return &edge.Problem{Status: 422, Code: "invalid_fields"}
+			}
+			return nil
+		},
 		Create: func(_ context.Context, id uuid.UUID, fields json.RawMessage) error {
 			var in struct{ Name string }
 			_ = json.Unmarshal(fields, &in)
@@ -59,6 +71,7 @@ func newFlow(t *testing.T) *flow {
 type answer struct {
 	status int
 	body   map[string]any
+	raw    string
 	header http.Header
 }
 
@@ -79,7 +92,7 @@ func (f *flow) call(method, path string, body any, headers ...string) answer {
 	}
 	rec := httptest.NewRecorder()
 	f.handler.ServeHTTP(rec, req)
-	a := answer{status: rec.Code, header: rec.Header()}
+	a := answer{status: rec.Code, header: rec.Header(), raw: rec.Body.String()}
 	_ = json.Unmarshal(rec.Body.Bytes(), &a.body)
 	return a
 }
@@ -162,7 +175,7 @@ func (f *flow) callBody(a answer) string { b, _ := json.Marshal(a.body); return 
 
 func TestSessionsAndPassword(t *testing.T) {
 	f := newFlow(t)
-	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password}), 202, "")
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
 	cookie, csrf := f.signIn(password)
 
 	// A client that is not a browser gets the session token in the body.
@@ -189,7 +202,7 @@ func TestSessionsAndPassword(t *testing.T) {
 
 func TestLockout(t *testing.T) {
 	f := newFlow(t)
-	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password}), 202, "")
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
 	for range 3 {
 		f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": "wrong password!"})
 	}

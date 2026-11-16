@@ -679,25 +679,37 @@ func (c *composer) renderEnv() []*project.EnvVar {
 			name := display(bp, "blueprint.esq")
 			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
 				Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
+			execute := func(s string) (string, bool) {
+				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)
+				if err != nil {
+					c.errorf(name, 0, "the value of %s: %v", v.Full, err)
+					return "", false
+				}
+				var b bytes.Buffer
+				if err := t.Execute(&b, data); err != nil {
+					c.errorf(name, 0, "the value of %s: %s", v.Full, cleanTemplateMsg(err.Error()))
+					return "", false
+				}
+				return b.String(), true
+			}
+			if v.When != "" {
+				if when, ok := execute(v.When); !ok || strings.TrimSpace(when) == "" || strings.TrimSpace(when) == "false" {
+					continue
+				}
+			}
 			render := func(val any) any {
 				s, ok := val.(string)
 				if !ok || !strings.Contains(s, "{{") {
 					return val
 				}
-				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)
-				if err != nil {
-					c.errorf(name, 0, "the value of %s: %v", v.Full, err)
+				text, ok := execute(s)
+				if !ok {
 					return val
 				}
-				var b bytes.Buffer
-				if err := t.Execute(&b, data); err != nil {
-					c.errorf(name, 0, "the value of %s: %s", v.Full, cleanTemplateMsg(err.Error()))
-					return val
+				if msg := checkEnvText(text, v.Type); msg != "" {
+					c.errorf(name, 0, "the value of %s renders to %q: %s", v.Full, text, msg)
 				}
-				if msg := checkEnvText(b.String(), v.Type); msg != "" {
-					c.errorf(name, 0, "the value of %s renders to %q: %s", v.Full, b.String(), msg)
-				}
-				return b.String()
+				return text
 			}
 			r.Default = render(v.Default)
 			r.ByEnv = map[string]any{}

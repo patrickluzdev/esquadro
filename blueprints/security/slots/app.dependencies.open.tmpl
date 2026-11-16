@@ -17,6 +17,20 @@
 {{- with strs .Options.password_lists}}
 		PasswordLists: {{goStrings .}},
 {{- end}}
+		PublicURL: {{printf "%q" .Options.public_url}},
+{{- with strs .Options.redirect_urls}}
+		RedirectURLs: {{goStrings .}},
+{{- end}}
+{{- if or (usesProvider .Entities "google") (usesProvider .Entities "github")}}
+		Providers: map[string]security.Provider{
+{{- if usesProvider .Entities "google"}}
+			"google": security.Google(d.config.SecurityGoogleClientID, d.config.SecurityGoogleClientSecret),
+{{- end}}
+{{- if usesProvider .Entities "github"}}
+			"github": security.GitHub(d.config.SecurityGithubClientID, d.config.SecurityGithubClientSecret),
+{{- end}}
+		},
+{{- end}}
 	}, d.logger)
 	if err != nil {
 		release()

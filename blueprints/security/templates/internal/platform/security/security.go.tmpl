@@ -42,6 +42,14 @@ type Config struct {
 	LimitAttempts bool
 	// PasswordLists are files of passwords to refuse.
 	PasswordLists []string
+	// PublicURL is the address of the app, for the providers' callbacks.
+	PublicURL string
+	// RedirectURLs are where, besides the app's own paths, people may be sent
+	// back to after signing in with a provider: an origin, or an origin and
+	// the start of a path.
+	RedirectURLs []string
+	// Providers sign in with other accounts, by name: google, github.
+	Providers map[string]Provider
 }
 
 // Security holds what the security of the app works with.
@@ -53,6 +61,7 @@ type Security struct {
 	keyKey  []byte
 	keys    keyCache
 	lists   map[string]bool
+	prefix  string
 	logger  *slog.Logger
 	now     func() time.Time
 }

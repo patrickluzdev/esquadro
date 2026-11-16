@@ -59,6 +59,9 @@ type EnvVar struct {
 	Generate int
 	// Field is the Go field of config.Config that holds it.
 	Field string
+	// When is a template, rendered with the declaring blueprint's data: the
+	// variable exists only when it renders to neither "" nor "false".
+	When string
 	// Blueprint is the blueprint that declares it, empty for the app.
 	Blueprint string
 	Span      dsl.Span
@@ -87,7 +90,7 @@ type EnvValue struct {
 
 // envModifiers are the modifiers of an environment variable besides the
 // environment names, which set its value there.
-var envModifiers = []string{"default", "required", "secret", "generate", "prefixed", "field"}
+var envModifiers = []string{"default", "required", "secret", "generate", "prefixed", "field", "when"}
 
 // EnvVarOf builds a variable from its declaration, reporting what is wrong
 // through errorf. Modifiers named after an environment, such as
@@ -160,6 +163,16 @@ func EnvVarOf(d *dsl.EnvDecl, errorf func(dsl.Span, string, ...any)) *EnvVar {
 				continue
 			}
 			v.Generate = n
+		case "when":
+			a, good := one()
+			if !good || a.Kind != dsl.StringValue || !strings.Contains(a.Text, "{{") {
+				if good {
+					errorf(a.Span, "when needs a template, true when the variable exists, e.g. when(\"{{if uses \\\"jobs\\\"}}true{{end}}\")")
+				}
+				ok = false
+				continue
+			}
+			v.When = a.Text
 		case "field":
 			a, good := one()
 			if !good || a.Kind != dsl.IdentValue {

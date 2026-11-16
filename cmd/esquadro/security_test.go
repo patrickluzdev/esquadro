@@ -93,3 +93,30 @@ entity User {
 		t.Fatalf("own schema:\n%s", sql)
 	}
 }
+
+// A provider's variables exist only when a realm signs in with it: env
+// declarations with when.
+func TestSecurityProviderVariables(t *testing.T) {
+	model := func(providers string) string {
+		return "package accounts\n\nentity User {\n  name string required\n  @security(principal, providers " + providers + ", read user, write user)\n}\n"
+	}
+	dir := securityProject(t, model("password"), "")
+	if code, out, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatalf("gen: %s%s", out, errOut)
+	}
+	if example := read(t, filepath.Join(dir, ".env.example")); strings.Contains(example, "SECURITY_GOOGLE") || strings.Contains(example, "SECURITY_PEPPER") {
+		t.Fatalf("variables nobody uses:\n%s", example)
+	}
+
+	os.WriteFile(filepath.Join(dir, "esquadro", "accounts.esq"), []byte(model("[password, google]")), 0o644)
+	if code, out, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatalf("gen: %s%s", out, errOut)
+	}
+	example := read(t, filepath.Join(dir, ".env.example"))
+	if !strings.Contains(example, "SECURITY_GOOGLE_CLIENT_ID") || !strings.Contains(example, "SECURITY_GOOGLE_CLIENT_SECRET") || strings.Contains(example, "SECURITY_GITHUB") {
+		t.Fatalf("google's variables:\n%s", example)
+	}
+	if deps := read(t, filepath.Join(dir, "cmd", "shop", "dependencies.go")); !strings.Contains(deps, `"google": security.Google(d.config.SecurityGoogleClientID, d.config.SecurityGoogleClientSecret)`) {
+		t.Fatalf("dependencies:\n%s", deps)
+	}
+}
