@@ -516,7 +516,8 @@ func Convert(v dsl.Value, t ValueType) (any, string) {
 		return nil, "expected a list of field names, e.g. [name, status]"
 	case TypeList:
 		if v.Kind != dsl.ListValue {
-			return nil, "expected a [list]"
+			// One value is a list of one: read public, as read [public].
+			return []any{scalar(v)}, ""
 		}
 		out := make([]any, 0, len(v.List))
 		for _, e := range v.List {

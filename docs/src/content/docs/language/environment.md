@@ -63,8 +63,8 @@ names the app in its logs and telemetry (`shop` by default).
 
 ## Values by environment
 
-Values that are not secrets can be set per environment in `app.esq`, as
-Spring Boot's `application-{profile}.yml`, versioned with the code:
+Values that are not secrets can be set per environment in `app.esq`,
+versioned with the code:
 
 ```esquadro
 app shop {

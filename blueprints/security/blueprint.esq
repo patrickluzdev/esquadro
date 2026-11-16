@@ -1,0 +1,98 @@
+/// Security in one place: who signs in, what each one may do, and the
+/// defenses at the edge (CORS, security headers, CSRF). An
+/// entity marked @security(principal) is a realm of its own, with its own
+/// sign-up, sign-in and sessions: User and Customer never share an identity.
+/// Identities live apart from the entities, in the security_ tables, with the
+/// principal's id: passwords (Argon2id), Google and GitHub sign-in, sessions
+/// in cookies, short JWTs with /.well-known/jwks.json, email verification and
+/// password reset. Each entity says who may list, read, create, update or
+/// delete it. Without a principal, it sends the security headers and answers
+/// CORS, as cors and security_headers did.
+blueprint security {
+  version "0.1.0"
+  requires app, env, domain, http, postgres, migrations
+  optional jobs, rest, api_docs, i18n, observability, testcontainers, compose
+
+  /// The prefix of the identity routes: /identity/<realm>/sign-in.
+  option path string default("/identity")
+  /// The origins browsers may call the app from; "*" is any, but never with
+  /// cookies.
+  option origins list default([])
+  /// Send Strict-Transport-Security, behind HTTPS only.
+  option hsts bool default(false)
+  /// The address of the app, for the links of emails and the OAuth callbacks.
+  option public_url string default("http://localhost:8080")
+  /// Where the app may send people back to after sign-in or an email link.
+  option redirect_urls list default([])
+
+  /// Days a session lasts without being used to renew it.
+  option session_days int default(7)
+  /// Hours of inactivity that end a session.
+  option session_idle_hours int default(24)
+  /// Days after which a session ends, used or not.
+  option session_max_days int default(30)
+  /// Keep the address and the browser of each session.
+  option session_ip bool default(true)
+  option session_user_agent bool default(true)
+  /// Minutes a JWT lasts.
+  option token_minutes int default(15)
+  /// Days between rotations of the JWT signing key, with jobs; 0 is never.
+  option rotate_keys_days int default(0)
+
+  /// The shortest password. NIST asks for 15 when the password is the only
+  /// factor.
+  option password_min int default(12)
+  option password_max int default(128)
+  /// none, common (a built-in list) or pwned (the list and Pwned Passwords).
+  option password_blocklist name default(common)
+  /// open or closed: whether a password may be set when Pwned Passwords does
+  /// not answer.
+  option pwned_fail name default(open)
+  /// Argon2id's cost; OWASP's minimum by default.
+  option argon2_memory_kib int default(19456)
+  option argon2_iterations int default(2)
+  option argon2_parallelism int default(1)
+  /// HMAC every password hash with SECURITY_PEPPER, kept out of the
+  /// database. Changing the pepper means resetting every password.
+  option pepper bool default(false)
+  /// Failed sign-ins before an account is locked, and for how long.
+  option lockout_attempts int default(5)
+  option lockout_minutes int default(15)
+
+  annotation entity {
+    /// The entity signs in: a realm named after it.
+    principal bool
+    /// open (anyone signs up), invite or closed (the default: only by the
+    /// app's security command).
+    signup name
+    /// password (the default), google and github.
+    providers list
+    /// The roles of the realm.
+    roles list
+    /// The realm's own permissions, besides those of the entities, e.g.
+    /// [orders.refund]; roles get them with grants.
+    permissions list
+    /// Which roles have which of those permissions, as role.permission,
+    /// e.g. [admin.orders.refund, staff.reports.view].
+    grants list
+    /// required, optional (the default) or off.
+    verify_email name
+    /// Whether a forgotten password can be reset by email (the default).
+    password_reset bool
+    password_min int
+    password_max int
+    password_blocklist name
+    lockout_attempts int
+    lockout_minutes int
+
+    /// Who may list, read, create, update or delete the entity: public, a
+    /// realm (whoever signed in to it) or realm.role; write is create,
+    /// update and delete.
+    list list
+    read list
+    create list
+    update list
+    delete list
+    write list
+  }
+}

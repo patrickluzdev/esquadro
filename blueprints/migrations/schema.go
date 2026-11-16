@@ -204,7 +204,8 @@ func moduleSnake(d project.Description, module string) string {
 
 // Check reports what would make the database invalid: tables of different
 // modules with the same name in public, and schemas option entries that are
-// not modules. It does not change anything.
+// not modules (but security, with the security blueprint). It does not
+// change anything.
 func Check(d project.Description) []string {
 	var problems []string
 	l := newLayout(d)
@@ -212,6 +213,10 @@ func Check(d project.Description) []string {
 		known := false
 		for _, m := range d.Modules {
 			known = known || m.Raw == name
+		}
+		// security is the schema of the security blueprint's tables.
+		if name == "security" && d.App.Options("security") != nil {
+			known = true
 		}
 		if !known {
 			problems = append(problems, fmt.Sprintf("the schemas option lists %q, which is not a module", name))

@@ -29,5 +29,6 @@ import "embed"
 //go:embed github_actions/blueprint.esq all:github_actions/templates
 //go:embed branching/blueprint.esq all:branching/templates branching/slots
 //go:embed env/blueprint.esq all:env/templates env/slots
+//go:embed security/blueprint.esq all:security/templates security/slots
 //go:embed git/blueprint.esq
 var FS embed.FS

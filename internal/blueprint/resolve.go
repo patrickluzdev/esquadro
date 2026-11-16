@@ -26,6 +26,12 @@ type Set struct {
 	Environments []string
 }
 
+// Checks are the checks of built-in blueprints, by name, run once the
+// project's blueprints are resolved: what a blueprint knows about the model
+// that the types of its options and annotations cannot say (a role that is
+// not declared, a permission no one has). esquadro registers them.
+var Checks = map[string]func(*project.Project, *Set) diag.List{}
+
 // Get returns the blueprint with the given name, or nil.
 func (s *Set) Get(name string) *Blueprint {
 	for _, b := range s.Blueprints {
@@ -98,6 +104,11 @@ func (r *resolver) resolve() {
 	r.set.Blueprints = r.order()
 	r.annotations()
 	r.env()
+	for _, b := range r.set.Blueprints {
+		if check := Checks[b.Manifest.Name]; check != nil && b.Ref.Source == project.SourceBuiltin {
+			r.diags = append(r.diags, check(r.p, r.set)...)
+		}
+	}
 	// Jobs are run by the jobs blueprint: without it, they would be left
 	// out in silence.
 	if len(r.p.Jobs) > 0 && r.byName["jobs"] == nil && !r.failed["jobs"] && r.l.unfetched == 0 {

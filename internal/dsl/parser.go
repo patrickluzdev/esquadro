@@ -401,7 +401,19 @@ func (p *parser) parseOption() *Option {
 func (p *parser) parseValue(context string) (Value, bool) {
 	t := p.tok()
 	switch t.Kind {
-	case String, Number, Name:
+	case Name:
+		p.advance()
+		v := tokenValue(t)
+		// A dotted name, written without spaces: user.admin.
+		for p.tok().Kind == Dot && p.tok().Pos.Offset == v.End.Offset && p.toks[p.i+1].Kind == Name && p.toks[p.i+1].Pos.Offset == p.tok().End.Offset {
+			p.advance()
+			n := p.advance()
+			v.Text += "." + n.Text
+			v.Raw = v.Text
+			v.End = n.End
+		}
+		return v, true
+	case String, Number:
 		p.advance()
 		return tokenValue(t), true
 	case LBrack:

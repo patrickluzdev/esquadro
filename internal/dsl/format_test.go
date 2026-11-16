@@ -159,3 +159,18 @@ func TestFormatEnv(t *testing.T) {
 		t.Fatalf("manifest got:\n%s", got)
 	}
 }
+
+func TestDottedNamesInValues(t *testing.T) {
+	src := "entity Product {\n  name string\n  @security(write [user.admin, user.staff], read public)\n}\n"
+	f := mustParse(t, src)
+	a := f.Decls[0].(*EntityDecl).Annotations[0]
+	if got := a.Args[0].Value.List[0].Text; got != "user.admin" {
+		t.Fatalf("got %q", got)
+	}
+	if got := string(Format(f)); got != src {
+		t.Fatalf("format:\n%s", got)
+	}
+	if _, diags := Parse("a.esq", []byte("entity P {\n  @security(write [user. admin])\n}\n")); !diags.HasErrors() {
+		t.Fatal("a dot with a space is not a dotted name")
+	}
+}

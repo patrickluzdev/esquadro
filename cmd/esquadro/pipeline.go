@@ -15,6 +15,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/jobs"
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
@@ -34,13 +35,18 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("env", "files"):        env.Files,
 }
 
+func init() {
+	blueprint.Checks["security"] = security.Check
+}
+
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
-	"app":   app.TemplateFuncs(),
-	"store": store.TemplateFuncs(),
-	"rest":  rest.TemplateFuncs(),
-	"i18n":  i18n.TemplateFuncs(),
-	"jobs":  jobs.TemplateFuncs(),
+	"app":      app.TemplateFuncs(),
+	"store":    store.TemplateFuncs(),
+	"rest":     rest.TemplateFuncs(),
+	"i18n":     i18n.TemplateFuncs(),
+	"jobs":     jobs.TemplateFuncs(),
+	"security": security.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints
