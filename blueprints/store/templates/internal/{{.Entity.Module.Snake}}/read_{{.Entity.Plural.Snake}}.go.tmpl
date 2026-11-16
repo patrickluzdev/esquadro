@@ -1,0 +1,38 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// Read{{$e.Plural.Pascal}} returns the {{$e.Plural.Snake}} with the given ids that exist, by id.
+func ({{$r}} *{{$m.Pascal}}) Read{{$e.Plural.Pascal}}(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]{{$e.Pascal}}, error) {
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Plural.Pascal}}ByIDs(ctx, postgres.UUIDs(ids))
+	if err != nil {
+		return nil, err
+	}
+	found := make(map[uuid.UUID]{{$e.Pascal}}, len(rows))
+	for _, row := range rows {
+		x := {{$e.Camel}}Of(row)
+		found[x.ID] = x
+	}
+	return found, nil
+}
+{{- range links $e}}{{if (link . (optionsOf "postgres")).Declared}}
+
+// List{{$e.Pascal}}{{.Pascal}}Of returns, for each of the {{$e.Plural.Snake}} with the given ids,
+// the ids of up to limit of its {{.Snake}} in order, and whether it has more.
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Pascal}}{{.Pascal}}Of(ctx context.Context, ids []uuid.UUID, limit int) (linked map[uuid.UUID][]uuid.UUID, more map[uuid.UUID]bool, err error) {
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).List{{$e.Pascal}}{{.Pascal}}Of(ctx, sqlgen.List{{$e.Pascal}}{{.Pascal}}OfParams{OwnIds: postgres.UUIDs(ids), PerOwn: int64(limit + 1)})
+	if err != nil {
+		return nil, nil, err
+	}
+	linked, more = map[uuid.UUID][]uuid.UUID{}, map[uuid.UUID]bool{}
+	for _, row := range rows {
+		own := postgres.ID(row.OwnID)
+		if len(linked[own]) == limit {
+			more[own] = true
+			continue
+		}
+		linked[own] = append(linked[own], postgres.ID(row.OtherID))
+	}
+	return linked, more, nil
+}
+{{- end}}{{end}}

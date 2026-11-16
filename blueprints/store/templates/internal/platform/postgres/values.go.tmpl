@@ -27,6 +27,15 @@ func Date(t time.Time) pgtype.Date { return pgtype.Date{Time: t, Valid: !t.IsZer
 // UUID is u, NULL when it is the nil UUID.
 func UUID(u uuid.UUID) pgtype.UUID { return pgtype.UUID{Bytes: u, Valid: u != uuid.Nil()} }
 
+// UUIDs is ids as a query takes them.
+func UUIDs(ids []uuid.UUID) []pgtype.UUID {
+	out := make([]pgtype.UUID, len(ids))
+	for i, id := range ids {
+		out[i] = UUID(id)
+	}
+	return out
+}
+
 // ID is the UUID u holds, the nil UUID when NULL.
 func ID(u pgtype.UUID) uuid.UUID {
 	if !u.Valid {

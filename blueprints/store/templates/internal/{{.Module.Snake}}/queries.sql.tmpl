@@ -10,6 +10,9 @@ RETURNING *;
 -- name: Get{{$e.Pascal}} :one
 SELECT * FROM {{$t}} WHERE id = @id;
 
+-- name: Get{{$e.Plural.Pascal}}ByIDs :many
+SELECT * FROM {{$t}} WHERE id = ANY(@ids::uuid[]);
+
 {{- $where := listWhere $.Entities $e (optionsOf "postgres") $.Options.search_language}}
 {{- range listSorts $e (optionsOf "postgres")}}{{$s := .}}
 {{- range $dir := list "Asc" "Desc"}}
@@ -60,6 +63,16 @@ ON CONFLICT DO NOTHING;
 
 -- name: RemoveFrom{{$e.Pascal}}{{.Pascal}} :exec
 DELETE FROM {{$l.Table}} WHERE {{$l.Own}} = @own_id AND {{$l.Other}} = @other_id;
+
+-- name: List{{$e.Pascal}}{{.Pascal}}Of :many
+SELECT own_id, other_id FROM (
+  SELECT {{$l.Own}} AS own_id, {{$l.Other}} AS other_id,
+    row_number() OVER (PARTITION BY {{$l.Own}} ORDER BY {{$l.Other}}) AS n
+  FROM {{$l.Table}}
+  WHERE {{$l.Own}} = ANY(@own_ids::uuid[])
+) linked
+WHERE n <= sqlc.arg(per_own)::bigint
+ORDER BY own_id, other_id;
 {{- end}}
 
 -- name: List{{$e.Pascal}}{{.Pascal}} :many

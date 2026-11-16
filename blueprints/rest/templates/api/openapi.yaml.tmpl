@@ -73,6 +73,15 @@ paths:
           explode: false
           description: Only these fields, comma-separated; `id` and `version` always come.
           schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Field"}}
+{{- if includable $e}}
+        - name: include
+          in: query
+          required: false
+          style: form
+          explode: false
+          description: The related records to answer with, comma-separated.
+          schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Include"}}
+{{- end}}
 {{- if has $pag "cursor"}}
         - $ref: "#/components/parameters/After"
         - $ref: "#/components/parameters/Limit"
@@ -163,6 +172,15 @@ paths:
           explode: false
           description: Only these fields, comma-separated; `id` and `version` always come.
           schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Field"}}
+{{- if includable $e}}
+        - name: include
+          in: query
+          required: false
+          style: form
+          explode: false
+          description: The related records to answer with, comma-separated.
+          schema: {type: array, items: {$ref: "#/components/schemas/{{.Pascal}}Include"}}
+{{- end}}
       responses:
         "200":
           description: {{quote (printf "The %s." (lower .Label))}}
@@ -428,10 +446,27 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         version: {type: integer, description: "Goes up with each change: the ETag, and what If-Match sends back."}
+{{- range includable $e}}
+{{- if eq .Kind.String "many-to-many"}}
+        {{.Snake}}:
+          type: array
+          description: With `include={{.Snake}}`, up to 100; past them, `{{.Snake}}_more`.
+          items: {$ref: "#/components/schemas/{{.Target.Pascal}}"}
+        {{.Snake}}_more: {type: boolean, description: "With `include={{.Snake}}`: there are more than the 100 listed."}
+{{- else}}
+        {{.Snake}}: {$ref: "#/components/schemas/{{.Target.Pascal}}"}
+{{- end}}
+{{- end}}
     {{.Pascal}}Field:
       type: string
       description: A field of a {{lower .Label}} that `fields` may ask for.
-      enum: [{{range inRequest $e}}{{quote (jsonName .)}}, {{end}}{{range keys $e}}{{quote (keyName .)}}, {{end}}"created_at", "updated_at"]
+      enum: [{{range $i, $f := answerFields $e}}{{if $i}}, {{end}}{{quote $f}}{{end}}{{range includable $e}}{{$r := .}}{{range answerFields .Target}}, {{quote (printf "%s.%s" $r.Snake .)}}{{end}}{{end}}]
+{{- if includable $e}}
+    {{.Pascal}}Include:
+      type: string
+      description: A relation of a {{lower .Label}} that `include` may ask for.
+      enum: [{{range $i, $r := includable $e}}{{if $i}}, {{end}}{{quote $r.Snake}}{{end}}]
+{{- end}}
     New{{.Pascal}}:
       type: object
 {{- $req := false}}{{range inRequest $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}{{range keys $e}}{{if keyInRequest $.Entities $e .}}{{$req = true}}{{end}}{{end}}

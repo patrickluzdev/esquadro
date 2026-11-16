@@ -1,15 +1,34 @@
-{{- $m := .Module}}{{$p := $m.Snake -}}
+{{- $m := .Module}}{{$p := $m.Snake}}{{$inc := false}}{{range $m.Entities}}{{if includable .}}{{$inc = true}}{{end}}{{end -}}
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
+{{- if includedFrom $m}}
+type HTTP struct {
+	{{$p}}  *{{$m.Pascal}}
+	include Includes
+}
+
+// Includes read, for an include, the records of other modules that the
+// {{$p}} module's records point at: each module's Include function.
+type Includes struct {
+{{- range includedFrom $m}}
+	{{.Plural.Pascal}} func(context.Context, []uuid.UUID, []string) (map[uuid.UUID]apigen.{{.Pascal}}, error)
+{{- end}}
+}
+
+// NewHTTP returns the API's operations on m, including other modules'
+// records with include.
+func NewHTTP(m *{{$m.Pascal}}, include Includes) HTTP { return HTTP{ {{- $p}}: m, include: include} }
+{{- else}}
 type HTTP struct{ {{$p}} *{{$m.Pascal}} }
 
 // NewHTTP returns the API's operations on m.
 func NewHTTP(m *{{$m.Pascal}}) HTTP { return HTTP{ {{$p}}: m} }
+{{- end}}
 {{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
 {{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
 
@@ -46,6 +65,13 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 	}
 	edge.SetETag(ctx, found.Version)
 	answer := {{.Camel}}Answer(found)
+{{- if includable $e}}
+	answers := []apigen.{{$P}}{answer}
+	if err := h.{{.Camel}}Included(ctx, []{{$P}}{found}, answers, params.Include, params.Fields); err != nil {
+		return nil, problemOf(err)
+	}
+	answer = answers[0]
+{{- end}}
 	{{.Camel}}Only(&answer, params.Fields)
 	return &answer, nil
 }
@@ -148,9 +174,15 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- end}}
 	answer := apigen.{{$P}}Page{Items: make([]apigen.{{$P}}, 0, len(page.{{.Plural.Pascal}}))}
 	for _, listed := range page.{{.Plural.Pascal}} {
-		item := {{.Camel}}Answer(listed)
-		{{.Camel}}Only(&item, params.Fields)
-		answer.Items = append(answer.Items, item)
+		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
+	}
+{{- if includable $e}}
+	if err := h.{{.Camel}}Included(ctx, page.{{.Plural.Pascal}}, answer.Items, params.Include, params.Fields); err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
+	for i := range answer.Items {
+		{{.Camel}}Only(&answer.Items[i], params.Fields)
 	}
 {{- if has $pag "page"}}
 	if q.Page > 0 {
@@ -545,6 +577,112 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 {{- end}}
 	return a
 }
+
+// Include{{.Plural.Pascal}} reads {{lower .Plural.Label}} by id for an include, from this module
+// or another: only those the request may read, with only the fields
+// asked for.
+func Include{{.Plural.Pascal}}(m *{{$m.Pascal}}) func(context.Context, []uuid.UUID, []string) (map[uuid.UUID]apigen.{{$P}}, error) {
+	return func(ctx context.Context, ids []uuid.UUID, fields []string) (map[uuid.UUID]apigen.{{$P}}, error) {
+		found, err := m.Read{{.Plural.Pascal}}(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		asked := make([]apigen.{{$P}}Field, len(fields))
+		for i, f := range fields {
+			asked[i] = apigen.{{$P}}Field(f)
+		}
+		out := make(map[uuid.UUID]apigen.{{$P}}, len(found))
+		for id, x := range found {
+{{- if $pol}}
+			if !({{$P}}Policy{}).Read(ctx, x) {
+				continue
+			}
+{{- end}}
+			a := {{.Camel}}Answer(x)
+			{{.Camel}}Only(&a, asked)
+			out[id] = a
+		}
+		return out, nil
+	}
+}
+{{- if includable $e}}
+
+// {{.Camel}}Included adds to the answers of xs the related records include
+// asks for, each with the fields asked of it ("{{(index (includable $e) 0).Snake}}.name").
+func (h HTTP) {{.Camel}}Included(ctx context.Context, xs []{{$P}}, answers []apigen.{{$P}}, include []apigen.{{$P}}Include, fields []apigen.{{$P}}Field) error {
+	asked := map[string]bool{}
+	for _, inc := range include {
+		asked[string(inc)] = true
+	}
+	of := map[string][]string{}
+	for _, f := range fields {
+		if rel, name, ok := strings.Cut(string(f), "."); ok {
+			if !asked[rel] {
+				return edge.ErrInvalidRequest
+			}
+			of[rel] = append(of[rel], name)
+		}
+	}
+{{- $many := false}}{{range includable $e}}{{if eq .Kind.String "many-to-many"}}{{$many = true}}{{end}}{{end}}
+{{- if $many}}
+	ids := make([]uuid.UUID, len(xs))
+	for i, x := range xs {
+		ids[i] = x.ID
+	}
+{{- end}}
+{{- range includable $e}}{{$T := .Target}}{{$g := ogenName .Snake}}
+{{- $load := printf "h.include.%s" $T.Plural.Pascal}}{{if eq $T.Module.Snake $m.Snake}}{{$load = printf "Include%s(h.%s)" $T.Plural.Pascal $p}}{{end}}
+	if asked[{{quote .Snake}}] {
+{{- if eq .Kind.String "many-to-many"}}
+		linked, more, err := h.{{$p}}.List{{$P}}{{.Pascal}}Of(ctx, ids, edge.MaxIncluded)
+		if err != nil {
+			return err
+		}
+		var all []uuid.UUID
+		for _, l := range linked {
+			all = append(all, l...)
+		}
+		found, err := {{$load}}(ctx, all, of[{{quote .Snake}}])
+		if err != nil {
+			return err
+		}
+		for i, x := range xs {
+			answers[i].{{$g}} = []apigen.{{$T.Pascal}}{}
+			for _, id := range linked[x.ID] {
+				if v, ok := found[id]; ok {
+					answers[i].{{$g}} = append(answers[i].{{$g}}, v)
+				}
+			}
+			if more[x.ID] {
+				answers[i].{{ogenName (printf "%s_more" .Snake)}} = apigen.NewOptBool(true)
+			}
+		}
+{{- else}}
+		related := make([]uuid.UUID, 0, len(xs))
+		for _, x := range xs {
+			if x.{{.Pascal}}ID != uuid.Nil() {
+				related = append(related, x.{{.Pascal}}ID)
+			}
+		}
+		found, err := {{$load}}(ctx, related, of[{{quote .Snake}}])
+		if err != nil {
+			return err
+		}
+		for i, x := range xs {
+			if v, ok := found[x.{{.Pascal}}ID]; ok {
+{{- if eq $T.Pascal $P}}
+				answers[i].{{$g}} = &v
+{{- else}}
+				answers[i].{{$g}} = apigen.NewOpt{{$T.Pascal}}(v)
+{{- end}}
+			}
+		}
+{{- end}}
+	}
+{{- end}}
+	return nil
+}
+{{- end}}
 
 // {{.Camel}}Only leaves in a only the fields asked for, with id and
 // version; none asked for, every one.

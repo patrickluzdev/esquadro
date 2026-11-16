@@ -41,7 +41,13 @@ type api struct {
 func newAPI(d dependencies) (http.Handler, error) {
 	a := api{
 {{- range .Modules}}{{if .Entities}}
-		{{.Camel}}Operations: {{.Snake}}.NewHTTP(d.{{.Camel}}),
+		{{.Camel}}Operations: {{.Snake}}.NewHTTP(d.{{.Camel}}
+{{- $mod := .}}{{with includedFrom .}}, {{$mod.Snake}}.Includes{
+{{- range .}}
+			{{.Plural.Pascal}}: {{.Module.Snake}}.Include{{.Plural.Pascal}}(d.{{.Module.Camel}}),
+{{- end}}
+		}
+{{- end}}),
 {{- end}}{{end}}
 		logger: d.logger,
 	}

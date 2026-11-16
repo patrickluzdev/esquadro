@@ -105,6 +105,10 @@ var (
 // PATCH sends as null.
 func Emptied[T any](*T) *T { return new(T) }
 
+// MaxIncluded is the most related records of a many-to-many relation an
+// include answers per record.
+const MaxIncluded = 100
+
 // Unset leaves out of an answer the field p points at.
 func Unset[T any](p *T) {
 	var zero T

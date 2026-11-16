@@ -449,4 +449,52 @@ func TestAPIIdempotency(t *testing.T) {
 	}
 }
 {{- end}}{{end}}
+{{- $inc := ""}}{{range .Entities}}{{if and (not $inc) (canSampleAPI .) (includable .)}}{{$inc = .Pascal}}{{end}}{{end}}
+{{- range .Entities}}{{if eq .Pascal $inc}}{{$e := .}}
+
+// TestAPIInclude reads a {{lower .Label}} with its related records, each with the
+// fields asked of it, and refuses fields of a relation not included.
+func TestAPIInclude(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := c.Create{{.Pascal}}(ctx, givenAPI{{.Pascal}}(t, c, 1), apigen.Create{{.Pascal}}Params{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(query string) (int, map[string]any) {
+		t.Helper()
+		res, err := http.Get(srv.URL + "/api/v1/{{.Plural.Kebab}}/" + created.ID.String() + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var body map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&body)
+		return res.StatusCode, body
+	}
+	status, body := get("?include={{range $i, $r := includable $e}}{{if $i}},{{end}}{{$r.Snake}}{{end}}&fields={{range $i, $r := includable $e}}{{if $i}},{{end}}{{$r.Snake}}.created_at{{end}}")
+	if status != 200 {
+		t.Fatalf("include: %d %v", status, body)
+	}
+{{- range includable $e}}
+{{- if eq .Kind.String "many-to-many"}}
+	if items, ok := body[{{quote .Snake}}].([]any); !ok || len(items) != 0 {
+		t.Errorf("{{.Snake}}: %v, want an empty list", body[{{quote .Snake}}])
+	}
+{{- else if .Required}}
+	if related, _ := body[{{quote .Snake}}].(map[string]any); len(related) != 3 || related["created_at"] == nil {
+		t.Errorf("{{.Snake}}: %v, want its id, version and created_at", body[{{quote .Snake}}])
+	}
+{{- end}}
+{{- end}}
+	if status, _ := get("?fields={{(index (includable $e) 0).Snake}}.created_at"); status != 400 {
+		t.Errorf("fields of a relation not included: %d, want 400", status)
+	}
+}
+{{- end}}{{end}}
 {{end -}}

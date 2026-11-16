@@ -74,6 +74,9 @@ func TemplateFuncs() template.FuncMap {
 		"schema":           schema,
 		"changeSchema":     changeSchema,
 		"clearable":        clearable,
+		"includable":       includable,
+		"includedFrom":     includedFrom,
+		"answerFields":     answerFields,
 		"enumName":         enumName,
 		"inRequest":        inRequest,
 		"keys":             keys,
@@ -196,6 +199,45 @@ func changeSchema(f *project.Field) string {
 	}
 	s := schema(f)
 	return strings.TrimSuffix(s, "}") + ", nullable: true}"
+}
+
+// includable lists the relations a record's answer may include: those whose
+// key it holds, and the many-to-many ones it declares.
+func includable(e *project.Entity) []*project.Relation {
+	var out []*project.Relation
+	for _, r := range e.Relations {
+		if r.OwnsForeignKey() || (r.Kind == project.ManyToMany && !r.Inferred) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// includedFrom lists, once each, the entities of other modules that m's
+// records may include.
+func includedFrom(m *project.Module) []*project.Entity {
+	var out []*project.Entity
+	for _, e := range m.Entities {
+		for _, r := range includable(e) {
+			if r.Target.Module != m && !slices.Contains(out, r.Target) {
+				out = append(out, r.Target)
+			}
+		}
+	}
+	return out
+}
+
+// answerFields are the names of a record's answer that fields may ask for:
+// all but id and version, which always come.
+func answerFields(e *project.Entity) []string {
+	var out []string
+	for _, f := range inRequest(e) {
+		out = append(out, jsonName(f))
+	}
+	for _, r := range keys(e) {
+		out = append(out, keyName(r))
+	}
+	return append(out, "created_at", "updated_at")
 }
 
 // inRequest lists the fields a NewX carries: the declared ones.
