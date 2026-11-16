@@ -57,7 +57,7 @@ type Loader struct {
 // Retired are built-in blueprints that are no more, with what replaces
 // them.
 var Retired = map[string]string{
-	"cors":             "blueprint security answers CORS; replace it with blueprint security, with its origins option",
+	"cors":             "blueprint http answers CORS; remove it, and list the origins in blueprint http, with its cors_origins option",
 	"security_headers": "blueprint security sends the security headers; replace it with blueprint security, with its hsts option",
 }
 

@@ -156,10 +156,10 @@ func TestSecurityMaintenance(t *testing.T) {
 	}
 }
 
-// cors and security_headers became part of security: a project that still
-// names them is told what to write instead.
+// cors and security_headers became part of http and security: a project
+// that still names them is told what to write instead.
 func TestRetiredBlueprints(t *testing.T) {
-	for name, option := range map[string]string{"cors": "origins", "security_headers": "hsts"} {
+	for name, option := range map[string]string{"cors": "cors_origins", "security_headers": "hsts"} {
 		dir, appEsq := smallProject(t, "app,env,http")
 		src := strings.Replace(read(t, appEsq), "  blueprint http\n", "  blueprint http\n  blueprint "+name+"\n", 1)
 		os.WriteFile(appEsq, []byte(src), 0o644)

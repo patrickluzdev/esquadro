@@ -19,9 +19,6 @@ blueprint security {
   /// With the pepper option, the key every password hash is mixed with;
   /// kept out of the database. Changing it means resetting every password.
   env SECURITY_PEPPER string secret required when("{{if and (realms .Entities) .Options.pepper}}true{{end}}")
-  /// The origins browsers may call the app from, comma-separated; * is any,
-  /// without cookies.
-  env CORS_ORIGINS list prefixed field(CORSOrigins) default("{{join \",\" (strs .Options.origins)}}")
   /// Send Strict-Transport-Security, behind HTTPS only.
   env HSTS bool prefixed field(HSTS) default("{{.Options.hsts}}")
   /// The OAuth client of the app at Google (console.cloud.google.com, APIs &
@@ -42,9 +39,6 @@ blueprint security {
 
   /// The prefix of the identity routes: /identity/<realm>/sign-in.
   option path string default("/identity")
-  /// The origins browsers may call the app from; "*" is any, but never with
-  /// cookies. <APP>_CORS_ORIGINS, comma separated, overrides it.
-  option origins list default([])
   /// Send Strict-Transport-Security, behind HTTPS only. <APP>_HSTS
   /// overrides it.
   option hsts bool default(false)

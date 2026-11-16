@@ -23,7 +23,6 @@ blueprint security
 | Option | Type | Default | |
 |---|---|---|---|
 | `path` | string | `"/identity"` | The prefix of the identity routes: /identity/&lt;realm>/sign-in. |
-| `origins` | list | `[]` | The origins browsers may call the app from; "*" is any, but never with cookies. &lt;APP>_CORS_ORIGINS, comma separated, overrides it. |
 | `hsts` | bool | `false` | Send Strict-Transport-Security, behind HTTPS only. &lt;APP>_HSTS overrides it. |
 | `public_url` | string | `"http://localhost:8080"` | The address of the app, for the links of emails and the OAuth callbacks. |
 | `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link. |
@@ -62,7 +61,6 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 |---|---|---|---|
 | `SECURITY_SECRET` | string, secret, required outside development | generated in development | Signs CSRF tokens and encrypts the JWT signing keys; esquadro generates one for development. |
 | `SECURITY_PEPPER` | string, secret, required outside development | - | With the pepper option, the key every password hash is mixed with; kept out of the database. Changing it means resetting every password. |
-| `<APP>_CORS_ORIGINS` | list | the app's, from its blueprints and options | The origins browsers may call the app from, comma-separated; * is any, without cookies. |
 | `<APP>_HSTS` | bool | the hsts option | Send Strict-Transport-Security, behind HTTPS only. |
 | `SECURITY_GOOGLE_CLIENT_ID` | string, required outside development | - | The OAuth client of the app at Google (console.cloud.google.com, APIs & Services, Credentials), for the realms that sign in with Google; its redirect URI is &lt;public_url>&lt;path>/&lt;realm>/oauth/google/callback. |
 | `SECURITY_GOOGLE_CLIENT_SECRET` | string, secret, required outside development | - |  |

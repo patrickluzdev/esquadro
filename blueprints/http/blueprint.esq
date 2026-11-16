@@ -11,6 +11,9 @@ blueprint http {
   env PORT int default("{{.Options.port}}")
   /// Take the client's address from X-Forwarded-For.
   env TRUST_PROXY bool prefixed default("{{.Options.trust_proxy}}")
+  /// The origins browsers may call the app from, comma-separated; * is any,
+  /// without cookies.
+  env CORS_ORIGINS list prefixed field(CORSOrigins) default("{{join \",\" (strs .Options.cors_origins)}}")
   requires app
 
   /// Port the server listens on; PORT overrides it.
@@ -19,6 +22,10 @@ blueprint http {
   /// rate limit; only behind a proxy that sets it. <APP>_TRUST_PROXY
   /// overrides it.
   option trust_proxy bool default(false)
+  /// The origins browsers may call the app from (https://app.example.com);
+  /// "*" is any, but never with cookies. None by default: only the app's
+  /// own pages. <APP>_CORS_ORIGINS, comma separated, overrides it.
+  option cors_origins list default([])
 
   /// Imports of cmd/<app>/routes.go.
   slot "http.routes.imports"

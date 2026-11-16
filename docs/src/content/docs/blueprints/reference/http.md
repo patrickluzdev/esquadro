@@ -23,6 +23,7 @@ blueprint http
 |---|---|---|---|
 | `port` | int | `8080` | Port the server listens on; PORT overrides it. |
 | `trust_proxy` | bool | `false` | Take the client's address from X-Forwarded-For, for the log and the rate limit; only behind a proxy that sets it. &lt;APP>_TRUST_PROXY overrides it. |
+| `cors_origins` | list | `[]` | The origins browsers may call the app from (https://app.example.com); "*" is any, but never with cookies. None by default: only the app's own pages. &lt;APP>_CORS_ORIGINS, comma separated, overrides it. |
 
 ```esquadro
 blueprint http {
@@ -38,6 +39,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 |---|---|---|---|
 | `PORT` | int | the port option | The port the HTTP server listens on. |
 | `<APP>_TRUST_PROXY` | bool | the trust_proxy option | Take the client's address from X-Forwarded-For. |
+| `<APP>_CORS_ORIGINS` | list | the app's, from its blueprints and options | The origins browsers may call the app from, comma-separated; * is any, without cookies. |
 
 ## Slots
 

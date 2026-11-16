@@ -28,6 +28,7 @@ func (d dependencies) routes() (http.Handler, error) {
 {{- end}}
 		edge.Log(d.logger, d.config.TrustProxy),
 		edge.Recover(d.logger),
+		edge.CORS(d.config.CORSOrigins),
 {{- with slot "http.middleware" .}}
 {{.}}
 {{- end}}

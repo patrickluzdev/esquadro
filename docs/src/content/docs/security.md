@@ -219,8 +219,10 @@ the password instead, never from the arguments.
 
 ## At the edge
 
-- **CORS**: the `origins` option (`<APP>_CORS_ORIGINS`). A listed origin may
-  send cookies; `"*"` lets any in, without them.
+- **CORS**: the [http](/esquadro/blueprints/reference/http/) blueprint's
+  `cors_origins` option (`<APP>_CORS_ORIGINS`), in every project with an
+  HTTP server. A listed origin may send cookies and sign in with them;
+  `"*"` lets any in, without them.
 - **Headers**: `nosniff`, `DENY` framing, a `default-src 'none'` CSP, no
   referrer, `no-store`, and HSTS with `hsts true` (`<APP>_HSTS`), behind HTTPS
   only.

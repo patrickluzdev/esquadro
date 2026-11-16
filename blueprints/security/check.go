@@ -218,8 +218,8 @@ func needs(p *project.Project, set *blueprint.Set, realms []*Realm, diags *diag.
 		diags.Errorf(ref.Pos, ref.Pos, "%s marked @security(principal), but security keeps identities with blueprints %s, and sends their emails with mail, which the app does not use", realms[0].Entity.Raw, strings.Join(missing, ", ")).
 			Suggestion = "blueprint " + missing[0]
 	}
-	if origins := names(set.Options["security"]["origins"]); slices.Contains(origins, "*") {
-		diags.Warnf(ref.Pos, ref.Pos, `origins ["*"] lets any site call the app, but browsers then send no cookies: pages of other origins sign in with tokens ("cookie": false), or list their origins`)
+	if origins := names(set.Options["http"]["cors_origins"]); slices.Contains(origins, "*") && len(realms) > 0 {
+		diags.Warnf(ref.Pos, ref.Pos, `cors_origins ["*"] lets any site call the app, but browsers then send no cookies: pages of other origins sign in with tokens ("cookie": false), or list their origins`)
 	}
 }
 
