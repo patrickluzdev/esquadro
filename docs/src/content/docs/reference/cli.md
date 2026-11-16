@@ -218,7 +218,7 @@ esquadro add. A starter is a project to begin from, with its blueprints
 listed in app.esq and an example model:
 
   api      A JSON API on PostgreSQL, with its contract, docs, image and CI, and a catalog to change.
-  worker   A background service on PostgreSQL: processes that run until it is stopped, with its image and CI.
+  worker   A background service on PostgreSQL: jobs on a queue, some on a schedule, worked until it is stopped, with its image and CI.
   cli      A command line tool: commands, configuration and CI, nothing else to start with.
 
   -blueprints string

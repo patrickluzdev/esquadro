@@ -8,7 +8,7 @@ sidebar:
 ## Annotations
 
 An annotation gives a blueprint a setting for one element: the app, an
-entity, a field or a relation. It is named after the blueprint:
+entity, a field, a relation or a [job](/esquadro/language/jobs/). It is named after the blueprint:
 
 ```esquadro
 entity Product {
@@ -26,8 +26,8 @@ in its [reference page](/esquadro/blueprints/overview/).
 
 ## Comments
 
-`//` and `/* ... */` are comments. `///` before the app, an entity, an enum or
-a field is documentation: it goes into the generated Go code, and an
+`//` and `/* ... */` are comments. `///` before the app, an entity, an enum,
+a job or a field is documentation: it goes into the generated Go code, and an
 entity's also into the API's contract.
 
 ```esquadro

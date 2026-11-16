@@ -84,7 +84,7 @@ blueprint billing {
 | `requires a, b` | blueprints the app must use too |
 | `optional a, b` | blueprints it works with when the app has them: it comes after them, and its contributions to their slots are dropped without them |
 | `option name type mods` | an option: type `string`, `int`, `number`, `bool`, `name` or `list`; `default(v)` or `required` |
-| `annotation app\|entity\|field\|relation { key type }` | the keys of `@billing(...)` on that element; key types also `field` and `fields` (names of the entity's fields) |
+| `annotation app\|entity\|field\|relation\|job { key type }` | the keys of `@billing(...)` on that element; key types also `field` and `fields` (names of the entity's fields) |
 | `slot "billing.x"` | a point where other blueprints add code; its name starts with the blueprint's |
 | `go_require "module" "version"` | a Go module the generated code needs at least |
 | `hook pre-gen\|post-gen "path"` | a program to run (see [Hooks](#hooks)) |
@@ -97,7 +97,7 @@ users read.
 Every file under `templates/` is rendered to the same path in the project.
 `.tmpl` files are templates; others are copied as they are.
 
-- **Per element:** a path that uses `.Entity`, `.Enum`, `.Module` or
+- **Per element:** a path that uses `.Entity`, `.Enum`, `.Job`, `.Module` or
   `.Relation` is rendered once for each of them:
   `internal/{{.Entity.Module.Snake}}/{{.Entity.Snake}}_invoice.go.tmpl`.
 - **The user's:** `name.once.tmpl` is written once; esquadro never changes it
@@ -110,11 +110,12 @@ A template sees:
 | | |
 |---|---|
 | `.App` | the app: `.Label`, `.Kebab`, `.Snake`, `.Module` (the Go module) |
-| `.Modules`, `.Entities`, `.Enums` | everything in the model |
-| `.Module`, `.Entity`, `.Enum`, `.Relation` | the element of a per-element template |
+| `.Modules`, `.Entities`, `.Enums`, `.Jobs` | everything in the model |
+| `.Module`, `.Entity`, `.Enum`, `.Job`, `.Relation` | the element of a per-element template |
 | `.Options` | this blueprint's options, defaults included |
 
-An entity has its `.Fields` and `.Relations`; names come in every form
+An entity has its `.Fields` and `.Relations`, a job its `.Fields` (its
+arguments), a module its `.Entities`, `.Enums` and `.Jobs`; names come in every form
 (`.Pascal`, `.Camel`, `.Snake`, `.Kebab`, `.Label`, `.Plural.Pascal`...).
 
 Functions, besides text/template's:

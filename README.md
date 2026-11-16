@@ -33,6 +33,16 @@ it all locally, a container image and a CI. Blueprints are small and
 optional: the `worker` and `cli` starters, or a project built blueprint by
 blueprint, take only what they need.
 
+The model also declares work for the background, run on a queue in
+PostgreSQL by the `worker`:
+
+```
+/// Sends the welcome email to a new user.
+job SendWelcomeEmail {
+  user_id uuid required
+}
+```
+
 ## Install
 
 ```

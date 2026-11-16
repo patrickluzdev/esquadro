@@ -26,13 +26,13 @@ needs and drops a line to lose a capability. The built-in ones:
 
 | Group | Blueprints |
 |---|---|
-| The program and how it runs | [app](reference/app/), [domain](reference/domain/), [http](reference/http/), [worker](reference/worker/) |
+| The program and how it runs | [app](reference/app/), [domain](reference/domain/), [http](reference/http/), [worker](reference/worker/), [jobs](reference/jobs/) |
 | PostgreSQL | [postgres](reference/postgres/), [migrations](reference/migrations/), [store](reference/store/), [testcontainers](reference/testcontainers/), [compose](reference/compose/) |
 | The JSON API | [rest](reference/rest/), [api_docs](reference/api_docs/), [cors](reference/cors/), [security_headers](reference/security_headers/), [rate_limit](reference/rate_limit/), [compression](reference/compression/), [i18n](reference/i18n/) |
 | Shipping it | [docker](reference/docker/), [github_actions](reference/github_actions/) (see [Deploying](/esquadro/deploying/)) |
 | The repository | [git](reference/git/) |
 
-`esquadro new -starter api` starts from all of them but `worker`; the
+`esquadro new -starter api` starts from all of them but `worker` and `jobs`; the
 `worker` and `cli` starters take fewer, and `esquadro new` without a starter
 takes only `app` (see [Getting started](/esquadro/getting-started/#create-a-project)).
 
