@@ -2,8 +2,8 @@
 
 Support for [Esquadro](https://github.com/patrickluzdev/esquadro)'s `.esq` files:
 
-- **Syntax highlighting** of models (`app`, `package`, `enum`, `entity`) and
-  blueprint manifests (`blueprint.esq`).
+- **Syntax highlighting** of models (`app`, `package`, `enum`, `entity`, `job`)
+  and blueprint manifests (`blueprint.esq`).
 - **Errors while you type**, before saving: the ones `esquadro check` reports,
   across the whole project (an entity misspelled in another file, an option a
   blueprint does not have), with the same suggestions.
@@ -13,21 +13,24 @@ Support for [Esquadro](https://github.com/patrickluzdev/esquadro)'s `.esq` files
 ## Requirements
 
 The extension runs `esquadro lsp`, the language server built into esquadro.
-Install esquadro and make sure `esquadro` is on your PATH, or set
-`esquadro.path` to the command.
+[Install esquadro](https://patrickluzdev.github.io/esquadro/getting-started/)
+and make sure `esquadro` is on your PATH, or set `esquadro.path` to the
+command.
 
-## Install from a .vsix
+## Install
+
+In VS Code, search the Extensions view for **Esquadro**, or run:
 
 ```
-task editor:package                      # in the esquadro repository
-code --install-extension editors/vscode/esquadro-0.1.0.vsix
+code --install-extension patrickluzdev.esquadro
 ```
 
-`code --install-extension` installs into VS Code's default profile. If the
-folder opens in another profile (the profile's name shows in the window's
-title bar), install there too:
-`code --profile "<profile>" --install-extension editors/vscode/esquadro-0.1.0.vsix`,
-then run "Developer: Reload Window".
+VSCodium, Cursor and other editors that use [Open VSX](https://open-vsx.org/extension/patrickluzdev/esquadro)
+find it there, under the same name.
+
+Extensions install into the current profile. If a folder opens in another
+profile (its name shows in the window's title bar), install there too:
+`code --profile "<profile>" --install-extension patrickluzdev.esquadro`.
 
 ## Other editors
 

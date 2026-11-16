@@ -20,6 +20,20 @@ task docs          # the documentation site, locally
 Run `task lint test e2e` before opening a pull request; CI runs the same on
 Linux and macOS. Windows is not supported yet.
 
+## The VS Code extension
+
+It lives in `editors/vscode/`. To try a change in your editor:
+
+```
+task editor:package
+code --install-extension editors/vscode/esquadro-*.vsix
+```
+
+then "Developer: Reload Window". The version in its `package.json` does not
+matter: a release stamps the tag's version on the extension it publishes.
+Its `README.md` is the extension's page on the Marketplace and Open VSX:
+write it for the people who install it.
+
 ## Conventions
 
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org):
