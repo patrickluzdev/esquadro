@@ -138,7 +138,7 @@ type Entity struct {
 	Module *Module
 	Plural Names
 	Doc    []string
-	// Fields includes the implicit id, created_at and updated_at, in that
+	// Fields includes the implicit id, version, created_at and updated_at, in that
 	// order around the declared fields.
 	Fields []*Field
 	// Relations includes both declared relations and the inverse side of
@@ -217,7 +217,7 @@ type Field struct {
 	// Pattern is a Go (RE2) regular expression, empty when not set.
 	Pattern string
 	Default *Default
-	// Implicit is true for id, created_at and updated_at.
+	// Implicit is true for id, version, created_at and updated_at.
 	Implicit    bool
 	Annotations []*dsl.Annotation
 	Ann         Ann

@@ -39,12 +39,17 @@ SELECT count(*) FROM {{$t}}
 
 -- name: Update{{$e.Pascal}} :one
 UPDATE {{$t}}
-SET {{range $ws}}{{.Column}} = @{{.Param}}, {{end}}updated_at = now()
-WHERE id = @id
+SET {{range $ws}}{{.Column}} = @{{.Param}}, {{end}}version = version + 1, updated_at = now()
+WHERE id = @id AND (sqlc.narg(if_version)::integer IS NULL OR version = sqlc.narg(if_version)::integer)
 RETURNING *;
 
+-- name: Touch{{$e.Pascal}} :execrows
+UPDATE {{$t}}
+SET version = version + 1, updated_at = now()
+WHERE id = @id AND (sqlc.narg(if_version)::integer IS NULL OR version = sqlc.narg(if_version)::integer);
+
 -- name: Delete{{$e.Pascal}} :execrows
-DELETE FROM {{$t}} WHERE id = @id;
+DELETE FROM {{$t}} WHERE id = @id AND (sqlc.narg(if_version)::integer IS NULL OR version = sqlc.narg(if_version)::integer);
 {{- range links $e}}{{$l := link . (optionsOf "postgres")}}
 {{- if $l.Declared}}
 

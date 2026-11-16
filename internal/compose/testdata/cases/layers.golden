@@ -34,6 +34,7 @@ package model
 type Category struct {
 	ID        string
 	Name      string
+	Version   string
 	CreatedAt string
 	UpdatedAt string
 }
@@ -45,6 +46,7 @@ type Product struct {
 	ID        string
 	Name      string
 	Status    string
+	Version   string
 	CreatedAt string
 	UpdatedAt string
 }

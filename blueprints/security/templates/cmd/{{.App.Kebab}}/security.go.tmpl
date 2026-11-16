@@ -42,7 +42,7 @@ func (d dependencies) realms() []security.Realm {
 				return refusal{{$m.Pascal}}(err)
 			},
 			Delete: func(ctx context.Context, id uuid.UUID) error {
-				if err := d.{{$m.Camel}}.Delete{{$e.Pascal}}(ctx, id); err != nil && !errors.Is(err, {{$m.Snake}}.Err{{$e.Pascal}}NotFound) {
+				if err := d.{{$m.Camel}}.Delete{{$e.Pascal}}(ctx, id, 0); err != nil && !errors.Is(err, {{$m.Snake}}.Err{{$e.Pascal}}NotFound) {
 					return err
 				}
 				return nil

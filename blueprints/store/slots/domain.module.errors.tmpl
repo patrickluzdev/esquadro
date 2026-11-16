@@ -3,4 +3,7 @@
 	Err{{.Pascal}}NotFound = errors.New("{{$.Module.Snake}}: no such {{lower .Label}}")
 	// Err{{.Pascal}}InUse is the error for deleting a {{lower .Label}} other records still point at.
 	Err{{.Pascal}}InUse = errors.New("{{$.Module.Snake}}: the {{lower .Label}} is still in use")
+	// Err{{.Pascal}}Changed is the error for changing a {{lower .Label}} of a version that is
+	// no longer its own: someone changed it in between.
+	Err{{.Pascal}}Changed = errors.New("{{$.Module.Snake}}: the {{lower .Label}} changed since that version")
 {{- end}}

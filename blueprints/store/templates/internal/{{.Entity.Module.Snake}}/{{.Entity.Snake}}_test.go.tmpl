@@ -157,14 +157,21 @@ func TestUpdate{{$e.Pascal}}(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, given{{$e.Pascal}}(t, {{$r}}, 2))
+	updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, created.Version, given{{$e.Pascal}}(t, {{$r}}, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.ID != created.ID || updated.UpdatedAt.Before(created.UpdatedAt) {
+	if updated.ID != created.ID || updated.UpdatedAt.Before(created.UpdatedAt) || updated.Version != created.Version+1 {
 		t.Fatalf("updated %+v, created %+v", updated, created)
 	}
-	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, uuid.NewV7(), given{{$e.Pascal}}(t, {{$r}}, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+	// The version it was read at no longer is its own: the change is refused.
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, created.Version, given{{$e.Pascal}}(t, {{$r}}, 4)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}Changed) {
+		t.Fatalf("updating an old version: %v", err)
+	}
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID, created.Version); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}Changed) {
+		t.Fatalf("deleting an old version: %v", err)
+	}
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, uuid.NewV7(), 0, given{{$e.Pascal}}(t, {{$r}}, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
 		t.Fatalf("updating a missing {{lower $e.Label}}: %v", err)
 	}
 }
@@ -178,13 +185,13 @@ func TestDelete{{$e.Pascal}}(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID); err != nil {
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := {{$r}}.Read{{$e.Pascal}}(ctx, created.ID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
 		t.Fatalf("reading a deleted {{lower $e.Label}}: %v", err)
 	}
-	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, created.ID, 0); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
 		t.Fatalf("deleting twice: %v", err)
 	}
 }

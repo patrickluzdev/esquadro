@@ -1,14 +1,25 @@
 {{- $rel := .Relation}}{{if manyToMany $rel}}{{$l := link $rel (optionsOf "postgres")}}{{if $l.Declared}}{{$e := .Entity}}{{$m := .Module}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // RemoveFrom{{$e.Pascal}}{{$rel.Pascal}} removes the {{lower $rel.Target.Label}} whose id is {{$l.OtherParam}}
 // from the {{$rel.Snake}} of the {{lower $e.Label}} whose id is id; removing one that is not
-// there changes nothing.
-func ({{$r}} *{{$m.Pascal}}) RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id, {{$l.OtherParam}} uuid.UUID) error {
-	return sqlgen.New({{$r}}.Pool).RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}Params{
-		OwnID:   postgres.UUID(id),
-		OtherID: postgres.UUID({{$l.OtherParam}}),
+// there changes nothing. It changes the {{lower $e.Label}}: its version goes up, and
+// with a version (not 0), only that version is changed (Err{{$e.Pascal}}Changed).
+func ({{$r}} *{{$m.Pascal}}) RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id uuid.UUID, version int, {{$l.OtherParam}} uuid.UUID) error {
+	return pgx.BeginFunc(ctx, {{$r}}.Pool, func(tx pgx.Tx) error {
+		q := sqlgen.New(tx)
+		touched, err := q.Touch{{$e.Pascal}}(ctx, sqlgen.Touch{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+		if err != nil {
+			return err
+		}
+		if touched == 0 {
+			return {{$e.Camel}}Gone(ctx, tx, id)
+		}
+		return q.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}Params{
+			OwnID:   postgres.UUID(id),
+			OtherID: postgres.UUID({{$l.OtherParam}}),
+		})
 	})
 }
 {{end}}{{end -}}

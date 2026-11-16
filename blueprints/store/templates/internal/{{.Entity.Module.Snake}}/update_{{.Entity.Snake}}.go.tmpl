@@ -1,21 +1,25 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (and (not $ws) (printf "%s/internal/platform/postgres" .App.Module))}}
+{{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Update{{$e.Pascal}} replaces the {{lower $e.Label}} with the given id by n, with
-// its defaults, once it passes the rules declared for {{$e.Plural.Snake}}.
-func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UUID, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
+// its defaults, once it passes the rules declared for {{$e.Plural.Snake}}. With a
+// version (not 0), only that version is replaced: Err{{$e.Pascal}}Changed when
+// someone changed it since.
+func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
 	n = n.WithDefaults()
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
 	}
 {{- if $ws}}
-	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, update{{$e.Pascal}}Params(id, n))
+	params := update{{$e.Pascal}}Params(id, n)
+	params.IfVersion = postgres.Version(version)
+	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, params)
 {{- else}}
-	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, postgres.UUID(id))
+	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, sqlgen.Update{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 {{- end}}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return {{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
+		return {{$e.Pascal}}{}, {{$e.Camel}}Gone(ctx, {{$r}}.Pool, id)
 	}
 	if err != nil {
 		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)

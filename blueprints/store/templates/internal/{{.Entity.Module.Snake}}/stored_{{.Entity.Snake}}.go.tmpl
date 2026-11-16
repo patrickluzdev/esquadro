@@ -1,7 +1,21 @@
 {{- $e := .Entity}}{{$ws := writable $e}}{{$rs := refusals $e -}}
 package {{$e.Module.Snake}}
 
-{{importBlock (and (needs $e "json") "encoding/json") (and $ws "uuid") (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "errors" (and (needs $e "json") "encoding/json") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// {{$e.Camel}}Gone is why a change of the {{lower $e.Label}} id changed nothing: it
+// does not exist (Err{{$e.Pascal}}NotFound), or its version is no longer the one
+// asked for (Err{{$e.Pascal}}Changed).
+func {{$e.Camel}}Gone(ctx context.Context, db sqlgen.DBTX, id uuid.UUID) error {
+	_, err := sqlgen.New(db).Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return Err{{$e.Pascal}}NotFound
+	case err != nil:
+		return err
+	}
+	return Err{{$e.Pascal}}Changed
+}
+
 // {{$e.Camel}}Of is the {{lower $e.Label}} a stored row holds.
 func {{$e.Camel}}Of(row sqlgen.{{sqlcModel $e (optionsOf "postgres")}}) {{$e.Pascal}} {
 	return {{$e.Pascal}}{

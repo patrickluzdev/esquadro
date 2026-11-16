@@ -1,27 +1,38 @@
 {{- $rel := .Relation}}{{if manyToMany $rel}}{{$l := link $rel (optionsOf "postgres")}}{{if $l.Declared}}{{$e := .Entity}}{{$m := .Module}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // AddTo{{$e.Pascal}}{{$rel.Pascal}} adds the {{lower $rel.Target.Label}} whose id is {{$l.OtherParam}} to the
 // {{$rel.Snake}} of the {{lower $e.Label}} whose id is id; adding it twice changes nothing.
 // It answers Err{{$e.Pascal}}NotFound
 {{- if $l.OtherKey}}, or Err{{$rel.Target.Pascal}}NotFound,{{end}} when there is no such
-// record.
-func ({{$r}} *{{$m.Pascal}}) AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id, {{$l.OtherParam}} uuid.UUID) error {
-	err := sqlgen.New({{$r}}.Pool).AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.AddTo{{$e.Pascal}}{{$rel.Pascal}}Params{
-		OwnID:   postgres.UUID(id),
-		OtherID: postgres.UUID({{$l.OtherParam}}),
-	})
-	if constraint, _, ok := postgres.Violation(err); ok {
-		switch constraint {
-		case {{quote $l.OwnKey}}:
-			return Err{{$e.Pascal}}NotFound
-{{- if $l.OtherKey}}
-		case {{quote $l.OtherKey}}:
-			return Err{{$rel.Target.Pascal}}NotFound
-{{- end}}
+// record. It changes the {{lower $e.Label}}: its version goes up, and with a version
+// (not 0), only that version is changed (Err{{$e.Pascal}}Changed).
+func ({{$r}} *{{$m.Pascal}}) AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id uuid.UUID, version int, {{$l.OtherParam}} uuid.UUID) error {
+	return pgx.BeginFunc(ctx, {{$r}}.Pool, func(tx pgx.Tx) error {
+		q := sqlgen.New(tx)
+		touched, err := q.Touch{{$e.Pascal}}(ctx, sqlgen.Touch{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+		if err != nil {
+			return err
 		}
-	}
-	return err
+		if touched == 0 {
+			return {{$e.Camel}}Gone(ctx, tx, id)
+		}
+		err = q.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.AddTo{{$e.Pascal}}{{$rel.Pascal}}Params{
+			OwnID:   postgres.UUID(id),
+			OtherID: postgres.UUID({{$l.OtherParam}}),
+		})
+		if constraint, _, ok := postgres.Violation(err); ok {
+			switch constraint {
+			case {{quote $l.OwnKey}}:
+				return Err{{$e.Pascal}}NotFound
+{{- if $l.OtherKey}}
+			case {{quote $l.OtherKey}}:
+				return Err{{$rel.Target.Pascal}}NotFound
+{{- end}}
+			}
+		}
+		return err
+	})
 }
 {{end}}{{end -}}

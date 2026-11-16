@@ -10,6 +10,7 @@ CREATE TYPE public.catalog_status AS ENUM ('ACTIVE', 'INACTIVE');
 CREATE TABLE public.categories (
     id uuid NOT NULL,
     name text NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
@@ -26,6 +27,7 @@ CREATE TABLE public.products (
     launched_on date DEFAULT CURRENT_DATE,
     details jsonb DEFAULT '{}'::jsonb,
     note text DEFAULT 'it''s new',
+    version integer NOT NULL DEFAULT 1,
     category_id uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -41,6 +43,7 @@ CREATE TABLE public.product_tags (
 CREATE TABLE public.tags (
     id uuid NOT NULL,
     label text NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
@@ -50,6 +53,7 @@ CREATE TABLE orders.orders (
     id uuid NOT NULL,
     number text NOT NULL,
     placed_at timestamptz NOT NULL DEFAULT now(),
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
@@ -59,6 +63,7 @@ CREATE TABLE orders.orders (
 CREATE TABLE orders.order_items (
     id uuid NOT NULL,
     quantity integer NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     order_id uuid NOT NULL,
     product_id uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -139,6 +144,7 @@ ALTER TABLE public.product_tags DROP CONSTRAINT product_tags_tag_id_fkey;
 CREATE TABLE public.makers (
     id uuid NOT NULL,
     name text NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
@@ -199,6 +205,7 @@ CREATE TABLE public.product_tags (
 CREATE TABLE public.tags (
     id uuid NOT NULL,
     label text NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
@@ -257,6 +264,7 @@ CREATE TABLE orders.orders (
     id uuid NOT NULL,
     number text NOT NULL,
     placed_at timestamptz NOT NULL DEFAULT now(),
+    version integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
@@ -266,6 +274,7 @@ CREATE TABLE orders.orders (
 CREATE TABLE orders.order_items (
     id uuid NOT NULL,
     quantity integer NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     order_id uuid NOT NULL,
     product_id uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),

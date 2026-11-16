@@ -24,7 +24,7 @@ func Test{{$e.Pascal}}{{$rel.Pascal}}(t *testing.T) {
 	otherID := uuid.NewV7() // a {{lower $t.Label}} of the {{$t.Module.Snake}} module: no foreign key
 {{- end}}
 	for range 2 { // adding twice changes nothing
-		if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, otherID); err != nil {
+		if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, 0, otherID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -39,7 +39,7 @@ func Test{{$e.Pascal}}{{$rel.Pascal}}(t *testing.T) {
 	}
 {{- end}}{{end}}
 	for range 2 { // removing what is not there changes nothing
-		if err := {{$r}}.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, otherID); err != nil {
+		if err := {{$r}}.RemoveFrom{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, 0, otherID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -47,11 +47,11 @@ func Test{{$e.Pascal}}{{$rel.Pascal}}(t *testing.T) {
 		t.Fatalf("after removing: %+v, %v", page, err)
 	}
 
-	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, uuid.NewV7(), otherID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, uuid.NewV7(), 0, otherID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
 		t.Fatalf("adding to a missing {{lower $e.Label}}: %v", err)
 	}
 {{- if $l.OtherKey}}
-	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, uuid.NewV7()); !errors.Is(err, {{$p}}.Err{{$t.Pascal}}NotFound) {
+	if err := {{$r}}.AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx, owner.ID, 0, uuid.NewV7()); !errors.Is(err, {{$p}}.Err{{$t.Pascal}}NotFound) {
 		t.Fatalf("adding a missing {{lower $t.Label}}: %v", err)
 	}
 {{- end}}

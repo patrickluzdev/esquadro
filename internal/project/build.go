@@ -325,6 +325,7 @@ var (
 	implicitID        = "id"
 	implicitCreatedAt = "created_at"
 	implicitUpdatedAt = "updated_at"
+	implicitVersion   = "version"
 )
 
 // buildJob builds a job: its arguments are fields, without the implicit
@@ -408,6 +409,9 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 	}
 	now := &Default{Kind: DefaultNow, Text: "now"}
 	e.Fields = append(e.Fields,
+		// version goes up with each change: the API's ETag, and what
+		// If-Match checks.
+		implicitField(implicitVersion, TypeInt, &Default{Kind: DefaultLiteral, Text: "1"}),
 		implicitField(implicitCreatedAt, TypeTime, now),
 		implicitField(implicitUpdatedAt, TypeTime, now))
 
@@ -423,7 +427,7 @@ var fieldModifiers = []string{"required", "unique", "min", "max", "pattern", "de
 func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 	n := b.names(d.Name)
 	switch n.Snake {
-	case implicitID, implicitCreatedAt, implicitUpdatedAt:
+	case implicitID, implicitCreatedAt, implicitUpdatedAt, implicitVersion:
 		if entity {
 			b.errorf(d.Name.Span, "%s is added to every entity automatically", n.Snake).
 				Suggestion = "remove this field"

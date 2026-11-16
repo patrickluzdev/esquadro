@@ -91,7 +91,7 @@ func TestShopModel(t *testing.T) {
 	for _, f := range prod.Fields {
 		fieldNames = append(fieldNames, f.Snake)
 	}
-	if got := strings.Join(fieldNames, " "); got != "id name description price stock status created_at updated_at" {
+	if got := strings.Join(fieldNames, " "); got != "id name description price stock status version created_at updated_at" {
 		t.Errorf("fields = %s", got)
 	}
 	if id := prod.Fields[0]; !id.Implicit || id.Type != TypeUUID || !id.Required {

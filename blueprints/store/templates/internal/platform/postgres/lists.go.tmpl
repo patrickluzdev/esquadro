@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"uuid"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Lists' errors: a cursor that is not one of the list's order, and an
@@ -23,6 +25,9 @@ func Opt[T, P any](v *T, to func(T) P) P {
 	}
 	return to(*v)
 }
+
+// Version is the version a change asks for, NULL for any (0).
+func Version(v int) pgtype.Int4 { return pgtype.Int4{Int32: int32(v), Valid: v > 0} }
 
 // Strings is a list of values as text, NULL without any: the values of an
 // enum a list filters by.

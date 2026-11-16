@@ -181,7 +181,7 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 		return nil, security.Refusal(ctx)
 	}
 {{- end}}
-	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), n)
+	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), 0, n)
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -199,7 +199,7 @@ func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params
 		return security.Refusal(ctx)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}})))
+	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}}), 0))
 }
 {{- if $pol}}
 
@@ -265,7 +265,7 @@ func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{
 		return problemOf(err)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
+	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), 0, uuid.UUID(params.{{$o}})))
 }
 
 func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFrom{{$P}}{{$R}}Params) error {
@@ -274,7 +274,7 @@ func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFr
 		return problemOf(err)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
+	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), 0, uuid.UUID(params.{{$o}})))
 }
 {{- end}}
 {{- end}}
@@ -370,6 +370,7 @@ func {{.Camel}}Answer(x {{$P}}) apigen.{{$P}} {
 		ID:        ogenuuid.UUID(x.ID),
 		CreatedAt: x.CreatedAt,
 		UpdatedAt: x.UpdatedAt,
+		Version:   x.Version,
 {{- range inRequest $e}}{{if .Required}}{{$g := ogenName (jsonName .)}}
 {{- if eq .Type "decimal"}}
 		{{$g}}: x.{{.Pascal}}.String(),
