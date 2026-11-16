@@ -33,6 +33,7 @@ func TestTutorial(t *testing.T) {
 	e.esquadro(0, "new", "-starter", "api", "-module", "example.com/shop", dir)
 	db := e.postgres()
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
+	e.createAdmin(db)
 	// step regenerates, migrates and serves, as the tutorial does after each
 	// change; it returns how to stop the service.
 	step := func() func() {
@@ -42,6 +43,7 @@ func TestTutorial(t *testing.T) {
 		return e.serve(db)
 	}
 	stop := e.serve(db)
+	e.signIn()
 	category := e.call("POST", "/categories", `{"name":"Books"}`, 201)
 	stop()
 
@@ -59,7 +61,7 @@ func TestTutorial(t *testing.T) {
 		}
 	}
 	newProduct := func(name, sku string) string {
-		return fmt.Sprintf(`{"name":%q,"price":"10","categoryId":%q,"sku":%q}`, name, category["id"], sku)
+		return fmt.Sprintf(`{"name":%q,"price":"10","category_id":%q,"sku":%q}`, name, category["id"], sku)
 	}
 	product := e.call("POST", "/products", newProduct("Dune", "DU-1"), 201)
 	refused := e.call("POST", "/products", newProduct("Copy", "DU-1"), 422)
@@ -111,7 +113,7 @@ entity OrderItem {
 	e.write(model("app.esq"), strings.Replace(app, "  blueprint postgres\n", "  blueprint postgres {\n    schemas [orders]\n  }\n", 1))
 	stop = step()
 	order := e.call("POST", "/orders", `{"number":"A-1"}`, 201)
-	e.call("POST", "/order-items", fmt.Sprintf(`{"quantity":2,"orderId":%q,"productId":%q}`, order["id"], product["id"]), 201)
+	e.call("POST", "/order-items", fmt.Sprintf(`{"quantity":2,"order_id":%q,"product_id":%q}`, order["id"], product["id"]), 201)
 	if m := e.read(only(t, filepath.Join(dir, "migrations", "00005_*.sql"))); !strings.Contains(m, "CREATE SCHEMA orders;") {
 		t.Fatalf("the orders' schema was not created:\n%s", m)
 	}

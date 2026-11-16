@@ -1,0 +1,17 @@
+// Who signs in: a realm each, with its own accounts, sessions and routes
+// under /identity/<realm>/. Create the first admin with
+//   go run ./cmd/<app> security create user you@example.com name=You -role admin
+package accounts
+
+/// Someone who works in the store: staff manage the catalog, admins also
+/// its categories and the users.
+entity User {
+  name string required min(2) max(80)
+  @security(principal, roles [admin, staff], read user, write user.admin)
+}
+
+/// Someone who buys: signs up on their own.
+entity Customer {
+  name string required min(2) max(80)
+  @security(principal, signup open, read user, write user.admin)
+}

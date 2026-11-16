@@ -14,7 +14,7 @@
       description: |
         The session cookie of a {{.Name}}, from POST {{$.Options.path}}/{{.Name}}/sign-in;
         named __Host-{{$.App.Snake}}_{{.Name}}_session outside {{index $.Environments 0}}. A
-        request that changes something sends the session's csrfToken in
+        request that changes something sends the session's csrf_token in
         X-CSRF-Token.
 {{- end}}
 {{- end}}

@@ -11,6 +11,7 @@ enum Status {
 entity Category {
   name     string required unique min(2) max(60)
   products < Product
+  @security(read public, write user.admin)
 }
 
 /// Something the store sells.
@@ -20,4 +21,5 @@ entity Product {
   price       decimal required min(0)
   status      Status  default(ACTIVE)
   category    > Category required
+  @security(read public, write [user.admin, user.staff])
 }

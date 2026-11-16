@@ -2,37 +2,190 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"slices"
+	"strings"
+	"text/tabwriter"
+
+	"{{.App.Module}}/internal/platform/edge"
+	"{{.App.Module}}/internal/platform/security"
 )
+
+const securityUsage = `usage: {{.App.Kebab}} security <command>
+
+  create <realm> <email> [field=value...] [-role r]... [-password-stdin] [-redirect /path]
+        an account, and a link to set its password (or the password, from stdin)
+  grant <realm> <email> <role>     give a role
+  revoke <realm> <email> <role>    take a role away
+  sessions <realm> <email>         the open sessions of an account
+  delete <realm> <email>           delete an account and its principal
+  cleanup                          delete expired sessions, links and keys
+  rotate-keys                      a new JWT signing key
+
+realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
 // securityCommand runs {{.App.Kebab}} security <command>.
 func securityCommand(ctx context.Context, args []string) error {
-	usage := fmt.Errorf("usage: {{.App.Kebab}} security <command>; commands: cleanup (delete expired sessions, links and keys), rotate-keys (a new JWT signing key)")
-	if len(args) != 1 {
-		return usage
+	if len(args) == 0 {
+		return errors.New(securityUsage)
 	}
 	d, release, err := open(ctx)
 	if err != nil {
 		return err
 	}
 	defer release()
-	switch args[0] {
+	command, args := args[0], args[1:]
+	switch command {
 	case "cleanup":
 		n, err := d.security.Cleanup(ctx)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stdout, "deleted %d expired rows\n", n)
+		fmt.Printf("deleted %d expired rows\n", n)
 		return nil
 	case "rotate-keys":
 		if err := d.security.RotateKeys(ctx); err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, "a new signing key signs the tokens; the old ones check theirs until they expire")
+		fmt.Println("a new signing key signs the tokens; the old ones check theirs until they expire")
+		return nil
+	case "create":
+		return createAccount(ctx, d, args, os.Stdin)
+	}
+	if len(args) < 2 {
+		return errors.New(securityUsage)
+	}
+	realm, ok := realmNamed(d, args[0])
+	if !ok {
+		return errors.New(securityUsage)
+	}
+	id, err := d.security.AccountID(ctx, realm.Name, args[1])
+	if err != nil {
+		return err
+	}
+	switch {
+	case (command == "grant" || command == "revoke") && len(args) == 3:
+		role := args[2]
+		if !slices.Contains(realm.Roles, role) {
+			return fmt.Errorf("%s is not a role of %s: %s", role, realm.Name, strings.Join(realm.Roles, ", "))
+		}
+		if command == "grant" {
+			return d.security.Grant(ctx, d.pool, id, role)
+		}
+		return d.security.Revoke(ctx, d.pool, id, role)
+	case command == "sessions" && len(args) == 2:
+		sessions, err := d.security.Sessions(ctx, id)
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "SESSION\tSINCE\tLAST SEEN\tADDRESS\tBROWSER")
+		for _, s := range sessions {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.ID, s.CreatedAt.Format("2006-01-02 15:04"), s.LastSeenAt.Format("2006-01-02 15:04"), s.IPAddress, s.UserAgent)
+		}
+		return w.Flush()
+	case command == "delete" && len(args) == 2:
+		return d.security.DeleteAccount(ctx, realm, id)
+	}
+	return errors.New(securityUsage)
+}
+
+// createAccount runs security create.
+func createAccount(ctx context.Context, d dependencies, args []string, stdin io.Reader) error {
+	if len(args) < 2 {
+		return errors.New(securityUsage)
+	}
+	realm, ok := realmNamed(d, args[0])
+	if !ok {
+		return errors.New(securityUsage)
+	}
+	email := args[1]
+	fs := flag.NewFlagSet("security create", flag.ContinueOnError)
+	var roles roleList
+	fs.Var(&roles, "role", "a role of the account; repeat it for more")
+	fromStdin := fs.Bool("password-stdin", false, "read the password from stdin, instead of answering a link to set it")
+	redirect := fs.String("redirect", "/", "the page of the app the link opens, which sets the password")
+	// Fields come before the flags: name=Ana -role admin.
+	fields := map[string]any{}
+	rest := args[2:]
+	for len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+		key, value, ok := strings.Cut(rest[0], "=")
+		if !ok {
+			return fmt.Errorf("%q is not field=value", rest[0])
+		}
+		var v any
+		if json.Unmarshal([]byte(value), &v) != nil {
+			v = value
+		}
+		fields[key] = v
+		rest = rest[1:]
+	}
+	if err := fs.Parse(rest); err != nil {
+		return err
+	}
+	var password string
+	if *fromStdin {
+		line, err := bufio.NewReader(stdin).ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		password = strings.TrimRight(line, "\r\n")
+	}
+	body, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	id, err := d.security.CreateAccount(ctx, realm, email, password, body, roles...)
+	if err != nil {
+		return describe(err)
+	}
+	fmt.Printf("created %s %s (%s)\n", realm.Name, email, id)
+	if password != "" {
 		return nil
 	}
-	return usage
+	link, expires, err := d.security.ResetLink(ctx, realm.Name, id, *redirect)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("its password is set at %s\nuntil %s\n", link, expires.Local().Format("2006-01-02 15:04"))
+	return nil
 }
+
+// realmNamed is the realm called name.
+func realmNamed(d dependencies, name string) (security.Realm, bool) {
+	for _, r := range d.realms() {
+		if r.Name == name {
+			return r, true
+		}
+	}
+	return security.Realm{}, false
+}
+
+// describe is an error of the model as a line: its fields refused.
+func describe(err error) error {
+	if weak, ok := errors.AsType[*security.WeakPassword](err); ok {
+		return fmt.Errorf("the password is refused: %s", weak.Reason)
+	}
+	if p, ok := errors.AsType[*edge.Problem](err); ok {
+		parts := make([]string, 0, len(p.Errors))
+		for _, f := range p.Errors {
+			parts = append(parts, f.Field+": "+f.Code)
+		}
+		return fmt.Errorf("%s %s", p.Title, strings.Join(parts, ", "))
+	}
+	return err
+}
+
+// roleList is the -role flag, repeated.
+type roleList []string
+
+func (r *roleList) String() string     { return strings.Join(*r, ",") }
+func (r *roleList) Set(v string) error { *r = append(*r, v); return nil }
 {{end -}}

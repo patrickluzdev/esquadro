@@ -90,9 +90,9 @@ func TestPasswordReset(t *testing.T) {
 	}
 
 	// A weak password does not use the link up.
-	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "short"}), 422, "invalid_fields")
-	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "a brand new passphrase"}), 204, "")
-	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "a brand new passphrase"}), 400, "invalid_link")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "new_password": "short"}), 422, "invalid_fields")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "new_password": "a brand new passphrase"}), 204, "")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "new_password": "a brand new passphrase"}), 400, "invalid_link")
 
 	// Every session ended; the new password signs in.
 	f.expect(f.call("GET", "/identity/person/session", nil, cookie), 401, "unauthorized")
@@ -103,7 +103,7 @@ func TestPasswordReset(t *testing.T) {
 	f.call("POST", "/identity/person/password/forgot", map[string]string{"email": "ana@example.com"})
 	_, late := f.mail.last(t, "reset_password")
 	*f.now = f.now.Add(61 * time.Minute)
-	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": late, "newPassword": "yet another passphrase"}), 400, "invalid_link")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": late, "new_password": "yet another passphrase"}), 400, "invalid_link")
 }
 
 func TestChangeEmail(t *testing.T) {

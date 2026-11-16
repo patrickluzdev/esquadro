@@ -115,10 +115,10 @@ func (f *flow) signIn(password string) (string, string) {
 	a := f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password})
 	f.expect(a, 200, "")
 	cookie, _, _ := strings.Cut(a.header.Get("Set-Cookie"), ";")
-	if !strings.HasPrefix(cookie, "test_person_session=") || a.str("csrfToken") == "" {
+	if !strings.HasPrefix(cookie, "test_person_session=") || a.str("csrf_token") == "" {
 		f.t.Fatalf("sign-in: %q %v", cookie, a.body)
 	}
-	return "Cookie: " + cookie, "X-CSRF-Token: " + a.str("csrfToken")
+	return "Cookie: " + cookie, "X-CSRF-Token: " + a.str("csrf_token")
 }
 
 const password = "correct horse battery staple"
@@ -185,16 +185,16 @@ func TestSessionsAndPassword(t *testing.T) {
 	// A client that is not a browser gets the session token in the body.
 	phone := f.call("POST", "/identity/person/sign-in", map[string]any{"email": "ana@example.com", "password": password, "cookie": false})
 	f.expect(phone, 200, "")
-	if phone.header.Get("Set-Cookie") != "" || phone.str("sessionToken") == "" {
+	if phone.header.Get("Set-Cookie") != "" || phone.str("session_token") == "" {
 		t.Fatalf("no cookie: %v", phone.body)
 	}
-	other := "Authorization: Bearer " + phone.str("sessionToken")
+	other := "Authorization: Bearer " + phone.str("session_token")
 	list := f.call("GET", "/identity/person/sessions", nil, cookie)
 	f.expect(list, 200, "")
 
 	// A new password needs the current one, and ends the other sessions.
 	change := func(current string) answer {
-		return f.call("POST", "/identity/person/password", map[string]string{"currentPassword": current, "newPassword": "another long passphrase"}, cookie, csrf)
+		return f.call("POST", "/identity/person/password", map[string]string{"current_password": current, "new_password": "another long passphrase"}, cookie, csrf)
 	}
 	f.expect(change("wrong password!"), 401, "invalid_credentials")
 	f.expect(change(password), 204, "")

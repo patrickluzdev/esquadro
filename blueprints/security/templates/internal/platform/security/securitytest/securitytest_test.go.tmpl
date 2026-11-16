@@ -1,0 +1,44 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+package securitytest
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"{{.App.Module}}/internal/platform/postgres/postgrestest"
+	"{{.App.Module}}/internal/platform/security"
+)
+
+func TestAs(t *testing.T) {
+	ctx := As(context.Background(), "realm", "role")
+	if p, ok := security.PrincipalIn(ctx, "realm"); !ok || p.Roles[0] != "role" {
+		t.Fatalf("%+v", p)
+	}
+	if err := security.Require(context.Background(), "x.y"); !errors.Is(err, security.ErrUnauthorized) {
+		t.Fatal(err)
+	}
+}
+
+func TestSignIn(t *testing.T) {
+	s, err := security.New(postgrestest.Fresh(t), security.Config{App: "test", Secret: strings.Repeat("s", 43),
+		SessionDays: 1, SessionIdleHours: 1, SessionMaxDays: 1}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth, id := SignIn(t, s, "realm", "role")
+	var got security.Principal
+	h := s.Authenticate([]string{"realm"}, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got, _ = security.PrincipalIn(r.Context(), "realm")
+	}))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", auth)
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if got.ID != id || len(got.Roles) != 1 || got.Roles[0] != "role" {
+		t.Fatalf("signed in as %+v", got)
+	}
+}
+{{end -}}

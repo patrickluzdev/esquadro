@@ -72,10 +72,13 @@ func TestLifecycle(t *testing.T) {
 	// an OTLP endpoint of the test's.
 	db := e.postgres()
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
+	e.createAdmin(db)
 	otlp := newOTLPReceiver(t)
 	stop := e.serve(append(db, "OTEL_EXPORTER_OTLP_ENDPOINT="+otlp.URL))
+	e.signIn()
+	e.securityScenario()
 	category := e.call("POST", "/categories", `{"name":"Books"}`, 201)
-	product := e.call("POST", "/products", fmt.Sprintf(`{"name":"Dune","price":"39.90","categoryId":%q}`, category["id"]), 201)
+	product := e.call("POST", "/products", fmt.Sprintf(`{"name":"Dune","price":"39.90","category_id":%q}`, category["id"]), 201)
 	stop()
 	// The spans of the request, of the API's operation and of its query;
 	// logs and metrics too.
@@ -123,17 +126,18 @@ func TestLifecycle(t *testing.T) {
 	e.run(nil, "go", "vet", "./...")
 	stop = e.serve(db)
 	defer stop()
+	e.signIn()
 	kept := e.call("GET", "/products/"+product["id"].(string), "", 200)
 	if kept["name"] != "Dune" || kept["price"] != "39.9" { // decimals come back without trailing zeros
 		t.Fatalf("the stored product changed: %v", kept)
 	}
 	brand := e.call("POST", "/brands", `{"name":"Ace"}`, 201)
-	added := e.call("POST", "/products", fmt.Sprintf(`{"name":"Emma","price":"12.00","categoryId":%q,"brandId":%q,"sku":"EM-1"}`,
+	added := e.call("POST", "/products", fmt.Sprintf(`{"name":"Emma","price":"12.00","category_id":%q,"brand_id":%q,"sku":"EM-1"}`,
 		category["id"], brand["id"]), 201)
 	if added["status"] != "INACTIVE" || added["sku"] != "EM-1" {
 		t.Fatalf("the new product does not follow the new model: %v", added)
 	}
-	refused := e.call("POST", "/products", fmt.Sprintf(`{"name":"Copy","price":"1","categoryId":%q,"sku":"EM-1"}`, category["id"]), 422)
+	refused := e.call("POST", "/products", fmt.Sprintf(`{"name":"Copy","price":"1","category_id":%q,"sku":"EM-1"}`, category["id"]), 422)
 	if !strings.Contains(fmt.Sprint(refused["errors"]), "taken") {
 		t.Fatalf("a taken sku was not refused: %v", refused)
 	}
@@ -146,6 +150,95 @@ type lifecycle struct {
 	t    *testing.T
 	dir  string
 	base string // the API's URL while serving
+	auth string // the Authorization header of the calls: the admin's session
+}
+
+const adminPassword = "a long admin passphrase"
+
+// createAdmin makes the first admin with the app's command: the password
+// from stdin, never in the arguments.
+func (e *lifecycle) createAdmin(db []string) {
+	e.t.Helper()
+	create := exec.Command("go", "run", "./cmd/shop", "security", "create", "user", "admin@example.com", "name=Admin", "-role", "admin", "-password-stdin")
+	create.Dir, create.Env, create.Stdin = e.dir, append(os.Environ(), db...), strings.NewReader(adminPassword+"\n")
+	if out, err := create.CombinedOutput(); err != nil || !strings.Contains(string(out), "created user admin@example.com") {
+		e.t.Fatalf("security create: %v\n%s", err, out)
+	}
+}
+
+// signIn signs the admin in, for the calls that follow.
+func (e *lifecycle) signIn() {
+	e.t.Helper()
+	res := e.request("POST", "/identity/user/sign-in", `{"email":"admin@example.com","password":"`+adminPassword+`","cookie":false}`, nil, 200)
+	token, _ := res.body["session_token"].(string)
+	if token == "" {
+		e.t.Fatalf("sign-in: %v", res.body)
+	}
+	e.auth = "Bearer " + token
+}
+
+// securityScenario checks who may do what, through the running service.
+func (e *lifecycle) securityScenario() {
+	e.t.Helper()
+	product := `{"name":"Dune","price":"1","category_id":"01a1e4af-0000-7000-8000-000000000000"}`
+	// Anyone reads the catalog; no one unsigned changes it.
+	e.request("GET", "/api/v1/products", "", nil, 200)
+	e.request("POST", "/api/v1/categories", `{"name":"X"}`, nil, 401)
+
+	// A customer signs up and in, and may not change the catalog.
+	e.request("POST", "/identity/customer/sign-up", `{"email":"bia@example.com","password":"correct horse battery staple","name":"Bia"}`, nil, 202)
+	customer := e.request("POST", "/identity/customer/sign-in", `{"email":"bia@example.com","password":"correct horse battery staple","cookie":false}`, nil, 200)
+	asCustomer := map[string]string{"Authorization": "Bearer " + customer.body["session_token"].(string)}
+	e.request("POST", "/api/v1/categories", `{"name":"X"}`, asCustomer, 403)
+
+	// A customer's JWT is refused where a user's is needed.
+	jwt := e.request("POST", "/identity/customer/token", "", asCustomer, 200)
+	e.request("GET", "/identity/user/session", "", map[string]string{"Authorization": "Bearer " + jwt.body["token"].(string)}, 401)
+
+	// With the session cookie, a change needs the CSRF token.
+	admin := e.request("POST", "/identity/user/sign-in", `{"email":"admin@example.com","password":"`+adminPassword+`"}`, nil, 200)
+	cookie := map[string]string{"Cookie": strings.Split(admin.header.Get("Set-Cookie"), ";")[0]}
+	e.request("POST", "/api/v1/products", product, cookie, 403)
+	cookie["X-CSRF-Token"] = admin.body["csrf_token"].(string)
+	e.request("POST", "/api/v1/products", product, cookie, 422) // let in: the category does not exist
+}
+
+// answer is a response: its status, headers and JSON object.
+type answer struct {
+	header http.Header
+	body   map[string]any
+}
+
+// request makes a request to the service, with headers, and wants its
+// status.
+func (e *lifecycle) request(method, path, body string, headers map[string]string, status int) answer {
+	e.t.Helper()
+	req, err := http.NewRequest(method, e.base+path, strings.NewReader(body))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode != status {
+		e.t.Fatalf("%s %s: %d, want %d: %s", method, path, res.StatusCode, status, raw)
+	}
+	a := answer{header: res.Header}
+	if len(raw) > 0 && raw[0] == '{' {
+		if err := json.Unmarshal(raw, &a.body); err != nil {
+			e.t.Fatalf("%s %s: %v: %s", method, path, err, raw)
+		}
+	}
+	return a
 }
 
 // esquadro runs an esquadro command in-process and wants its exit code.
@@ -224,6 +317,8 @@ func (e *lifecycle) serve(db []string) func() {
 	port := l.Addr().(*net.TCPAddr).Port
 	l.Close()
 	cmd := exec.Command(filepath.Join(e.dir, "bin", "shop"))
+	// Where the app runs: it reads its .env.development there.
+	cmd.Dir = e.dir
 	cmd.Env = append(append(os.Environ(), db...), fmt.Sprintf("PORT=%d", port))
 	var logs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &logs, &logs
@@ -258,33 +353,11 @@ func (e *lifecycle) serve(db []string) func() {
 	}
 }
 
-// call makes a request to the API and wants its status; it returns the JSON
-// object answered, if any.
+// call makes a request to the API, signed in as the admin, and wants its
+// status; it returns the JSON object answered, if any.
 func (e *lifecycle) call(method, path, body string, status int) map[string]any {
 	e.t.Helper()
-	req, err := http.NewRequest(method, e.base+"/api/v1"+path, strings.NewReader(body))
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(res.Body)
-	if res.StatusCode != status {
-		e.t.Fatalf("%s %s: %d, want %d: %s", method, path, res.StatusCode, status, raw)
-	}
-	var doc map[string]any
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &doc); err != nil {
-			e.t.Fatalf("%s %s: %v: %s", method, path, err, raw)
-		}
-	}
-	return doc
+	return e.request(method, "/api/v1"+path, body, map[string]string{"Authorization": e.auth}, status).body
 }
 
 // otlpReceiver is an OTLP/HTTP endpoint that keeps what it is sent, by

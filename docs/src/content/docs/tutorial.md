@@ -18,18 +18,28 @@ esquadro new -starter api shop
 cd shop
 task up
 task migrate
+go run ./cmd/shop security create user you@example.com name=You -role admin -password-stdin
 task run
 ```
 
-Leave `task run` in a terminal; in another, the API answers:
+The `security create` line makes the first admin; type a password of at least
+12 characters and press Enter. Leave `task run` in a terminal; in another, sign
+in, and the API answers:
 
 ```sh
-curl -X POST localhost:8080/api/v1/categories \
+TOKEN=$(curl -s localhost:8080/identity/user/sign-in -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"your password","cookie":false}' | jq -r .session_token)
+curl -X POST localhost:8080/api/v1/categories -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"name":"Books"}'
 ```
 
+Without `jq`, copy `session_token` from the sign-in's answer. Anyone may read
+the catalog; only an admin changes categories, and staff too products, as the
+`@security` lines of `esquadro/catalog.esq` say. The calls below send the same
+`authorization` header, left out for short.
+
 The model is in `esquadro/catalog.esq`: a `Category` and a `Product` with a
-`Status`. After each step below, stop `task run` (Ctrl+C), run:
+`Status`; who signs in is in `esquadro/accounts.esq`. After each step below, stop `task run` (Ctrl+C), run:
 
 ```sh
 esquadro gen
@@ -84,10 +94,14 @@ entity Product {
 
 `Brand` gets everything `Category` has: its type and rules, its use cases
 (create, read, list, update, delete), its queries, its operations at
-`/api/v1/brands` and its tests. `Product` gets an optional `brandId`, and the
+`/api/v1/brands` and its tests. `Product` gets an optional `brand_id`, and the
 migration creates the table and the foreign key. Deleting a brand that
 products point at answers `409 in_use`; since the key is optional, you could
 write `on_delete(set_null)` to clear it instead.
+
+`esquadro gen` warns that `Brand` has no `@security`: until it says who may,
+whoever signed in may change it. Add `@security(read public, write user.admin)`
+to it, as `Category` has.
 
 ## 4. Tag products
 

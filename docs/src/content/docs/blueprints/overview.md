@@ -32,7 +32,7 @@ needs and drops a line to lose a capability. The built-in ones:
 | Running it in production | [observability](reference/observability/) (see [Observability](/esquadro/observability/)), [docker](reference/docker/), [github_actions](reference/github_actions/) (see [Deploying](/esquadro/deploying/)) |
 | The repository | [git](reference/git/), [branching](reference/branching/) (see [Branching](/esquadro/branching/)) |
 
-`esquadro new -starter api` starts from all of them but `worker` and `jobs`; the
+`esquadro new -starter api` starts from all of them but `branching`; the
 `worker` and `cli` starters take fewer, and `esquadro new` without a starter
 takes only `app` (see [Getting started](/esquadro/getting-started/#create-a-project)).
 

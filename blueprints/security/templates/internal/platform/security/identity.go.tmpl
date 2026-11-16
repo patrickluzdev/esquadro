@@ -25,6 +25,7 @@ import (
 // Realm is a kind of principal, with the entity it is and how it signs in.
 type Realm struct {
 	Name        string
+	Roles       []string
 	Providers   []string // password, google, github
 	Signup      string   // open, invite or closed
 	VerifyEmail string   // required, optional or off
@@ -155,13 +156,16 @@ func (s *Security) signUp(realm Realm) http.HandlerFunc {
 	}
 }
 
-// createAccount creates an identity with a password and its principal, with
-// the same id, and answers it: uuid.Nil() for an email that already has an
-// account, which creates nothing, without an error.
+// createAccount creates an identity with a password, if any, and its
+// principal, with the same id, and answers it: uuid.Nil() for an email that
+// already has an account, which creates nothing, without an error.
 func (s *Security) createAccount(ctx context.Context, realm Realm, email, password string, fields json.RawMessage) (uuid.UUID, error) {
-	hash, err := s.hasher.Hash(password)
-	if err != nil {
-		return uuid.Nil(), err
+	var hash string
+	if password != "" {
+		var err error
+		if hash, err = s.hasher.Hash(password); err != nil {
+			return uuid.Nil(), err
+		}
 	}
 	id := uuid.NewV7()
 	tx, err := s.db.Begin(ctx)
@@ -174,9 +178,11 @@ func (s *Security) createAccount(ctx context.Context, realm Realm, email, passwo
 	if err != nil || tag.RowsAffected() == 0 {
 		return uuid.Nil(), err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)`,
-		uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
-		return uuid.Nil(), err
+	if hash != "" {
+		if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)`,
+			uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
+			return uuid.Nil(), err
+		}
 	}
 	// The principal is made by its module; if anything fails after, it is
 	// deleted, so that no principal is left without its identity.
@@ -303,9 +309,9 @@ type sessionAnswer struct {
 	Realm        string    `json:"realm"`
 	Roles        []string  `json:"roles"`
 	Permissions  []string  `json:"permissions"`
-	ExpiresAt    time.Time `json:"expiresAt,omitzero"`
-	CSRFToken    string    `json:"csrfToken,omitempty"`
-	SessionToken string    `json:"sessionToken,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at,omitzero"`
+	CSRFToken    string    `json:"csrf_token,omitempty"`
+	SessionToken string    `json:"session_token,omitempty"`
 }
 
 // signOut ends the session of the request.
@@ -353,7 +359,7 @@ func (s *Security) token(realm Realm) http.HandlerFunc {
 			s.fail(w, r, err)
 			return
 		}
-		writeJSON(w, map[string]any{"token": raw, "expiresAt": expires})
+		writeJSON(w, map[string]any{"token": raw, "expires_at": expires})
 	}
 }
 
@@ -361,10 +367,10 @@ func (s *Security) token(realm Realm) http.HandlerFunc {
 type sessionView struct {
 	ID         uuid.UUID `json:"id"`
 	Current    bool      `json:"current"`
-	CreatedAt  time.Time `json:"createdAt"`
-	LastSeenAt time.Time `json:"lastSeenAt"`
-	IPAddress  string    `json:"ipAddress,omitempty"`
-	UserAgent  string    `json:"userAgent,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	LastSeenAt time.Time `json:"last_seen_at"`
+	IPAddress  string    `json:"ip_address,omitempty"`
+	UserAgent  string    `json:"user_agent,omitempty"`
 }
 
 // sessions answers the open sessions of the principal: its devices.
@@ -434,8 +440,8 @@ func (s *Security) changePassword(realm Realm) http.HandlerFunc {
 			return
 		}
 		var in struct {
-			Current string `json:"currentPassword"`
-			New     string `json:"newPassword"`
+			Current string `json:"current_password"`
+			New     string `json:"new_password"`
 		}
 		if !decode(w, r, &in) {
 			edge.Write(w, r, ErrBadRequest)

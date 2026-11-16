@@ -120,12 +120,12 @@ func TestSocialSignUpAndSignIn(t *testing.T) {
 	// The account has no password yet, and the provider is its only way in.
 	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
 	cookie := sessionCookie(again)
-	csrf := "X-CSRF-Token: " + f.call("GET", "/identity/person/session", nil, cookie).str("csrfToken")
+	csrf := "X-CSRF-Token: " + f.call("GET", "/identity/person/session", nil, cookie).str("csrf_token")
 	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 409, "last_credential")
 
 	// It sets a first password, with a recent sign-in instead of the
 	// current one; then the provider may go.
-	f.expect(f.call("POST", "/identity/person/password", map[string]string{"newPassword": password}, cookie, csrf), 204, "")
+	f.expect(f.call("POST", "/identity/person/password", map[string]string{"new_password": password}, cookie, csrf), 204, "")
 	f.signIn(password)
 	f.expect(f.call("DELETE", "/identity/person/providers/fake", nil, cookie, csrf), 204, "")
 }

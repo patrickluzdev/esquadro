@@ -1,1 +1,1 @@
-A JSON API on PostgreSQL, with its contract, docs, image and CI, and a catalog to change.
+A JSON API on PostgreSQL, with sign-in and roles, background jobs, its contract, docs, image and CI, and a catalog to change.

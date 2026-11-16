@@ -289,7 +289,7 @@ func (s *Security) providers(realm Realm) http.HandlerFunc {
 		}
 		type linked struct {
 			Provider  string    `json:"provider"`
-			CreatedAt time.Time `json:"createdAt"`
+			CreatedAt time.Time `json:"created_at"`
 		}
 		list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (linked, error) {
 			var l linked

@@ -1,0 +1,131 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// What the app's security command does: accounts made and changed by
+// someone who runs the app, not through its routes.
+
+// ErrNoAccount is an email without an account in a realm.
+var ErrNoAccount = errors.New("security: no account has this email")
+
+// AccountID is the id of the account of email in realm.
+func (s *Security) AccountID(ctx context.Context, realm, email string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT id FROM {{$identities}} WHERE realm = $1 AND email = $2`, realm, normalEmail(email)).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil(), ErrNoAccount
+	}
+	return id, err
+}
+
+// CreateAccount makes an account of realm, with its principal from fields,
+// and roles: with password, which the realm's policy checks, or without
+// one, for the person to set with a reset link (ResetLink).
+func (s *Security) CreateAccount(ctx context.Context, realm Realm, email, password string, fields json.RawMessage, roles ...string) (uuid.UUID, error) {
+	address := normalEmail(email)
+	if address == "" {
+		return uuid.Nil(), fmt.Errorf("security: %q is not an email", email)
+	}
+	for _, role := range roles {
+		if !slices.Contains(realm.Roles, role) {
+			return uuid.Nil(), fmt.Errorf("security: %s is not a role of %s: %v", role, realm.Name, realm.Roles)
+		}
+	}
+	if password != "" {
+		policy := realm.Policy
+		policy.Lists = s.lists
+		if err := policy.Check(ctx, password, address, s.cfg.App); err != nil {
+			return uuid.Nil(), err
+		}
+	}
+	if err := realm.Validate(fields); err != nil {
+		return uuid.Nil(), err
+	}
+	id, err := s.createAccount(ctx, realm, address, password, fields)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	if id == uuid.Nil() {
+		return uuid.Nil(), fmt.Errorf("security: %s already has an account of %s", address, realm.Name)
+	}
+	for _, role := range roles {
+		if err := s.Grant(ctx, s.db, id, role); err != nil {
+			return id, err
+		}
+	}
+	s.event(ctx, "account_created", realm.Name, id.String(), true)
+	return id, nil
+}
+
+// ResetLink is a link that sets the password of an account, for redirect,
+// the page of the app that takes it.
+func (s *Security) ResetLink(ctx context.Context, realm string, id uuid.UUID, redirect string) (string, time.Time, error) {
+	if !s.allowedRedirect(redirect) {
+		return "", time.Time{}, ErrBadRedirect
+	}
+	token, expires, err := s.newVerification(ctx, s.db, realm, "reset_password", id, "", time.Duration(s.cfg.PasswordResetMinutes)*time.Minute)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return s.link(redirect, token), expires, nil
+}
+
+// SetPassword sets the password of an account, ending its sessions.
+func (s *Security) SetPassword(ctx context.Context, realm Realm, id uuid.UUID, password string) error {
+	var email string
+	if err := s.db.QueryRow(ctx, `SELECT email FROM {{$identities}} WHERE id = $1`, id).Scan(&email); err != nil {
+		return err
+	}
+	policy := realm.Policy
+	policy.Lists = s.lists
+	if err := policy.Check(ctx, password, email, s.cfg.App); err != nil {
+		return err
+	}
+	hash, err := s.hasher.Hash(password)
+	if err != nil {
+		return err
+	}
+	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO {{securityTable "credentials" $pg}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)
+			ON CONFLICT (realm, provider, subject) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`, uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
+			return err
+		}
+		return s.EndSessions(ctx, tx, id, uuid.Nil())
+	})
+}
+
+// CreateIdentity makes an identity of realm, without a principal nor a
+// password, with roles: for tests, and for accounts made by code.
+func (s *Security) CreateIdentity(ctx context.Context, realm, email string, roles ...string) (uuid.UUID, error) {
+	id := uuid.NewV7()
+	if _, err := s.db.Exec(ctx, `INSERT INTO {{$identities}} (id, realm, email) VALUES ($1, $2, $3)`, id, realm, normalEmail(email)); err != nil {
+		return uuid.Nil(), err
+	}
+	for _, role := range roles {
+		if err := s.Grant(ctx, s.db, id, role); err != nil {
+			return uuid.Nil(), err
+		}
+	}
+	return id, nil
+}
+
+// SessionToken opens a session of an identity, without signing in: the
+// token to send as Authorization: Bearer.
+func (s *Security) SessionToken(ctx context.Context, id uuid.UUID) (string, error) {
+	token, _, err := s.StartSession(ctx, s.db, id, "", "")
+	return token, err
+}
+{{end -}}

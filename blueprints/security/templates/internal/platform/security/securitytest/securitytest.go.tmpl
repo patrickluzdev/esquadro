@@ -1,0 +1,35 @@
+{{- if realms .Entities -}}
+// Package securitytest signs tests in: as a principal in a context, or with
+// a real session.
+package securitytest
+
+import (
+	"context"
+	"testing"
+	"uuid"
+
+	"{{.App.Module}}/internal/platform/security"
+)
+
+// As is ctx signed in as a principal of realm with roles, without a
+// database: for code that calls security.Require or security.Allows.
+func As(ctx context.Context, realm string, roles ...string) context.Context {
+	return security.WithPrincipal(ctx, security.Principal{ID: uuid.NewV7(), Realm: realm, Roles: roles})
+}
+
+// SignIn makes an identity of realm with roles, and a session for it: the
+// value of the Authorization header that signs requests in, and its id.
+func SignIn(t testing.TB, s *security.Security, realm string, roles ...string) (string, uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	id, err := s.CreateIdentity(ctx, realm, realm+"-"+uuid.NewV7().String()+"@test.example", roles...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := s.SessionToken(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return "Bearer " + token, id
+}
+{{end -}}

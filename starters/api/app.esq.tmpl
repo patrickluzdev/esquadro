@@ -7,6 +7,8 @@ app {{.Name}} {
   blueprint env
   blueprint domain
   blueprint http
+  blueprint worker
+  blueprint jobs
 
   // PostgreSQL: connection, migrations, use cases, tests and local services
   blueprint postgres
@@ -15,7 +17,7 @@ app {{.Name}} {
   blueprint testcontainers
   blueprint compose
 
-  // the JSON API and what every request goes through
+  // the JSON API, who signs in to it, and what every request goes through
   blueprint rest
   blueprint api_docs
   blueprint security
