@@ -1,101 +1,295 @@
 {{- $load := slot "app.config.load" . -}}
-{{- $number := contains $load "l.number(" -}}
-{{- $flag := contains $load "l.flag(" -}}
-{{- $list := contains $load "l.list(" -}}
-{{- $ratio := contains $load "l.ratio(" -}}
-// Package config reads the service's configuration from the environment.
+{{- $legacyNumber := contains $load "l.number(" -}}
+{{- $legacyFlag := contains $load "l.flag(" -}}
+{{- $legacyList := contains $load "l.list(" -}}
+{{- $legacyRatio := contains $load "l.ratio(" -}}
+{{- $integer := or $legacyNumber (envUses .Env "int") -}}
+{{- $real := or $legacyRatio (envUses .Env "number") -}}
+{{- $boolean := or $legacyFlag (envUses .Env "bool") -}}
+{{- $strings := or $legacyList (envUses .Env "list") -}}
+{{- $duration := envUses .Env "duration" -}}
+{{- $file := uses "env" -}}
+// Package config reads {{.App.Label}}'s configuration from the environment.
+//
+// Each variable is declared in the model (by a blueprint or in app.esq),
+// with its value in each environment. A value comes from, in order: the
+// process's environment{{if $file}}, the .env.<environment> file of the working
+// directory{{end}}, the value the model gives that environment, its default.
 package config
 
-{{importBlock (and (or $number $flag $ratio) "fmt") "os" (and (or $number $flag $ratio) "strconv") (and $list "strings")}}
-// Config is the service's configuration.
+{{importBlock (and $file "bufio") (and $file "errors") "fmt" (and $file "io/fs") "os" "slices" (and (or $integer $real $boolean) "strconv") "strings" (and $duration "time")}}
+// Environments are the environments {{.App.Label}} runs in; APP_ENV picks one,
+// and the first is the one when APP_ENV is not set.
+var Environments = {{goStrings .Environments}}
+
+// Config is {{.App.Label}}'s configuration.
 type Config struct {
-	// Env is "production" in production; anything else is development.
+	// Env is the environment the app runs in, one of Environments.
 	Env string
+{{- range .Env}}
+	// {{.Field}} is {{.Full}}{{with .Doc}}: {{join " " .}}{{end}}
+	{{.Field}} {{envGoType .}}
+{{- end}}
 {{- with slot "app.config.fields" .}}
 {{.}}
 {{- end}}
+
+	vars []Var
 }
 
-// Load reads the configuration from environment variables, with defaults
-// that suit development.
+// Var is a variable as Load read it: for the env command.
+type Var struct {
+	Name, Value, Source string
+	Secret              bool
+}
+
+// Vars are the variables as Load read them: each one's value and where it
+// came from.
+func (c Config) Vars() []Var { return c.vars }
+
+// Load reads the configuration of the environment APP_ENV names. Every
+// problem is in the error, at once: a required variable that is not set, a
+// value of the wrong type. A secret's value never is.
 func Load() (Config, error) {
-	var l loader
-	c := Config{Env: l.text("{{upper .App.Snake}}_ENV", "development")}
+	l := &loader{env: environment()}
+	c := Config{Env: l.env}
+	if !slices.Contains(Environments, c.Env) {
+		return c, fmt.Errorf("config: APP_ENV is %q, which is not one of %s", c.Env, strings.Join(Environments, ", "))
+	}
+{{- if $file}}
+	if err := l.readFile(".env." + c.Env); err != nil {
+		return c, err
+	}
+{{- end}}
+{{- range .Env}}
+	c.{{.Field}} = l.{{envLoader .}}(variable{name: {{quote .Full}}, values: {{envValues . $.Environments}}
+{{- with .Required}}, required: {{goStrings .}}{{end}}
+{{- if .Secret}}, secret: true{{end}}})
+{{- end}}
 {{- with $load}}
 {{.}}
 {{- end}}
-	return c, l.err
+	c.vars = l.vars
+	return c, l.err()
 }
 
-// loader reads environment variables, keeping the first error.
-type loader struct{ err error }
-
-// text is the variable name, or fallback when it is unset or empty.
-func (l *loader) text(name, fallback string) string {
-	if v := os.Getenv(name); v != "" {
-		return v
+// environment is APP_ENV, or {{upper .App.Snake}}_ENV as projects named it before,
+// or the first environment.
+func environment() string {
+	for _, name := range []string{"APP_ENV", "{{upper .App.Snake}}_ENV"} {
+		if v := os.Getenv(name); v != "" {
+			return v
+		}
 	}
-	return fallback
+	return Environments[0]
 }
-{{- if $number}}
 
-// number is the variable name as an integer, or fallback.
-func (l *loader) number(name string, fallback int) int {
-	v := l.text(name, "")
-	if v == "" {
-		return fallback
+// variable is how a variable is read: its name, the values the model gives
+// it (by environment, and under "" in every one), the environments that must
+// set it, and whether its value is secret.
+type variable struct {
+	name     string
+	values   map[string]string
+	required []string
+	secret   bool
+}
+
+// loader reads variables, keeping every problem and where each value came
+// from.
+type loader struct {
+	env      string
+	file     map[string]string
+	fileName string
+	vars     []Var
+	problems []string
+}
+
+// read is a variable's text and whether it is set.
+func (l *loader) read(v variable) (string, bool) {
+	value, source := "", ""
+	switch {
+	case os.Getenv(v.name) != "":
+		value, source = os.Getenv(v.name), "environment"
+{{- if $file}}
+	case l.file[v.name] != "":
+		value, source = l.file[v.name], l.fileName
+{{- end}}
+	case v.values[l.env] != "":
+		value, source = v.values[l.env], l.env+" value"
+	case v.values[""] != "":
+		value, source = v.values[""], "default"
 	}
-	n, err := strconv.Atoi(v)
-	if err != nil && l.err == nil {
-		l.err = fmt.Errorf("config: %s must be a number: %w", name, err)
+	l.vars = append(l.vars, Var{Name: v.name, Value: value, Source: source, Secret: v.secret})
+	if value == "" {
+		if slices.Contains(v.required, l.env) {
+			l.problems = append(l.problems, v.name+" is not set")
+		}
+		return "", false
+	}
+	return value, true
+}
+
+// refuse records a value that is not of its variable's type.
+func (l *loader) refuse(v variable, value, want string) {
+	if v.secret {
+		l.problems = append(l.problems, fmt.Sprintf("%s must be %s", v.name, want))
+		return
+	}
+	l.problems = append(l.problems, fmt.Sprintf("%s must be %s, got %q", v.name, want, value))
+}
+
+func (l *loader) err() error {
+	if len(l.problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("config (%s): %s", l.env, strings.Join(l.problems, "; "))
+}
+
+func (l *loader) str(v variable) string {
+	value, _ := l.read(v)
+	return value
+}
+{{- if $integer}}
+
+func (l *loader) integer(v variable) int {
+	value, ok := l.read(v)
+	if !ok {
+		return 0
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		l.refuse(v, value, "a whole number")
 	}
 	return n
 }
 {{- end}}
-{{- if $ratio}}
+{{- if $real}}
 
-// ratio is the variable name as a number from 0 to 1, or fallback.
-func (l *loader) ratio(name string, fallback float64) float64 {
-	v := l.text(name, "")
-	if v == "" {
-		return fallback
+func (l *loader) float(v variable) float64 {
+	value, ok := l.read(v)
+	if !ok {
+		return 0
 	}
-	f, err := strconv.ParseFloat(v, 64)
-	if (err != nil || f < 0 || f > 1) && l.err == nil {
-		l.err = fmt.Errorf("config: %s must be a number from 0 to 1, got %q", name, v)
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		l.refuse(v, value, "a number")
 	}
 	return f
 }
 {{- end}}
-{{- if $flag}}
+{{- if $boolean}}
 
-// flag is the variable name as true or false, or fallback.
-func (l *loader) flag(name string, fallback bool) bool {
-	v := l.text(name, "")
-	if v == "" {
-		return fallback
+func (l *loader) boolean(v variable) bool {
+	value, ok := l.read(v)
+	if !ok {
+		return false
 	}
-	b, err := strconv.ParseBool(v)
-	if err != nil && l.err == nil {
-		l.err = fmt.Errorf("config: %s must be true or false: %w", name, err)
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		l.refuse(v, value, "true or false")
 	}
 	return b
 }
 {{- end}}
-{{- if $list}}
+{{- if $strings}}
 
-// list is the variable name as comma-separated values, or fallback.
-func (l *loader) list(name string, fallback []string) []string {
-	v := l.text(name, "")
-	if v == "" {
-		return fallback
-	}
+// items is a comma-separated list.
+func (l *loader) items(v variable) []string {
+	value, _ := l.read(v)
 	var out []string
-	for item := range strings.SplitSeq(v, ",") {
+	for item := range strings.SplitSeq(value, ",") {
 		if item = strings.TrimSpace(item); item != "" {
 			out = append(out, item)
 		}
 	}
 	return out
+}
+{{- end}}
+{{- if $duration}}
+
+// duration is a Go duration, such as 30s or 5m.
+func (l *loader) duration(v variable) time.Duration {
+	value, ok := l.read(v)
+	if !ok {
+		return 0
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		l.refuse(v, value, "a duration, such as 30s")
+	}
+	return d
+}
+{{- end}}
+{{- if $file}}
+
+// readFile reads a .env file, when there is one: NAME=value lines, with
+// # comments, optional export and quotes.
+func (l *loader) readFile(name string) error {
+	f, err := os.Open(name)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	defer f.Close()
+	l.file, l.fileName = map[string]string{}, name
+	s := bufio.NewScanner(f)
+	for n := 1; s.Scan(); n++ {
+		line := strings.TrimSpace(s.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(strings.TrimPrefix(line, "export "), "=")
+		if !ok {
+			return fmt.Errorf("config: %s:%d is not NAME=value", name, n)
+		}
+		value = strings.TrimSpace(value)
+		if unquoted, err := strconv.Unquote(value); err == nil && strings.HasPrefix(value, `"`) {
+			value = unquoted
+		} else if len(value) >= 2 && value[0] == '\'' && value[len(value)-1] == '\'' {
+			value = value[1 : len(value)-1]
+		}
+		l.file[strings.TrimSpace(key)] = value
+	}
+	return s.Err()
+}
+{{- end}}
+{{- if $legacyNumber}}
+
+// The loader of blueprints that read their variables in code (the
+// app.config.load slot), with their fallback in every environment.
+
+// number is the variable name as an integer, or fallback.
+func (l *loader) number(name string, fallback int) int {
+	return l.integer(variable{name: name, values: map[string]string{"": strconv.Itoa(fallback)}})
+}
+{{- end}}
+{{- if $legacyRatio}}
+
+// ratio is the variable name as a number from 0 to 1, or fallback.
+func (l *loader) ratio(name string, fallback float64) float64 {
+	return l.float(variable{name: name, values: map[string]string{"": strconv.FormatFloat(fallback, 'g', -1, 64)}})
+}
+{{- end}}
+{{- if $legacyFlag}}
+
+// flag is the variable name as true or false, or fallback.
+func (l *loader) flag(name string, fallback bool) bool {
+	return l.boolean(variable{name: name, values: map[string]string{"": strconv.FormatBool(fallback)}})
+}
+{{- end}}
+{{- if $legacyList}}
+
+// list is the variable name as comma-separated values, or fallback.
+func (l *loader) list(name string, fallback []string) []string {
+	return l.items(variable{name: name, values: map[string]string{"": strings.Join(fallback, ",")}})
+}
+{{- end}}
+{{- if contains $load "l.text("}}
+
+// text is the variable name, or fallback.
+func (l *loader) text(name, fallback string) string {
+	return l.str(variable{name: name, values: map[string]string{"": fallback}})
 }
 {{- end}}

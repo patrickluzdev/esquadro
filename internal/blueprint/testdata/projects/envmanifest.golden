@@ -1,0 +1,31 @@
+testdata/projects/envmanifest/app.esq:5:13: error: blueprint "./blueprints/db" has an invalid manifest
+  |
+5 |   blueprint "./blueprints/db"
+  |             ^^^^^^^^^^^^^^^^^
+
+testdata/projects/envmanifest/blueprints/db/blueprint.esq:8:3: error: SECRET_KEY is a secret: it cannot have a default, which would be in the code; give it a development value at most
+  |
+8 |   env SECRET_KEY string secret default("x")
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/envmanifest/blueprints/db/blueprint.esq:9:3: error: generate is for secrets: mark TOKEN secret
+  |
+9 |   env TOKEN string generate(32)
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/envmanifest/blueprints/db/blueprint.esq:10:23: error: default of BAD: expected a whole number
+   |
+10 |   env BAD int default("ten")
+   |                       ^^^^^
+
+testdata/projects/envmanifest/blueprints/db/blueprint.esq:11:7: error: weird is not an environment variable name: use upper case letters, digits and _, e.g. DATABASE_URL
+   |
+11 |   env weird string
+   |       ^^^^^
+
+testdata/projects/envmanifest/blueprints/db/blueprint.esq:12:32: error: default of TIMEOUT: "forever" is not a duration, such as "30s" or "5m"
+   |
+12 |   env TIMEOUT duration default("forever")
+   |                                ^^^^^^^^^
+
+6 errors

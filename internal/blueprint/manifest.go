@@ -13,6 +13,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/dsl"
+	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // ManifestFile is the name of a blueprint's manifest inside its folder.
@@ -63,6 +64,8 @@ type Manifest struct {
 	// dropped when they are missing.
 	Optional []Dep
 	Options  []*Spec
+	// Env are the environment variables the blueprint reads.
+	Env []*project.EnvVar
 	// Annotations maps each target to the keys the blueprint accepts there.
 	Annotations map[Target]*AnnotationSpec
 	Slots       []*Slot
@@ -249,6 +252,14 @@ func (v *validator) manifest(f *dsl.File) *Manifest {
 			}
 			if s := v.spec(it.Name, it.Type, it.Modifiers, it.Doc, optionTypes, "option"); s != nil {
 				m.Options = append(m.Options, s)
+			}
+		case *dsl.EnvDecl:
+			if !once("env "+it.Name.Name, it.Name.Span) {
+				continue
+			}
+			if e := project.EnvVarOf(it, func(s dsl.Span, format string, args ...any) { v.errorf(s, format, args...) }); e != nil {
+				e.Blueprint = m.Name
+				m.Env = append(m.Env, e)
 			}
 		case *dsl.AnnotationDecl:
 			v.annotation(m, it, once)

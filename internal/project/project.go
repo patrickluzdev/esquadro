@@ -70,7 +70,11 @@ type App struct {
 	// Annotations are validated later against the blueprints' schemas.
 	Annotations []*dsl.Annotation
 	Ann         Ann
-	Pos         diag.Pos
+	// Env are the app's own environment variables, and EnvValues the values
+	// it sets per environment, checked when blueprints are resolved.
+	Env       []*EnvVar
+	EnvValues []EnvValue
+	Pos       diag.Pos
 }
 
 // SourceKind says where a blueprint comes from.

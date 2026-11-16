@@ -11,7 +11,7 @@ import (
 var (
 	topKeywords      = []string{"package", "app", "enum", "entity", "job", "blueprint"}
 	appSettings      = []string{"module", "blueprint"}
-	manifestSettings = []string{"version", "requires", "optional", "option", "annotation", "slot", "go_require", "hook"}
+	manifestSettings = []string{"version", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -306,6 +306,14 @@ func (p *parser) parseApp() Decl {
 func (p *parser) parseAppItem(app *AppDecl) bool {
 	p.dropDoc()
 	t := p.tok()
+	if t.Kind == Name && t.Text == "env" {
+		b := p.parseEnvBlock()
+		if b == nil {
+			return false
+		}
+		app.Items = append(app.Items, b)
+		return true
+	}
 	if t.Kind == At {
 		a := p.parseAnnotation()
 		if a == nil {
@@ -316,7 +324,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 		return true
 	}
 	if t.Kind != Name {
-		p.errorf(t, "expected an app setting (module or blueprint), found %s", t.describe())
+		p.errorf(t, "expected an app setting (module, blueprint or env), found %s", t.describe())
 		return false
 	}
 	switch t.Text {
@@ -777,6 +785,12 @@ func (p *parser) parseManifestItem() ManifestItem {
 		}
 		o.Span = Span{Pos: t.Pos, End: p.lastEnd}
 		return o
+	case "env":
+		d := p.parseEnvDecl(doc, t)
+		if d == nil {
+			return nil
+		}
+		return d
 	case "annotation":
 		target, ok := p.expectIdent("annotation target (app, entity, field, relation or job)")
 		if !ok {
@@ -896,4 +910,71 @@ func (p *parser) parsePackage(f *File) Decl {
 		return nil
 	}
 	return d
+}
+
+// parseEnvDecl parses the rest of "env NAME type modifiers", start being the
+// token that began it ("env", or the name inside an app's env block).
+func (p *parser) parseEnvDecl(doc []string, start Token) *EnvDecl {
+	name, ok := p.expectIdent("variable name")
+	if !ok {
+		return nil
+	}
+	return p.parseEnvDeclRest(doc, start, name)
+}
+
+func (p *parser) parseEnvDeclRest(doc []string, start Token, name Ident) *EnvDecl {
+	typ, ok := p.expectIdent("type of " + name.Name)
+	if !ok {
+		return nil
+	}
+	d := &EnvDecl{Doc: doc, Name: name, Type: typ}
+	if !p.parsePlainModifiers(&d.Modifiers) {
+		return nil
+	}
+	d.Span = Span{Pos: start.Pos, End: p.lastEnd}
+	return d
+}
+
+// parseEnvBlock parses an app's "env { NAME type modifiers ... }" or
+// "env <environment> { NAME value ... }".
+func (p *parser) parseEnvBlock() *EnvBlock {
+	start := p.advance() // "env"
+	b := &EnvBlock{}
+	if p.tok().Kind == Name {
+		env := identOf(p.advance())
+		b.Environment = &env
+	}
+	open, ok := p.expect(LBrace, "after env")
+	if !ok {
+		return nil
+	}
+	what := "env"
+	if b.Environment != nil {
+		what += " " + b.Environment.Name
+	}
+	end := p.parseBlock(open, what, func() bool {
+		if b.Environment != nil {
+			p.dropDoc()
+			o := p.parseOption()
+			if o == nil {
+				return false
+			}
+			b.Values = append(b.Values, o)
+			return true
+		}
+		doc := p.takeDoc()
+		t := p.tok()
+		name, ok := p.expectIdent("variable name")
+		if !ok {
+			return false
+		}
+		d := p.parseEnvDeclRest(doc, t, name)
+		if d == nil {
+			return false
+		}
+		b.Decls = append(b.Decls, d)
+		return true
+	})
+	b.Span = Span{Pos: start.Pos, End: end}
+	return b
 }

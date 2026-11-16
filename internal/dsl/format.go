@@ -143,6 +143,7 @@ const (
 	relationRow
 	optionRow
 	optionDeclRow
+	envDeclRow
 	keyRow
 	goRequireRow
 )
@@ -341,6 +342,8 @@ func (p *printer) app(out *strings.Builder, d *AppDecl) {
 			l.text = p.blueprintRef(it)
 		case *Annotation:
 			l.text = annotationString(it)
+		case *EnvBlock:
+			l.text = p.envBlock(it)
 		}
 		l.trail = p.trailing(sp.End.Offset)
 		b.lines = append(b.lines, l)
@@ -351,6 +354,54 @@ func (p *printer) app(out *strings.Builder, d *AppDecl) {
 	out.WriteString("}")
 	out.WriteString(p.closeTrail(d.Span))
 	out.WriteString("\n")
+}
+
+// envBlock writes an app's env block: declarations, or an environment's
+// values.
+func (p *printer) envBlock(e *EnvBlock) string {
+	var sb strings.Builder
+	sb.WriteString("env")
+	if e.Environment != nil {
+		sb.WriteString(" ")
+		sb.WriteString(e.Environment.Name)
+	}
+	first := e.End.Offset - 1
+	switch {
+	case len(e.Decls) > 0:
+		first = e.Decls[0].Pos.Offset
+	case len(e.Values) > 0:
+		first = e.Values[0].Pos.Offset
+	}
+	sb.WriteString(" {")
+	sb.WriteString(p.headerTrail(e.Pos.Line, first))
+	sb.WriteString("\n")
+	p.lastLine = e.Pos.Line
+	b := &body{p: p}
+	for _, d := range e.Decls {
+		b.before(d.Pos.Offset, d.Pos.Line-len(d.Doc))
+		b.docs(d.Doc)
+		b.lines = append(b.lines, line{
+			cells: []string{d.Name.Name, d.Type.Name, modifiersString(d.Modifiers, nil)},
+			kind:  keyRow,
+			trail: p.trailing(d.End.Offset),
+		})
+		p.lastLine = d.End.Line
+	}
+	for _, o := range e.Values {
+		b.before(o.Pos.Offset, o.Pos.Line)
+		b.lines = append(b.lines, line{
+			cells: []string{o.Key.Name, valueString(o.Value)},
+			kind:  optionRow,
+			trail: p.trailing(o.End.Offset),
+		})
+		p.lastLine = o.End.Line
+	}
+	b.end(e.End.Offset - 1)
+	var inner strings.Builder
+	b.render(&inner, "  ")
+	sb.WriteString(inner.String())
+	sb.WriteString("}")
+	return sb.String()
 }
 
 func (p *printer) blueprintRef(r *BlueprintRef) string {
@@ -610,6 +661,9 @@ func (p *printer) blueprint(out *strings.Builder, d *BlueprintDecl) {
 		case *OptionDecl:
 			l.cells = []string{"option " + it.Name.Name, it.Type.Name, modifiersString(it.Modifiers, nil)}
 			l.kind = optionDeclRow
+		case *EnvDecl:
+			l.cells = []string{"env " + it.Name.Name, it.Type.Name, modifiersString(it.Modifiers, nil)}
+			l.kind = envDeclRow
 		case *AnnotationDecl:
 			l.text = p.annotationDecl(it)
 		case *SlotItem:
@@ -640,6 +694,8 @@ func (p *printer) blueprint(out *strings.Builder, d *BlueprintDecl) {
 func manifestItemDoc(it ManifestItem) []string {
 	switch it := it.(type) {
 	case *OptionDecl:
+		return it.Doc
+	case *EnvDecl:
 		return it.Doc
 	case *AnnotationDecl:
 		return it.Doc

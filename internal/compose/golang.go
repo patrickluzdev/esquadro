@@ -163,6 +163,9 @@ func enumValues(e *project.Enum) string {
 
 // strs is a list option as strings.
 func strs(v any) []string {
+	if l, ok := v.([]string); ok {
+		return l
+	}
 	list, _ := v.([]any)
 	out := make([]string, 0, len(list))
 	for _, x := range list {

@@ -146,3 +146,16 @@ func mustParse(t *testing.T, src string) *File {
 	}
 	return f
 }
+
+func TestFormatEnv(t *testing.T) {
+	src := "app shop {\n  module \"x\"\n  env {\n    /// The Stripe key.\n    STRIPE_KEY string secret required(staging, production)\n    TIMEOUT duration default(\"30s\")\n  }\n  env production {\n    SHOP_CORS_ORIGINS [\"https://shop.com\"]\n    SHOP_RATE_LIMIT 300\n  }\n}\n"
+	want := "app shop {\n  module \"x\"\n  env {\n    /// The Stripe key.\n    STRIPE_KEY string   secret required(staging, production)\n    TIMEOUT    duration default(\"30s\")\n  }\n  env production {\n    SHOP_CORS_ORIGINS [\"https://shop.com\"]\n    SHOP_RATE_LIMIT   300\n  }\n}\n"
+	if got := string(Format(mustParse(t, src))); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+	manifest := "blueprint postgres {\n  version \"0.1.0\"\n  /// The connection.\n  env DATABASE_URL string secret required(staging, production) development(\"postgres://localhost\")\n  env POOL_MAX int prefixed default(10)\n}\n"
+	want = "blueprint postgres {\n  version \"0.1.0\"\n  /// The connection.\n  env DATABASE_URL string secret required(staging, production) development(\"postgres://localhost\")\n  env POOL_MAX     int    prefixed default(10)\n}\n"
+	if got := string(Format(mustParse(t, manifest))); got != want {
+		t.Fatalf("manifest got:\n%s", got)
+	}
+}

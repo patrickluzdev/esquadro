@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -18,6 +19,11 @@ type Set struct {
 	// Options holds each blueprint's options with defaults filled in, by
 	// blueprint name then option name.
 	Options map[string]map[string]any
+	// Env are the project's environment variables: those of its blueprints,
+	// in generation order, then the app's; Environments are its
+	// environments, the first one where development happens.
+	Env          []*project.EnvVar
+	Environments []string
 }
 
 // Get returns the blueprint with the given name, or nil.
@@ -91,6 +97,7 @@ func (r *resolver) resolve() {
 	}
 	r.set.Blueprints = r.order()
 	r.annotations()
+	r.env()
 	// Jobs are run by the jobs blueprint: without it, they would be left
 	// out in silence.
 	if len(r.p.Jobs) > 0 && r.byName["jobs"] == nil && !r.failed["jobs"] && r.l.unfetched == 0 {
@@ -442,4 +449,91 @@ func refString(ref *project.BlueprintRef) string {
 		return ref.Ref
 	}
 	return `"` + ref.Ref + `"`
+}
+
+// env gathers the project's environment variables and checks them: names
+// unique once prefixed, environments that exist, secrets without values in
+// the code, and the app's values per environment.
+func (r *resolver) env() {
+	envs := project.DefaultEnvironments
+	if opts, ok := r.set.Options["env"]; ok {
+		if list, ok := opts["environments"].([]any); ok && len(list) > 0 {
+			envs = nil
+			for _, e := range list {
+				if s, ok := e.(string); ok {
+					envs = append(envs, s)
+				}
+			}
+		}
+	}
+	r.set.Environments = envs
+	development := envs[0]
+	prefix := strings.ToUpper(r.p.App.Snake) + "_"
+
+	byName := map[string]*project.EnvVar{}
+	add := func(v *project.EnvVar) {
+		c := *v
+		c.Full = c.Name
+		if c.Prefixed {
+			c.Full = prefix + c.Name
+		}
+		if c.Field == "" {
+			c.Field = project.FieldName(c.Name)
+		}
+		if prev, ok := byName[c.Full]; ok {
+			owner := "the app"
+			if prev.Blueprint != "" {
+				owner = "blueprint " + prev.Blueprint
+			}
+			r.errorf(c.Span, "%s is already declared by %s", c.Full, owner)
+			return
+		}
+		for _, e := range c.Required {
+			if !slices.Contains(envs, e) {
+				r.errorf(c.Span, "%s: %s is not an environment of the app (%s)", c.Full, e, strings.Join(envs, ", "))
+			}
+		}
+		for e := range c.ByEnv {
+			if !slices.Contains(envs, e) {
+				r.errorf(c.Span, "%s: %s is not an environment of the app (%s)", c.Full, e, strings.Join(envs, ", "))
+			} else if c.Secret && e != development {
+				r.errorf(c.Span, "%s is a secret: only %s may have a value in the code", c.Full, development)
+			}
+		}
+		c.Values = map[string]any{}
+		byName[c.Full] = &c
+		r.set.Env = append(r.set.Env, &c)
+	}
+	for _, b := range r.set.Blueprints {
+		for _, v := range b.Manifest.Env {
+			add(v)
+		}
+	}
+	for _, v := range r.p.App.Env {
+		add(v)
+	}
+	for _, val := range r.p.App.EnvValues {
+		env := val.Environment.Name
+		if !slices.Contains(envs, env) {
+			r.errorf(val.Environment.Span, "%s is not an environment of the app: %s", env, strings.Join(envs, ", ")).
+				Suggestion = didYouMean(env, envs)
+			continue
+		}
+		v := byName[val.Name.Name]
+		if v == nil {
+			names := slices.Sorted(maps.Keys(byName))
+			r.errorf(val.Name.Span, "the app has no environment variable %s", val.Name.Name).Suggestion = didYouMean(val.Name.Name, names)
+			continue
+		}
+		if v.Secret {
+			r.errorf(val.Name.Span, "%s is a secret: its value goes in .env.%s or the platform's secrets, never in a .esq file", v.Full, env)
+			continue
+		}
+		converted, msg := project.ConvertEnv(val.Value, v.Type)
+		if msg != "" {
+			r.errorf(val.Value.Span, "%s: %s", v.Full, msg)
+			continue
+		}
+		v.Values[env] = converted
+	}
 }

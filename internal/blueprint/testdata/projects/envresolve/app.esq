@@ -1,0 +1,22 @@
+package shop
+
+app shop {
+  module "example.com/shop"
+  blueprint "./blueprints/db"
+  blueprint "./blueprints/env" {
+    environments ["development", "qa", "production"]
+  }
+
+  env {
+    STRIPE_KEY string secret required(qa, production)
+    DATABASE_URL string
+  }
+  env production {
+    SHOP_POOL_MAX "twenty"
+    DATABASE_URL "postgres://prod"
+    STRIP_KEY "x"
+  }
+  env staging {
+    SHOP_POOL_MAX 5
+  }
+}

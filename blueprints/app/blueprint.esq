@@ -4,9 +4,15 @@
 blueprint app {
   version "0.2.0"
 
-  /// Fields of config.Config.
+  /// The app's name, in its logs and telemetry: run one binary as
+  /// shop-api and shop-worker, for example.
+  env APP_NAME string default("{{.App.Kebab}}")
+
+  /// Fields of config.Config, for blueprints that read their variables in
+  /// code; declare them with env instead.
   slot "app.config.fields"
-  /// Code in config.Load that fills those fields from the environment with
+  /// Code in config.Load that fills those fields from the environment, for
+  /// blueprints that read their variables in code, with
   /// the loader l: l.text(name, "default"), l.number(name, 1),
   /// l.ratio(name, 0.5), l.flag(name, true) or l.list(name, []string{"a"});
   /// c is the Config.

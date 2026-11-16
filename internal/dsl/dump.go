@@ -38,6 +38,24 @@ func Dump(f *File) string {
 			for _, a := range d.Annotations {
 				w(1, "%s", dumpAnnotation(a))
 			}
+			for _, it := range d.Items {
+				b, ok := it.(*EnvBlock)
+				if !ok {
+					continue
+				}
+				env := ""
+				if b.Environment != nil {
+					env = " " + b.Environment.Name
+				}
+				w(1, "env%s @%s", env, pos(b.Span))
+				for _, e := range b.Decls {
+					w(2, "var %s %s%s", e.Name.Name, e.Type.Name, dumpMods(e.Modifiers, nil))
+					docs(3, e.Doc)
+				}
+				for _, o := range b.Values {
+					w(2, "value %s %s", o.Key.Name, dumpValue(o.Value))
+				}
+			}
 		case *EnumDecl:
 			w(0, "enum %s @%s", d.Name.Name, pos(d.Span))
 			docs(1, d.Doc)
@@ -62,6 +80,9 @@ func Dump(f *File) string {
 					w(1, "%s %s", it.Keyword.Name, strings.Join(names, ", "))
 				case *OptionDecl:
 					w(1, "option %s %s%s @%s", it.Name.Name, it.Type.Name, dumpMods(it.Modifiers, nil), pos(it.Span))
+					docs(2, it.Doc)
+				case *EnvDecl:
+					w(1, "env %s %s%s @%s", it.Name.Name, it.Type.Name, dumpMods(it.Modifiers, nil), pos(it.Span))
 					docs(2, it.Doc)
 				case *AnnotationDecl:
 					w(1, "annotation %s @%s", it.Target.Name, pos(it.Span))

@@ -234,6 +234,24 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 		}
 	}
 
+	for _, it := range d.Items {
+		e, ok := it.(*dsl.EnvBlock)
+		if !ok {
+			continue
+		}
+		if e.Environment == nil {
+			for _, decl := range e.Decls {
+				if v := EnvVarOf(decl, func(s dsl.Span, format string, args ...any) { b.errorf(s, format, args...) }); v != nil {
+					app.Env = append(app.Env, v)
+				}
+			}
+			continue
+		}
+		for _, o := range e.Values {
+			app.EnvValues = append(app.EnvValues, EnvValue{Environment: *e.Environment, Name: o.Key, Value: o.Value})
+		}
+	}
+
 	seen := map[string]*BlueprintRef{}
 	for _, r := range d.Blueprints {
 		ref := &BlueprintRef{Ref: r.Ref.Text, Options: r.Options, Pos: r.Pos, RefSpan: r.Ref.Span}

@@ -94,6 +94,11 @@ type Data struct {
 	Enums    []*project.Enum
 	Modules  []*project.Module
 	Jobs     []*project.Job
+	// Env are the project's environment variables, with their values
+	// rendered, and Environments its environments, the first one where
+	// development happens.
+	Env          []*project.EnvVar
+	Environments []string
 	// Entity is set in templates rendered per entity (and per relation),
 	// Enum per enum and Module per module; per entity and per enum, Module is theirs. Slot
 	// contributions see their caller's values.
@@ -148,6 +153,8 @@ type composer struct {
 
 	// extra are template functions by blueprint name.
 	extra map[string]template.FuncMap
+	// env are the project's variables, their values rendered.
+	env []*project.EnvVar
 
 	// Rendering state.
 	cur   *File    // file being rendered
@@ -230,6 +237,7 @@ func (c *composer) compose() *Result {
 	for _, bp := range c.set.Blueprints {
 		c.loadContributions(bp)
 	}
+	c.env = c.renderEnv()
 
 	files := map[string]*File{}
 	for _, bp := range c.set.Blueprints {
@@ -326,6 +334,7 @@ func (c *composer) parse(bp *blueprint.Blueprint, name, p string) *template.Temp
 func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 	self := bp.Manifest.Name
 	funcs := c.baseFuncs(self)
+	maps.Copy(funcs, envFuncs(func(name string) map[string]any { return c.set.Options[name] }))
 	maps.Copy(funcs, c.extra[self])
 	return funcs
 }
@@ -523,6 +532,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 
 	whole := Data{
 		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
+		Env: c.env, Environments: c.set.Environments,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
 	var datas []Data
@@ -641,4 +651,44 @@ func btoi(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// renderEnv copies the project's variables, rendering the string values a
+// blueprint declares as templates with that blueprint's data: a development
+// value may depend on its options, or on another blueprint's.
+func (c *composer) renderEnv() []*project.EnvVar {
+	out := make([]*project.EnvVar, 0, len(c.set.Env))
+	for _, v := range c.set.Env {
+		r := *v
+		bp := c.set.Get(v.Blueprint)
+		if bp != nil {
+			name := display(bp, "blueprint.esq")
+			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
+				Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
+			render := func(val any) any {
+				s, ok := val.(string)
+				if !ok || !strings.Contains(s, "{{") {
+					return val
+				}
+				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)
+				if err != nil {
+					c.errorf(name, 0, "the value of %s: %v", v.Full, err)
+					return val
+				}
+				var b bytes.Buffer
+				if err := t.Execute(&b, data); err != nil {
+					c.errorf(name, 0, "the value of %s: %s", v.Full, cleanTemplateMsg(err.Error()))
+					return val
+				}
+				return b.String()
+			}
+			r.Default = render(v.Default)
+			r.ByEnv = map[string]any{}
+			for e, val := range v.ByEnv {
+				r.ByEnv[e] = render(val)
+			}
+		}
+		out = append(out, &r)
+	}
+	return out
 }

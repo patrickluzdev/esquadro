@@ -1,0 +1,37 @@
+testdata/projects/envresolve/app.esq:12:5: error: DATABASE_URL is already declared by blueprint db
+   |
+12 |     DATABASE_URL string
+   |     ^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/envresolve/app.esq:15:19: error: SHOP_POOL_MAX: expected a whole number
+   |
+15 |     SHOP_POOL_MAX "twenty"
+   |                   ^^^^^^^^
+
+testdata/projects/envresolve/app.esq:16:5: error: DATABASE_URL is a secret: its value goes in .env.production or the platform's secrets, never in a .esq file
+   |
+16 |     DATABASE_URL "postgres://prod"
+   |     ^^^^^^^^^^^^
+
+testdata/projects/envresolve/app.esq:17:5: error: the app has no environment variable STRIP_KEY
+   |
+17 |     STRIP_KEY "x"
+   |     ^^^^^^^^^
+   = help: did you mean "STRIPE_KEY"?
+
+testdata/projects/envresolve/app.esq:19:7: error: staging is not an environment of the app: development, qa, production
+   |
+19 |   env staging {
+   |       ^^^^^^^
+
+testdata/projects/envresolve/blueprints/db/blueprint.esq:5:3: error: DATABASE_URL: staging is not an environment of the app (development, qa, production)
+  |
+5 |   env DATABASE_URL string secret required(staging, production) development("postgres://localhost") production("postgres://prod")
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+testdata/projects/envresolve/blueprints/db/blueprint.esq:5:3: error: DATABASE_URL is a secret: only development may have a value in the code
+  |
+5 |   env DATABASE_URL string secret required(staging, production) development("postgres://localhost") production("postgres://prod")
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+7 errors

@@ -89,8 +89,8 @@ type AppDecl struct {
 	Span
 }
 
-// AppItem is an item of the app block: *ModuleItem, *BlueprintRef or
-// *Annotation.
+// AppItem is an item of the app block: *ModuleItem, *BlueprintRef,
+// *EnvBlock or *Annotation.
 type AppItem interface {
 	appItemNode()
 	SourceSpan() Span
@@ -135,6 +135,27 @@ type EntityDecl struct {
 	Annotations []*Annotation
 	// Members keeps fields, relations and annotations in source order.
 	Members []Member
+	Span
+}
+
+// EnvDecl declares an environment variable: "env NAME type modifiers", in
+// a blueprint manifest or in an app's env block.
+type EnvDecl struct {
+	Doc       []string
+	Name      Ident
+	Type      Ident
+	Modifiers []*Modifier
+	Span
+}
+
+// EnvBlock is an app's "env { declarations }", the variables of the app
+// itself, or "env <environment> { NAME value ... }", values of variables in
+// one environment.
+type EnvBlock struct {
+	// Environment is nil for a block of declarations.
+	Environment *Ident
+	Decls       []*EnvDecl
+	Values      []*Option
 	Span
 }
 
@@ -216,6 +237,7 @@ func (*JobDecl) declNode()    {}
 func (*ModuleItem) appItemNode()   {}
 func (*BlueprintRef) appItemNode() {}
 func (*Annotation) appItemNode()   {}
+func (*EnvBlock) appItemNode()     {}
 
 func (*Field) memberNode()      {}
 func (*Relation) memberNode()   {}
@@ -231,8 +253,8 @@ type BlueprintDecl struct {
 }
 
 // ManifestItem is a line of a blueprint manifest: *VersionItem,
-// *DependsItem, *OptionDecl, *AnnotationDecl, *SlotItem, *GoRequireItem or
-// *HookItem.
+// *DependsItem, *OptionDecl, *EnvDecl, *AnnotationDecl, *SlotItem,
+// *GoRequireItem or *HookItem.
 type ManifestItem interface {
 	manifestItemNode()
 	SourceSpan() Span
@@ -318,6 +340,7 @@ type PackageDecl struct {
 func (*VersionItem) manifestItemNode()    {}
 func (*DependsItem) manifestItemNode()    {}
 func (*OptionDecl) manifestItemNode()     {}
+func (*EnvDecl) manifestItemNode()        {}
 func (*AnnotationDecl) manifestItemNode() {}
 func (*SlotItem) manifestItemNode()       {}
 func (*GoRequireItem) manifestItemNode()  {}

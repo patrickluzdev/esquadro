@@ -1,0 +1,4 @@
+blueprint env {
+  version "0.1.0"
+  option environments list default(["development", "staging", "production"])
+}

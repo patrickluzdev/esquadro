@@ -1,0 +1,6 @@
+package shop
+
+app shop {
+  module "example.com/shop"
+  blueprint "./blueprints/db"
+}

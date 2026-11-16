@@ -1,0 +1,8 @@
+blueprint db {
+  version "0.1.0"
+
+  /// The connection.
+  env DATABASE_URL string secret required(staging, production) development("postgres://localhost") production("postgres://prod")
+  /// Most connections.
+  env POOL_MAX int prefixed default(10)
+}
