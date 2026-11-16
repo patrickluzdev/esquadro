@@ -19,6 +19,7 @@ blueprint git
 |---|---|---|---|
 | `initial_commit` | bool | `true` | Commit everything on the first generation. |
 | `message` | string | `"chore: generate project with esquadro"` | Message of the first commit. |
+| `branch` | string | `"main"` | The branch a new repository starts on, whatever git's own default is; with branching, its main option decides. |
 
 ```esquadro
 blueprint git {

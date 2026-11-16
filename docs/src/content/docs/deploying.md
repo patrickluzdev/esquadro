@@ -50,7 +50,13 @@ against Postgres run too), the build, and `esquadro gen -check`, with the
 esquadro version recorded in `esquadro/lock.json`: it fails when someone
 changed the model without regenerating, or edited generated files.
 
-With `docker`, it also builds the image and, for tags `v*`, publishes it to
+It runs as little as it can, to save Actions minutes, which count on
+private repositories: on pushes to the long-lived branches and tags, on pull
+requests once they are ready for review (not drafts), and a newer run of
+the same branch or pull request cancels the older one. The
+[branching](/esquadro/branching/) blueprint sets the long-lived branches.
+
+With `docker`, for tags `v*`, it also builds the image and publishes it to
 GitHub's container registry:
 
 ```sh
