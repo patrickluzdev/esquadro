@@ -100,7 +100,7 @@ yours. Write an action there and it replaces the model's:
 ```go
 // Only open orders change, and only by their customer.
 func (p OrderPolicy) Update(ctx context.Context, o Order) bool {
-	return p.orderRules.Update(ctx, o) && o.Status == StatusOPEN
+	return p.orderRules.Update(ctx, o) && o.Status == StatusOpen
 }
 ```
 
