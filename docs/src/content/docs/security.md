@@ -49,12 +49,19 @@ id of its identity. The identities, credentials, sessions and the rest live in
 
 Every entity says who may `list`, `read`, `create`, `update` or `delete` it;
 `write` is the last three. Each is `public` (anyone, signed in or not), a realm
-(`user`: any of its accounts) or a role (`user.admin`):
+(`user`: any of its accounts), a role (`user.admin`), or `owner`: the
+principal the record belongs to.
 
 ```esquadro
 entity Product {
   ...
   @security(read public, write [user.admin, user.staff])
+}
+
+entity Review {
+  text     string required
+  customer > Customer required
+  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])
 }
 ```
 
@@ -62,15 +69,51 @@ entity Product {
 - An entity without `@security` may be changed by whoever signed in, in any
   realm; `esquadro check` warns of it.
 - An entity with rules, but none for an operation, lets no one do it.
-- Linking and unlinking a many-to-many relation is an `update`; listing it, a
-  `read`.
+- Linking and unlinking a many-to-many relation is an `update` of the record;
+  listing it, a `read`.
+
+### Owners
+
+`owner` is the relation of the entity to a principal: `customer > Customer`
+above. With more than one, `@security(owner buyer, ...)` says which; a
+principal (`Customer` itself) owns its own record. With `owner`:
+
+- a list holds only the records of whoever asks, unless another rule lets
+  them see all (an admin sees every review); the query filters them, so pages
+  stay whole;
+- a record someone may not read answers `404`, as if it did not exist, and
+  `401` to a request without a session or token: no one learns which ids
+  exist;
+- a record created by its owner is theirs, whatever the body says
+  (`customer_id` is then optional in the API); someone let in by another rule,
+  such as an admin, chooses the owner, creating on someone's behalf;
+- an owner cannot hand a record over to someone else on update.
+
+### Policies
+
+Each entity has a policy, in `internal/<module>/<entity>_policy.go`, that the
+API asks before each operation: `List` (a scope: all, the owner's, or none),
+`Read`, `Create`, `Update` and `Delete`. Its rules come from the model, in
+`<entity>_policy_gen.go`, generated again with it; the file without `_gen` is
+yours. Write an action there and it replaces the model's:
+
+```go
+// Only open orders change, and only by their customer.
+func (p OrderPolicy) Update(ctx context.Context, o Order) bool {
+	return p.orderRules.Update(ctx, o) && o.Status == StatusOPEN
+}
+```
+
+Ask the policy in your own code too: `sales.OrderPolicy{}.Update(ctx, order)`.
+The generated tests check the model's rules; `TestAPIAccess` checks that the
+API answers as the policy that runs says, yours included.
 
 Each operation of the API answers `401 unauthorized` to a request without a
-session or token, and `403 forbidden` to one that may not; its description in
-`openapi.yaml` says who may. In your own code, `security.Require(ctx,
-"orders.refund")` answers the same problems, by the roles' permissions;
-`security.Allows(ctx, "user.admin")` checks a rule. An operation of your own,
-which the generated table does not name, needs someone signed in.
+session or token that may not, and `403 forbidden` to one with a session;
+its description in `openapi.yaml` says who may. In your own code,
+`security.Require(ctx, "orders.refund")` answers the same problems, by the
+roles' permissions; `security.Allows(ctx, "user.admin")` checks a rule. An
+operation of your own, which is not an entity's, needs someone signed in.
 
 ## Signing in
 
