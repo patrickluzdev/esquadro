@@ -1,4 +1,4 @@
-	d.mail, err = mail.New(mail.Config{URL: d.config.MailURL, From: d.config.MailFrom, Development: d.config.Env == "{{index .Environments 0}}"}, d.logger)
+	d.mail, err = mail.New(mail.Config{URL: d.config.MailURL, From: d.config.MailFrom, Development: d.config.Env == "{{index .Environments 0}}"{{if uses "jobs"}}, Secret: d.config.MailSecret{{end}}}, d.logger)
 	if err != nil {
 		release()
 		return d, nil, err

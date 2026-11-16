@@ -12,6 +12,9 @@ blueprint mail {
   /// log:// (into the log). In development, the local Mailpit of
   /// compose.yaml, or the log.
   env MAIL_URL string secret required development("{{if uses \"compose\"}}smtp://localhost:{{composePort \"mailpit\" \"1025\"}}{{else}}log://{{end}}")
+  /// With jobs, seals the emails in the queue, links and addresses
+  /// included; esquadro generates one for development.
+  env MAIL_SECRET string secret required generate(32) when("{{if uses \"jobs\"}}true{{end}}")
   /// Who emails come from: Shop <no-reply@shop.com>.
   env MAIL_FROM string required development("{{.App.Label}} <no-reply@localhost>")
   requires app, env

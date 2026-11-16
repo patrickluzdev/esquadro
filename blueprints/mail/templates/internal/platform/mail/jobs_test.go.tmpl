@@ -1,0 +1,70 @@
+{{- if and (uses "jobs") (uses "testcontainers") -}}
+package mail
+
+import (
+	"strings"
+	"testing"
+
+	"{{.App.Module}}/internal/platform/jobs"
+	"{{.App.Module}}/internal/platform/postgres/postgrestest"
+)
+
+func TestTheQueueSealsEmails(t *testing.T) {
+	ctx := t.Context()
+	db := postgrestest.Fresh(t)
+	var delivered []Message
+	m := NewWith(transportFunc(func(msg Message) { delivered = append(delivered, msg) }), "Shop <no-reply@shop.example>")
+	var err error
+	m.sealKey = []byte(strings.Repeat("k", 32))
+	q, registry := jobs.NewQueue(), jobs.NewRegistry()
+	m.RegisterJobs(registry)
+	if err = q.Open(db, registry, jobs.Config{Workers: 1, Queues: []string{"default"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	m.UseJobs(q)
+	if err := m.Send(ctx, Email{To: []string{"ana@example.com"}, Template: "welcome", Data: map[string]any{"Name": "Ana"}}); err != nil {
+		t.Fatal(err)
+	}
+	var raw []byte
+	if err := db.QueryRow(ctx, `SELECT args FROM river_job WHERE kind = 'mail_send'`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "ana@example.com") || strings.Contains(string(raw), "Welcome") {
+		t.Fatalf("the queue shows the email: %s", raw)
+	}
+	if len(delivered) != 0 {
+		t.Fatal("delivered before the job ran")
+	}
+
+	// A transaction that does not commit sends nothing.
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SendTx(ctx, tx, Email{To: []string{"bia@example.com"}, Template: "welcome", Data: map[string]any{"Name": "Bia"}}); err != nil {
+		t.Fatal(err)
+	}
+	tx.Rollback(ctx)
+	if n, _ := q.Count(ctx, "mail_send"); n != 1 {
+		t.Fatalf("%d jobs", n)
+	}
+}
+
+func TestSealedEmailsOpen(t *testing.T) {
+	m := NewWith(transportFunc(func(Message) {}), "a@b.example")
+	m.sealKey = []byte(strings.Repeat("k", 32))
+	args, err := m.seal(Message{ID: "x", To: []string{"ana@example.com"}, Subject: "s", Text: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := m.open(args.Sealed)
+	if err != nil || msg.ID != "x" || msg.To[0] != "ana@example.com" {
+		t.Fatalf("%+v %v", msg, err)
+	}
+	other := NewWith(transportFunc(func(Message) {}), "a@b.example")
+	other.sealKey = []byte(strings.Repeat("o", 32))
+	if _, err := other.open(args.Sealed); err == nil {
+		t.Fatal("opened with another key")
+	}
+}
+{{end -}}

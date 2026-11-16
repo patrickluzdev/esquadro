@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"time"
+	"uuid"
 )
 
 // Email is an email to send: to whom, and the template that writes it
@@ -18,12 +19,8 @@ type Email struct {
 // fails fails here, and sends it in the background: by the job queue when
 // the app has one, retried until it goes; else in this process.
 func (m *Mailer) Send(ctx context.Context, e Email) error {
-	msg, err := Write(e.Template, e.Data)
+	msg, err := m.written(e)
 	if err != nil {
-		return err
-	}
-	msg.To, msg.ReplyTo, msg.From = e.To, e.ReplyTo, m.from
-	if err := check(msg); err != nil {
 		return err
 	}
 	if m.enqueue != nil {
@@ -42,4 +39,15 @@ func (m *Mailer) Send(ctx context.Context, e Email) error {
 	}
 	go work()
 	return nil
+}
+
+// written is the message an email's template writes, with its ID, the one
+// it keeps when it is sent again.
+func (m *Mailer) written(e Email) (Message, error) {
+	msg, err := Write(e.Template, e.Data)
+	if err != nil {
+		return Message{}, err
+	}
+	msg.To, msg.ReplyTo, msg.From, msg.ID = e.To, e.ReplyTo, m.from, uuid.NewV7().String()
+	return msg, check(msg)
 }

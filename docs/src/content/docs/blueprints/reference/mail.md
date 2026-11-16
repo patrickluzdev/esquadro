@@ -25,4 +25,5 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | Variable | Type | Value | |
 |---|---|---|---|
 | `MAIL_URL` | string, secret, required outside development | a value in development | How emails go: smtp://user:password@host:port (TLS on 465, STARTTLS otherwise; without TLS only in development), resend://API_KEY, or log:// (into the log). In development, the local Mailpit of compose.yaml, or the log. |
+| `MAIL_SECRET` | string, secret, required outside development | generated in development | With jobs, seals the emails in the queue, links and addresses included; esquadro generates one for development. |
 | `MAIL_FROM` | string, required outside development | development: the app's, from its blueprints and options | Who emails come from: Shop &lt;no-reply@shop.com>. |

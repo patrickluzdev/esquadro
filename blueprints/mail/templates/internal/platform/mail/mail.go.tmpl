@@ -4,12 +4,18 @@ package mail
 
 import (
 	"context"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/mail"
 	"strings"
 	"uuid"
+{{- if uses "jobs"}}
+
+	"{{.App.Module}}/internal/platform/jobs"
+{{- end}}
 )
 
 // Message is an email, written: who it goes to, and its subject and
@@ -40,6 +46,8 @@ type Config struct {
 	From string
 	// Development lets SMTP go without TLS, to the local Mailpit.
 	Development bool
+	// Secret is MAIL_SECRET, which seals the emails in the job queue.
+	Secret string
 }
 
 // Mailer sends the app's emails.
@@ -51,6 +59,11 @@ type Mailer struct {
 	// before Send returns, for tests.
 	enqueue func(ctx context.Context, m Message) error
 	sendNow bool
+	// sealKey seals the emails in the job queue.
+	sealKey []byte
+{{- if uses "jobs"}}
+	queue   *jobs.Queue
+{{- end}}
 }
 
 // New returns the mailer of cfg, or what is wrong with it.
@@ -63,7 +76,16 @@ func New(cfg Config, logger *slog.Logger) (*Mailer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Mailer{transport: transport, from: from.String(), logger: logger}, nil
+	m := &Mailer{transport: transport, from: from.String(), logger: logger}
+	if cfg.Secret != "" {
+		if len(cfg.Secret) < 32 {
+			return nil, errors.New("mail: MAIL_SECRET must be at least 32 characters")
+		}
+		if m.sealKey, err = hkdf.Key(sha256.New, []byte(cfg.Secret), nil, "{{.App.Snake}} mail queue", 32); err != nil {
+			return nil, err
+		}
+	}
+	return m, nil
 }
 
 // NewWith returns a mailer that hands its messages to transport before

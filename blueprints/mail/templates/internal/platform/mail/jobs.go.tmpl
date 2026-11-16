@@ -1,0 +1,106 @@
+{{- if uses "jobs" -}}
+package mail
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/jobs"
+)
+
+// sendArgs is an email in the queue, written and sealed: nothing of it, an
+// address or a link, shows in the queue's table.
+type sendArgs struct {
+	Sealed []byte `json:"sealed"`
+}
+
+func (sendArgs) Kind() string { return "mail_send" }
+
+// UseJobs sends the emails by the job queue: retried until they go, and,
+// with Resend, never twice.
+func (m *Mailer) UseJobs(q *jobs.Queue) {
+	m.queue = q
+	m.enqueue = func(ctx context.Context, msg Message) error {
+		args, err := m.seal(msg)
+		if err != nil {
+			return err
+		}
+		return q.Enqueue(ctx, args)
+	}
+}
+
+// SendTx is Send in the transaction tx: the email goes only if tx commits,
+// so that no "order confirmed" goes for an order that was not stored.
+func (m *Mailer) SendTx(ctx context.Context, tx pgx.Tx, e Email) error {
+	if m.queue == nil {
+		return errors.New("mail: SendTx needs the job queue")
+	}
+	msg, err := m.written(e)
+	if err != nil {
+		return err
+	}
+	args, err := m.seal(msg)
+	if err != nil {
+		return err
+	}
+	return m.queue.EnqueueTx(ctx, tx, args)
+}
+
+// RegisterJobs registers the work of sending an email.
+func (m *Mailer) RegisterJobs(r *jobs.Registry) {
+	jobs.Add(r, func(ctx context.Context, args sendArgs) error {
+		msg, err := m.open(args.Sealed)
+		if err != nil {
+			return err
+		}
+		return m.Deliver(ctx, msg)
+	})
+}
+
+func (m *Mailer) seal(msg Message) (sendArgs, error) {
+	if m.sealKey == nil {
+		return sendArgs{}, errors.New("mail: the queue needs MAIL_SECRET")
+	}
+	plain, err := json.Marshal(msg)
+	if err != nil {
+		return sendArgs{}, err
+	}
+	gcm, err := m.gcm()
+	if err != nil {
+		return sendArgs{}, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	rand.Read(nonce)
+	return sendArgs{Sealed: gcm.Seal(nonce, nonce, plain, nil)}, nil
+}
+
+func (m *Mailer) open(sealed []byte) (Message, error) {
+	gcm, err := m.gcm()
+	if err != nil {
+		return Message{}, err
+	}
+	if len(sealed) < gcm.NonceSize() {
+		return Message{}, errors.New("mail: a sealed email too short")
+	}
+	plain, err := gcm.Open(nil, sealed[:gcm.NonceSize()], sealed[gcm.NonceSize():], nil)
+	if err != nil {
+		return Message{}, errors.New("mail: an email in the queue does not open with MAIL_SECRET")
+	}
+	var msg Message
+	return msg, json.Unmarshal(plain, &msg)
+}
+
+func (m *Mailer) gcm() (cipher.AEAD, error) {
+	block, err := aes.NewCipher(m.sealKey)
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
+}
+{{end -}}
