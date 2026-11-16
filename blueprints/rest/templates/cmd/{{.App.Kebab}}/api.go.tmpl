@@ -55,7 +55,11 @@ func newAPI(d dependencies) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return edge.Chain(operations, edge.JSONOnly, edge.LimitBody(int64(d.config.MaxBodyKB)*1024)), nil
+	return edge.Chain(operations,
+{{- with slot "rest.middleware" .}}
+{{.}}
+{{- end}}
+		edge.JSONOnly, edge.LimitBody(int64(d.config.MaxBodyKB)*1024)), nil
 }
 
 // NewError answers the errors of the operations as Problem Details.

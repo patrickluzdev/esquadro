@@ -1,0 +1,116 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"context"
+	"net/http"
+	"slices"
+	"strings"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// grants are the permissions of each role of each realm, as the model
+// declares them.
+var grants = map[string]map[string][]string{
+{{- range realms .Entities}}{{if .Grants}}
+	"{{.Name}}": {
+{{- range $role, $perms := .Grants}}
+		"{{$role}}": {{goElems $perms}},
+{{- end}}
+	},
+{{- end}}{{end}}
+}
+
+// Allows reports whether the request of ctx comes from one rules let in:
+// "public" (anyone), a realm ("user": any of its principals) or a realm's
+// role ("user.admin").
+func Allows(ctx context.Context, rules ...string) bool {
+	for _, rule := range rules {
+		if rule == "public" {
+			return true
+		}
+		realm, role, hasRole := strings.Cut(rule, ".")
+		p, ok := PrincipalIn(ctx, realm)
+		if ok && (!hasRole || slices.Contains(p.Roles, role)) {
+			return true
+		}
+	}
+	return false
+}
+
+// Can reports whether p has permission, by one of its roles.
+func Can(p Principal, permission string) bool {
+	for _, role := range p.Roles {
+		if slices.Contains(grants[p.Realm][role], permission) {
+			return true
+		}
+	}
+	return false
+}
+
+// PermissionsOf are the permissions p has, by its roles.
+func PermissionsOf(p Principal) []string {
+	out := []string{}
+	for _, role := range p.Roles {
+		for _, perm := range grants[p.Realm][role] {
+			if !slices.Contains(out, perm) {
+				out = append(out, perm)
+			}
+		}
+	}
+	return out
+}
+
+// Require answers nil when the request of ctx comes from a principal with
+// permission, such as orders.refund; else the problem to answer:
+// unauthorized (401) without one, forbidden (403) when it may not.
+func Require(ctx context.Context, permission string) error {
+	principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
+	if len(principals) == 0 {
+		return ErrUnauthorized
+	}
+	for _, p := range principals {
+		if Can(p, permission) {
+			return nil
+		}
+	}
+	return ErrForbidden
+}
+
+// Authorize lets a request of the API in when access, by operation ID,
+// says who it comes from may: find is the operation of a request. An
+// operation that access does not name, one of your own, needs a principal
+// of any realm; check more with Allows or Require in its code.
+func (s *Security) Authorize(find func(method, path string) (string, bool), access map[string][]string) edge.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			op, found := find(r.Method, r.URL.Path)
+			if !found {
+				// Not an operation: ogen answers not_found or
+				// method_not_allowed.
+				next.ServeHTTP(w, r)
+				return
+			}
+			ctx := r.Context()
+			rules, named := access[op]
+			principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
+			switch {
+			case named && Allows(ctx, rules...):
+			case !named && len(principals) > 0:
+			case len(principals) == 0:
+				w.Header().Set("WWW-Authenticate", `Bearer realm="{{.App.Snake}}"`)
+				edge.Write(w, r, ErrUnauthorized)
+				return
+			default:
+				edge.Write(w, r, ErrForbidden)
+				return
+			}
+			if len(principals) > 0 {
+				w.Header().Set("Cache-Control", "no-store")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+{{end -}}

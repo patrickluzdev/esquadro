@@ -24,10 +24,18 @@ blueprint rest {
   /// Code in the API tests' newTestServer that sets more of d, the
   /// dependencies, given t and pool.
   slot "rest.test.dependencies"
+  /// Code in newTestServer that wraps h, the service's handler, before the
+  /// test server serves it.
+  slot "rest.test.handler"
   /// Paths of your own operations, indented by two.
   slot "rest.paths"
   /// Schemas of your own operations, indented by four.
   slot "rest.schemas"
+  /// Security schemes, indented by four, under components.securitySchemes.
+  slot "rest.security.schemes"
+  /// Middleware of the API in newAPI, before ogen's server, one per line
+  /// ending with a comma; d is the dependencies, operations ogen's server.
+  slot "rest.middleware"
 
   go_require "github.com/ogen-go/ogen" "v1.24.0"
 

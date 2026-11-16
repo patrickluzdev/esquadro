@@ -15,7 +15,10 @@ info:
     `invalid_request` (400) for a request that does not match this contract,
     `not_found` (404), `method_not_allowed` (405), `not_acceptable` (406),
     `in_use` (409) for deleting a record others point at,
-    `request_too_large` (413), `unsupported_media_type` (415),
+    `request_too_large` (413), `unsupported_media_type` (415),{{if accessLine .Entities (index .Entities 0) "read"}}
+    `unauthorized` (401) without a session or a token, `forbidden` (403) for
+    one that may not, `csrf` (403) for a change with a session cookie but
+    without its X-CSRF-Token,{{end}}
     `invalid_fields` (422) listing every field refused at once, with codes
     `required`, `too_short`, `too_long`, `too_small`, `too_large`, `pattern`,
     `invalid_value`, `not_found` (a related record that does not exist) and
@@ -42,6 +45,9 @@ paths:
         The {{lower .Plural.Label}} in the order they were created, in pages of
         `limit` (25 by default, at most 100). `next` is the cursor of the next
         page, absent on the last one: pass it as `after`.
+{{- with accessLine $.Entities $e "list"}}
+        {{.}}
+{{- end}}
       tags: [{{.Module.Snake}}]
       parameters:
         - $ref: "#/components/parameters/After"
@@ -62,6 +68,9 @@ paths:
         Stores a new {{lower .Label}}, with its defaults, once it passes the rules
         declared for {{lower .Plural.Label}}.
         Codes: `invalid_fields` (422); `invalid_request` (400).
+{{- with accessLine $.Entities $e "create"}}
+        {{.}}
+{{- end}}
       tags: [{{.Module.Snake}}]
       requestBody:
         required: true
@@ -89,6 +98,9 @@ paths:
       summary: {{quote (printf "Read a %s" (lower .Label))}}
       description: |
         Codes: `not_found` (404).
+{{- with accessLine $.Entities $e "read"}}
+        {{.}}
+{{- end}}
       tags: [{{.Module.Snake}}]
       responses:
         "200":
@@ -106,6 +118,9 @@ paths:
         Replaces the {{lower .Label}} by the one sent, so a field left out is
         cleared or takes its default.
         Codes: `invalid_fields` (422); `not_found` (404); `invalid_request` (400).
+{{- with accessLine $.Entities $e "update"}}
+        {{.}}
+{{- end}}
       tags: [{{.Module.Snake}}]
       requestBody:
         required: true
@@ -127,6 +142,9 @@ paths:
       summary: {{quote (printf "Delete a %s" (lower .Label))}}
       description: |
         Codes: `not_found` (404); `in_use` (409) while other records point at it.
+{{- with accessLine $.Entities $e "delete"}}
+        {{.}}
+{{- end}}
       tags: [{{.Module.Snake}}]
       responses:
         "204":
@@ -147,6 +165,9 @@ paths:
         In pages, as the other lists{{if .CrossesModules}}; {{lower .Target.Plural.Label}} of
         the {{.Target.Module.Snake}} module, by ID{{end}}.
         Codes: `not_found` (404) when there is no such {{lower $e.Label}}.
+{{- with accessLine $.Entities $e "read"}}
+        {{.}}
+{{- end}}
       tags: [{{$e.Module.Snake}}]
       parameters:
         - $ref: "#/components/parameters/After"
@@ -177,6 +198,9 @@ paths:
       description: |
         Adding one already there changes nothing.
         Codes: `not_found` (404) when there is no such record.
+{{- with accessLine $.Entities $e "update"}}
+        {{.}}
+{{- end}}
       tags: [{{$e.Module.Snake}}]
       responses:
         "204":
@@ -188,6 +212,9 @@ paths:
       summary: {{quote (printf "Remove from the %s of a %s" (lower .Label) (lower $e.Label))}}
       description: |
         Removing one that is not there changes nothing.
+{{- with accessLine $.Entities $e "update"}}
+        {{.}}
+{{- end}}
       tags: [{{$e.Module.Snake}}]
       responses:
         "204":
@@ -221,6 +248,10 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+{{- with slot "rest.security.schemes" .}}
+  securitySchemes:
+{{.}}
+{{- end}}
   schemas:
     Problem:
       type: object

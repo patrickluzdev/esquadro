@@ -64,13 +64,9 @@ func (s *Security) Authenticate(realms []string, origins []string) edge.Middlewa
 				}
 				principals[realm] = p
 			}
-			if len(principals) > 0 {
-				ctx = context.WithValue(ctx, principalsKey{}, principals)
-				for _, realm := range realms {
-					if p, ok := principals[realm]; ok {
-						ctx = WithPrincipal(ctx, p)
-						break
-					}
+			for _, realm := range realms {
+				if p, ok := principals[realm]; ok {
+					ctx = WithPrincipal(ctx, p)
 				}
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))

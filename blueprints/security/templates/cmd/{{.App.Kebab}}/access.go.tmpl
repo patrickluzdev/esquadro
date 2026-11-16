@@ -1,0 +1,21 @@
+{{- if and (realms .Entities) (uses "rest") -}}
+package main
+
+// access is who may run each operation of the API, by its ID, as the
+// @security annotations of the model say: "public", a realm, or a realm's
+// role.
+var access = map[string][]string{
+{{- range $e := .Entities}}
+	"list{{$e.Plural.Pascal}}": {{goElems (access $.Entities $e "list")}},
+	"create{{$e.Pascal}}": {{goElems (access $.Entities $e "create")}},
+	"get{{$e.Pascal}}": {{goElems (access $.Entities $e "read")}},
+	"update{{$e.Pascal}}": {{goElems (access $.Entities $e "update")}},
+	"delete{{$e.Pascal}}": {{goElems (access $.Entities $e "delete")}},
+{{- range manyToMany $e}}
+	"list{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "read")}},
+	"addTo{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "update")}},
+	"removeFrom{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "update")}},
+{{- end}}
+{{- end}}
+}
+{{end -}}

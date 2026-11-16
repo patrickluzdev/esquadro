@@ -2,8 +2,12 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -23,5 +27,72 @@ func testSecurity(t *testing.T, pool *pgxpool.Pool) *security.Security {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// everyone is a principal of each realm, with every role.
+var everyone = []security.Principal{
+{{- range realms .Entities}}
+	{ID: uuid.NewV7(), Realm: "{{.Name}}", Roles: {{goStrings .Roles}}},
+{{- end}}
+}
+
+// signedInAsEveryone signs every request in as everyone, for the tests of
+// what the API does; TestAPIAccess checks who may do it.
+func signedInAsEveryone(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		for _, p := range everyone {
+			ctx = security.WithPrincipal(ctx, p)
+		}
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// TestAPIAccess runs every operation of access as each kind of principal:
+// no one, each realm without roles, and each role alone.
+func TestAPIAccess(t *testing.T) {
+	s := testSecurity(t, nil)
+	h := s.Authorize(func(_, path string) (string, bool) { return strings.TrimPrefix(path, "/"), true }, access)(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	type who struct {
+		name string
+		p    *security.Principal
+	}
+	whos := []who{ {name: "no one"} }
+	for _, e := range everyone {
+		whos = append(whos, who{e.Realm, &security.Principal{ID: e.ID, Realm: e.Realm}})
+		for _, role := range e.Roles {
+			whos = append(whos, who{e.Realm + "." + role, &security.Principal{ID: e.ID, Realm: e.Realm, Roles: []string{role}}})
+		}
+	}
+	run := func(op string, w who) int {
+		req := httptest.NewRequest("GET", "/"+op, nil)
+		if w.p != nil {
+			req = req.WithContext(security.WithPrincipal(req.Context(), *w.p))
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	for op, rules := range access {
+		for _, w := range whos {
+			want := http.StatusNoContent
+			if !slices.Contains(rules, "public") {
+				switch {
+				case w.p == nil:
+					want = http.StatusUnauthorized
+				case !slices.Contains(rules, w.p.Realm) && !slices.ContainsFunc(w.p.Roles, func(role string) bool { return slices.Contains(rules, w.p.Realm+"."+role) }):
+					want = http.StatusForbidden
+				}
+			}
+			if got := run(op, w); got != want {
+				t.Errorf("%s as %s: %d, want %d (rules %v)", op, w.name, got, want, rules)
+			}
+		}
+	}
+	// An operation of your own needs someone signed in.
+	if run("yourOwnOperation", whos[0]) != http.StatusUnauthorized || run("yourOwnOperation", whos[1]) != http.StatusNoContent {
+		t.Error("an operation access does not name")
+	}
 }
 {{end -}}

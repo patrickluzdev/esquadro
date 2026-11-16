@@ -132,8 +132,21 @@ type Principal struct {
 
 type principalKey struct{}
 
-// WithPrincipal is ctx with the request's principal.
+// WithPrincipal is ctx signed in as p, besides the principals of the other
+// realms ctx has; PrincipalOf answers the first one. Code that acts on its
+// own, such as a job, signs in this way.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
+	all := map[string]Principal{p.Realm: p}
+	for realm, other := range principals {
+		if realm != p.Realm {
+			all[realm] = other
+		}
+	}
+	ctx = context.WithValue(ctx, principalsKey{}, all)
+	if _, ok := ctx.Value(principalKey{}).(Principal); ok {
+		return ctx
+	}
 	return context.WithValue(ctx, principalKey{}, p)
 }
 

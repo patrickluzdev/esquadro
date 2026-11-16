@@ -47,8 +47,11 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 |---|---|
 | `rest.tags` | Tags of your own operations in api/openapi.yaml, indented by two. |
 | `rest.test.dependencies` | Code in the API tests' newTestServer that sets more of d, the dependencies, given t and pool. |
+| `rest.test.handler` | Code in newTestServer that wraps h, the service's handler, before the test server serves it. |
 | `rest.paths` | Paths of your own operations, indented by two. |
 | `rest.schemas` | Schemas of your own operations, indented by four. |
+| `rest.security.schemes` | Security schemes, indented by four, under components.securitySchemes. |
+| `rest.middleware` | Middleware of the API in newAPI, before ogen's server, one per line ending with a comma; d is the dependencies, operations ogen's server. |
 
 ## Hooks
 

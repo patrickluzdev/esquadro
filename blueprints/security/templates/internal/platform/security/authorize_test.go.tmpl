@@ -1,0 +1,45 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"testing"
+	"uuid"
+)
+
+func TestPermissions(t *testing.T) {
+	ctx := context.Background()
+	if err := Require(ctx, "anything.at_all"); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("no one: %v", err)
+	}
+	for realm, roles := range grants {
+		for role, perms := range roles {
+			p := Principal{ID: uuid.NewV7(), Realm: realm, Roles: []string{role}}
+			for _, perm := range perms {
+				if !Can(p, perm) || Can(Principal{Realm: realm}, perm) || !slices.Contains(PermissionsOf(p), perm) {
+					t.Errorf("%s.%s and %s", realm, role, perm)
+				}
+				if err := Require(WithPrincipal(ctx, p), perm); err != nil {
+					t.Errorf("%s.%s requires %s: %v", realm, role, perm, err)
+				}
+				if err := Require(WithPrincipal(ctx, Principal{Realm: realm}), perm); !errors.Is(err, ErrForbidden) {
+					t.Errorf("no role requires %s: %v", perm, err)
+				}
+			}
+		}
+	}
+	if PermissionsOf(Principal{Realm: "nobody"}) == nil {
+		t.Error("no permissions are an empty list, for JSON")
+	}
+
+	two := WithPrincipal(WithPrincipal(ctx, Principal{Realm: "a", Roles: []string{"admin"}}), Principal{Realm: "b"})
+	if !Allows(two, "a.admin") || !Allows(two, "b") || Allows(two, "b.admin") || Allows(two, "c") || !Allows(ctx, "public") || Allows(ctx, "a") {
+		t.Error("Allows")
+	}
+	if p, _ := PrincipalOf(two); p.Realm != "a" {
+		t.Errorf("PrincipalOf is the first: %s", p.Realm)
+	}
+}
+{{end -}}

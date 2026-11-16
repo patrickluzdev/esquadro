@@ -2,6 +2,8 @@ package security
 
 import (
 	"slices"
+	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -13,6 +15,26 @@ func TemplateFuncs() template.FuncMap {
 		"securityTable": Table,
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
+		"access":        Access,
+		// goElems is a []string literal without its type, for the values of
+		// a map: {"a", "b"}.
+		"goElems": func(items []string) string {
+			quoted := make([]string, len(items))
+			for i, s := range items {
+				quoted[i] = strconv.Quote(s)
+			}
+			return "{" + strings.Join(quoted, ", ") + "}"
+		},
+		// manyToMany are the relations of e the API links and unlinks.
+		"manyToMany": func(e *project.Entity) []*project.Relation {
+			var out []*project.Relation
+			for _, r := range e.Relations {
+				if r.Kind == project.ManyToMany {
+					out = append(out, r)
+				}
+			}
+			return out
+		},
 	}
 }
 

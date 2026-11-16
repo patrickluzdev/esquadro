@@ -1,0 +1,20 @@
+{{- if realms .Entities}}
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A JWT from POST {{.Options.path}}/<realm>/token, valid {{.Options.token_minutes}} minutes; or a
+        session token, from a sign-in with "cookie": false.
+{{- range realms .Entities}}
+    {{.Entity.Camel}}Session:
+      type: apiKey
+      in: cookie
+      name: {{$.App.Snake}}_{{.Name}}_session
+      description: |
+        The session cookie of a {{.Name}}, from POST {{$.Options.path}}/{{.Name}}/sign-in;
+        named __Host-{{$.App.Snake}}_{{.Name}}_session outside {{index $.Environments 0}}. A
+        request that changes something sends the session's csrfToken in
+        X-CSRF-Token.
+{{- end}}
+{{- end}}

@@ -286,7 +286,8 @@ func (s *Security) openSession(w http.ResponseWriter, r *http.Request, realm str
 		return sessionAnswer{}, err
 	}
 	s.event(ctx, "sign_in", realm, id.String(), true)
-	answer := sessionAnswer{ID: id, Realm: realm, Roles: roles, ExpiresAt: ses.ExpiresAt}
+	answer := sessionAnswer{ID: id, Realm: realm, Roles: roles, ExpiresAt: ses.ExpiresAt,
+		Permissions: PermissionsOf(Principal{Realm: realm, Roles: roles})}
 	if cookie {
 		http.SetCookie(w, s.SessionCookie(realm, token, ses.MaxExpiresAt))
 		answer.CSRFToken = s.CSRFToken(ses.ID)
@@ -301,6 +302,7 @@ type sessionAnswer struct {
 	ID           uuid.UUID `json:"id"`
 	Realm        string    `json:"realm"`
 	Roles        []string  `json:"roles"`
+	Permissions  []string  `json:"permissions"`
 	ExpiresAt    time.Time `json:"expiresAt,omitzero"`
 	CSRFToken    string    `json:"csrfToken,omitempty"`
 	SessionToken string    `json:"sessionToken,omitempty"`
@@ -331,7 +333,7 @@ func (s *Security) session(realm Realm) http.HandlerFunc {
 			edge.Write(w, r, ErrUnauthorized)
 			return
 		}
-		answer := sessionAnswer{ID: p.ID, Realm: p.Realm, Roles: p.Roles}
+		answer := sessionAnswer{ID: p.ID, Realm: p.Realm, Roles: p.Roles, Permissions: PermissionsOf(p)}
 		if p.SessionID != nil {
 			answer.CSRFToken = s.CSRFToken(*p.SessionID)
 		}

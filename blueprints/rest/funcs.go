@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -17,6 +18,7 @@ import (
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"jsonName":         jsonName,
+		"accessLine":       accessLine,
 		"keyName":          func(r *project.Relation) string { return r.Camel + "Id" },
 		"ogenName":         ogenName,
 		"schema":           schema,
@@ -308,4 +310,14 @@ func modulePaths(appModule string, modules []*project.Module) []string {
 		}
 	}
 	return out
+}
+
+// accessLine is who may do op on e, for the operation's description; empty
+// when nothing signs in.
+func accessLine(entities []*project.Entity, e *project.Entity, op string) string {
+	rules := security.Access(entities, e, op)
+	if rules == nil {
+		return ""
+	}
+	return "Who may: " + security.AccessText(rules) + "."
 }
