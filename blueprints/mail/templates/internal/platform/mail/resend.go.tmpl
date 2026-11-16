@@ -1,0 +1,49 @@
+package mail
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+// resend sends by Resend's API. The message's ID is its idempotency key:
+// a retry of the same message is not sent twice.
+type resend struct {
+	key, endpoint string
+	client        *http.Client
+}
+
+func (r *resend) Deliver(ctx context.Context, m Message) error {
+	body, err := json.Marshal(map[string]any{
+		"from": m.From, "to": m.To, "subject": m.Subject, "text": m.Text,
+		"html": m.HTML, "reply_to": m.ReplyTo,
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+r.key)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", m.ID)
+	client := r.client
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 300 {
+		answer, _ := io.ReadAll(io.LimitReader(res.Body, 4<<10))
+		return fmt.Errorf("resend answered %s: %s", res.Status, answer)
+	}
+	return nil
+}

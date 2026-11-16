@@ -1,0 +1,112 @@
+// Package mail sends {{.App.Label}}'s emails: by SMTP, by Resend's API, or
+// into the log, as MAIL_URL says.
+package mail
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/mail"
+	"strings"
+	"uuid"
+)
+
+// Message is an email, written: who it goes to, and its subject and
+// bodies.
+type Message struct {
+	// ID names the message for the provider: a retry of the same message
+	// keeps it, so that Resend does not send it twice.
+	ID      string
+	From    string
+	To      []string
+	ReplyTo string
+	Subject string
+	Text    string
+	// HTML is optional; the text goes along for the readers without it.
+	HTML string
+}
+
+// Transport hands messages to whoever delivers them.
+type Transport interface {
+	Deliver(ctx context.Context, m Message) error
+}
+
+// Config is how the app sends emails.
+type Config struct {
+	// URL is MAIL_URL: smtp://..., resend://... or log://.
+	URL string
+	// From is MAIL_FROM, the sender of every email.
+	From string
+	// Development lets SMTP go without TLS, to the local Mailpit.
+	Development bool
+}
+
+// Mailer sends the app's emails.
+type Mailer struct {
+	transport Transport
+	from      string
+	logger    *slog.Logger
+}
+
+// New returns the mailer of cfg, or what is wrong with it.
+func New(cfg Config, logger *slog.Logger) (*Mailer, error) {
+	from, err := mail.ParseAddress(cfg.From)
+	if err != nil {
+		return nil, fmt.Errorf("mail: MAIL_FROM %q is not an address such as Shop <no-reply@shop.com>", cfg.From)
+	}
+	transport, err := transportOf(cfg.URL, cfg.Development, logger)
+	if err != nil {
+		return nil, err
+	}
+	return &Mailer{transport: transport, from: from.String(), logger: logger}, nil
+}
+
+// NewWith returns a mailer that hands its messages to transport: for tests.
+func NewWith(transport Transport, from string) *Mailer {
+	return &Mailer{transport: transport, from: from}
+}
+
+// Deliver hands a written message to the transport now, from MAIL_FROM
+// unless it says otherwise.
+func (m *Mailer) Deliver(ctx context.Context, msg Message) error {
+	if msg.From == "" {
+		msg.From = m.from
+	}
+	if msg.ID == "" {
+		msg.ID = uuid.NewV7().String()
+	}
+	if err := check(msg); err != nil {
+		return err
+	}
+	if err := m.transport.Deliver(ctx, msg); err != nil {
+		return fmt.Errorf("mail: deliver %q: %w", msg.Subject, err)
+	}
+	return nil
+}
+
+// check refuses a message that is not one: no recipient, an address that
+// is not one, or a line break in a header, which would add headers of its
+// own.
+func check(m Message) error {
+	if len(m.To) == 0 {
+		return errors.New("mail: a message without recipients")
+	}
+	for _, a := range append([]string{m.From}, m.To...) {
+		if _, err := mail.ParseAddress(a); err != nil {
+			return fmt.Errorf("mail: %q is not an address", a)
+		}
+	}
+	if m.ReplyTo != "" {
+		if _, err := mail.ParseAddress(m.ReplyTo); err != nil {
+			return fmt.Errorf("mail: reply-to %q is not an address", m.ReplyTo)
+		}
+	}
+	if strings.ContainsAny(m.Subject+m.ID, "\r\n") {
+		return errors.New("mail: a line break in the subject")
+	}
+	if m.Text == "" {
+		return errors.New("mail: a message without text")
+	}
+	return nil
+}

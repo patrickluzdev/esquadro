@@ -1,0 +1,178 @@
+package mail
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
+	"net"
+	"net/mail"
+	"net/smtp"
+	"net/textproto"
+	"net/url"
+	"strings"
+	"time"
+)
+
+// smtpTransport sends by SMTP: TLS from the start on port 465, STARTTLS on
+// the others; without TLS only when allowed, in development.
+type smtpTransport struct {
+	host, port     string
+	user, password string
+	implicitTLS    bool
+	allowPlain     bool
+	// tlsConfig is nil but in tests, which trust a certificate of theirs.
+	tlsConfig *tls.Config
+}
+
+func smtpTransportOf(u *url.URL, development bool) (*smtpTransport, error) {
+	if u.Hostname() == "" || u.Port() == "" {
+		return nil, fmt.Errorf("mail: MAIL_URL smtp:// needs a host and a port: smtp://user:password@smtp.example.com:587")
+	}
+	t := &smtpTransport{host: u.Hostname(), port: u.Port(), implicitTLS: u.Port() == "465", allowPlain: development}
+	if u.User != nil {
+		t.user = u.User.Username()
+		t.password, _ = u.User.Password()
+	}
+	return t, nil
+}
+
+func (t *smtpTransport) tls() *tls.Config {
+	if t.tlsConfig != nil {
+		return t.tlsConfig
+	}
+	return &tls.Config{ServerName: t.host, MinVersion: tls.VersionTLS12}
+}
+
+func (t *smtpTransport) Deliver(ctx context.Context, m Message) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	addr := net.JoinHostPort(t.host, t.port)
+	var conn net.Conn
+	var err error
+	if t.implicitTLS {
+		conn, err = (&tls.Dialer{Config: t.tls()}).DialContext(ctx, "tcp", addr)
+	} else {
+		conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	}
+	if err != nil {
+		return err
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	c, err := smtp.NewClient(conn, t.host)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	defer c.Close()
+	if !t.implicitTLS {
+		if ok, _ := c.Extension("STARTTLS"); ok {
+			if err := c.StartTLS(t.tls()); err != nil {
+				return err
+			}
+		} else if !t.allowPlain {
+			return errors.New("the server does not offer STARTTLS; outside development, emails go over TLS only")
+		}
+	}
+	if t.user != "" {
+		if err := c.Auth(plainAuth{t.user, t.password}); err != nil {
+			return err
+		}
+	}
+	from, _ := mail.ParseAddress(m.From)
+	if err := c.Mail(from.Address); err != nil {
+		return err
+	}
+	for _, to := range m.To {
+		a, _ := mail.ParseAddress(to)
+		if err := c.Rcpt(a.Address); err != nil {
+			return err
+		}
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	body, err := mimeOf(m, t.host)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(body); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return c.Quit()
+}
+
+// plainAuth is SMTP's PLAIN authentication. Unlike smtp.PlainAuth, which
+// allows it without TLS only to localhost, it trusts Deliver, which allows
+// a connection without TLS only in development (to Mailpit, in compose too).
+type plainAuth struct{ user, password string }
+
+func (a plainAuth) Start(*smtp.ServerInfo) (string, []byte, error) {
+	return "PLAIN", []byte("\x00" + a.user + "\x00" + a.password), nil
+}
+
+func (a plainAuth) Next(_ []byte, more bool) ([]byte, error) {
+	if more {
+		return nil, errors.New("unexpected server challenge")
+	}
+	return nil, nil
+}
+
+// mimeOf writes a message as MIME: its text, and its HTML as an
+// alternative when it has one.
+func mimeOf(m Message, host string) ([]byte, error) {
+	var b bytes.Buffer
+	header := func(k, v string) { fmt.Fprintf(&b, "%s: %s\r\n", k, v) }
+	header("From", m.From)
+	header("To", strings.Join(m.To, ", "))
+	if m.ReplyTo != "" {
+		header("Reply-To", m.ReplyTo)
+	}
+	header("Subject", mime.QEncoding.Encode("utf-8", m.Subject))
+	header("Date", time.Now().Format(time.RFC1123Z))
+	header("Message-ID", "<"+m.ID+"@"+host+">")
+	header("MIME-Version", "1.0")
+	if m.HTML == "" {
+		header("Content-Type", `text/plain; charset="utf-8"`)
+		header("Content-Transfer-Encoding", "quoted-printable")
+		b.WriteString("\r\n")
+		return b.Bytes(), writeQP(&b, m.Text)
+	}
+	parts := multipart.NewWriter(&b)
+	header("Content-Type", `multipart/alternative; boundary="`+parts.Boundary()+`"`)
+	b.WriteString("\r\n")
+	for _, p := range []struct{ kind, body string }{ {"text/plain", m.Text}, {"text/html", m.HTML} } {
+		w, err := parts.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {p.kind + `; charset="utf-8"`},
+			"Content-Transfer-Encoding": {"quoted-printable"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := writeQP(w, p.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := parts.Close(); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+func writeQP(w interface{ Write([]byte) (int, error) }, s string) error {
+	qp := quotedprintable.NewWriter(w)
+	if _, err := qp.Write([]byte(s)); err != nil {
+		return err
+	}
+	return qp.Close()
+}

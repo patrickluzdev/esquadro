@@ -1,0 +1,19 @@
+/// Email: by SMTP (any provider, the local Mailpit included) or Resend's
+/// API, chosen by MAIL_URL in each environment. Modules send emails from
+/// templates of the project; with jobs, each is a job, sealed and retried
+/// until it goes. The security blueprint's emails go out here too. With
+/// compose, Mailpit catches every email in development, at
+/// http://localhost:8025.
+blueprint mail {
+  version "0.1.0"
+
+  /// How emails go: smtp://user:password@host:port (TLS on 465, STARTTLS
+  /// otherwise; without TLS only in development), resend://API_KEY, or
+  /// log:// (into the log). In development, the local Mailpit of
+  /// compose.yaml, or the log.
+  env MAIL_URL string secret required development("{{if uses \"compose\"}}smtp://localhost:{{composePort \"mailpit\" \"1025\"}}{{else}}log://{{end}}")
+  /// Who emails come from: Shop <no-reply@shop.com>.
+  env MAIL_FROM string required development("{{.App.Label}} <no-reply@localhost>")
+  requires app, env
+  optional jobs, compose, domain, security, testcontainers, docker
+}

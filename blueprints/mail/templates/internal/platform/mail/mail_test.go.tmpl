@@ -1,0 +1,254 @@
+package mail
+
+import (
+	"bufio"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/json"
+	"io"
+	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// smtpServer is an SMTP server for the tests: it keeps what it is sent, and
+// offers STARTTLS, or TLS from the start, when given a certificate.
+type smtpServer struct {
+	addr     string
+	mu       sync.Mutex
+	data     []string
+	auth     []string
+	sawTLS   bool
+	starttls *tls.Config
+}
+
+func newSMTPServer(t *testing.T, starttls, implicit *tls.Config) *smtpServer {
+	t.Helper()
+	var l net.Listener
+	var err error
+	if implicit != nil {
+		l, err = tls.Listen("tcp", "127.0.0.1:0", implicit)
+	} else {
+		l, err = net.Listen("tcp", "127.0.0.1:0")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	s := &smtpServer{addr: l.Addr().String(), starttls: starttls, sawTLS: implicit != nil}
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go s.serve(conn)
+		}
+	}()
+	return s
+}
+
+func (s *smtpServer) serve(conn net.Conn) {
+	defer conn.Close()
+	r, w := bufio.NewReader(conn), conn
+	say := func(line string) { io.WriteString(w, line+"\r\n") }
+	say("220 test ESMTP")
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		cmd := strings.ToUpper(strings.TrimSpace(line))
+		switch {
+		case strings.HasPrefix(cmd, "EHLO"):
+			if s.starttls != nil {
+				say("250-test")
+				say("250-STARTTLS")
+				say("250 AUTH PLAIN")
+			} else {
+				say("250-test")
+				say("250 AUTH PLAIN")
+			}
+		case cmd == "STARTTLS":
+			say("220 go ahead")
+			tc := tls.Server(conn, s.starttls)
+			if tc.Handshake() != nil {
+				return
+			}
+			s.mu.Lock()
+			s.sawTLS = true
+			s.mu.Unlock()
+			conn, r, w = tc, bufio.NewReader(tc), tc
+		case strings.HasPrefix(cmd, "AUTH"):
+			s.mu.Lock()
+			s.auth = append(s.auth, strings.TrimSpace(line))
+			s.mu.Unlock()
+			say("235 ok")
+		case strings.HasPrefix(cmd, "MAIL"), strings.HasPrefix(cmd, "RCPT"):
+			say("250 ok")
+		case cmd == "DATA":
+			say("354 go")
+			var b strings.Builder
+			for {
+				l, err := r.ReadString('\n')
+				if err != nil || l == ".\r\n" {
+					break
+				}
+				b.WriteString(l)
+			}
+			s.mu.Lock()
+			s.data = append(s.data, b.String())
+			s.mu.Unlock()
+			say("250 queued")
+		case cmd == "QUIT":
+			say("221 bye")
+			return
+		default:
+			say("250 ok")
+		}
+	}
+}
+
+// testCert is a certificate for 127.0.0.1, and a client config that trusts
+// it.
+func testCert(t *testing.T) (*tls.Config, *tls.Config) {
+	t.Helper()
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "test"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, DNSNames: []string{"localhost"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, _ := x509.ParseCertificate(der)
+	pool := x509.NewCertPool()
+	pool.AddCert(cert)
+	server := &tls.Config{Certificates: []tls.Certificate{ {Certificate: [][]byte{der}, PrivateKey: key} }}
+	return server, &tls.Config{RootCAs: pool, ServerName: "127.0.0.1"}
+}
+
+func smtpMailer(t *testing.T, raw string, development bool, client *tls.Config) *Mailer {
+	t.Helper()
+	m, err := New(Config{URL: raw, From: "Shop <no-reply@shop.example>", Development: development}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.transport.(*smtpTransport).tlsConfig = client
+	return m
+}
+
+var message = Message{To: []string{"Ana <ana@example.com>"}, Subject: "Olá, café", Text: "Seu pedido chegou: https://shop.example/x?a=1&b=2", HTML: "<p>Seu pedido chegou</p>"}
+
+func TestSMTPWithSTARTTLS(t *testing.T) {
+	server, client := testCert(t)
+	s := newSMTPServer(t, server, nil)
+	m := smtpMailer(t, "smtp://user:secret@"+s.addr, false, client)
+	if err := m.Deliver(t.Context(), message); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.sawTLS || len(s.auth) != 1 || len(s.data) != 1 {
+		t.Fatalf("tls %v, auth %v, %d messages", s.sawTLS, s.auth, len(s.data))
+	}
+	got := s.data[0]
+	for _, want := range []string{"From: \"Shop\" <no-reply@shop.example>", "To: Ana <ana@example.com>", "Subject: =?utf-8?q?Ol=C3=A1,_caf=C3=A9?=", "multipart/alternative", "text/html", "Message-ID: <"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestSMTPWithTLSFromTheStart(t *testing.T) {
+	server, client := testCert(t)
+	s := newSMTPServer(t, nil, server)
+	host, _, _ := net.SplitHostPort(s.addr)
+	m := smtpMailer(t, "smtp://"+s.addr, false, client)
+	tr := m.transport.(*smtpTransport)
+	tr.implicitTLS, tr.host = true, host
+	if err := m.Deliver(t.Context(), message); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSMTPWithoutTLSOnlyInDevelopment(t *testing.T) {
+	s := newSMTPServer(t, nil, nil)
+	if err := smtpMailer(t, "smtp://"+s.addr, false, nil).Deliver(t.Context(), message); err == nil || !strings.Contains(err.Error(), "STARTTLS") {
+		t.Fatalf("outside development, without TLS: %v", err)
+	}
+	if err := smtpMailer(t, "smtp://"+s.addr, true, nil).Deliver(t.Context(), message); err != nil {
+		t.Fatalf("development, to Mailpit: %v", err)
+	}
+}
+
+func TestResend(t *testing.T) {
+	var got map[string]any
+	var auth, key string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth, key = r.Header.Get("Authorization"), r.Header.Get("Idempotency-Key")
+		json.NewDecoder(r.Body).Decode(&got)
+		w.Write([]byte(`{"id":"x"}`))
+	}))
+	defer srv.Close()
+	m, err := New(Config{URL: "resend://re_123", From: "Shop <no-reply@shop.example>"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.transport.(*resend).endpoint = srv.URL
+	msg := message
+	msg.ID = "job-42"
+	if err := m.Deliver(t.Context(), msg); err != nil {
+		t.Fatal(err)
+	}
+	if auth != "Bearer re_123" || key != "job-42" || got["subject"] != "Olá, café" || got["html"] == "" {
+		t.Fatalf("auth %q, key %q, body %v", auth, key, got)
+	}
+
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"message":"invalid from"}`, http.StatusUnprocessableEntity)
+	}))
+	defer failing.Close()
+	m.transport.(*resend).endpoint = failing.URL
+	if err := m.Deliver(context.Background(), message); err == nil || !strings.Contains(err.Error(), "invalid from") {
+		t.Fatalf("a refusal: %v", err)
+	}
+}
+
+func TestConfigAndMessagesRefused(t *testing.T) {
+	for _, raw := range []string{"", "http://x", "smtp://nohost", "resend://", "::"} {
+		if _, err := New(Config{URL: raw, From: "a@b.example"}, nil); err == nil {
+			t.Errorf("MAIL_URL %q passed", raw)
+		}
+	}
+	if _, err := New(Config{URL: "log://", From: "not an address"}, nil); err == nil {
+		t.Error("a bad MAIL_FROM passed")
+	}
+	m, _ := New(Config{URL: "log://", From: "a@b.example"}, nil)
+	for _, bad := range []Message{
+		{To: nil, Subject: "x", Text: "x"},
+		{To: []string{"nope"}, Subject: "x", Text: "x"},
+		{To: []string{"a@b.example"}, Subject: "x\r\nBcc: evil@example.com", Text: "x"},
+		{To: []string{"a@b.example\r\nBcc: evil@example.com"}, Subject: "x", Text: "x"},
+		{To: []string{"a@b.example"}, Subject: "x"},
+	} {
+		if err := m.Deliver(t.Context(), bad); err == nil {
+			t.Errorf("%+v passed", bad)
+		}
+	}
+	if err := m.Deliver(t.Context(), message); err != nil {
+		t.Fatalf("log: %v", err)
+	}
+}
