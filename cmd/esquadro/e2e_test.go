@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -148,6 +149,26 @@ func TestLifecycle(t *testing.T) {
 		t.Fatalf("the new product does not follow the new model: %v", added)
 	}
 	refused := e.call("POST", "/products", fmt.Sprintf(`{"name":"Copy","price":"1","category_id":%q,"sku":"EM-1"}`, category["id"]), 422)
+	// Lists as the model declares: ordered, filtered, searched, by page.
+	names := func(page map[string]any) []string {
+		var out []string
+		for _, item := range page["items"].([]any) {
+			out = append(out, item.(map[string]any)["name"].(string))
+		}
+		return out
+	}
+	if got := names(e.call("GET", "/products?sort=-price", "", 200)); !slices.Equal(got, []string{"Dune", "Emma"}) {
+		t.Fatalf("by price: %v", got)
+	}
+	if got := names(e.call("GET", "/products?price_max=20", "", 200)); !slices.Equal(got, []string{"Emma"}) {
+		t.Fatalf("up to 20: %v", got)
+	}
+	if got := names(e.call("GET", "/products?q=dune", "", 200)); !slices.Equal(got, []string{"Dune"}) {
+		t.Fatalf("search: %v", got)
+	}
+	if page := e.call("GET", "/products?page=1&per_page=1", "", 200); page["total"] != 2.0 || page["total_pages"] != 2.0 {
+		t.Fatalf("by page: %v", page)
+	}
 	if !strings.Contains(fmt.Sprint(refused["errors"]), "taken") {
 		t.Fatalf("a taken sku was not refused: %v", refused)
 	}
