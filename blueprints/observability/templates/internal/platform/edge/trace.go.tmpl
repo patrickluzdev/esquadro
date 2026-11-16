@@ -17,24 +17,31 @@ import (
 func Trace(next http.Handler) http.Handler {
 	named := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
+		// Named here, once served: a middleware may have passed on a copy
+		// of the request, which the router wrote its pattern on.
 		if route := RouteOf(r.Context()); route != "" {
-			trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("http.route", route))
+			span := trace.SpanFromContext(r.Context())
+			span.SetAttributes(attribute.String("http.route", route))
+			span.SetName(spanName(r))
 		}
 	})
 	return otelhttp.NewHandler(named, "http.request",
-		// The name is set again once served, when the route is known.
-		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
-			route := RouteOf(r.Context())
-			switch {
-			case route == "":
-				return r.Method
-			case !strings.Contains(route, " "):
-				// A pattern without a method, such as a mounted prefix.
-				return r.Method + " " + route
-			}
-			return route
-		}),
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return spanName(r) }),
 		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" }),
 	)
+}
+
+// spanName is the name of a request's span: its route, such as
+// "GET /products/{id}", once known; its method before.
+func spanName(r *http.Request) string {
+	route := RouteOf(r.Context())
+	switch {
+	case route == "":
+		return r.Method
+	case !strings.Contains(route, " "):
+		// A pattern without a method, such as a mounted prefix.
+		return r.Method + " " + route
+	}
+	return route
 }
 {{end -}}
