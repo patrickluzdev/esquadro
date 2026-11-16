@@ -116,3 +116,14 @@ func OwnerOf(entities []*project.Entity, e *project.Entity) (Owner, string) {
 	}
 	return Owner{}, fmt.Sprintf("%s has more than one relation to a principal (%s): say which one owns it, e.g. @security(owner %s, ...)", e.Raw, strings.Join(names, ", "), names[0])
 }
+
+// OwnerUsed is the owner of e's records when one of its rules is owner.
+func OwnerUsed(entities []*project.Entity, e *project.Entity) (Owner, bool) {
+	for _, op := range []string{"list", "read", "create", "update", "delete"} {
+		if slices.Contains(Access(entities, e, op), "owner") {
+			o, why := OwnerOf(entities, e)
+			return o, why == ""
+		}
+	}
+	return Owner{}, false
+}

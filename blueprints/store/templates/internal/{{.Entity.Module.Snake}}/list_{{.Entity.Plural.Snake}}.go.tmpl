@@ -25,6 +25,29 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after
 	if err != nil {
 		return {{$e.Pascal}}Page{}, err
 	}
+	return {{$e.Camel}}PageOf(rows, limit), nil
+}
+{{- if ownerColumn .Entities $e}}
+
+// List{{$e.Plural.Pascal}}OwnedBy is List{{$e.Plural.Pascal}} of the {{$e.Plural.Snake}} that belong to
+// owner, for security's owner rule.
+func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}OwnedBy(ctx context.Context, owner, after uuid.UUID, limit int) ({{$e.Pascal}}Page, error) {
+	limit = min(max(limit, 1), Max{{$e.Pascal}}Page)
+	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Plural.Pascal}}OwnedBy(ctx, sqlgen.List{{$e.Plural.Pascal}}OwnedByParams{
+		OwnerID:  postgres.UUID(owner),
+		After:    postgres.UUID(after),
+		PageSize: int32(limit + 1),
+	})
+	if err != nil {
+		return {{$e.Pascal}}Page{}, err
+	}
+	return {{$e.Camel}}PageOf(rows, limit), nil
+}
+{{- end}}
+
+// {{$e.Camel}}PageOf is a page of up to limit rows, with the cursor of the
+// next when there is one more.
+func {{$e.Camel}}PageOf(rows []sqlgen.{{sqlcModel $e (optionsOf "postgres")}}, limit int) {{$e.Pascal}}Page {
 	page := {{$e.Pascal}}Page{ {{$e.Plural.Pascal}}: make([]{{$e.Pascal}}, 0, min(len(rows), limit)) }
 	for i, row := range rows {
 		if i == limit {
@@ -33,5 +56,5 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, after
 		}
 		page.{{$e.Plural.Pascal}} = append(page.{{$e.Plural.Pascal}}, {{$e.Camel}}Of(row))
 	}
-	return page, nil
+	return page
 }

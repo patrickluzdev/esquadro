@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints/postgres"
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -18,15 +19,40 @@ import (
 // opts is always the template's .Options, the postgres blueprint's options.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"pgTable":         pgTable,
-		"pgColumn":        pgColumn,
-		"sqlcModel":       sqlcModel,
-		"sqlcField":       sqlcField,
-		"sqlcIn":          sqlcIn,
-		"sqlcOut":         sqlcOut,
-		"sqlcEnum":        sqlcEnum,
-		"ownSchema":       ownSchema,
-		"keyColumn":       func(r *project.Relation) string { return r.Snake + "_id" },
+		"pgTable":   pgTable,
+		"pgColumn":  pgColumn,
+		"sqlcModel": sqlcModel,
+		"sqlcField": sqlcField,
+		"sqlcIn":    sqlcIn,
+		"sqlcOut":   sqlcOut,
+		"sqlcEnum":  sqlcEnum,
+		"ownSchema": ownSchema,
+		"keyColumn": func(r *project.Relation) string { return r.Snake + "_id" },
+		// ownerField is the Go field of the owner of an entity's records:
+		// its relation's key, or ID in a principal; empty without.
+		"ownerField": func(entities []*project.Entity, e *project.Entity) string {
+			o, ok := security.OwnerUsed(entities, e)
+			switch {
+			case !ok:
+				return ""
+			case o.Relation == nil:
+				return "ID"
+			}
+			return o.Relation.Pascal + "ID"
+		},
+		// ownerColumn is the column of the owner of an entity's records,
+		// when a rule of security is owner: its relation's key, or id in a
+		// principal; empty without.
+		"ownerColumn": func(entities []*project.Entity, e *project.Entity) string {
+			o, ok := security.OwnerUsed(entities, e)
+			switch {
+			case !ok:
+				return ""
+			case o.Relation == nil:
+				return "id"
+			}
+			return postgres.Ident(o.Relation.Snake + "_id")
+		},
 		"keyField":        func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
 		"keyIn":           keyIn,
 		"keyOut":          keyOut,
