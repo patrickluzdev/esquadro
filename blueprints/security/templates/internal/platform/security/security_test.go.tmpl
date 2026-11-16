@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -61,11 +63,11 @@ func TestHashAndVerify(t *testing.T) {
 }
 
 func TestPasswordPolicy(t *testing.T) {
-	p := PasswordPolicy{Min: 12, Max: 128, Blocklist: "common"}
+	p := PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists", Lists: map[string]bool{"senhasecreta1": true}}
 	for password, reason := range map[string]string{
 		"short":                  "too_short",
 		strings.Repeat("a", 129): "too_long",
-		"password1234":           "common",
+		"SenhaSecreta1":          "common",
 		"aaaaaaaaaaaa":           "common",
 		"123456789012":           "common",
 		"qwertyuiopas":           "common",
@@ -83,8 +85,17 @@ func TestPasswordPolicy(t *testing.T) {
 	if err := p.Check(context.Background(), "ação 🔐 açaí ok!"); err != nil {
 		t.Fatalf("unicode and spaces count, and are allowed: %v", err)
 	}
-	if err := (PasswordPolicy{Min: 12, Max: 128, Blocklist: "none"}).Check(context.Background(), "password1234"); err != nil {
+	if err := (PasswordPolicy{Min: 12, Max: 128, Blocklist: "none"}).Check(context.Background(), "aaaaaaaaaaaa"); err != nil {
 		t.Fatalf("no blocklist: %v", err)
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "br.txt"), []byte("# Brazil\nFlamengo2026\n\nsenha@mudar\n"), 0o644)
+	lists, err := ReadPasswordLists(filepath.Join(dir, "br.txt"))
+	if err != nil || !lists["flamengo2026"] || !lists["senha@mudar"] || len(lists) != 2 {
+		t.Fatalf("lists: %v %v", lists, err)
+	}
+	if _, err := ReadPasswordLists(filepath.Join(dir, "nope.txt")); err == nil {
+		t.Fatal("a missing list passed")
 	}
 }
 

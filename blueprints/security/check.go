@@ -18,7 +18,7 @@ var (
 	Signups    = []string{"open", "invite", "closed"}
 	Providers  = []string{"password", "google", "github"}
 	Verify     = []string{"required", "optional", "off"}
-	Blocklists = []string{"none", "common", "pwned"}
+	Blocklists = []string{"none", "lists", "pwned"}
 	Operations = []string{"list", "read", "create", "update", "delete", "write"}
 )
 

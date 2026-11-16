@@ -13,6 +13,10 @@
 		TokenMinutes: {{.Options.token_minutes}}, Issuer: {{printf "%q" .Options.public_url}},
 		Argon2MemoryKiB: {{.Options.argon2_memory_kib}}, Argon2Iterations: {{.Options.argon2_iterations}}, Argon2Parallelism: {{.Options.argon2_parallelism}},
 		LockoutAttempts: {{.Options.lockout_attempts}}, LockoutMinutes: {{.Options.lockout_minutes}},
+		LimitAttempts: d.config.Env != "{{index .Environments 0}}",
+{{- with strs .Options.password_lists}}
+		PasswordLists: {{goStrings .}},
+{{- end}}
 	}, d.logger)
 	if err != nil {
 		release()

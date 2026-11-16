@@ -14,6 +14,9 @@ import (
 // Locked is how long sign-ins under any of the keys are refused: an
 // account ("account:<realm>:<email>") or an address ("ip:<address>").
 func (s *Security) Locked(ctx context.Context, keys ...string) (time.Duration, error) {
+	if !s.cfg.LimitAttempts {
+		return 0, nil
+	}
 	var until *time.Time
 	err := s.db.QueryRow(ctx, `SELECT max(locked_until) FROM {{$attempts}} WHERE key = ANY($1)`, keys).Scan(&until)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -28,6 +31,9 @@ func (s *Security) Locked(ctx context.Context, keys ...string) (time.Duration, e
 // Failed counts a failed sign-in under key; after limit of them within the
 // lockout window, the key is locked for the lockout's minutes.
 func (s *Security) Failed(ctx context.Context, key string, limit int) error {
+	if !s.cfg.LimitAttempts {
+		return nil
+	}
 	now := s.now()
 	window := time.Duration(s.cfg.LockoutMinutes) * time.Minute
 	_, err := s.db.Exec(ctx, `INSERT INTO {{$attempts}} AS a (key, count, window_start) VALUES ($1, 1, $2)

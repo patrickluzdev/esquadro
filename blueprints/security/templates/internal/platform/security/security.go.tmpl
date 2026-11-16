@@ -37,6 +37,11 @@ type Config struct {
 
 	Argon2MemoryKiB, Argon2Iterations, Argon2Parallelism int
 	LockoutAttempts, LockoutMinutes                      int
+	// LimitAttempts counts failed sign-ins and locks; off in development,
+	// where trying again should never be in the way.
+	LimitAttempts bool
+	// PasswordLists are files of passwords to refuse.
+	PasswordLists []string
 }
 
 // Security holds what the security of the app works with.
@@ -47,6 +52,7 @@ type Security struct {
 	csrfKey []byte
 	keyKey  []byte
 	keys    keyCache
+	lists   map[string]bool
 	logger  *slog.Logger
 	now     func() time.Time
 }
@@ -64,8 +70,12 @@ func New(db *pgxpool.Pool, cfg Config, logger *slog.Logger) (*Security, error) {
 	if err != nil {
 		return nil, err
 	}
+	lists, err := ReadPasswordLists(cfg.PasswordLists...)
+	if err != nil {
+		return nil, err
+	}
 	return &Security{
-		db: db, cfg: cfg, csrfKey: csrfKey, keyKey: keyKey, logger: logger, now: time.Now,
+		db: db, cfg: cfg, csrfKey: csrfKey, keyKey: keyKey, lists: lists, logger: logger, now: time.Now,
 		hasher: Hasher{
 			Memory: uint32(cfg.Argon2MemoryKiB), Iterations: uint32(cfg.Argon2Iterations),
 			Parallelism: uint8(cfg.Argon2Parallelism), Pepper: []byte(cfg.Pepper),

@@ -16,7 +16,7 @@ blueprint security
 ## Works with
 
 - **Requires** [app](../app/), [env](../env/), [domain](../domain/), [http](../http/), [postgres](../postgres/), [migrations](../migrations/): the app must use them too.
-- **Works with** [jobs](../jobs/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/) when the app uses them.
+- **Works with** [jobs](../jobs/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/), [docker](../docker/) when the app uses them.
 
 ## Options
 
@@ -36,13 +36,14 @@ blueprint security
 | `rotate_keys_days` | int | `0` | Days between rotations of the JWT signing key, with jobs; 0 is never. |
 | `password_min` | int | `12` | The shortest password. NIST asks for 15 when the password is the only factor. |
 | `password_max` | int | `128` |  |
-| `password_blocklist` | name | `"common"` | none, common (a built-in list) or pwned (the list and Pwned Passwords). |
+| `password_blocklist` | name | `"none"` | none, lists (the passwords of password_lists, and those made of a sequence, a repetition, the app's name or the person's email) or pwned (all that, and Pwned Passwords). |
+| `password_lists` | list | `[]` | Files of passwords to refuse, one per line, read when the app starts (relative to where it runs): lists for the language and the country of its users. |
 | `pwned_fail` | name | `"open"` | open or closed: whether a password may be set when Pwned Passwords does not answer. |
 | `argon2_memory_kib` | int | `19456` | Argon2id's cost; OWASP's minimum by default. |
 | `argon2_iterations` | int | `2` |  |
 | `argon2_parallelism` | int | `1` |  |
 | `pepper` | bool | `false` | HMAC every password hash with SECURITY_PEPPER, kept out of the database. Changing the pepper means resetting every password. |
-| `lockout_attempts` | int | `5` | Failed sign-ins before an account is locked, and for how long. |
+| `lockout_attempts` | int | `5` | Failed sign-ins before an account is locked, and for how long; never in development. |
 | `lockout_minutes` | int | `15` |  |
 
 ```esquadro

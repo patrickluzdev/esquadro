@@ -5,10 +5,10 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha1"
-	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,10 +20,14 @@ import (
 // with no composition rules and no expiry.
 type PasswordPolicy struct {
 	Min, Max int
-	// Blocklist is none, common (a list of common passwords) or pwned (the
-	// list and Pwned Passwords, which only ever sees the first five
+	// Blocklist is none, lists (the passwords of Lists, and those made of a
+	// sequence, a repetition, the app's name or the person's email) or pwned
+	// (all that, and Pwned Passwords, which only ever sees the first five
 	// characters of the password's SHA-1).
 	Blocklist string
+	// Lists are the passwords refused, lower case: the app's own lists, for
+	// the language and the country of its users.
+	Lists map[string]bool
 	// PwnedFailOpen accepts a password when Pwned Passwords does not answer.
 	PwnedFailOpen bool
 	// Client asks Pwned Passwords; http.DefaultClient when nil.
@@ -31,7 +35,8 @@ type PasswordPolicy struct {
 }
 
 // WeakPassword is a password the policy refuses, and why: too_short,
-// too_long, common or breached.
+// too_long, common (in a list, or made of a sequence, a repetition or a
+// name) or breached.
 type WeakPassword struct{ Reason string }
 
 func (e *WeakPassword) Error() string { return "security: weak password: " + e.Reason }
@@ -51,7 +56,7 @@ func (p PasswordPolicy) Check(ctx context.Context, password string, context ...s
 		return nil
 	}
 	lower := strings.ToLower(password)
-	if commonPasswords[lower] || repetitive(lower) {
+	if p.Lists[lower] || repetitive(lower) {
 		return &WeakPassword{Reason: "common"}
 	}
 	for _, c := range context {
@@ -128,17 +133,26 @@ func (p PasswordPolicy) pwned(ctx context.Context, password string) (bool, error
 	return false, s.Err()
 }
 
-//go:embed common_passwords.txt
-var commonPasswordsText string
-
-// commonPasswords are passwords too common to use, lower case.
-var commonPasswords = func() map[string]bool {
+// ReadPasswordLists reads lists of passwords to refuse: files with one
+// password per line, # comments.
+func ReadPasswordLists(paths ...string) (map[string]bool, error) {
 	m := map[string]bool{}
-	for line := range strings.Lines(commonPasswordsText) {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
-			m[strings.ToLower(line)] = true
+	for _, path := range paths {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("security: a password list: %w", err)
+		}
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			if line := strings.TrimSpace(s.Text()); line != "" && !strings.HasPrefix(line, "#") {
+				m[strings.ToLower(line)] = true
+			}
+		}
+		f.Close()
+		if err := s.Err(); err != nil {
+			return nil, fmt.Errorf("security: %s: %w", path, err)
 		}
 	}
-	return m
-}()
+	return m, nil
+}
 {{end -}}

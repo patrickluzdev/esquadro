@@ -1,0 +1,7 @@
+{{- if and (realms .Entities) (strs .Options.password_lists)}}
+# The lists of passwords security refuses, read from where the app runs.
+WORKDIR /app
+{{- range strs .Options.password_lists}}
+COPY {{.}} /app/{{.}}
+{{- end}}
+{{- end}}
