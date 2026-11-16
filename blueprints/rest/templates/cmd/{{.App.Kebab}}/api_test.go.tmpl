@@ -133,6 +133,54 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 	}
 }
 
+// TestAPI{{.Plural.Pascal}}Patch changes a {{lower .Label}} by PATCH: nothing sent changes
+// nothing, and an old version is refused.
+func TestAPI{{.Plural.Pascal}}Patch(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1), apigen.Create{{$P}}Params{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	same, err := c.Patch{{$P}}(ctx, &apigen.{{$P}}Changes{}, apigen.Patch{{$P}}Params{ {{- $id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}}})
+	if err != nil || same.Version != created.Version {
+		t.Fatalf("nothing to change: %+v, %v", same, err)
+	}
+	_, err = c.Patch{{$P}}(ctx, &apigen.{{$P}}Changes{}, apigen.Patch{{$P}}Params{ {{- $id}}: created.ID, IfMatch: apigen.NewOptString(`"99"`)})
+	if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != 412 {
+		t.Fatalf("an old version: %v, want 412", err)
+	}
+{{- $req := ""}}{{range inRequest $e}}{{if and (not $req) .Required (clearable .)}}{{$req = jsonName .}}{{end}}{{end}}
+{{- if $req}}
+
+	// A required field sent as null is refused as missing.
+	req, _ := http.NewRequest("PATCH", srv.URL+"/api/v1/{{.Plural.Kebab}}/"+created.ID.String(), strings.NewReader(`{"{{$req}}": null}`))
+	req.Header.Set("Content-Type", "application/json")
+{{- if ifMatchRequired $e $.Options}}
+	req.Header.Set("If-Match", "*")
+{{- end}}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var doc struct {
+		Errors []struct {
+			Field string `json:"field"`
+			Code  string `json:"code"`
+		} `json:"errors"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&doc); err != nil || res.StatusCode != 422 || len(doc.Errors) != 1 || doc.Errors[0].Code != "required" {
+		t.Fatalf("null for {{$req}}: %d %+v %v", res.StatusCode, doc, err)
+	}
+{{- end}}
+}
+
 // TestAPI{{.Plural.Pascal}}IfMatch changes a {{lower .Label}} with the ETag it was read with,
 // and is refused with an older one.
 func TestAPI{{.Plural.Pascal}}IfMatch(t *testing.T) {

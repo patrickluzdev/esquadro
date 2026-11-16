@@ -35,6 +35,45 @@ type New{{$e.Pascal}} struct {
 	{{.Pascal}}ID uuid.UUID
 {{- end}}{{end}}
 }
+
+// {{$e.Pascal}}Changes are changes to {{if eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower $e.Label}}: each field not nil is
+// set (to its zero value, to empty it); the rest stay as they are.
+type {{$e.Pascal}}Changes struct {
+{{- range $e.Fields}}{{if not .Implicit}}
+	{{.Pascal}} *{{goType .}}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+	{{.Pascal}}ID *uuid.UUID
+{{- end}}{{end}}
+}
+
+// Apply is x with the changes c makes, as it would be written again.
+func (c {{$e.Pascal}}Changes) Apply(x {{$e.Pascal}}) New{{$e.Pascal}} {
+	n := New{{$e.Pascal}}{
+{{- range $e.Fields}}{{if not .Implicit}}
+		{{.Pascal}}: x.{{.Pascal}},
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+		{{.Pascal}}ID: x.{{.Pascal}}ID,
+{{- end}}{{end}}
+	}
+{{- range $e.Fields}}{{if not .Implicit}}
+	if c.{{.Pascal}} != nil {
+		n.{{.Pascal}} = *c.{{.Pascal}}
+	}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+	if c.{{.Pascal}}ID != nil {
+		n.{{.Pascal}}ID = *c.{{.Pascal}}ID
+	}
+{{- end}}{{end}}
+	return n
+}
+
+// Empty reports whether c changes nothing.
+func (c {{$e.Pascal}}Changes) Empty() bool {
+	return {{$first := true}}{{range $e.Fields}}{{if not .Implicit}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{if $first}}true{{end}}
+}
 {{- $defaults := false}}
 {{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end}}
 {{- if $defaults}}

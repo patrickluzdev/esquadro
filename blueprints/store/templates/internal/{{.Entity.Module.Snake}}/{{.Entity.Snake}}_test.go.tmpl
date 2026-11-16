@@ -11,7 +11,8 @@ func Test{{$e.Pascal}}UseCases(t *testing.T) {
 }
 {{- else}}
 
-{{importBlock "context" "errors" "testing" "uuid" (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+{{- $texts := textFields $e}}
+{{importBlock "context" "errors" "testing" "uuid" (and $texts "reflect") (and (gt (len $texts) 1) "sync") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
 // given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
 // first; i tells records apart. Change the values freely: esquadro wrote
 // them from the rules in the .esq file.
@@ -203,7 +204,56 @@ func TestUpdate{{$e.Pascal}}(t *testing.T) {
 	}
 }
 
-func TestDelete{{$e.Pascal}}(t *testing.T) {
+{{if $texts}}{{$f := index $texts 0 -}}
+// TestPatch{{$e.Pascal}} changes one field of a {{lower $e.Label}} and keeps the rest.
+func TestPatch{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := given{{$e.Pascal}}(t, {{$r}}, 2)
+	patched, err := {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &other.{{$f.Pascal}}}, nil)
+	if err != nil || patched.{{$f.Pascal}} != other.{{$f.Pascal}} || patched.Version != created.Version+1 {
+		t.Fatalf("patch: %+v, %v", patched, err)
+	}
+	keep := {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &created.{{$f.Pascal}}}
+	if got, want := keep.Apply(patched), keep.Apply(created); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the other fields changed: %+v, want %+v", got, want)
+	}
+	if same, err := {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{}, nil); err != nil || same.Version != patched.Version {
+		t.Fatalf("no changes: %+v, %v", same, err)
+	}
+	if _, err := {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, created.Version, keep, nil); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}Changed) {
+		t.Fatalf("patching an old version: %v", err)
+	}
+	if _, err := {{$r}}.Patch{{$e.Pascal}}(ctx, uuid.NewV7(), 0, keep, nil); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("patching a missing {{lower $e.Label}}: %v", err)
+	}
+{{- if gt (len $texts) 1}}{{$g := index $texts 1}}
+
+	// Two at once, on different fields: both are kept.
+	third := given{{$e.Pascal}}(t, {{$r}}, 3)
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	wg.Go(func() {
+		_, errs[0] = {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &third.{{$f.Pascal}}}, nil)
+	})
+	wg.Go(func() {
+		_, errs[1] = {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $g.Pascal}}: &third.{{$g.Pascal}}}, nil)
+	})
+	wg.Wait()
+	read, err := {{$r}}.Read{{$e.Pascal}}(ctx, created.ID)
+	if errs[0] != nil || errs[1] != nil || err != nil || read.{{$f.Pascal}} != third.{{$f.Pascal}} || read.{{$g.Pascal}} != third.{{$g.Pascal}} {
+		t.Fatalf("two at once: %+v, %v", read, errors.Join(append(errs, err)...))
+	}
+{{- end}}
+}
+
+{{end}}func TestDelete{{$e.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})

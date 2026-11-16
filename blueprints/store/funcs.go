@@ -77,15 +77,24 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return postgres.Ident(o.Relation.Snake + "_id")
 		},
-		"keyField":        func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
-		"keyIn":           keyIn,
-		"keyOut":          keyOut,
-		"needs":           needs,
-		"constraint":      constraint,
-		"pgIdent":         postgres.Ident,
-		"writable":        writable,
-		"refusals":        refusals,
-		"contains":        strings.Contains,
+		"keyField":   func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
+		"keyIn":      keyIn,
+		"keyOut":     keyOut,
+		"needs":      needs,
+		"constraint": constraint,
+		"pgIdent":    postgres.Ident,
+		"writable":   writable,
+		"refusals":   refusals,
+		"contains":   strings.Contains,
+		"textFields": func(e *project.Entity) []*project.Field {
+			var out []*project.Field
+			for _, f := range e.Fields {
+				if !f.Implicit && (f.Type == project.TypeString || f.Type == project.TypeText) {
+					out = append(out, f)
+				}
+			}
+			return out
+		},
 		"canSample":       canSample,
 		"parents":         parents,
 		"sample":          sample,

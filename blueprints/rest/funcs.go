@@ -72,6 +72,8 @@ func TemplateFuncs() template.FuncMap {
 		"keyName":          keyName,
 		"ogenName":         ogenName,
 		"schema":           schema,
+		"changeSchema":     changeSchema,
+		"clearable":        clearable,
 		"enumName":         enumName,
 		"inRequest":        inRequest,
 		"keys":             keys,
@@ -101,8 +103,6 @@ func TemplateFuncs() template.FuncMap {
 	}
 }
 
-// jsonName is a field's property name in the contract: camelCase, as the
-// rest of a JSON API.
 // jsonName is a field's name in the API's JSON: snake_case.
 func jsonName(f *project.Field) string { return f.Snake }
 
@@ -176,6 +176,26 @@ func schema(f *project.Field) string {
 		return fmt.Sprintf("{$ref: \"#/components/schemas/%s\"}", enumName(f.Enum))
 	}
 	return "{type: string}"
+}
+
+// clearable reports whether a PATCH may send f as null: a field without a
+// default, which null empties (or, when required, is refused as such).
+func clearable(f *project.Field) bool { return f.Default == nil && f.Type != project.TypeJSON }
+
+// changeSchema is f's schema in a PATCH body: null for a clearable one.
+func changeSchema(f *project.Field) string {
+	if !clearable(f) {
+		return schema(f)
+	}
+	if f.Type == project.TypeEnum {
+		values := make([]string, len(f.Enum.Values))
+		for i, v := range f.Enum.Values {
+			values[i] = fmt.Sprintf("%q", v.Raw)
+		}
+		return fmt.Sprintf("{type: string, enum: [%s], nullable: true}", strings.Join(values, ", "))
+	}
+	s := schema(f)
+	return strings.TrimSuffix(s, "}") + ", nullable: true}"
 }
 
 // inRequest lists the fields a NewX carries: the declared ones.

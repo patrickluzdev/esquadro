@@ -1,14 +1,22 @@
 {{- if and (policies .Entities) (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "encoding/json" "net/http" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
+{{importBlock "context" "encoding/json" "io" "net/http" "strings" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
 // call answers the status of a request as who, and the IDs of the list it
 // answered, if any.
 func call(t *testing.T, method, url, who string) (int, map[string]bool) {
 	t.Helper()
-	req, err := http.NewRequest(method, url, nil)
+	var body io.Reader
+	if method == "PATCH" {
+		body = strings.NewReader("{}")
+	}
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("If-Match", "*")
 	}
 	res, err := asTestPrincipal(who).Do(req)
 	if err != nil {
@@ -102,8 +110,13 @@ func TestAPIAccess(t *testing.T) {
 			_ = owner
 {{- end}}
 
-			// Refusals only: a delete let through would change what the
+			// Refusals only: a change let through would change what the
 			// next one sees.
+			if read && !policy.Update(as(who), stored) {
+				if got, _ := call(t, "PATCH", url+"/"+stored.ID.String(), who); got != refused(who) {
+					t.Errorf("patch as %s: %d, want %d", who, got, refused(who))
+				}
+			}
 			if read && !policy.Delete(as(who), stored) {
 				if got, _ := call(t, "DELETE", url+"/"+stored.ID.String(), who); got != refused(who) {
 					t.Errorf("delete as %s: %d, want %d", who, got, refused(who))

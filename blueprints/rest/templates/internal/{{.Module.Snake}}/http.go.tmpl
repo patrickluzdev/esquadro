@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -196,6 +196,45 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 	return &answer, nil
 }
 
+func (h HTTP) Patch{{$P}}(ctx context.Context, req *apigen.{{$P}}Changes, params apigen.Patch{{$P}}Params) (*apigen.{{$P}}, error) {
+{{- if $pol}}
+	if _, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
+	c, unread := {{.Camel}}ChangesOf(req)
+	if unread != nil {
+		return nil, problemOf(&InvalidFields{Fields: unread})
+	}
+	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
+	if err != nil {
+		return nil, err
+	}
+{{- if $pol}}
+	guard := func(stored {{$P}}, n *New{{$P}}) error {
+{{- if $claims}}
+		{{$P}}Policy{}.Claim(ctx, n, &stored)
+{{- end}}
+		if !({{$P}}Policy{}).Read(ctx, stored) {
+			return Err{{$P}}NotFound
+		}
+		if !({{$P}}Policy{}).Update(ctx, stored) {
+			return security.Refusal(ctx)
+		}
+		return nil
+	}
+	updated, err := h.{{$p}}.Patch{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, c, guard)
+{{- else}}
+	updated, err := h.{{$p}}.Patch{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, c, nil)
+{{- end}}
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	edge.SetETag(ctx, updated.Version)
+	answer := {{.Camel}}Answer(updated)
+	return &answer, nil
+}
+
 func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
 {{- if $pol}}
 	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
@@ -367,6 +406,60 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 {{- end}}
 {{- end}}
 	return n, invalid
+}
+
+// {{.Camel}}ChangesOf reads the changes a PATCH sends.
+func {{.Camel}}ChangesOf(req *apigen.{{$P}}Changes) ({{$P}}Changes, []FieldError) {
+	var c {{$P}}Changes
+	var invalid []FieldError
+{{- range inRequest $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "c.%s" .Pascal}}
+{{- if eq .Type "json"}}
+	if len(req.{{$g}}) > 0 {
+		{{$x}} = new(json.RawMessage(req.{{$g}}))
+	}
+{{- else}}
+{{- if clearable .}}
+	if req.{{$g}}.Set && req.{{$g}}.Null {
+{{- if .Required}}
+		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "required"})
+{{- else}}
+		{{$x}} = edge.Emptied({{$x}})
+{{- end}}
+	} else if req.{{$g}}.Set {
+		v := req.{{$g}}.Value
+{{- else}}
+	if v, ok := req.{{$g}}.Get(); ok {
+{{- end}}
+{{- if eq .Type "decimal"}}
+		if d, err := decimal.NewFromString(v); err == nil {
+			{{$x}} = &d
+		} else {
+			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+		}
+{{- else if eq .Type "uuid"}}
+		{{$x}} = new(uuid.UUID(v))
+{{- else if eq .Type "enum"}}
+		{{$x}} = new({{.Enum.Pascal}}(v))
+{{- else}}
+		{{$x}} = &v
+{{- end}}
+	}
+{{- end}}
+{{- end}}
+{{- range keys $e}}{{$g := ogenName (keyName .)}}
+{{- if .Required}}
+	if v, ok := req.{{$g}}.Get(); ok {
+		c.{{.Pascal}}ID = new(uuid.UUID(v))
+	}
+{{- else}}
+	if req.{{$g}}.Set && req.{{$g}}.Null {
+		c.{{.Pascal}}ID = new(uuid.Nil())
+	} else if req.{{$g}}.Set {
+		c.{{.Pascal}}ID = new(uuid.UUID(req.{{$g}}.Value))
+	}
+{{- end}}
+{{- end}}
+	return c, invalid
 }
 
 // refuse{{$P}} joins the fields the contract could not read with those the

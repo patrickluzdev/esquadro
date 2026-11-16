@@ -185,6 +185,35 @@ paths:
                 $ref: "#/components/schemas/{{.Pascal}}"
         default:
           $ref: "#/components/responses/Problem"
+    patch:
+      operationId: patch{{.Pascal}}
+      summary: {{quote (printf "Change some fields of a %s" (lower .Label))}}
+      description: |
+        Changes only the fields sent: one left out stays as it is, and null
+        empties one that may be empty. Without If-Match, a change someone else
+        made meanwhile is kept.
+        Codes: `invalid_fields` (422); `not_found` (404); `invalid_request` (400).
+{{- with accessLine $.Entities $e "update"}}
+        {{.}}
+{{- end}}
+      tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/{{.Pascal}}Changes"
+      responses:
+        "200":
+          description: {{quote (printf "The saved %s." (lower .Label))}}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{.Pascal}}"
+        default:
+          $ref: "#/components/responses/Problem"
     delete:
       operationId: delete{{.Pascal}}
       summary: {{quote (printf "Delete a %s" (lower .Label))}}
@@ -393,6 +422,18 @@ components:
 {{- end}}
 {{- range keys $e}}
         {{keyName .}}: {type: string, format: uuid}
+{{- end}}
+{{- if and (not (inRequest $e)) (not (keys $e))}} {}
+{{- end}}
+    {{.Pascal}}Changes:
+      type: object
+      description: Changes to a {{lower .Label}}; only the fields sent change.
+      properties:
+{{- range inRequest $e}}
+        {{jsonName .}}: {{changeSchema .}}
+{{- end}}
+{{- range keys $e}}
+        {{keyName .}}: {type: string, format: uuid{{if not .Required}}, nullable: true{{end}}}
 {{- end}}
 {{- if and (not (inRequest $e)) (not (keys $e))}} {}
 {{- end}}

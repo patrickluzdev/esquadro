@@ -101,6 +101,10 @@ var (
 	ErrPreconditionRequired = &Problem{Status: 428, Code: "precondition_required", Title: "Send If-Match with the ETag of the record you read."}
 )
 
+// Emptied is a change to the zero value of what p's type holds: what a
+// PATCH sends as null.
+func Emptied[T any](*T) *T { return new(T) }
+
 type headersKey struct{}
 
 // ResponseHeaders lets an operation set headers of its response that the
