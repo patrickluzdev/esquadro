@@ -86,12 +86,13 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `password_blocklist` | name |  |
 | entity | `lockout_attempts` | int |  |
 | entity | `lockout_minutes` | int |  |
-| entity | `list` | list | Who may list, read, create, update or delete the entity: public, a realm (whoever signed in to it) or realm.role; write is create, update and delete. |
+| entity | `list` | list | Who may list, read, create, update or delete the entity: public, a realm (whoever signed in to it), realm.role, or owner (the principal the record belongs to); write is create, update and delete. |
 | entity | `read` | list |  |
 | entity | `create` | list |  |
 | entity | `update` | list |  |
 | entity | `delete` | list |  |
 | entity | `write` | list |  |
+| entity | `owner` | name | The relation to the principal a record belongs to, for the owner rule, when the entity has more than one; a principal owns itself. |
 
 An annotation is written `@security(key value)` on the element.
 

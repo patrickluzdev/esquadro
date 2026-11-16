@@ -2,6 +2,7 @@ package security
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -46,6 +47,58 @@ func TestAccess(t *testing.T) {
 		t.Error(got)
 	}
 	if got := AccessText(nil); got != "nobody" {
+		t.Error(got)
+	}
+}
+
+func TestOwnerOf(t *testing.T) {
+	customer := &project.Entity{Ann: project.Ann{"security": {"principal": true}}}
+	customer.Snake, customer.Raw = "customer", "Customer"
+	tag := &project.Entity{}
+	tag.Snake, tag.Raw = "tag", "Tag"
+	relation := func(e, target *project.Entity, name string) *project.Relation {
+		r := &project.Relation{Kind: project.ManyToOne, Entity: e, Target: target}
+		r.Snake, r.Raw = name, name
+		e.Relations = append(e.Relations, r)
+		return r
+	}
+	order := &project.Entity{Ann: project.Ann{"security": {}}}
+	order.Snake, order.Raw = "order", "Order"
+	buyer := relation(order, customer, "buyer")
+	relation(order, tag, "tag")
+	all := []*project.Entity{customer, order, tag}
+
+	if o, why := OwnerOf(all, order); why != "" || o.Relation != buyer || o.Realm != "customer" {
+		t.Fatalf("one relation to a principal: %+v %s", o, why)
+	}
+	if o, why := OwnerOf(all, customer); why != "" || o.Relation != nil || o.Realm != "customer" {
+		t.Fatalf("a principal owns itself: %+v %s", o, why)
+	}
+	if _, why := OwnerOf(all, tag); !strings.Contains(why, "needs a relation of Tag to a principal") {
+		t.Fatal(why)
+	}
+	gift := relation(order, customer, "gifted_to")
+	if _, why := OwnerOf(all, order); !strings.Contains(why, "more than one relation to a principal") {
+		t.Fatal(why)
+	}
+	order.Ann["security"]["owner"] = "gifted_to"
+	if o, _ := OwnerOf(all, order); o.Relation != gift {
+		t.Fatal("owner names the relation")
+	}
+	order.Ann["security"]["owner"] = "nope"
+	if _, why := OwnerOf(all, order); !strings.Contains(why, "owner nope is not a relation") {
+		t.Fatal(why)
+	}
+
+	// write owner on a principal: update and delete, not create.
+	customer.Ann["security"]["write"] = []any{"owner"}
+	if got := Access(all, customer, "create"); len(got) != 0 {
+		t.Fatalf("create: %v", got)
+	}
+	if got := Access(all, customer, "update"); !slices.Equal(got, []string{"owner"}) {
+		t.Fatalf("update: %v", got)
+	}
+	if got := AccessText([]string{"owner", "user.admin"}); got != "the one it belongs to, or a user with role admin" {
 		t.Error(got)
 	}
 }

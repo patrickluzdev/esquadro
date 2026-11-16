@@ -154,7 +154,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 
 	for _, e := range p.Entities {
 		a := e.Ann["security"]
-		ruled := false
+		ruled, ownerChecked := false, false
 		for _, op := range Operations {
 			who := names(a[op])
 			if who == nil {
@@ -165,6 +165,15 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 				if w == "public" {
 					continue
 				}
+				if w == "owner" {
+					if principal, _ := a["principal"].(bool); principal && op == "create" {
+						errorf(e, op, "create owner: a principal is created by sign-up, not by its owner")
+					} else if _, why := OwnerOf(p.Entities, e); why != "" && !ownerChecked {
+						errorf(e, op, "%s", why)
+					}
+					ownerChecked = true
+					continue
+				}
 				realm, role, hasRole := strings.Cut(w, ".")
 				r := byName[realm]
 				switch {
@@ -173,7 +182,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 					for _, k := range realms {
 						known = append(known, k.Name)
 					}
-					errorf(e, op, "%s: %s is not public, nor a realm (an entity marked @security(principal)): %s", op, w, strings.Join(append([]string{"public"}, known...), ", "))
+					errorf(e, op, "%s: %s is not public, owner, nor a realm (an entity marked @security(principal)): %s", op, w, strings.Join(append([]string{"public", "owner"}, known...), ", "))
 				case hasRole && !slices.Contains(r.Roles, role):
 					errorf(e, op, "%s: %s is not a role of %s, whose roles are %s", op, role, realm, strings.Join(r.Roles, ", "))
 				}

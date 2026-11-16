@@ -42,6 +42,16 @@ entity Note {
 entity Tag {
   label string
 }
+
+entity Ticket {
+  title string
+  @security(read owner, write user)
+}
+
+entity Customer {
+  name string
+  @security(principal, create owner, read owner)
+}
 `, "")
 	code, _, errOut := esq(t, "check", dir)
 	if code != 1 {
@@ -56,7 +66,9 @@ entity Tag {
 		`grants gives staff.reports.view, but reports.view is not one of the realm's permissions`,
 		`password_min 6 is below 8`,
 		`write: boss is not a role of user, whose roles are admin, staff`,
-		`write: team is not public, nor a realm`,
+		`write: team is not public, owner, nor a realm`,
+		`the owner rule needs a relation of Ticket to a principal`,
+		`create owner: a principal is created by sign-up, not by its owner`,
 		`Tag has no @security(read, write...)`,
 	} {
 		if !strings.Contains(errOut, want) {

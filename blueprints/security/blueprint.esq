@@ -126,13 +126,16 @@ blueprint security {
     lockout_minutes int
 
     /// Who may list, read, create, update or delete the entity: public, a
-    /// realm (whoever signed in to it) or realm.role; write is create,
-    /// update and delete.
+    /// realm (whoever signed in to it), realm.role, or owner (the principal
+    /// the record belongs to); write is create, update and delete.
     list list
     read list
     create list
     update list
     delete list
     write list
+    /// The relation to the principal a record belongs to, for the owner
+    /// rule, when the entity has more than one; a principal owns itself.
+    owner name
   }
 }
