@@ -276,6 +276,21 @@ func (e *lifecycle) ownerScenario(product string) {
 	if kept["customer_id"] != carlaID || kept["text"] != "Still great" {
 		e.t.Fatalf("the review after carla's update: %v", kept)
 	}
+
+	// A PATCH changes only the text. The review comes with its product and
+	// only the fields asked for; its customer only to whom may read
+	// customers (staff), not to Carla.
+	e.request("PATCH", path, `{"text":"Even better"}`, carla, 200)
+	query := path + "?include=customer,product&fields=text,customer.name,product.name"
+	read := e.request("GET", query, "", carla, 200).body
+	reviewed, _ := read["product"].(map[string]any)
+	if read["text"] != "Even better" || read["product_id"] != nil || read["customer"] != nil || reviewed["id"] != product || reviewed["name"] == nil {
+		e.t.Fatalf("the review with include and fields, as carla: %v", read)
+	}
+	owner, _ := e.request("GET", query, "", map[string]string{"Authorization": e.auth}, 200).body["customer"].(map[string]any)
+	if owner["id"] != carlaID || owner["name"] != "Someone" || owner["created_at"] != nil {
+		e.t.Fatalf("the review's customer, as an admin: %v", owner)
+	}
 }
 
 // safeWrites checks If-Match and Idempotency-Key through the running
