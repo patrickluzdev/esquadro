@@ -348,7 +348,12 @@ func (s *Security) oauthConfig(realm Realm, name string) (*oauth2.Config, error)
 // allowedRedirect reports whether the app may send a browser to target:
 // one of its own paths, or an address of RedirectURLs.
 func (s *Security) allowedRedirect(target string) bool {
-	if strings.HasPrefix(target, "/") && !strings.HasPrefix(target, "//") && !strings.HasPrefix(target, "/\\") {
+	// Browsers drop tabs and newlines from addresses and read \ as /:
+	// "/\t/evil.example" would be "//evil.example", another site.
+	if strings.ContainsFunc(target, func(r rune) bool { return r < 0x20 || r == 0x7f || r == '\\' }) {
+		return false
+	}
+	if strings.HasPrefix(target, "/") && !strings.HasPrefix(target, "//") {
 		return true
 	}
 	u, err := url.Parse(target)
@@ -357,7 +362,13 @@ func (s *Security) allowedRedirect(target string) bool {
 	}
 	for _, allowed := range s.cfg.RedirectURLs {
 		a, err := url.Parse(allowed)
-		if err == nil && a.Scheme == u.Scheme && a.Host == u.Host && strings.HasPrefix(u.Path, a.Path) {
+		if err != nil || a.Scheme != u.Scheme || a.Host != u.Host {
+			continue
+		}
+		// The path of redirect_urls, or below it: /signed-in lets in
+		// /signed-in and /signed-in/home, not /signed-in-elsewhere.
+		base := strings.TrimSuffix(a.Path, "/")
+		if u.Path == base || strings.HasPrefix(u.Path, base+"/") || (base == "" && u.Path == "") {
 			return true
 		}
 	}

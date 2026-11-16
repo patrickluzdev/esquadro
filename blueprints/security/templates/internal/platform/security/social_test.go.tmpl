@@ -136,7 +136,12 @@ func TestSocialRefusals(t *testing.T) {
 
 	// Only the app's paths and redirect_urls.
 	f.expect(f.call("GET", "/identity/person/oauth/fake?redirect=https://evil.example/", nil), 400, "invalid_redirect")
-	f.expect(f.call("GET", "/identity/person/oauth/fake?redirect=//evil.example/", nil), 400, "invalid_redirect")
+	for _, target := range []string{"//evil.example/", "/\\evil.example/", "https://app.example/signed-in-elsewhere", "https://app.example.evil/signed-in", "javascript:alert(1)"} {
+		f.expect(f.call("GET", "/identity/person/oauth/fake?redirect="+url.QueryEscape(target), nil), 400, "invalid_redirect")
+	}
+	if !f.s.allowedRedirect("/app?x=1") || !f.s.allowedRedirect("https://app.example/signed-in") || f.s.allowedRedirect("/\t/evil.example") {
+		t.Error("allowedRedirect")
+	}
 
 	// The callback finishes only in the browser that started, once.
 	start := f.call("GET", "/identity/person/oauth/fake?redirect=/app", nil)

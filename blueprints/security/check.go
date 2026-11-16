@@ -4,6 +4,7 @@ package security
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -256,6 +257,14 @@ func options(p *project.Project, set *blueprint.Set, diags *diag.List) {
 		errorf("pwned_fail", "pwned_fail %q is not open or closed", v)
 	}
 	passwordRules(opts, errorf)
+	for _, path := range names(opts["password_lists"]) {
+		// A path of the project: it goes in the Dockerfile as COPY <path>.
+		clean := filepath.ToSlash(filepath.Clean(path))
+		if path == "" || filepath.IsAbs(path) || clean != path || strings.HasPrefix(clean, "../") || clean == ".." ||
+			strings.ContainsFunc(path, func(r rune) bool { return r <= ' ' || r == 0x7f || r == '"' || r == '\\' || r == '$' }) {
+			errorf("password_lists", "password_lists %q: write a path of the project, relative and without spaces, e.g. config/passwords-br.txt", path)
+		}
+	}
 	if m, _ := opts["argon2_memory_kib"].(int64); m < 7168 {
 		errorf("argon2_memory_kib", "argon2_memory_kib %d is below OWASP's least (7168 KiB, with 5 iterations; 19456 with 2)", m)
 	}

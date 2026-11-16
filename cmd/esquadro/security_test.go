@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -173,5 +174,24 @@ func TestSecurityWithoutPrincipals(t *testing.T) {
 	}
 	if strings.Contains(read(t, filepath.Join(dir, ".env.example")), "SECURITY_SECRET") {
 		t.Fatal("SECURITY_SECRET without principals")
+	}
+}
+
+// password_lists goes in the Dockerfile: only plain paths of the project.
+func TestSecurityPasswordListPaths(t *testing.T) {
+	accounts := "package accounts\n\nentity User {\n  name string required\n  @security(principal, read user, write user)\n}\n"
+	for path, ok := range map[string]bool{
+		"config/passwords-br.txt": true, "../secret.txt": false, "/etc/passwd": false,
+		"a b.txt": false, "x.txt\nRUN curl evil": false, "./config/x.txt": false,
+	} {
+		dir := securityProject(t, accounts, "")
+		appEsq := filepath.Join(dir, "esquadro", "app.esq")
+		quoted, _ := json.Marshal(path)
+		src := strings.Replace(read(t, appEsq), "  blueprint security\n", "  blueprint security {\n    password_lists ["+string(quoted)+"]\n  }\n", 1)
+		os.WriteFile(appEsq, []byte(src), 0o644)
+		_, _, errOut := esq(t, "check", dir)
+		if refused := strings.Contains(errOut, "write a path of the project"); refused == ok {
+			t.Errorf("%q: refused %v\n%s", path, refused, errOut)
+		}
 	}
 }
