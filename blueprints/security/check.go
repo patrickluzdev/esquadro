@@ -192,20 +192,21 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 }
 
 // needs checks what realms need: identities are kept in PostgreSQL, with
-// their own migrations, and principals are entities.
+// their own migrations, principals are entities, and the emails of sign-up
+// and password reset go by mail.
 func needs(p *project.Project, set *blueprint.Set, realms []*Realm, diags *diag.List) {
 	ref := securityRef(p)
 	if len(realms) == 0 || ref == nil {
 		return
 	}
 	var missing []string
-	for _, name := range []string{"domain", "postgres", "migrations"} {
+	for _, name := range []string{"domain", "postgres", "migrations", "mail"} {
 		if set.Get(name) == nil {
 			missing = append(missing, name)
 		}
 	}
 	if len(missing) > 0 {
-		diags.Errorf(ref.Pos, ref.Pos, "%s marked @security(principal), but security keeps identities with blueprints %s, which the app does not use", realms[0].Entity.Raw, strings.Join(missing, ", ")).
+		diags.Errorf(ref.Pos, ref.Pos, "%s marked @security(principal), but security keeps identities with blueprints %s, and sends their emails with mail, which the app does not use", realms[0].Entity.Raw, strings.Join(missing, ", ")).
 			Suggestion = "blueprint " + missing[0]
 	}
 	if origins := names(set.Options["security"]["origins"]); slices.Contains(origins, "*") {

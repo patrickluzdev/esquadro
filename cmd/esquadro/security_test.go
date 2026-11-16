@@ -13,7 +13,7 @@ import (
 func securityProject(t *testing.T, accounts, postgres string) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "shop")
-	if code, _, errOut := esq(t, "new", "-no-gen", "-no-git", "-module", "example.com/shop", "-blueprints", "app,env,domain,http,postgres,migrations,security", dir); code != 0 {
+	if code, _, errOut := esq(t, "new", "-no-gen", "-no-git", "-module", "example.com/shop", "-blueprints", "app,env,domain,http,postgres,migrations,security,mail", dir); code != 0 {
 		t.Fatal(errOut)
 	}
 	appEsq := filepath.Join(dir, "esquadro", "app.esq")
@@ -193,5 +193,14 @@ func TestSecurityPasswordListPaths(t *testing.T) {
 		if refused := strings.Contains(errOut, "write a path of the project"); refused == ok {
 			t.Errorf("%q: refused %v\n%s", path, refused, errOut)
 		}
+	}
+}
+
+// Signing in sends emails: principals need the mail blueprint.
+func TestSecurityNeedsMail(t *testing.T) {
+	dir, _ := smallProject(t, "app,env,domain,http,postgres,migrations,security")
+	os.WriteFile(filepath.Join(dir, "esquadro", "accounts.esq"), []byte("package accounts\n\nentity User {\n  name string required\n  @security(principal, read user, write user)\n}\n"), 0o644)
+	if code, _, errOut := esq(t, "check", dir); code != 1 || !strings.Contains(errOut, "sends their emails with mail") {
+		t.Fatalf("exit %d\n%s", code, errOut)
 	}
 }

@@ -18,5 +18,5 @@ blueprint mail {
   /// Who emails come from: Shop <no-reply@shop.com>.
   env MAIL_FROM string required development("{{.App.Label}} <no-reply@localhost>")
   requires app, env
-  optional jobs, compose, domain, security, testcontainers, docker
+  optional jobs, compose, domain, testcontainers, docker
 }

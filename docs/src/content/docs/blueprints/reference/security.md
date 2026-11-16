@@ -16,7 +16,7 @@ blueprint security
 ## Works with
 
 - **Requires** [app](../app/), [env](../env/), [http](../http/): the app must use them too.
-- **Works with** [domain](../domain/), [postgres](../postgres/), [migrations](../migrations/), [jobs](../jobs/), [worker](../worker/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/), [docker](../docker/) when the app uses them.
+- **Works with** [mail](../mail/), [domain](../domain/), [postgres](../postgres/), [migrations](../migrations/), [jobs](../jobs/), [worker](../worker/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/), [docker](../docker/) when the app uses them.
 
 ## Options
 

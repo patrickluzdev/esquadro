@@ -11,7 +11,7 @@
 blueprint security {
   version "0.1.0"
   requires app, env, http
-  optional domain, postgres, migrations, jobs, worker, rest, api_docs, i18n, observability, testcontainers, compose, docker
+  optional mail, domain, postgres, migrations, jobs, worker, rest, api_docs, i18n, observability, testcontainers, compose, docker
 
   /// Signs CSRF tokens and encrypts the JWT signing keys; esquadro
   /// generates one for development.

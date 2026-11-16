@@ -37,7 +37,7 @@ func newFlow(t *testing.T) *flow {
 	s.cfg.Providers = map[string]Provider{"fake": f.fake.provider()}
 	s.cfg.VerifyEmailHours, s.cfg.PasswordResetMinutes = 24, 60
 	f.mail = &fakeMailer{}
-	s.mailer, s.sendNow = f.mail, true
+	s.mailer = f.mail
 	policy := PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists"}
 	person := Realm{
 		Name: "person", Providers: []string{"password", "fake"}, Signup: "open", VerifyEmail: "optional", PasswordReset: true, Policy: policy,

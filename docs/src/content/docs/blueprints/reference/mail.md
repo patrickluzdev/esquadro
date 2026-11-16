@@ -16,7 +16,7 @@ blueprint mail
 ## Works with
 
 - **Requires** [app](../app/), [env](../env/): the app must use them too.
-- **Works with** [jobs](../jobs/), [compose](../compose/), [domain](../domain/), [security](../security/), [testcontainers](../testcontainers/), [docker](../docker/) when the app uses them.
+- **Works with** [jobs](../jobs/), [compose](../compose/), [domain](../domain/), [testcontainers](../testcontainers/), [docker](../docker/) when the app uses them.
 
 ## Environment variables
 

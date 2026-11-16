@@ -3,53 +3,18 @@ package security
 
 import (
 	"context"
-	"encoding/json"
 
 	"{{.App.Module}}/internal/platform/jobs"
 )
-
-// emailArgs is an email to send, sealed: its link carries a token, which
-// the queue's table must not show.
-type emailArgs struct {
-	Sealed []byte `json:"sealed"`
-}
-
-func (emailArgs) Kind() string { return "security_email" }
 
 // cleanupArgs cleans up every hour, and rotates the signing keys when due.
 type cleanupArgs struct{}
 
 func (cleanupArgs) Kind() string { return "security_cleanup" }
 
-// UseJobs sends the emails by the job queue: retried until they go.
-func (s *Security) UseJobs(q *jobs.Queue) {
-	s.enqueue = func(ctx context.Context, m Message) error {
-		plain, err := json.Marshal(m)
-		if err != nil {
-			return err
-		}
-		sealed, err := seal(s.jobsKey, plain)
-		if err != nil {
-			return err
-		}
-		return q.Enqueue(ctx, emailArgs{Sealed: sealed})
-	}
-}
-
-// RegisterJobs registers the work of security's jobs: the emails, and the
-// hourly cleanup.
+// RegisterJobs registers the hourly cleanup, which also rotates the
+// signing keys when due.
 func (s *Security) RegisterJobs(r *jobs.Registry) {
-	jobs.Add(r, func(ctx context.Context, args emailArgs) error {
-		plain, err := open(s.jobsKey, args.Sealed)
-		if err != nil {
-			return err
-		}
-		var m Message
-		if err := json.Unmarshal(plain, &m); err != nil {
-			return err
-		}
-		return s.mailer.Send(ctx, m)
-	})
 	jobs.Add(r, func(ctx context.Context, _ cleanupArgs) error {
 		if _, err := s.Cleanup(ctx); err != nil {
 			return err

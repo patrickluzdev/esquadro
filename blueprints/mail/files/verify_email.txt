@@ -1,0 +1,6 @@
+Subject: Verify your email
+Open this link to verify your email:
+
+{{.Link}}
+
+It works until {{.Expires}}.

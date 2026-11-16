@@ -1,0 +1,6 @@
+Subject: Confirm your new email
+Open this link to use this email in your account:
+
+{{.Link}}
+
+It works until {{.Expires}}.

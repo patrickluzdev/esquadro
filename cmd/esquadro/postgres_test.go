@@ -137,7 +137,9 @@ entity OrderItem {
 	run(nil, "docker", "build", "-q", "-t", image, ".")
 	t.Cleanup(func() { exec.Command("docker", "rmi", "-f", image).Run() })
 	app := strings.TrimSpace(run(nil, "docker", "run", "-d", "--rm", "--network", "container:"+container,
-		"-e", "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/shop?sslmode=disable", "-e", "PORT=18197", image))
+		"-e", "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/shop?sslmode=disable", "-e", "PORT=18197",
+		// Production needs how emails go; the log is enough here.
+		"-e", "MAIL_URL=log://", "-e", "MAIL_FROM=Shop <no-reply@shop.example>", "-e", "MAIL_SECRET="+strings.Repeat("s", 43), image))
 	t.Cleanup(func() { exec.Command("docker", "rm", "-f", app).Run() })
 	for {
 		status, _ := exec.Command("docker", "inspect", "--format", "{{.State.Health.Status}}", app).Output()

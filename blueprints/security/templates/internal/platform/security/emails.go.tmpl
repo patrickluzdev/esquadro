@@ -45,32 +45,16 @@ var (
 	ErrEmailTaken = &edge.Problem{Status: http.StatusConflict, Code: "email_taken", Title: "Another account has this email."}
 )
 
-// send sends m in the background: by the job queue when there is one, else
-// in this process. It never fails the request: a lost email is sent again
-// on request.
+// send hands m to the Mailer, which sends it in the background. It never
+// fails the request: a lost email is sent again on request.
 func (s *Security) send(ctx context.Context, m Message) {
 	if s.mailer == nil {
 		s.logError(ctx, errors.New("security: no mailer to send "+m.Kind))
 		return
 	}
-	if s.enqueue != nil {
-		if err := s.enqueue(ctx, m); err != nil {
-			s.logError(ctx, err)
-		}
-		return
+	if err := s.mailer.Send(ctx, m); err != nil {
+		s.logError(ctx, err)
 	}
-	work := func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-		defer cancel()
-		if err := s.mailer.Send(ctx, m); err != nil {
-			s.logError(ctx, err)
-		}
-	}
-	if s.sendNow {
-		work()
-		return
-	}
-	go work()
 }
 
 // newVerification makes a link token for purpose, replacing the earlier
