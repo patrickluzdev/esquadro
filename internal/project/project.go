@@ -18,6 +18,7 @@ type Project struct {
 	Modules  []*Module
 	Enums    []*Enum
 	Entities []*Entity
+	Jobs     []*Job
 }
 
 // Module is a part of the domain: the entities and enums of the files that
@@ -26,6 +27,7 @@ type Module struct {
 	Names
 	Entities []*Entity
 	Enums    []*Enum
+	Jobs     []*Job
 	Pos      diag.Pos
 }
 
@@ -75,7 +77,7 @@ type App struct {
 type SourceKind int
 
 const (
-	SourceBuiltin SourceKind = iota // blueprint platform
+	SourceBuiltin SourceKind = iota // blueprint app
 	SourceLocal                     // blueprint "./blueprints/mine"
 	SourceGit                       // blueprint "github.com/acme/x@v1.2.0"
 )
@@ -141,6 +143,28 @@ type Entity struct {
 	Annotations []*dsl.Annotation
 	Ann         Ann
 	Pos         diag.Pos
+}
+
+// Job is work done in the background, declared with "job": its fields are
+// its arguments, as the queue stores them.
+type Job struct {
+	Names
+	Module      *Module
+	Doc         []string
+	Fields      []*Field
+	Annotations []*dsl.Annotation
+	Ann         Ann
+	Pos         diag.Pos
+}
+
+// Field returns the job's argument with the given name as written, or nil.
+func (j *Job) Field(name string) *Field {
+	for _, f := range j.Fields {
+		if f.Raw == name {
+			return f
+		}
+	}
+	return nil
 }
 
 // Field returns the field with the given name as written, or nil.

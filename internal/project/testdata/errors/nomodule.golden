@@ -8,6 +8,6 @@ nomodule.esq:3:5: warning: app shop uses no blueprints, so nothing will be gener
   |
 3 | app shop {
   |     ^^^^
-  = help: add one, e.g. blueprint platform
+  = help: add one, e.g. blueprint app; see them with esquadro blueprint list
 
 1 error, 1 warning

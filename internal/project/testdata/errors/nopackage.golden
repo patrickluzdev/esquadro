@@ -1,4 +1,4 @@
-nopackage.esq:1:1: error: nopackage.esq has entities or enums but no package declaration
+nopackage.esq:1:1: error: nopackage.esq has entities, enums or jobs but no package declaration
   |
 1 | app shop {
   | ^

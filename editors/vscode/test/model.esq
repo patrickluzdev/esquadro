@@ -48,3 +48,15 @@ entity Product {
 //^ punctuation.definition.annotation.esquadro
 // ^^^^^^^^ entity.name.function.decorator.esquadro
 }
+
+/// Sends the welcome email.
+job SendWelcomeEmail {
+// <--- storage.type.esquadro
+//  ^^^^^^^^^^^^^^^^ entity.name.type.esquadro
+  user_id uuid required
+//^^^^^^^ variable.other.property.esquadro
+//        ^^^^ support.type.esquadro
+}
+job CloseDailyReport
+// <--- storage.type.esquadro
+//  ^^^^^^^^^^^^^^^^ entity.name.type.esquadro

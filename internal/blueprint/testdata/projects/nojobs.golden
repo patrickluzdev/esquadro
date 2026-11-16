@@ -1,0 +1,7 @@
+testdata/projects/nojobs/app.esq:8:1: error: SendWelcomeEmail declares a job, but no blueprint runs jobs
+  |
+8 | job SendWelcomeEmail {
+  | ^^^
+  = help: add the jobs blueprint: esquadro add jobs
+
+1 error

@@ -86,13 +86,20 @@ func Dump(f *File) string {
 					w(1, "hook %s %s%s", it.Event.Name, dumpValue(it.Path), writes)
 				}
 			}
-		case *EntityDecl:
-			w(0, "entity %s @%s", d.Name.Name, pos(d.Span))
-			docs(1, d.Doc)
-			for _, o := range d.Options {
+		case *EntityDecl, *JobDecl:
+			keyword, ent := "entity", (*EntityDecl)(nil)
+			switch d := d.(type) {
+			case *EntityDecl:
+				ent = d
+			case *JobDecl:
+				keyword, ent = "job", &d.EntityDecl
+			}
+			w(0, "%s %s @%s", keyword, ent.Name.Name, pos(ent.Span))
+			docs(1, ent.Doc)
+			for _, o := range ent.Options {
 				w(1, "option %s %s", o.Key.Name, dumpValue(o.Value))
 			}
-			for _, m := range d.Members {
+			for _, m := range ent.Members {
 				switch m := m.(type) {
 				case *Field:
 					w(1, "field %s %s%s @%s", m.Name.Name, m.Type.Name, dumpMods(m.Modifiers, m.Annotations), pos(m.Span))

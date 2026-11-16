@@ -1,0 +1,2 @@
+{{.Job.Pascal}} in {{.Module.Raw}}: {{range .Job.Fields}}{{.Snake}} {{.Type}}{{if .Required}} required{{end}}; {{end}}
+every: {{with ann .Job}}{{.every}}{{else}}-{{end}}

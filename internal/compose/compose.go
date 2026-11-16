@@ -93,12 +93,16 @@ type Data struct {
 	Entities []*project.Entity
 	Enums    []*project.Enum
 	Modules  []*project.Module
+	Jobs     []*project.Job
 	// Entity is set in templates rendered per entity (and per relation),
 	// Enum per enum and Module per module; per entity and per enum, Module is theirs. Slot
 	// contributions see their caller's values.
 	Entity *project.Entity
 	Enum   *project.Enum
 	Module *project.Module
+	// Job is set in templates rendered per job, whose file name uses .Job;
+	// Module is the job's.
+	Job *project.Job
 	// Relation is set in templates rendered per relation: each side of
 	// every relation, with Entity and Module those of its side.
 	Relation *project.Relation
@@ -188,7 +192,7 @@ func (c *composer) templateError(file string, err error) {
 		col, _ := strconv.Atoi(m[3])
 		pos := diag.Pos{File: m[1], Line: line, Col: max(col, 1)}
 		d := c.diags.Errorf(pos, diag.Pos{}, "%s", cleanTemplateMsg(m[4]))
-		for _, v := range []string{"Entity", "Enum", "Relation"} {
+		for _, v := range []string{"Entity", "Enum", "Relation", "Job"} {
 			if strings.Contains(m[4], "nil pointer evaluating *project."+v+".") {
 				d.Suggestion = fmt.Sprintf(".%s is only set in templates whose file name uses .%s (rendered once per %s) and in slots opened from them",
 					v, v, strings.ToLower(v))
@@ -340,7 +344,7 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 			return slices.ContainsFunc(c.set.Blueprints, func(b *blueprint.Blueprint) bool { return b.Manifest.Name == name })
 		},
 		// ann returns this blueprint's annotation values on a node (app,
-		// entity, field or relation), or nil when it has none.
+		// entity, field, relation or job), or nil when it has none.
 		"ann": func(node any) map[string]any { return annOf(node)[self] },
 		// annOf returns another blueprint's annotation values on a node.
 		"annOf":    func(name string, node any) map[string]any { return annOf(node)[name] },
@@ -392,6 +396,8 @@ func annOf(node any) project.Ann {
 	case *project.Field:
 		return n.Ann
 	case *project.Relation:
+		return n.Ann
+	case *project.Job:
 		return n.Ann
 	}
 	return nil
@@ -461,6 +467,7 @@ var (
 	relationRef = regexp.MustCompile(`\.Relation\b`)
 	entityRef   = regexp.MustCompile(`\.Entity\b`)
 	enumRef     = regexp.MustCompile(`\.Enum\b`)
+	jobRef      = regexp.MustCompile(`\.Job\b`)
 	moduleRef   = regexp.MustCompile(`\.Module\b`)
 )
 
@@ -491,9 +498,10 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	// per entity or enum, not per module.
 	perEntity := !perRelation && entityRef.MatchString(outPath)
 	perEnum := enumRef.MatchString(outPath)
-	perModule := !perRelation && !perEntity && !perEnum && moduleRef.MatchString(outPath)
-	if (perEntity || perRelation) && perEnum {
-		c.errorf(name, 0, "a template path cannot use both .Enum and .Entity or .Relation")
+	perJob := jobRef.MatchString(outPath)
+	perModule := !perRelation && !perEntity && !perEnum && !perJob && moduleRef.MatchString(outPath)
+	if n := btoi(perEntity || perRelation) + btoi(perEnum) + btoi(perJob); n > 1 {
+		c.errorf(name, 0, "a template path can use only one of .Entity (or .Relation), .Enum and .Job")
 		return nil
 	}
 	pathTmpl, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(outPath)
@@ -514,7 +522,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	}
 
 	whole := Data{
-		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules,
+		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
 	var datas []Data
@@ -537,6 +545,12 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 		for _, e := range c.p.Enums {
 			d := whole
 			d.Enum, d.Module = e, e.Module
+			datas = append(datas, d)
+		}
+	case perJob:
+		for _, j := range c.p.Jobs {
+			d := whole
+			d.Job, d.Module = j, j.Module
 			datas = append(datas, d)
 		}
 	case perModule:
@@ -620,4 +634,11 @@ func (c *composer) goError(name, target string, content []byte, err error) {
 			d.Suggestion = fmt.Sprintf("line %d of the generated file is: %s", n, strings.TrimSpace(lines[n-1]))
 		}
 	}
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

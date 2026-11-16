@@ -83,7 +83,7 @@ func (r *resolver) resolve() {
 		for _, d := range b.Manifest.Requires {
 			if r.byName[d.Name] == nil && !r.failed[d.Name] && r.l.unfetched == 0 {
 				r.errorf(b.Ref.RefSpan, "blueprint %s requires %s", b.Manifest.Name, d.Name).
-					Suggestion = "add to the app: blueprint " + d.Name
+					Suggestion = "add it: esquadro add " + d.Name
 			}
 		}
 		r.set.Options[b.Manifest.Name] = r.options(b)
@@ -91,6 +91,14 @@ func (r *resolver) resolve() {
 	}
 	r.set.Blueprints = r.order()
 	r.annotations()
+	// Jobs are run by the jobs blueprint: without it, they would be left
+	// out in silence.
+	if len(r.p.Jobs) > 0 && r.byName["jobs"] == nil && !r.failed["jobs"] && r.l.unfetched == 0 {
+		j := r.p.Jobs[0]
+		r.errorf(dsl.Span{Pos: j.Pos, End: diag.Pos{File: j.Pos.File, Line: j.Pos.Line, Col: j.Pos.Col + len("job"), Offset: j.Pos.Offset + len("job")}},
+			"%s declares a job, but no blueprint runs jobs", j.Raw).
+			Suggestion = "add the jobs blueprint: esquadro add jobs"
+	}
 }
 
 // options validates the options written for a blueprint in the app block and
@@ -234,6 +242,12 @@ func (r *resolver) annotations() {
 			}
 		}
 	}
+	for _, j := range r.p.Jobs {
+		j.Ann = r.annotate(j.Annotations, TargetJob, nil)
+		for _, f := range j.Fields {
+			f.Ann = r.annotate(f.Annotations, TargetField, nil)
+		}
+	}
 }
 
 func (r *resolver) annotate(anns []*dsl.Annotation, t Target, e *project.Entity) project.Ann {
@@ -287,7 +301,7 @@ func (r *resolver) unknownAnnotation(a *dsl.Annotation) {
 	name := a.Name.Name
 	if slices.Contains(r.l.BuiltinNames(), name) {
 		r.errorf(a.Span, "@%s needs blueprint %s, which this app does not use", name, name).
-			Suggestion = "add to the app: blueprint " + name
+			Suggestion = "add it: esquadro add " + name
 		return
 	}
 	cands := r.l.BuiltinNames()

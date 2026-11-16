@@ -9,6 +9,15 @@ type Description struct {
 	Modules  []Names             `json:"modules"`
 	Enums    []EnumDescription   `json:"enums"`
 	Entities []EntityDescription `json:"entities"`
+	Jobs     []JobDescription    `json:"jobs,omitempty"`
+}
+
+// JobDescription describes a job: its arguments are fields.
+type JobDescription struct {
+	Names
+	Module string             `json:"module"`
+	Fields []FieldDescription `json:"fields"`
+	Ann    Ann                `json:"ann,omitempty"`
 }
 
 // AppDescription describes the app block.
@@ -111,19 +120,7 @@ func (p *Project) Describe() Description {
 			Fields: []FieldDescription{}, Relations: []RelationDescription{},
 		}
 		for _, f := range e.Fields {
-			fd := FieldDescription{
-				Names: f.Names, Type: f.Type, Required: f.Required, Unique: f.Unique,
-				Min: f.Min, Max: f.Max, Pattern: f.Pattern, Implicit: f.Implicit, Ann: f.Ann,
-			}
-			if f.Enum != nil {
-				fd.Enum = f.Enum.Raw
-			}
-			if f.Default != nil {
-				def := *f.Default
-				def.EnumValue = nil // named by Text already
-				fd.Default = &def
-			}
-			ed.Fields = append(ed.Fields, fd)
+			ed.Fields = append(ed.Fields, describeField(f))
 		}
 		for _, r := range e.Relations {
 			rd := RelationDescription{
@@ -141,7 +138,30 @@ func (p *Project) Describe() Description {
 		}
 		d.Entities = append(d.Entities, ed)
 	}
+	for _, j := range p.Jobs {
+		jd := JobDescription{Names: j.Names, Module: moduleName(j.Module), Ann: j.Ann, Fields: []FieldDescription{}}
+		for _, f := range j.Fields {
+			jd.Fields = append(jd.Fields, describeField(f))
+		}
+		d.Jobs = append(d.Jobs, jd)
+	}
 	return d
+}
+
+func describeField(f *Field) FieldDescription {
+	fd := FieldDescription{
+		Names: f.Names, Type: f.Type, Required: f.Required, Unique: f.Unique,
+		Min: f.Min, Max: f.Max, Pattern: f.Pattern, Implicit: f.Implicit, Ann: f.Ann,
+	}
+	if f.Enum != nil {
+		fd.Enum = f.Enum.Raw
+	}
+	if f.Default != nil {
+		def := *f.Default
+		def.EnumValue = nil // named by Text already
+		fd.Default = &def
+	}
+	return fd
 }
 
 func moduleName(m *Module) string {

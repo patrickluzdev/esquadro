@@ -115,3 +115,34 @@ func TestFormatKeepsABlueprintBlockOfComments(t *testing.T) {
 		t.Fatalf("got:\n%s", got)
 	}
 }
+
+func TestFormatJobs(t *testing.T) {
+	src := "package accounts\n/// Sends it.\njob SendWelcomeEmail {\n  user_id uuid required\n  locale string default(\"en\")\n  @jobs(max_attempts 3)\n}\njob CloseDailyReport // nightly\njob Empty {}\n"
+	f, diags := Parse("a.esq", []byte(src))
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	want := "package accounts\n\n/// Sends it.\njob SendWelcomeEmail {\n  user_id uuid   required\n  locale  string default(\"en\")\n  @jobs(max_attempts 3)\n}\n\njob CloseDailyReport // nightly\n\njob Empty\n"
+	if got := string(Format(f)); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+	if again := string(Format(mustParse(t, want))); again != want {
+		t.Fatalf("not stable:\n%s", again)
+	}
+}
+
+func TestParseJobRefusesOptions(t *testing.T) {
+	_, diags := Parse("a.esq", []byte("package a\njob Send (plural \"x\") {\n}\n"))
+	if !diags.HasErrors() || !strings.Contains(diags[0].Message, `expected "{" or the end of the line after job Send`) {
+		t.Fatalf("diags: %v", diags)
+	}
+}
+
+func mustParse(t *testing.T, src string) *File {
+	t.Helper()
+	f, diags := Parse("a.esq", []byte(src))
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	return f
+}

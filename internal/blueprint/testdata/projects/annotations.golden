@@ -13,7 +13,7 @@ testdata/projects/annotations/app.esq:11:20: error: @postgres needs blueprint po
    |
 11 |   price    decimal @postgres(column product_price)
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = help: add to the app: blueprint postgres
+   = help: add it: esquadro add postgres
 
 testdata/projects/annotations/app.esq:12:19: error: blueprint app has no annotation for fields
    |
@@ -24,24 +24,24 @@ testdata/projects/annotations/app.esq:13:19: error: @postgres needs blueprint po
    |
 13 |   sku      string @postgres(colum sku)
    |                   ^^^^^^^^^^^^^^^^^^^^
-   = help: add to the app: blueprint postgres
+   = help: add it: esquadro add postgres
 
 testdata/projects/annotations/app.esq:14:19: error: @postgres needs blueprint postgres, which this app does not use
    |
 14 |   code     string @postgres(column)
    |                   ^^^^^^^^^^^^^^^^^
-   = help: add to the app: blueprint postgres
+   = help: add it: esquadro add postgres
 
 testdata/projects/annotations/app.esq:15:23: error: @postgres needs blueprint postgres, which this app does not use
    |
 15 |   category > Category @postgres(column cat)
    |                       ^^^^^^^^^^^^^^^^^^^^^
-   = help: add to the app: blueprint postgres
+   = help: add it: esquadro add postgres
 
 testdata/projects/annotations/app.esq:17:3: error: @postgres needs blueprint postgres, which this app does not use
    |
 17 |   @postgres(index [name, stauts])
    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = help: add to the app: blueprint postgres
+   = help: add it: esquadro add postgres
 
 8 errors

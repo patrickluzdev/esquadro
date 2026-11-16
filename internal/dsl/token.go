@@ -3,13 +3,14 @@
 //
 // Grammar (informal; newlines end fields, settings and options):
 //
-//	File       = { AppDecl | EnumDecl | EntityDecl } .
+//	File       = { AppDecl | EnumDecl | EntityDecl | JobDecl } .
 //	AppDecl    = "app" Ident "{" { AppItem } "}" .
 //	AppItem    = "module" String
 //	           | "blueprint" ( Ident | String ) [ "{" { Option } "}" ]
 //	           | Annotation .
 //	EnumDecl   = "enum" Ident "{" { Ident [ "," ] } "}" .
 //	EntityDecl = "entity" Ident [ "(" Option { "," Option } ")" ] "{" { Member } "}" .
+//	JobDecl    = "job" Ident [ "{" { Member } "}" ] .
 //	Member     = Field | Relation | Annotation .
 //	Field      = Ident Ident { Modifier | Annotation } .
 //	Relation   = Ident ( ">" | "-" | "<>" | "<" ) Ident [ "." Ident ] [ "(" Ident ")" ] { Modifier | Annotation } .

@@ -8,13 +8,13 @@ testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires app
   |
 4 |   blueprint "./blueprints/stripe"
   |             ^^^^^^^^^^^^^^^^^^^^^
-  = help: add to the app: blueprint app
+  = help: add it: esquadro add app
 
 testdata/projects/deps/app.esq:4:13: error: blueprint stripe requires postgres
   |
 4 |   blueprint "./blueprints/stripe"
   |             ^^^^^^^^^^^^^^^^^^^^^
-  = help: add to the app: blueprint postgres
+  = help: add it: esquadro add postgres
 
 testdata/projects/deps/app.esq:5:13: error: blueprint folder testdata/projects/deps/blueprints/missing does not exist
   |

@@ -1,0 +1,10 @@
+package accounts
+
+app shop {
+  module "github.com/example/shop"
+  blueprint app
+}
+
+job SendWelcomeEmail {
+  user_id uuid required
+}

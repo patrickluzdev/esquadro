@@ -1,0 +1,23 @@
+package accounts
+
+app shop {
+  module "example.com/shop"
+}
+
+entity User {
+  email string required
+}
+
+/// Relations, unique and a repeated argument are refused.
+job SendWelcomeEmail {
+  user   > User
+  email  string unique
+  email  string
+  status Missing
+}
+
+job User
+
+job send_report {
+  id uuid required
+}

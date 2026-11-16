@@ -1,0 +1,18 @@
+package accounts
+
+app shop {
+  module "github.com/example/shop"
+  blueprint jobs
+}
+
+enum Locale { EN PT }
+
+/// Sends the welcome email.
+job SendWelcomeEmail {
+  user_id uuid   required
+  locale  Locale default(EN)
+}
+
+job CloseDailyReport {
+  @jobs(every "0 3 * * *")
+}

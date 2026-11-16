@@ -1,0 +1,10 @@
+=== all.txt  [jobs: all.txt.tmpl]
+2 jobs, 0 entities
+=== jobs/accounts/close_daily_report.txt  [jobs: jobs/{{.Job.Module.Snake}}/{{.Job.Snake}}.txt.tmpl]
+CloseDailyReport in accounts: 
+every: 0 3 * * *
+=== jobs/accounts/send_welcome_email.txt  [jobs: jobs/{{.Job.Module.Snake}}/{{.Job.Snake}}.txt.tmpl]
+SendWelcomeEmail in accounts: user_id uuid required; locale enum; 
+every: -
+=== modules/accounts.txt  [jobs: modules/{{.Module.Snake}}.txt.tmpl]
+SendWelcomeEmail CloseDailyReport 

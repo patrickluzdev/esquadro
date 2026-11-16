@@ -138,6 +138,16 @@ type EntityDecl struct {
 	Span
 }
 
+// JobDecl is a "job" block: work to do in the background, whose fields are
+// its arguments. It is written as an entity, without options, and its block
+// may be left out when it has no arguments. Relations are parsed, to report
+// them clearly, but are not valid.
+type JobDecl struct {
+	EntityDecl
+	// Bare is true when the job was written without a block.
+	Bare bool
+}
+
 // Member is a member of an entity: *Field, *Relation or *Annotation.
 type Member interface {
 	memberNode()
@@ -201,6 +211,7 @@ func (s Span) SourceSpan() Span { return s }
 func (*AppDecl) declNode()    {}
 func (*EnumDecl) declNode()   {}
 func (*EntityDecl) declNode() {}
+func (*JobDecl) declNode()    {}
 
 func (*ModuleItem) appItemNode()   {}
 func (*BlueprintRef) appItemNode() {}

@@ -37,7 +37,9 @@ func Format(f *File) []byte {
 		case *EnumDecl:
 			p.enum(&out, d)
 		case *EntityDecl:
-			p.entity(&out, d)
+			p.entity(&out, "entity", d)
+		case *JobDecl:
+			p.entity(&out, "job", &d.EntityDecl)
 		case *BlueprintDecl:
 			p.blueprint(&out, d)
 		case *PackageDecl:
@@ -71,6 +73,8 @@ func firstLine(d Decl) int {
 	case *EnumDecl:
 		doc = d.Doc
 	case *EntityDecl:
+		doc = d.Doc
+	case *JobDecl:
 		doc = d.Doc
 	case *BlueprintDecl:
 		doc = d.Doc
@@ -427,9 +431,11 @@ func (p *printer) enum(out *strings.Builder, d *EnumDecl) {
 	out.WriteString("\n")
 }
 
-func (p *printer) entity(out *strings.Builder, d *EntityDecl) {
+// entity writes an entity, or a job (keyword "job"), which is written
+// without a block when it has nothing in it.
+func (p *printer) entity(out *strings.Builder, keyword string, d *EntityDecl) {
 	p.docs(out, d.Doc)
-	header := "entity " + d.Name.Name
+	header := keyword + " " + d.Name.Name
 	if len(d.Options) > 0 {
 		opts := make([]string, len(d.Options))
 		for i, o := range d.Options {
@@ -440,7 +446,9 @@ func (p *printer) entity(out *strings.Builder, d *EntityDecl) {
 	innerComments := p.ci < len(p.comments) && p.comments[p.ci].Pos.Offset < d.End.Offset-1
 	if len(d.Members) == 0 && !innerComments {
 		out.WriteString(header)
-		out.WriteString(" {}")
+		if keyword != "job" {
+			out.WriteString(" {}")
+		}
 		out.WriteString(p.closeTrail(d.Span))
 		out.WriteString("\n")
 		return

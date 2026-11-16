@@ -77,6 +77,7 @@ type builder struct {
 	// modules by name, and the module of each entity and enum declaration.
 	modules  map[string]*Module
 	moduleOf map[dsl.Decl]*Module
+	jobs     map[string]*Job
 }
 
 func (b *builder) errorf(s dsl.Span, format string, args ...any) *diag.Diagnostic {
@@ -142,6 +143,8 @@ func (b *builder) build() {
 			b.declare(d.Name, d)
 		case *dsl.EntityDecl:
 			b.declare(d.Name, d)
+		case *dsl.JobDecl:
+			b.declare(d.Name, d)
 		case *dsl.BlueprintDecl:
 			b.errorf(d.Name.Span, "blueprint manifests cannot be part of a project").
 				Suggestion = "put this block in blueprint.esq inside the blueprint's own folder"
@@ -180,6 +183,11 @@ func (b *builder) build() {
 	for _, d := range b.allDecls() {
 		if d, ok := d.(*dsl.EntityDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
 			b.buildEntity(d)
+		}
+	}
+	for _, d := range b.allDecls() {
+		if d, ok := d.(*dsl.JobDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
+			b.buildJob(d)
 		}
 	}
 	// Pass 2: declared relations.
@@ -258,7 +266,7 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 	}
 	if len(d.Blueprints) == 0 {
 		b.diags.Warnf(d.Name.Pos, d.Name.End, "app %s uses no blueprints, so nothing will be generated", d.Name.Name).
-			Suggestion = "add one, e.g. blueprint platform"
+			Suggestion = "add one, e.g. blueprint app; see them with esquadro blueprint list"
 	}
 	return app
 }
@@ -301,6 +309,43 @@ var (
 	implicitUpdatedAt = "updated_at"
 )
 
+// buildJob builds a job: its arguments are fields, without the implicit
+// ones; it has no relations, and nothing is unique in a queue.
+func (b *builder) buildJob(d *dsl.JobDecl) {
+	j := &Job{Names: b.names(d.Name), Module: b.moduleOf[d], Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
+	if j.Module != nil {
+		j.Module.Jobs = append(j.Module.Jobs, j)
+	}
+	for _, r := range d.Relations {
+		b.errorf(r.Name.Span, "a job's arguments cannot be relations: they are stored in the queue, as values").
+			Suggestion = fmt.Sprintf("pass the id instead: %s_id uuid", strings.TrimSuffix(b.names(r.Name).Snake, "_id"))
+	}
+	for _, f := range d.Fields {
+		for _, m := range f.Modifiers {
+			if m.Name.Name == "unique" {
+				b.errorf(m.Name.Span, "unique is for entities: a job's arguments are not stored in a table").
+					Suggestion = "remove it"
+			}
+		}
+		if fld := b.buildField(j.Module, f, false); fld != nil {
+			j.Fields = append(j.Fields, fld)
+		}
+	}
+	seen := map[string]*Field{}
+	for _, f := range j.Fields {
+		if prev, ok := seen[f.Snake]; ok {
+			b.errorf(dsl.Span{Pos: f.Pos, End: nameEnd(f.Pos, f.Raw)}, "%s is already an argument of %s, at line %d", f.Raw, j.Raw, prev.Pos.Line)
+			continue
+		}
+		seen[f.Snake] = f
+	}
+	if b.jobs == nil {
+		b.jobs = map[string]*Job{}
+	}
+	b.jobs[d.Name.Name] = j
+	b.p.Jobs = append(b.p.Jobs, j)
+}
+
 func implicitField(name string, t Type, d *Default) *Field {
 	n, _ := makeNames(name)
 	return &Field{Names: n, Type: t, Required: true, Implicit: true, Default: d}
@@ -339,7 +384,7 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 	e.Fields = append(e.Fields, implicitField(implicitID, TypeUUID, nil))
 	for _, f := range d.Fields {
-		if fld := b.buildField(e.Module, f); fld != nil {
+		if fld := b.buildField(e.Module, f, true); fld != nil {
 			e.Fields = append(e.Fields, fld)
 		}
 	}
@@ -355,13 +400,17 @@ func (b *builder) buildEntity(d *dsl.EntityDecl) {
 
 var fieldModifiers = []string{"required", "unique", "min", "max", "pattern", "default"}
 
-func (b *builder) buildField(mod *Module, d *dsl.Field) *Field {
+// buildField builds a field of an entity, or with entity false an argument
+// of a job, which has no implicit fields.
+func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 	n := b.names(d.Name)
 	switch n.Snake {
 	case implicitID, implicitCreatedAt, implicitUpdatedAt:
-		b.errorf(d.Name.Span, "%s is added to every entity automatically", n.Snake).
-			Suggestion = "remove this field"
-		return nil
+		if entity {
+			b.errorf(d.Name.Span, "%s is added to every entity automatically", n.Snake).
+				Suggestion = "remove this field"
+			return nil
+		}
 	}
 	f := &Field{Names: n, Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
 
@@ -945,6 +994,10 @@ func (b *builder) checkTypeNameClashes() {
 				continue
 			}
 			tables[e.Plural.Snake] = e
+		case *dsl.JobDecl:
+			if j := b.jobs[d.Name.Name]; j != nil {
+				check(j.Names, j.Pos, d.Name.Span)
+			}
 		}
 	}
 }
@@ -1061,14 +1114,14 @@ func (b *builder) buildModules() {
 			switch d := d.(type) {
 			case *dsl.PackageDecl:
 				mod = b.module(d)
-			case *dsl.EntityDecl, *dsl.EnumDecl:
+			case *dsl.EntityDecl, *dsl.EnumDecl, *dsl.JobDecl:
 				if mod != nil {
 					b.moduleOf[d] = mod
 					continue
 				}
 				if !reported {
 					sp := d.SourceSpan()
-					b.diags.Errorf(diag.Pos{File: f.Name, Line: 1, Col: 1}, diag.Pos{}, "%s has entities or enums but no package declaration", f.Name).
+					b.diags.Errorf(diag.Pos{File: f.Name, Line: 1, Col: 1}, diag.Pos{}, "%s has entities, enums or jobs but no package declaration", f.Name).
 						Suggestion = fmt.Sprintf("start the file with the module its declarations belong to, e.g. package catalog (first declaration at line %d)", sp.Pos.Line)
 					reported = true
 				}

@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	topKeywords      = []string{"package", "app", "enum", "entity", "blueprint"}
+	topKeywords      = []string{"package", "app", "enum", "entity", "job", "blueprint"}
 	appSettings      = []string{"module", "blueprint"}
 	manifestSettings = []string{"version", "requires", "optional", "option", "annotation", "slot", "go_require", "hook"}
 )
@@ -39,6 +39,8 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 				d = p.parseEnum()
 			case "entity":
 				d = p.parseEntity()
+			case "job":
+				d = p.parseJob()
 			case "blueprint":
 				d = p.parseBlueprint()
 			case "package":
@@ -48,7 +50,7 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 		if d == nil {
 			// A failed app/enum/entity has already reported and resynced.
 			if t.Kind != Name || !isTopKeyword(t.Text) {
-				e := p.errorf(t, "expected package, app, enum, entity or blueprint, found %s", t.describe())
+				e := p.errorf(t, "expected package, app, enum, entity, job or blueprint, found %s", t.describe())
 				if t.Kind == Name {
 					e.Suggestion = didYouMean(t.Text, topKeywords)
 				}
@@ -488,6 +490,32 @@ func (p *parser) parseEntity() Decl {
 	return ent
 }
 
+func (p *parser) parseJob() Decl {
+	doc := p.takeDoc()
+	start := p.advance() // "job"
+	name, ok := p.expectIdent("job name")
+	if !ok {
+		p.syncTop()
+		return nil
+	}
+	job := &JobDecl{}
+	job.Doc, job.Name = doc, name
+	if t := p.tok(); t.Kind != LBrace {
+		if t.Kind != Newline && t.Kind != EOF {
+			p.errorf(t, `expected "{" or the end of the line after job %s, found %s`, name.Name, t.describe())
+			p.syncTop()
+			return nil
+		}
+		job.Bare = true
+		job.Span = Span{Pos: start.Pos, End: name.End}
+		return job
+	}
+	open := p.advance()
+	end := p.parseBlock(open, "job "+name.Name, func() bool { return p.parseMember(&job.EntityDecl) })
+	job.Span = Span{Pos: start.Pos, End: end}
+	return job
+}
+
 func (p *parser) parseEntityOptions(ent *EntityDecl) bool {
 	p.advance() // "("
 	for {
@@ -750,7 +778,7 @@ func (p *parser) parseManifestItem() ManifestItem {
 		o.Span = Span{Pos: t.Pos, End: p.lastEnd}
 		return o
 	case "annotation":
-		target, ok := p.expectIdent("annotation target (app, entity, field or relation)")
+		target, ok := p.expectIdent("annotation target (app, entity, field, relation or job)")
 		if !ok {
 			return nil
 		}
