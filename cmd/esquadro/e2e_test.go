@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,9 +75,16 @@ func TestLifecycle(t *testing.T) {
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
 	e.createAdmin(db)
 	otlp := newOTLPReceiver(t)
-	stop := e.serve(append(db, "OTEL_EXPORTER_OTLP_ENDPOINT="+otlp.URL))
+	mailURL, mailbox := e.mailpit()
+	stop := e.serve(append(db, "OTEL_EXPORTER_OTLP_ENDPOINT="+otlp.URL, "MAIL_URL="+mailURL))
+	stopWork := e.work(append(db, "MAIL_URL="+mailURL))
 	e.signIn()
 	e.securityScenario()
+	// The customer's verification email went by the queue and Mailpit; its
+	// link verifies the email.
+	token := e.verificationToken(mailbox, "bia@example.com")
+	e.request("POST", "/identity/customer/verify-email", `{"token":"`+token+`"}`, nil, 204)
+	stopWork()
 	category := e.call("POST", "/categories", `{"name":"Books"}`, 201)
 	product := e.call("POST", "/products", fmt.Sprintf(`{"name":"Dune","price":"39.90","category_id":%q}`, category["id"]), 201)
 	stop()
@@ -304,6 +312,85 @@ func (e *lifecycle) postgres() []string {
 		time.Sleep(300 * time.Millisecond)
 	}
 	return []string{"DATABASE_URL=postgres://postgres:postgres@127.0.0.1:" + hostPort + "/shop?sslmode=disable"}
+}
+
+// mailpit starts Mailpit: the MAIL_URL of its SMTP, and the address of its
+// API.
+func (e *lifecycle) mailpit() (string, string) {
+	e.t.Helper()
+	out, err := exec.Command("docker", "run", "-d", "--rm", "-p", "127.0.0.1::1025", "-p", "127.0.0.1::8025", "axllent/mailpit:v1.33.0").Output()
+	if err != nil {
+		e.t.Fatalf("docker run mailpit: %v", err)
+	}
+	container := strings.TrimSpace(string(out))
+	e.t.Cleanup(func() { exec.Command("docker", "rm", "-f", container).Run() })
+	port := func(p string) string {
+		out, err := exec.Command("docker", "port", container, p+"/tcp").Output()
+		if err != nil {
+			e.t.Fatal(err)
+		}
+		_, hostPort, _ := strings.Cut(strings.TrimSpace(strings.Split(string(out), "\n")[0]), ":")
+		return hostPort
+	}
+	return "smtp://127.0.0.1:" + port("1025"), "http://127.0.0.1:" + port("8025")
+}
+
+// verificationToken waits for the verification email to address in
+// Mailpit, and answers the token of its link.
+func (e *lifecycle) verificationToken(mailbox, address string) string {
+	e.t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		res, err := http.Get(mailbox + "/api/v1/search?query=" + url.QueryEscape("to:"+address+" subject:\"Verify your email\""))
+		if err == nil {
+			var found struct{ Messages []struct{ ID string } }
+			json.NewDecoder(res.Body).Decode(&found)
+			res.Body.Close()
+			if len(found.Messages) > 0 {
+				res, err := http.Get(mailbox + "/api/v1/message/" + found.Messages[0].ID)
+				if err != nil {
+					e.t.Fatal(err)
+				}
+				var msg struct{ Text string }
+				json.NewDecoder(res.Body).Decode(&msg)
+				res.Body.Close()
+				_, token, ok := strings.Cut(msg.Text, "token=")
+				if !ok {
+					e.t.Fatalf("no link in the email:\n%s", msg.Text)
+				}
+				return strings.Fields(token)[0]
+			}
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatal("the verification email did not reach Mailpit")
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+// work starts the app's background work (jobs), and returns how to stop
+// it.
+func (e *lifecycle) work(env []string) func() {
+	e.t.Helper()
+	cmd := exec.Command(filepath.Join(e.dir, "bin", "shop"), "run")
+	cmd.Dir = e.dir
+	cmd.Env = append(os.Environ(), env...)
+	var logs bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &logs, &logs
+	if err := cmd.Start(); err != nil {
+		e.t.Fatal(err)
+	}
+	return func() {
+		cmd.Process.Signal(syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() { cmd.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}
 }
 
 // serve builds and starts the service, and returns how to stop it.

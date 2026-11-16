@@ -136,17 +136,16 @@ of `redirect_urls`.
 ## Emails
 
 Verification, password reset and email change send links to a page of your
-app (`redirect`), which posts the token back. `cmd/<app>/mailer.go` is yours:
-it writes the emails, and in development logs them, links included. Elsewhere,
-write how they go (an SMTP server, an email service): until then, sending
-fails with an error that says so.
+app (`redirect`), which posts the token back. They go by the
+[mail](/esquadro/email/) blueprint, which an app with realms needs: from the
+templates `verify_email`, `reset_password`, `confirm_email_change` and
+`email_changed`, which are yours to change; in development, to Mailpit.
 
-With the [jobs](/esquadro/blueprints/reference/jobs/) blueprint, each email is
-a job, retried until it goes, sealed so that its link does not show in the
-queue; an hourly job deletes expired sessions and links, and rotates the JWT
-signing key every `rotate_keys_days`. Without jobs, emails go in the
-background and the [worker](/esquadro/blueprints/reference/worker/) cleans up;
-without either, run `<app> security cleanup` on a schedule.
+With the [jobs](/esquadro/blueprints/reference/jobs/) blueprint, an hourly job
+deletes expired sessions and links, and rotates the JWT signing key every
+`rotate_keys_days`. Without jobs, the
+[worker](/esquadro/blueprints/reference/worker/) does it; without either, run
+`<app> security cleanup` on a schedule.
 
 ## Commands
 

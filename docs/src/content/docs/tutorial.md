@@ -33,7 +33,9 @@ curl -X POST localhost:8080/api/v1/categories -H "authorization: Bearer $TOKEN" 
   -H 'content-type: application/json' -d '{"name":"Books"}'
 ```
 
-Without `jq`, copy `session_token` from the sign-in's answer. Anyone may read
+Without `jq`, copy `session_token` from the sign-in's answer. The emails the
+app sends, such as a customer's verification, are at http://localhost:8025
+(Mailpit, which `task up` started). Anyone may read
 the catalog; only an admin changes categories, and staff too products, as the
 `@security` lines of `esquadro/catalog.esq` say. The calls below send the same
 `authorization` header, left out for short.
