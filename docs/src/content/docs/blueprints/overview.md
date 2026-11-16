@@ -26,7 +26,7 @@ needs and drops a line to lose a capability. The built-in ones:
 
 | Group | Blueprints |
 |---|---|
-| The program and how it runs | [app](reference/app/), [domain](reference/domain/), [http](reference/http/), [worker](reference/worker/), [jobs](reference/jobs/) |
+| The program and how it runs | [app](reference/app/), [env](reference/env/), [domain](reference/domain/), [http](reference/http/), [worker](reference/worker/), [jobs](reference/jobs/) |
 | PostgreSQL | [postgres](reference/postgres/), [migrations](reference/migrations/), [store](reference/store/), [testcontainers](reference/testcontainers/), [compose](reference/compose/) |
 | The JSON API | [rest](reference/rest/), [api_docs](reference/api_docs/), [cors](reference/cors/), [security_headers](reference/security_headers/), [rate_limit](reference/rate_limit/), [compression](reference/compression/), [i18n](reference/i18n/) |
 | Running it in production | [observability](reference/observability/) (see [Observability](/esquadro/observability/)), [docker](reference/docker/), [github_actions](reference/github_actions/) (see [Deploying](/esquadro/deploying/)) |
@@ -81,9 +81,10 @@ generating.
 ## Configuring them
 
 Options go in the app block and have a default that suits development. The
-ones read when the service starts (a port, a rate limit) can be changed in
-production by an environment variable, named in each blueprint's reference:
-`SHOP_RATE_LIMIT=300`.
+ones read when the service starts (a port, a rate limit) are environment
+variables, declared by the blueprint and listed in its reference, which
+each environment can set: `SHOP_RATE_LIMIT=300` (see
+[Environment variables](/esquadro/language/environment/)).
 
 ## Where they come from
 

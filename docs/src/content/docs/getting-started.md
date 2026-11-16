@@ -68,7 +68,11 @@ program with the `check` and `version` commands, and you
 [add blueprints](#add-what-you-need) as you need them.
 
 `esquadro new` writes the model in `esquadro/`, generates the project from it
-and, with the `git` blueprint, makes it a repository with a first commit. The
+and, with the `git` blueprint, makes it a repository with a first commit.
+With the `env` blueprint, the project has three environments (`development`,
+`staging`, `production`), every variable has a value in development, and
+`.env.example` documents them all (see
+[Environment variables](/esquadro/language/environment/)). The
 `api` starter writes:
 
 ```

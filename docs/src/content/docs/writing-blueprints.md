@@ -84,6 +84,7 @@ blueprint billing {
 | `requires a, b` | blueprints the app must use too |
 | `optional a, b` | blueprints it works with when the app has them: it comes after them, and its contributions to their slots are dropped without them |
 | `option name type mods` | an option: type `string`, `int`, `number`, `bool`, `name` or `list`; `default(v)` or `required` |
+| `env NAME type mods` | an environment variable the blueprint's code reads, as `config.Config.Name` (see [Environment variables](/esquadro/language/environment/)); a string value may be a template, such as `default("{{.Options.port}}")` |
 | `annotation app\|entity\|field\|relation\|job { key type }` | the keys of `@billing(...)` on that element; key types also `field` and `fields` (names of the entity's fields) |
 | `slot "billing.x"` | a point where other blueprints add code; its name starts with the blueprint's |
 | `go_require "module" "version"` | a Go module the generated code needs at least |

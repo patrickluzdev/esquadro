@@ -13,14 +13,22 @@ The base of every generated project: the command line and its commands, the depe
 blueprint app
 ```
 
+## Environment variables
+
+Read when the app starts; see [Environment variables](/esquadro/language/environment/).
+
+| Variable | Type | Value | |
+|---|---|---|---|
+| `APP_NAME` | string | the app's, from its blueprints and options | The app's name, in its logs and telemetry: run one binary as shop-api and shop-worker, for example. |
+
 ## Slots
 
 Other blueprints add code at these points (see [Writing a blueprint](/esquadro/writing-blueprints/#slots)).
 
 | Slot | |
 |---|---|
-| `app.config.fields` | Fields of config.Config. |
-| `app.config.load` | Code in config.Load that fills those fields from the environment with the loader l: l.text(name, "default"), l.number(name, 1), l.ratio(name, 0.5), l.flag(name, true) or l.list(name, []string{"a"}); c is the Config. |
+| `app.config.fields` | Fields of config.Config, for blueprints that read their variables in code; declare them with env instead. |
+| `app.config.load` | Code in config.Load that fills those fields from the environment, for blueprints that read their variables in code, with the loader l: l.text(name, "default"), l.number(name, 1), l.ratio(name, 0.5), l.flag(name, true) or l.list(name, []string{"a"}); c is the Config. |
 | `app.commands` | Cases of the command switch in run, each returning the command's error, e.g. case "migrate": return migrate(ctx). The case "" is the command run without arguments. The app's own command is check, which opens every dependency to see that the configuration works. |
 | `app.dependencies.imports` | Imports of cmd/&lt;app>/dependencies.go. |
 | `app.dependencies` | Fields of the dependencies struct. |

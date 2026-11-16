@@ -136,6 +136,46 @@ project checks, and that its generated code is what the model generates;
 says how to fix what is not. Outside a project, it checks the tools only.
 ```
 
+## esquadro env
+
+List and check the project's environment variables.
+
+```
+Usage: esquadro env <command> [arguments]
+
+Commands:
+  list   list the project's environment variables, by environment
+  check  check an environment's .env file against the model
+
+Variables are declared in the model: by blueprints, and in app.esq's env blocks.
+```
+
+### esquadro env list
+
+List the project's environment variables, by environment.
+
+```
+Usage: esquadro env list [dir]
+
+Lists the environment variables of the project in dir (default: the current
+directory): their type, the environments that require them, their value in
+each environment from the model, and the blueprint that declares them.
+```
+
+### esquadro env check
+
+Check an environment's .env file against the model.
+
+```
+Usage: esquadro env check [environment] [dir]
+
+Checks the .env.<environment> file of the project in dir (default: the
+current directory), or of every environment, against the model: the
+variables the environment requires that have no value, values of the wrong
+type, and variables the model does not declare. The process's environment
+is not read: it checks what the file and the model give.
+```
+
 ## esquadro explain
 
 Tell where a generated file came from.
@@ -222,7 +262,7 @@ listed in app.esq and an example model:
   cli      A command line tool: commands, configuration and CI, nothing else to start with.
 
   -blueprints string
-    	comma-separated blueprints of the app, instead of a starter (default: app)
+    	comma-separated blueprints of the app, instead of a starter (default: app,env)
   -module string
     	Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)
   -no-gen

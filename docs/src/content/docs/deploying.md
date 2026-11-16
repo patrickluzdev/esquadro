@@ -25,10 +25,13 @@ docker run shop:dev version       # dev, or the version it was built with
 The image's version comes from `docker build --build-arg VERSION=v1.2.0`; the
 CI below passes the tag's.
 
-The image runs in production mode (`SHOP_ENV=production`: JSON logs, no
-`/docs`), and is configured by environment variables, as the app is
-(`DATABASE_URL`, `PORT`...). With `http`, it exposes the port and checks its
-own health (`shop health`, which asks `/healthz`).
+The image runs in production (`APP_ENV=production`: JSON logs, no `/docs`),
+and is configured by environment variables, as the app is: the platform
+sets the ones production requires (`esquadro env list` shows them), or the
+app refuses to start, saying which are missing (see
+[Environment variables](/esquadro/language/environment/)). With `http`, it
+exposes the port and checks its own health (`shop health`, which asks
+`/healthz`).
 
 With `compose`, the app is also a service of `compose.yaml`, in the `app`
 profile, so that `task up` keeps starting only what the app needs:
@@ -71,5 +74,5 @@ somewhere (see [Observability](/esquadro/observability/)).
 
 The image runs anywhere that runs containers. Blueprints for specific
 platforms (Fly.io, Kubernetes...) are planned; until then, point your
-platform at the image and give it the environment variables of
-`internal/platform/config/config.go`.
+platform at the image and give it the environment variables production
+requires, which `esquadro env list` shows.
