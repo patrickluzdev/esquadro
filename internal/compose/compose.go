@@ -12,6 +12,8 @@
 //	  {{.Relation.Snake}}.go.tmpl            once per relation, each side
 //	  notes.md.once.tmpl                     owned by the user after creation
 //	  static/logo.png                        copied as is (no .tmpl)
+//	files/
+//	  welcome.txt               read as it is by {{file "welcome.txt"}}
 //	slots/
 //	  platform.routes.tmpl      contribution to the slot platform.routes
 //	  platform.routes/*.tmpl    several contributions to the same slot
@@ -45,6 +47,7 @@ const (
 	templatesDir = "templates"
 	slotsDir     = "slots"
 	tmplExt      = ".tmpl"
+	filesDir     = "files"
 	onceExt      = ".once.tmpl"
 )
 
@@ -348,6 +351,16 @@ func (c *composer) parse(bp *blueprint.Blueprint, name, p string) *template.Temp
 func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 	self := bp.Manifest.Name
 	funcs := c.baseFuncs(self)
+	// file is the content of files/<name> of the blueprint, as it is: for
+	// files with templates of their own, such as an email's, which
+	// {{if}} can still leave out.
+	funcs["file"] = func(name string) (string, error) {
+		b, err := fs.ReadFile(bp.FS, path.Join(filesDir, path.Clean("/" + name)[1:]))
+		if err != nil {
+			return "", fmt.Errorf("file %q: no files/%s in blueprint %s", name, name, self)
+		}
+		return string(b), nil
+	}
 	maps.Copy(funcs, envFuncs(func(name string) map[string]any { return c.set.Options[name] }))
 	maps.Copy(funcs, c.extra[self])
 	return funcs

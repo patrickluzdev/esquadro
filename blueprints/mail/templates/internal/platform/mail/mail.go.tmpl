@@ -47,6 +47,10 @@ type Mailer struct {
 	transport Transport
 	from      string
 	logger    *slog.Logger
+	// enqueue sends by the job queue, when there is one; sendNow sends
+	// before Send returns, for tests.
+	enqueue func(ctx context.Context, m Message) error
+	sendNow bool
 }
 
 // New returns the mailer of cfg, or what is wrong with it.
@@ -62,9 +66,10 @@ func New(cfg Config, logger *slog.Logger) (*Mailer, error) {
 	return &Mailer{transport: transport, from: from.String(), logger: logger}, nil
 }
 
-// NewWith returns a mailer that hands its messages to transport: for tests.
+// NewWith returns a mailer that hands its messages to transport before
+// Send returns: for tests.
 func NewWith(transport Transport, from string) *Mailer {
-	return &Mailer{transport: transport, from: from}
+	return &Mailer{transport: transport, from: from, sendNow: true}
 }
 
 // Deliver hands a written message to the transport now, from MAIL_FROM

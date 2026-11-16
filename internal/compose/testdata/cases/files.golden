@@ -1,0 +1,4 @@
+=== welcome.txt  [core: welcome.txt.once.tmpl] once
+Subject: Hello, {{.Name}}
+
+This is copied as it is: {{.Name}} is not rendered.

@@ -1,0 +1,6 @@
+Subject: Welcome, {{.Name}}
+Hi {{.Name}},
+
+This email comes from a template of the project:
+internal/platform/mail/templates/welcome.txt (and welcome.html). Change it,
+or write others like it, and send them with Mailer.Send.

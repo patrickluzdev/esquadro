@@ -1,0 +1,45 @@
+package mail
+
+import (
+	"context"
+	"time"
+)
+
+// Email is an email to send: to whom, and the template that writes it
+// with Data.
+type Email struct {
+	To       []string
+	Template string
+	Data     any
+	ReplyTo  string
+}
+
+// Send writes an email from its template now, so that a template that
+// fails fails here, and sends it in the background: by the job queue when
+// the app has one, retried until it goes; else in this process.
+func (m *Mailer) Send(ctx context.Context, e Email) error {
+	msg, err := Write(e.Template, e.Data)
+	if err != nil {
+		return err
+	}
+	msg.To, msg.ReplyTo, msg.From = e.To, e.ReplyTo, m.from
+	if err := check(msg); err != nil {
+		return err
+	}
+	if m.enqueue != nil {
+		return m.enqueue(ctx, msg)
+	}
+	work := func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+		defer cancel()
+		if err := m.Deliver(ctx, msg); err != nil && m.logger != nil {
+			m.logger.ErrorContext(ctx, "mail", "error", err)
+		}
+	}
+	if m.sendNow {
+		work()
+		return nil
+	}
+	go work()
+	return nil
+}

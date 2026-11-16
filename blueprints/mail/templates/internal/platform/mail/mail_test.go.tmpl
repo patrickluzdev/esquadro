@@ -252,3 +252,11 @@ func TestConfigAndMessagesRefused(t *testing.T) {
 		t.Fatalf("log: %v", err)
 	}
 }
+
+// transportFunc is a transport that hands messages to a function.
+type transportFunc func(Message)
+
+func (f transportFunc) Deliver(_ context.Context, m Message) error {
+	f(m)
+	return nil
+}

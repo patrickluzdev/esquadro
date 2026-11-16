@@ -1,0 +1,3 @@
+Subject: Hello, {{.Name}}
+
+This is copied as it is: {{.Name}} is not rendered.

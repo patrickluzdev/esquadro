@@ -1,0 +1,64 @@
+package mail
+
+import (
+	"encoding/json"
+	"io/fs"
+	"strings"
+	"testing"
+)
+
+// TestTemplates writes every email of the app with its <name>.json, so
+// that a template that names a field its data does not have fails here,
+// not when it is sent. A template without one is only parsed.
+func TestTemplates(t *testing.T) {
+	names := Templates()
+	if len(names) == 0 {
+		t.Fatal("no templates")
+	}
+	for _, name := range names {
+		raw, err := fs.ReadFile(templates, "templates/"+name+".json")
+		if err != nil {
+			if _, err := parse(name); err != nil {
+				t.Error(err)
+			}
+			continue
+		}
+		var data any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			t.Errorf("%s.json: %v", name, err)
+			continue
+		}
+		msg, err := Write(name, data)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if msg.Subject == "" || strings.TrimSpace(msg.Text) == "" {
+			t.Errorf("%s: an empty subject or text", name)
+		}
+	}
+}
+
+func TestWriteAndSend(t *testing.T) {
+	msg, err := Write("welcome", map[string]any{"Name": "<Ana>"})
+	if err != nil || msg.Subject != "Welcome, <Ana>" || !strings.Contains(msg.HTML, "Hi &lt;Ana&gt;") || !strings.Contains(msg.Text, "Hi <Ana>,") {
+		t.Fatalf("%+v %v", msg, err)
+	}
+	if _, err := Write("welcome", map[string]any{}); err == nil {
+		t.Fatal("a missing field passed")
+	}
+	if _, err := Write("../secret", nil); err == nil {
+		t.Fatal("a path passed as a name")
+	}
+	var got []Message
+	m := NewWith(transportFunc(func(m Message) { got = append(got, m) }), "Shop <no-reply@shop.example>")
+	if err := m.Send(t.Context(), Email{To: []string{"ana@example.com"}, Template: "welcome", Data: map[string]any{"Name": "Ana"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].From != "\"Shop\" <no-reply@shop.example>" && got[0].From != "Shop <no-reply@shop.example>" {
+		t.Fatalf("%+v", got)
+	}
+	if err := m.Send(t.Context(), Email{To: []string{"ana@example.com"}, Template: "nope"}); err == nil {
+		t.Fatal("a template that does not exist passed")
+	}
+}

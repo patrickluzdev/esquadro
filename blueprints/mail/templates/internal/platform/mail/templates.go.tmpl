@@ -1,0 +1,96 @@
+package mail
+
+import (
+	"bytes"
+	"embed"
+	"errors"
+	"fmt"
+	htmltemplate "html/template"
+	"io/fs"
+	"strings"
+	"sync"
+	"text/template"
+)
+
+// templates are the emails of the app, one per name: <name>.txt, whose
+// first line is "Subject: ...", and, for an HTML version, <name>.html
+// defining "content", which _layout.html wraps. <name>.json, data to try
+// the template with, is for the tests.
+//
+//go:embed all:templates
+var templates embed.FS
+
+// written is a template, parsed once.
+type written struct {
+	subject, text *template.Template
+	html          *htmltemplate.Template
+}
+
+var parsed sync.Map // name -> *written
+
+// Write is the message the template name writes with data: its subject and
+// text, and its HTML when it has one.
+func Write(name string, data any) (Message, error) {
+	w, err := parse(name)
+	if err != nil {
+		return Message{}, err
+	}
+	var subject, text, html bytes.Buffer
+	if err := w.subject.Execute(&subject, data); err != nil {
+		return Message{}, fmt.Errorf("mail: %s: %w", name, err)
+	}
+	if err := w.text.Execute(&text, data); err != nil {
+		return Message{}, fmt.Errorf("mail: %s: %w", name, err)
+	}
+	if w.html != nil {
+		if err := w.html.ExecuteTemplate(&html, "_layout.html", data); err != nil {
+			return Message{}, fmt.Errorf("mail: %s: %w", name, err)
+		}
+	}
+	return Message{Subject: strings.TrimSpace(subject.String()), Text: strings.TrimSpace(text.String()) + "\n", HTML: html.String()}, nil
+}
+
+// Templates are the names of the app's emails.
+func Templates() []string {
+	entries, _ := fs.Glob(templates, "templates/*.txt")
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, strings.TrimSuffix(strings.TrimPrefix(e, "templates/"), ".txt"))
+	}
+	return names
+}
+
+func parse(name string) (*written, error) {
+	if w, ok := parsed.Load(name); ok {
+		return w.(*written), nil
+	}
+	if strings.ContainsAny(name, "/\\.") {
+		return nil, fmt.Errorf("mail: %q is not a template name", name)
+	}
+	raw, err := fs.ReadFile(templates, "templates/"+name+".txt")
+	if err != nil {
+		return nil, fmt.Errorf("mail: no template %s: write internal/platform/mail/templates/%s.txt", name, name)
+	}
+	first, body, _ := strings.Cut(string(raw), "\n")
+	subject, ok := strings.CutPrefix(first, "Subject:")
+	if !ok {
+		return nil, fmt.Errorf("mail: %s.txt: the first line is the subject, Subject: ...", name)
+	}
+	w := &written{}
+	if w.subject, err = template.New(name + ".subject").Option("missingkey=error").Parse(strings.TrimSpace(subject)); err != nil {
+		return nil, fmt.Errorf("mail: %s.txt: %w", name, err)
+	}
+	if w.text, err = template.New(name + ".txt").Option("missingkey=error").Parse(body); err != nil {
+		return nil, fmt.Errorf("mail: %s.txt: %w", name, err)
+	}
+	if _, err := fs.Stat(templates, "templates/"+name+".html"); err == nil {
+		w.html, err = htmltemplate.New(name).Option("missingkey=error").ParseFS(templates, "templates/_layout.html", "templates/"+name+".html")
+		if err != nil {
+			return nil, fmt.Errorf("mail: %s.html: %w", name, err)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	parsed.Store(name, w)
+	return w, nil
+}
