@@ -1,0 +1,11 @@
+package {{.Job.Module.Snake}}
+
+import "context"
+
+// work{{.Job.Pascal}} does the {{.Job.Pascal}} job. This file is yours:
+// esquadro wrote it once and leaves it alone. An error makes the queue try
+// the job again later; the module's use cases are m's methods.
+func (m *{{.Job.Module.Pascal}}) work{{.Job.Pascal}}(ctx context.Context, args {{.Job.Pascal}}Args) error {
+	_, _ = ctx, args
+	return nil
+}

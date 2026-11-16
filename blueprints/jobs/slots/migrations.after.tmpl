@@ -1,0 +1,8 @@
+	// The job queue's tables, as the River version in go.mod has them.
+	migrator, err := rivermigrate.New(riverdatabasesql.New(db), nil)
+	if err != nil {
+		return fmt.Errorf("migrations: job queue: %w", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		return fmt.Errorf("migrations: job queue: %w", err)
+	}

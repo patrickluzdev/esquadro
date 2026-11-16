@@ -46,7 +46,7 @@ func runDocs(args []string, _, stderr io.Writer) int {
 // blueprintOrder lists the built-in blueprints as the site presents them:
 // by group, in the order an app lists them.
 var blueprintOrder = []string{
-	"app", "domain", "http", "worker",
+	"app", "domain", "http", "worker", "jobs",
 	"postgres", "migrations", "store", "testcontainers", "compose",
 	"rest", "api_docs", "cors", "security_headers", "rate_limit", "compression", "i18n",
 	"docker", "github_actions",

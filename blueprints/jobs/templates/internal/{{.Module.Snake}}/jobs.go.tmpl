@@ -1,0 +1,16 @@
+{{- if .Module.Jobs -}}
+package {{.Module.Snake}}
+
+import "{{.App.Module}}/internal/platform/jobs"
+
+// RegisterJobs registers the work of the module's jobs, and the schedules of
+// the periodic ones.
+func (m *{{.Module.Pascal}}) RegisterJobs(r *jobs.Registry) {
+{{- range .Module.Jobs}}{{$j := .}}
+	jobs.Add(r, m.work{{.Pascal}})
+{{- with index (ann .) "every"}}
+	jobs.Every(r, {{quote .}}, {{$j.Pascal}}Args{}.WithDefaults())
+{{- end}}
+{{- end}}
+}
+{{end -}}

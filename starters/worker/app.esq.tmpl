@@ -2,10 +2,11 @@
 app {{.Name}} {
   module "{{.Module}}"
 
-  // the program, its modules and the processes it runs
+  // the program, its modules, and the jobs it works in the background
   blueprint app
   blueprint domain
   blueprint worker
+  blueprint jobs
 
   // PostgreSQL: connection, migrations, use cases, tests and local services
   blueprint postgres

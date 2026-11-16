@@ -1,4 +1,5 @@
-{{- if .Entities -}}
+{{- $after := slot "migrations.after" . -}}
+{{- if or .Entities $after -}}
 // Package migrations holds the database migrations, written by esquadro from
 // each change in the .esq files and owned by you once written.
 package migrations
@@ -6,25 +7,36 @@ package migrations
 import (
 	"context"
 	"database/sql"
+{{- if .Entities}}
 	"embed"
+{{- end}}
 	"fmt"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // the "pgx" driver goose uses through database/sql
+{{- if .Entities}}
 	"github.com/pressly/goose/v3"
+{{- end}}
+{{- with slot "migrations.imports" .}}
+{{.}}
+{{- end}}
 )
+{{- if .Entities}}
 
 // FS holds every migration, applied in order by goose.
 //
 //go:embed *.sql
 var FS embed.FS
+{{- end}}
 
-// Apply applies the migrations the database at url does not have yet.
+// Apply applies the migrations the database at url does not have yet{{if $after}}, then
+// those of the app's blueprints{{end}}.
 func Apply(ctx context.Context, url string) error {
 	db, err := sql.Open("pgx", url)
 	if err != nil {
 		return fmt.Errorf("migrations: %w", err)
 	}
 	defer db.Close()
+{{- if .Entities}}
 	provider, err := goose.NewProvider(goose.DialectPostgres, db, FS)
 	if err != nil {
 		return fmt.Errorf("migrations: load: %w", err)
@@ -32,6 +44,10 @@ func Apply(ctx context.Context, url string) error {
 	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("migrations: apply: %w", err)
 	}
+{{- end}}
+{{- with $after}}
+{{.}}
+{{- end}}
 	return nil
 }
 {{end -}}

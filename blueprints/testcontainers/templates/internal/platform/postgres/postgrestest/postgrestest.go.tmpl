@@ -1,4 +1,4 @@
-{{- if .Entities -}}
+{{- if or .Entities (slot "migrations.after" .) -}}
 // Package postgrestest gives each test its own Postgres database, cloned from
 // a migrated template in one container per test binary. Tests need Docker.
 package postgrestest

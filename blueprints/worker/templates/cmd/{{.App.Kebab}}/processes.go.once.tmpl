@@ -1,3 +1,17 @@
+{{- if uses "jobs" -}}
+package main
+
+import "{{.App.Module}}/internal/platform/worker"
+
+// processes are work of your own the run command does, side by side with
+// the job queue, until the app is asked to stop. This file is yours:
+// esquadro wrote it once and leaves it alone. The jobs of the model need
+// nothing here: the queue is a process of its own. A process runs until its
+// context ends, and worker.Every runs one at an interval.
+func (d dependencies) processes() []worker.Process {
+	return nil
+}
+{{- else -}}
 package main
 
 import (
@@ -19,3 +33,4 @@ func (d dependencies) processes() []worker.Process {
 		})},
 	}
 }
+{{- end}}

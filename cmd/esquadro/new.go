@@ -21,7 +21,7 @@ import (
 // blueprintGroups name what the built-in blueprints are for, as comments
 // over them in an app.esq written from a list of blueprints.
 var blueprintGroups = map[string]string{
-	"app": "base", "domain": "base", "http": "base", "worker": "base",
+	"app": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",

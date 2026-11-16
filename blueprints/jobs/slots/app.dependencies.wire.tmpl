@@ -1,0 +1,8 @@
+	registry := jobs.NewRegistry()
+{{- range .Modules}}{{if .Jobs}}
+	d.{{.Camel}}.RegisterJobs(registry)
+{{- end}}{{end}}
+	if err = d.jobs.Open(d.pool, registry, jobs.Config{Workers: d.config.JobsWorkers, Queues: d.config.JobsQueues}, d.logger); err != nil {
+		release()
+		return d, nil, err
+	}

@@ -1,0 +1,173 @@
+// Package jobs is the job queue of {{.App.Label}}: River, on its PostgreSQL.
+// Modules enqueue their jobs; the worker's run command works them.
+package jobs
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"slices"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/robfig/cron/v3"
+)
+
+// Queue enqueues jobs and, in the worker, works them. It is made empty, so
+// that modules can hold it, and opened once they have registered their jobs.
+type Queue struct {
+	client *river.Client[pgx.Tx]
+	// working is whether there is work to do: a registered job.
+	working bool
+}
+
+// NewQueue returns a queue to open.
+func NewQueue() *Queue { return &Queue{} }
+
+// Config is how the queue works jobs.
+type Config struct {
+	// Workers is how many jobs each queue works at once, in each process.
+	Workers int
+	// Queues are the queues worked.
+	Queues []string
+}
+
+// Registry collects the work of each kind of job and the schedules of the
+// periodic ones.
+type Registry struct {
+	workers  *river.Workers
+	periodic []*river.PeriodicJob
+	queues   map[string]string // the queue of each kind of job
+	n        int
+	errs     []error
+}
+
+// NewRegistry returns an empty registry.
+func NewRegistry() *Registry {
+	return &Registry{workers: river.NewWorkers(), queues: map[string]string{}}
+}
+
+// Add registers the work of a kind of job: work runs once per job, and an
+// error makes River try it again later.
+func Add[T river.JobArgs](r *Registry, work func(ctx context.Context, args T) error) {
+	river.AddWorker(r.workers, river.WorkFunc(func(ctx context.Context, job *river.Job[T]) error {
+		return work(ctx, job.Args)
+	}))
+	var zero T
+	r.queues[zero.Kind()] = queueOf(zero)
+	r.n++
+}
+
+// Every enqueues args on a cron schedule: five fields ("0 3 * * *"), or
+// "@every 10m", "@hourly", "@daily".
+func Every(r *Registry, schedule string, args river.JobArgs) {
+	s, err := cron.ParseStandard(schedule)
+	if err != nil {
+		r.errs = append(r.errs, fmt.Errorf("jobs: %s: schedule %q: %w", args.Kind(), schedule, err))
+		return
+	}
+	if v, ok := args.(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			r.errs = append(r.errs, fmt.Errorf("jobs: %s runs every %q with its defaults, which are not valid: %w", args.Kind(), schedule, err))
+			return
+		}
+	}
+	r.periodic = append(r.periodic, river.NewPeriodicJob(s,
+		func() (river.JobArgs, *river.InsertOpts) { return args, nil },
+		&river.PeriodicJobOpts{ID: args.Kind()}))
+}
+
+func queueOf(args river.JobArgs) string {
+	if o, ok := args.(river.JobArgsWithInsertOpts); ok && o.InsertOpts().Queue != "" {
+		return o.InsertOpts().Queue
+	}
+	return river.QueueDefault
+}
+
+// Open makes the queue ready on pool, with the jobs of the registry.
+func (q *Queue) Open(pool *pgxpool.Pool, r *Registry, cfg Config, logger *slog.Logger) error {
+	if err := errors.Join(r.errs...); err != nil {
+		return err
+	}
+	config := &river.Config{Workers: r.workers, PeriodicJobs: r.periodic, Logger: logger}
+	if r.n > 0 {
+		config.Queues = map[string]river.QueueConfig{}
+		for _, name := range cfg.Queues {
+			config.Queues[name] = river.QueueConfig{MaxWorkers: max(cfg.Workers, 1)}
+		}
+		for kind, queue := range r.queues {
+			if !slices.Contains(cfg.Queues, queue) {
+				return fmt.Errorf("jobs: %s goes to queue %q, which is not worked: add it to the jobs blueprint's queues", kind, queue)
+			}
+		}
+	}
+	client, err := river.NewClient(riverpgxv5.New(pool), config)
+	if err != nil {
+		return fmt.Errorf("jobs: %w", err)
+	}
+	q.client, q.working = client, r.n > 0
+	return nil
+}
+
+// Enqueue adds a job to the queue, once its arguments are valid.
+func (q *Queue) Enqueue(ctx context.Context, args river.JobArgs) error {
+	return q.insert(ctx, nil, args)
+}
+
+// EnqueueTx adds a job in the transaction tx: it is enqueued only if tx
+// commits.
+func (q *Queue) EnqueueTx(ctx context.Context, tx pgx.Tx, args river.JobArgs) error {
+	return q.insert(ctx, tx, args)
+}
+
+func (q *Queue) insert(ctx context.Context, tx pgx.Tx, args river.JobArgs) error {
+	if q.client == nil {
+		return errors.New("jobs: the queue is not open")
+	}
+	if v, ok := args.(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
+	var err error
+	if tx != nil {
+		_, err = q.client.InsertTx(ctx, tx, args, nil)
+	} else {
+		_, err = q.client.Insert(ctx, args, nil)
+	}
+	if err != nil {
+		return fmt.Errorf("jobs: enqueue %s: %w", args.Kind(), err)
+	}
+	return nil
+}
+
+// Count is how many jobs of a kind are in the queue, in any state: for
+// tests.
+func (q *Queue) Count(ctx context.Context, kind string) (int, error) {
+	res, err := q.client.JobList(ctx, river.NewJobListParams().Kinds(kind).First(10_000))
+	if err != nil {
+		return 0, err
+	}
+	return len(res.Jobs), nil
+}
+
+// Run works the jobs until ctx ends, then lets the running ones finish, for
+// up to 30 seconds: a process of the worker.
+func (q *Queue) Run(ctx context.Context) error {
+	if !q.working {
+		<-ctx.Done()
+		return nil
+	}
+	// Jobs must not stop when ctx does: Stop lets them finish.
+	if err := q.client.Start(context.WithoutCancel(ctx)); err != nil {
+		return fmt.Errorf("jobs: %w", err)
+	}
+	<-ctx.Done()
+	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	return q.client.Stop(stop)
+}

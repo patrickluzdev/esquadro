@@ -1,0 +1,36 @@
+/// Work in the background, on a queue in PostgreSQL (River): each job the
+/// model declares gets its arguments' type, with their rules, a method of
+/// its module that enqueues it (EnqueueX, and EnqueueXTx in a transaction,
+/// so that it is enqueued only if the transaction commits), and a file of
+/// yours where its work goes. The worker's run command works the queue: a
+/// job that fails is tried again later, a job is worked once even with
+/// several workers, and one with @jobs(every "...") is enqueued on that
+/// schedule.
+blueprint jobs {
+  version "0.1.0"
+  requires app, domain, postgres, migrations, worker
+  optional testcontainers
+
+  /// Jobs worked at once, per queue, by each process; <APP>_JOBS_WORKERS
+  /// overrides it.
+  option workers int default(10)
+  /// The queues the worker works; a job goes to default unless its
+  /// @jobs(queue ...) says otherwise.
+  option queues list default(["default"])
+
+  annotation job {
+    /// When to enqueue the job, as cron: "0 3 * * *" (every day at 3:00),
+    /// or "@every 10m", "@hourly", "@daily". Its arguments are then their
+    /// defaults.
+    every string
+    /// Attempts before the job is given up (River's default: 25).
+    max_attempts int
+    /// The queue it goes to: one of the blueprint's queues.
+    queue string
+  }
+
+  go_require "github.com/riverqueue/river" "v0.50.0"
+  go_require "github.com/riverqueue/river/riverdriver/riverpgxv5" "v0.50.0"
+  go_require "github.com/riverqueue/river/riverdriver/riverdatabasesql" "v0.50.0"
+  go_require "github.com/robfig/cron/v3" "v3.0.1"
+}

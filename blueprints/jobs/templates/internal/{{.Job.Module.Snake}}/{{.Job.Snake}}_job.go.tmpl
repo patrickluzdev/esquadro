@@ -1,0 +1,171 @@
+{{- $j := .Job -}}{{- $m := .Job.Module -}}
+{{- $utf8 := ""}}{{$re := "" -}}
+{{- range $j.Fields -}}
+{{- if and (or (eq .Type "string") (eq .Type "text")) (or .Min .Max)}}{{$utf8 = "unicode/utf8"}}{{end -}}
+{{- if .Pattern}}{{$re = "regexp"}}{{end -}}
+{{- end -}}
+{{- $queue := index (ann $j) "queue"}}{{$attempts := index (ann $j) "max_attempts" -}}
+{{- $defaults := false}}
+{{- range $j.Fields}}{{if and .Default (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end -}}
+package {{$m.Snake}}
+
+{{importBlock "context" (goImports $j) $re $utf8 "github.com/jackc/pgx/v5" (and (or $queue $attempts) "github.com/riverqueue/river")}}
+// {{$j.Pascal}}Args are the arguments of the {{$j.Pascal}} job.
+{{- with $j.Doc}}
+//
+{{- range .}}
+//{{if .}} {{.}}{{end}}
+{{- end}}
+{{- end}}
+type {{$j.Pascal}}Args struct {
+{{- range $j.Fields}}
+{{- if .Doc}}
+	{{goDoc .Pascal .Doc ""}}
+{{- end}}
+	{{.Pascal}} {{goType .}} `json:"{{.Snake}}"`
+{{- end}}
+}
+
+// Kind names the job in the queue.
+func ({{$j.Pascal}}Args) Kind() string { return "{{$m.Snake}}.{{$j.Snake}}" }
+{{- if or $queue $attempts}}
+
+// InsertOpts are how the job is enqueued, from its @jobs annotation.
+func ({{$j.Pascal}}Args) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{ {{- if $queue}}Queue: {{quote $queue}}{{end}}{{if and $queue $attempts}}, {{end}}{{if $attempts}}MaxAttempts: {{$attempts}}{{end -}} }
+}
+{{- end}}
+{{- if $defaults}}
+
+// WithDefaults fills the arguments left empty with their defaults.
+func (a {{$j.Pascal}}Args) WithDefaults() {{$j.Pascal}}Args {
+{{- range $j.Fields}}{{if .Default}}{{$x := printf "a.%s" .Pascal}}
+{{- if or (eq .Type "string") (eq .Type "text")}}
+	if {{$x}} == "" {
+		{{$x}} = {{quote .Default.Text}}
+	}
+{{- else if eq .Type "uuid"}}
+	if {{$x}} == uuid.Nil() {
+		{{$x}} = uuid.MustParse({{quote .Default.Text}})
+	}
+{{- else if eq .Type "enum"}}
+	if {{$x}} == "" {
+		{{$x}} = {{.Enum.Pascal}}{{.Default.EnumValue.Pascal}}
+	}
+{{- else if eq .Type "json"}}
+	if len({{$x}}) == 0 {
+		{{$x}} = json.RawMessage({{quote .Default.Text}})
+	}
+{{- else if and (or (eq .Type "time") (eq .Type "date")) (eq .Default.Text "now")}}
+	if {{$x}}.IsZero() {
+		{{$x}} = time.Now()
+	}
+{{- end}}
+{{- end}}{{end}}
+	return a
+}
+{{- else}}
+
+// WithDefaults returns a: no argument has a default an empty value could
+// stand for.
+func (a {{$j.Pascal}}Args) WithDefaults() {{$j.Pascal}}Args { return a }
+{{- end}}
+{{range $j.Fields}}{{if .Pattern}}
+// {{$j.Camel}}{{.Pascal}}Pattern is the pattern declared for {{$j.Pascal}}.{{.Raw}}.
+var {{$j.Camel}}{{.Pascal}}Pattern = regexp.MustCompile({{rawQuote .Pattern}})
+{{end}}{{end}}
+{{- $checks := false}}
+{{- range $j.Fields}}
+{{- if and .Required (not (or (eq .Type "int") (eq .Type "int64") (eq .Type "decimal") (eq .Type "bool")))}}{{$checks = true}}{{end}}
+{{- if or .Min .Max .Pattern (eq .Type "enum")}}{{$checks = true}}{{end}}
+{{- end}}
+{{- if not $checks}}
+// Validate checks the arguments: no rule is declared for them.
+func (a {{$j.Pascal}}Args) Validate() error { return nil }
+{{- else}}
+// Validate checks the arguments against the rules declared for them.
+func (a {{$j.Pascal}}Args) Validate() error {
+	var invalid []FieldError
+	refuse := func(field, code string) { invalid = append(invalid, FieldError{Field: field, Code: code}) }
+{{- range $j.Fields}}{{$x := printf "a.%s" .Pascal}}
+{{- if .Required}}
+{{- if or (eq .Type "string") (eq .Type "text") (eq .Type "enum")}}
+	if {{$x}} == "" {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "uuid"}}
+	if {{$x}} == uuid.Nil() {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if or (eq .Type "time") (eq .Type "date")}}
+	if {{$x}}.IsZero() {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "json"}}
+	if len({{$x}}) == 0 {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- end}}
+{{- end}}
+{{- if or (eq .Type "string") (eq .Type "text")}}
+{{- if .Min}}
+	if {{$x}} != "" && utf8.RuneCountInString({{$x}}) < {{.Min.Text}} {
+		refuse({{quote .Snake}}, "too_short")
+	}
+{{- end}}
+{{- if .Max}}
+	if utf8.RuneCountInString({{$x}}) > {{.Max.Text}} {
+		refuse({{quote .Snake}}, "too_long")
+	}
+{{- end}}
+{{- if .Pattern}}
+	if {{$x}} != "" && !{{$j.Camel}}{{.Pascal}}Pattern.MatchString({{$x}}) {
+		refuse({{quote .Snake}}, "pattern")
+	}
+{{- end}}
+{{- else if or (eq .Type "int") (eq .Type "int64")}}
+{{- if .Min}}
+	if {{$x}} < {{.Min.Text}} {
+		refuse({{quote .Snake}}, "too_small")
+	}
+{{- end}}
+{{- if .Max}}
+	if {{$x}} > {{.Max.Text}} {
+		refuse({{quote .Snake}}, "too_large")
+	}
+{{- end}}
+{{- else if eq .Type "decimal"}}
+{{- if .Min}}
+	if {{$x}}.LessThan(decimal.RequireFromString({{quote .Min.Text}})) {
+		refuse({{quote .Snake}}, "too_small")
+	}
+{{- end}}
+{{- if .Max}}
+	if {{$x}}.GreaterThan(decimal.RequireFromString({{quote .Max.Text}})) {
+		refuse({{quote .Snake}}, "too_large")
+	}
+{{- end}}
+{{- else if eq .Type "enum"}}
+	if {{$x}} != "" && !{{$x}}.Valid() {
+		refuse({{quote .Snake}}, "invalid_value")
+	}
+{{- end}}
+{{- end}}
+	if len(invalid) > 0 {
+		return &InvalidFields{Fields: invalid}
+	}
+	return nil
+}
+{{- end}}
+
+// Enqueue{{$j.Pascal}} enqueues the {{$j.Pascal}} job, with its arguments'
+// defaults, once they are valid; *InvalidFields says which are not.
+func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}(ctx context.Context, args {{$j.Pascal}}Args) error {
+	return m.Jobs.Enqueue(ctx, args.WithDefaults())
+}
+
+// Enqueue{{$j.Pascal}}Tx enqueues the {{$j.Pascal}} job in tx: only if tx
+// commits.
+func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}Tx(ctx context.Context, tx pgx.Tx, args {{$j.Pascal}}Args) error {
+	return m.Jobs.EnqueueTx(ctx, tx, args.WithDefaults())
+}

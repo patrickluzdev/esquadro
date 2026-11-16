@@ -1,1 +1,1 @@
-A background service on PostgreSQL: processes that run until it is stopped, with its image and CI.
+A background service on PostgreSQL: jobs on a queue, some on a schedule, worked until it is stopped, with its image and CI.

@@ -5,6 +5,14 @@ blueprint migrations {
   version "0.1.0"
   requires app, postgres
 
+  /// Imports of migrations/migrations.go.
+  slot "migrations.imports"
+  /// Code in migrations.Apply after the model's migrations: the migrations
+  /// of a blueprint's own tables (a job queue...). db is the *sql.DB and ctx
+  /// the context; on failure it returns the error. It also runs on the
+  /// tests' template database.
+  slot "migrations.after"
+
   go_require "github.com/pressly/goose/v3" "v3.24.1"
 
   hook pre-gen "write"

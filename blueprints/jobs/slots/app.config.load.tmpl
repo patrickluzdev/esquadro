@@ -1,0 +1,2 @@
+	c.JobsWorkers = l.number("{{upper .App.Snake}}_JOBS_WORKERS", {{.Options.workers}})
+	c.JobsQueues = l.list("{{upper .App.Snake}}_JOBS_QUEUES", {{goStrings .Options.queues}})

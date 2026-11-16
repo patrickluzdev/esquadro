@@ -22,7 +22,7 @@ type Process struct {
 // every process to return.
 func Run(ctx context.Context, logger *slog.Logger, processes ...Process) error {
 	if len(processes) == 0 {
-		return errors.New("worker: no processes to run")
+		return errors.New("worker: no processes to run: add one to cmd/<app>/processes.go")
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)

@@ -338,6 +338,11 @@ func parents(e *project.Entity) []*project.Relation {
 // sample is a Go expression for a valid value of a field in tests, with i
 // (a Go expression) telling records apart; empty when the field is best
 // left unset (an optional field with a pattern).
+// Sample is a Go expression of a valid value for a field, for tests: pkg
+// qualifies its enum, i is an int expression that makes strings differ. It
+// is empty when no value can be made (a string with a pattern).
+func Sample(f *project.Field, pkg, i string) string { return sample(f, pkg, i) }
+
 func sample(f *project.Field, pkg, i string) string {
 	switch f.Type {
 	case project.TypeString, project.TypeText:
@@ -395,14 +400,17 @@ func sampleString(f *project.Field, i string) string {
 }
 
 // sampleImports lists the imports the samples of an entity need.
-func sampleImports(e *project.Entity) []string {
+func sampleImports(e *project.Entity) []string { return SampleImports(e.Fields) }
+
+// SampleImports are the imports the samples of fields need.
+func SampleImports(fields []*project.Field) []string {
 	var out []string
 	add := func(p string) {
 		if !slices.Contains(out, p) {
 			out = append(out, p)
 		}
 	}
-	for _, f := range e.Fields {
+	for _, f := range fields {
 		if f.Implicit {
 			continue
 		}

@@ -16,7 +16,8 @@ import (
 // TestEveryKindOfProjectRuns generates the smallest project and one from
 // each starter but api (TestLifecycle follows that one), and runs them: each
 // builds, passes go vet and its tests, and answers version; the worker runs
-// its processes against Postgres and stops cleanly when asked to.
+// its job queue against Postgres and stops cleanly when asked to (its
+// generated tests work a job through the queue).
 func TestEveryKindOfProjectRuns(t *testing.T) {
 	if err := exec.Command("docker", "info").Run(); err != nil {
 		t.Fatal("Docker is not available")
@@ -63,11 +64,12 @@ func TestEveryKindOfProjectRuns(t *testing.T) {
 			if err := cmd.Start(); err != nil {
 				t.Fatal(err)
 			}
+			// The job queue runs as a process of the worker.
 			deadline := time.Now().Add(30 * time.Second)
-			for !strings.Contains(logs.String(), "the worker is alive") {
+			for !strings.Contains(logs.String(), "process started") || !strings.Contains(logs.String(), "process=jobs") {
 				if time.Now().After(deadline) {
 					cmd.Process.Kill()
-					t.Fatalf("the worker did not run its process:\n%s", logs.String())
+					t.Fatalf("the worker did not start its job queue:\n%s", logs.String())
 				}
 				time.Sleep(100 * time.Millisecond)
 			}

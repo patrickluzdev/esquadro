@@ -43,11 +43,18 @@ func goType(f *project.Field) string {
 	return goTypes[f.Type]
 }
 
-// goImports returns, sorted, the imports the Go types of an entity's fields
-// need.
-func goImports(e *project.Entity) []string {
+// goImports returns, sorted, the imports the Go types of the fields of an
+// entity or the arguments of a job need.
+func goImports(node any) []string {
+	var fields []*project.Field
+	switch n := node.(type) {
+	case *project.Entity:
+		fields = n.Fields
+	case *project.Job:
+		fields = n.Fields
+	}
 	var out []string
-	for _, f := range e.Fields {
+	for _, f := range fields {
 		if imp := goImportOf[f.Type]; imp != "" && !slices.Contains(out, imp) {
 			out = append(out, imp)
 		}

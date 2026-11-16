@@ -1,6 +1,6 @@
 // An example module: change it, delete it, or add files like it, one per
 // module. Run esquadro gen after each change; esquadro check finds mistakes.
-// The worker's processes are in cmd/<app>/processes.go.
+// Each job's work is in internal/billing/<job>_work.go, a file of yours.
 package billing
 
 enum InvoiceStatus {
@@ -15,4 +15,15 @@ entity Invoice {
   amount decimal       required min(0)
   due_on date          required
   status InvoiceStatus default(PENDING)
+}
+
+/// Sends an invoice to its customer: enqueued with EnqueueSendInvoice, from
+/// a use case or the API.
+job SendInvoice {
+  invoice_id uuid required
+}
+
+/// Marks the invoices past their due date, every day at 3:00.
+job MarkOverdueInvoices {
+  @jobs(every "0 3 * * *")
 }

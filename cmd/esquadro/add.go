@@ -35,7 +35,14 @@ func runAdd(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return 2
 	}
-	l := loadProject("add", dir, stderr, false)
+	// The project may have errors the blueprints to add fix (a @jobs
+	// annotation, before the jobs blueprint): it is checked once changed.
+	sources, err := readProject(dir)
+	if err != nil {
+		fmt.Fprintf(stderr, "esquadro add: %v\n", err)
+		return 1
+	}
+	l, _ := loadAll("add", dir, sources, io.Discard, false)
 	if l == nil {
 		return 1
 	}
@@ -44,9 +51,17 @@ func runAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "esquadro add: %v\n", err)
 		return 1
 	}
+	present := map[string]bool{}
+	for _, r := range app.decl.Blueprints {
+		if r.Ref.Kind == dsl.IdentValue {
+			present[r.Ref.Text] = true
+		} else if b, _ := l.loader.Load(refOf(r.Ref.Text)); b != nil {
+			present[b.Manifest.Name] = true
+		}
+	}
 
 	// The blueprints to add, each after those it requires.
-	has := func(name string) bool { return l.set.Get(name) != nil }
+	has := func(name string) bool { return present[name] }
 	var added []*blueprint.Blueprint
 	adding := map[string]bool{}
 	var visit func(ref *project.BlueprintRef, requiredBy string) bool
@@ -95,7 +110,7 @@ func runAdd(args []string, stdout, stderr io.Writer) int {
 	src := app.src
 	at := app.insertAt()
 	changed := slices.Concat(src[:at], []byte(block.String()), src[at:])
-	sources := withSource(l.sources, app.name, changed)
+	sources = withSource(l.sources, app.name, changed)
 	if loadSources("add", dir, sources, stderr, false) == nil {
 		fmt.Fprintln(stderr, "esquadro add: app.esq was not changed")
 		return 1

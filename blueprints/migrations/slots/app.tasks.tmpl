@@ -1,4 +1,4 @@
-{{- if .Entities}}
+{{- if or .Entities (slot "migrations.after" .)}}
   migrate:
     desc: Apply the database migrations (DATABASE_URL)
     cmds:

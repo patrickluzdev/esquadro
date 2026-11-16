@@ -1,0 +1,99 @@
+{{- if and .Module.Jobs (uses "testcontainers") -}}
+{{- $m := .Module -}}
+package {{$m.Snake}}
+
+{{importBlock "bytes" "context" "encoding/json" "errors" "log/slog" "testing" "time" (sampleImports $m) (printf "%s/internal/platform/jobs" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) "github.com/jackc/pgx/v5/pgxpool"}}
+
+// openJobs opens a job queue on a fresh database, with what register adds.
+func openJobs(t *testing.T, register func(r *jobs.Registry)) (*{{$m.Pascal}}, *jobs.Queue, *pgxpool.Pool) {
+	t.Helper()
+	pool := postgrestest.Fresh(t)
+	q := jobs.NewQueue()
+	r := jobs.NewRegistry()
+	register(r)
+	if err := q.Open(pool, r, jobs.Config{Workers: 2, Queues: {{goStrings (optionsOf "jobs").queues}}}, slog.New(slog.DiscardHandler)); err != nil {
+		t.Fatal(err)
+	}
+	return New(Deps{Jobs: q}), q, pool
+}
+
+// TestRegisterJobs opens a queue with the module's jobs, which checks the
+// schedules of the periodic ones and the queues they go to.
+func TestRegisterJobs(t *testing.T) {
+	m := New(Deps{})
+	openJobs(t, m.RegisterJobs)
+}
+{{- range $m.Jobs}}{{$j := .}}{{if canSample $j}}
+
+func valid{{$j.Pascal}}Args() {{$j.Pascal}}Args {
+	return {{$j.Pascal}}Args{
+{{- range $j.Fields}}{{if .Required}}
+		{{.Pascal}}: {{sample . "" "1"}},
+{{- end}}{{end}}
+	}
+}
+
+func TestEnqueue{{$j.Pascal}}(t *testing.T) {
+	ctx := t.Context()
+	m, q, pool := openJobs(t, New(Deps{}).RegisterJobs)
+	if err := m.Enqueue{{$j.Pascal}}(ctx, valid{{$j.Pascal}}Args()); err != nil {
+		t.Fatal(err)
+	}
+{{- if refusesEmpty $j}}
+	var invalid *InvalidFields
+	if err := m.Enqueue{{$j.Pascal}}(ctx, {{$j.Pascal}}Args{}); !errors.As(err, &invalid) {
+		t.Fatalf("empty arguments: got %v, want *InvalidFields", err)
+	}
+{{- end}}
+
+	// In a transaction rolled back: not enqueued.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Enqueue{{$j.Pascal}}Tx(ctx, tx, valid{{$j.Pascal}}Args()); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.Count(ctx, {{$j.Pascal}}Args{}.Kind()); err != nil || n != 1 {
+		t.Fatalf("%d {{$j.Snake}} jobs enqueued (%v), want 1", n, err)
+	}
+}
+
+// Test{{$j.Pascal}}IsWorked runs the queue as the worker does, with a test's
+// work in place of the module's: the job enqueued reaches it, with its
+// arguments.
+func Test{{$j.Pascal}}IsWorked(t *testing.T) {
+	worked := make(chan {{$j.Pascal}}Args, 1)
+	m, q, _ := openJobs(t, func(r *jobs.Registry) {
+		jobs.Add(r, func(_ context.Context, args {{$j.Pascal}}Args) error {
+			worked <- args
+			return nil
+		})
+	})
+	ctx, stop := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- q.Run(ctx) }()
+	want := valid{{$j.Pascal}}Args().WithDefaults()
+	if err := m.Enqueue{{$j.Pascal}}(ctx, want); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-worked:
+		g, _ := json.Marshal(got)
+		w, _ := json.Marshal(want)
+		if !bytes.Equal(g, w) {
+			t.Fatalf("worked with %s, want %s", g, w)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("the job was not worked")
+	}
+	stop()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+{{- end}}{{end}}
+{{end -}}

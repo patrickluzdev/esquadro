@@ -10,6 +10,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/app"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
+	"github.com/patrickluzdev/esquadro/blueprints/jobs"
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
@@ -35,6 +36,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"store": store.TemplateFuncs(),
 	"rest":  rest.TemplateFuncs(),
 	"i18n":  i18n.TemplateFuncs(),
+	"jobs":  jobs.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints
@@ -83,15 +85,27 @@ func loadProject(cmd, dir string, stderr io.Writer, update bool) *loadedProject 
 // loadSources is loadProject with the project's files given, as read or as
 // they would be after a change.
 func loadSources(cmd, dir string, sources []project.Source, stderr io.Writer, update bool) *loadedProject {
+	l, ok := loadAll(cmd, dir, sources, stderr, update)
+	if !ok {
+		return nil
+	}
+	return l
+}
+
+// loadAll is loadSources that also returns, when the project has errors,
+// what could be loaded: its blueprint loader always, its project and
+// blueprints when they got that far. It returns nil only when the lockfile
+// or the cache cannot be read.
+func loadAll(cmd, dir string, sources []project.Source, stderr io.Writer, update bool) (*loadedProject, bool) {
 	lock, err := workspace.ReadLock(dir)
 	if err != nil {
 		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
-		return nil
+		return nil, false
 	}
 	cache, err := blueprint.DefaultCacheDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "esquadro %s: %v\n", cmd, err)
-		return nil
+		return nil, false
 	}
 	pinned := map[string]string{}
 	for _, b := range lock.Blueprints {
@@ -122,8 +136,5 @@ func loadSources(cmd, dir string, sources []project.Source, stderr io.Writer, up
 	if len(diags) > 0 {
 		diag.Render(stderr, diags, l.source(nil))
 	}
-	if diags.HasErrors() {
-		return nil
-	}
-	return l
+	return l, !diags.HasErrors()
 }
