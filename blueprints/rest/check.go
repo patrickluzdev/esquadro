@@ -38,6 +38,15 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 			diags.Errorf(e.Pos, e.Pos, "%s: unpaged_max %d must be at least 1", e.Raw, n)
 		}
 	}
+	modes := []string{"optional", "required"}
+	if v, ok := set.Options["rest"]["if_match"].(string); ok && !slices.Contains(modes, v) {
+		diags.Errorf(p.App.Pos, p.App.Pos, "if_match %q is not optional or required", v)
+	}
+	for _, e := range p.Entities {
+		if v, ok := e.Ann["rest"]["if_match"].(string); ok && !slices.Contains(modes, v) {
+			diags.Errorf(e.Pos, e.Pos, "%s: if_match %q is not optional or required", e.Raw, v)
+		}
+	}
 	if n, ok := set.Options["rest"]["unpaged_max"].(int64); ok && n < 1 {
 		diags.Errorf(p.App.Pos, p.App.Pos, "%s", fmt.Sprintf("unpaged_max %d must be at least 1", n))
 	}
@@ -57,4 +66,13 @@ func strs(v any) []string {
 		return out
 	}
 	return nil
+}
+
+// IfMatchRequired reports whether changing e needs If-Match.
+func IfMatchRequired(e *project.Entity, opts map[string]any) bool {
+	if v, ok := e.Ann["rest"]["if_match"].(string); ok {
+		return v == "required"
+	}
+	v, _ := opts["if_match"].(string)
+	return v == "required"
 }

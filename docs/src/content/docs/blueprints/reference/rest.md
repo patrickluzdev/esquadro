@@ -26,6 +26,7 @@ blueprint rest
 | `max_body_kb` | int | `1024` | Largest request body, in KB; 0 turns the limit off. &lt;APP>_MAX_BODY_KB overrides it. |
 | `pagination` | list | `["cursor", "page"]` | How lists page, unless an entity says otherwise: cursor (after, limit, next), page (page, per_page, total) or both; [] lists every record, up to unpaged_max. |
 | `unpaged_max` | int | `1000` | The most records a list without pagination answers; above it, the list answers too_many_records. |
+| `if_match` | name | `"optional"` | Whether changing or deleting a record needs If-Match with the ETag it was read with: optional (it is checked when sent) or required (428 without it). |
 
 ```esquadro
 blueprint rest {
@@ -47,6 +48,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 |---|---|---|---|
 | entity | `pagination` | list | How the entity's list pages: cursor, page, both, or [] (none). |
 | entity | `unpaged_max` | int | The most records its list answers without pagination. |
+| entity | `if_match` | name | optional or required, for the entity: see the if_match option. |
 
 An annotation is written `@rest(key value)` on the element.
 

@@ -2,9 +2,11 @@
 package edge
 
 import (
+	"context"
 	"fmt"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -90,5 +92,55 @@ func acceptsJSON(accept string) bool {
 		}
 	}
 	return false
+}
+
+// The problems of If-Match: a version that is no longer the record's, and
+// a change without one where the API asks for it.
+var (
+	ErrPreconditionFailed   = &Problem{Status: 412, Code: "precondition_failed", Title: "The record changed since you read it: read it again."}
+	ErrPreconditionRequired = &Problem{Status: 428, Code: "precondition_required", Title: "Send If-Match with the ETag of the record you read."}
+)
+
+type headersKey struct{}
+
+// ResponseHeaders lets an operation set headers of its response that the
+// contract does not declare, such as ETag: ogen writes only the declared
+// ones.
+func ResponseHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), headersKey{}, w.Header())))
+	})
+}
+
+// SetETag sets the ETag of the response to the request of ctx: the
+// version of the record it answers.
+func SetETag(ctx context.Context, version int) {
+	if h, ok := ctx.Value(headersKey{}).(http.Header); ok {
+		h.Set("ETag", `"`+strconv.Itoa(version)+`"`)
+	}
+}
+
+// IfMatch is the version an If-Match header asks for: 0 for any (absent,
+// or *), or ErrPreconditionRequired when required and absent. A weak or
+// malformed tag matches no version.
+func IfMatch(header string, set, required bool) (int, error) {
+	switch {
+	case !set || header == "":
+		if required {
+			return 0, ErrPreconditionRequired
+		}
+		return 0, nil
+	case strings.TrimSpace(header) == "*":
+		return 0, nil
+	}
+	tag := strings.TrimSpace(header)
+	if !strings.HasPrefix(tag, `"`) || !strings.HasSuffix(tag, `"`) || len(tag) < 3 {
+		return 0, ErrPreconditionFailed
+	}
+	v, err := strconv.Atoi(tag[1 : len(tag)-1])
+	if err != nil || v < 1 {
+		return 0, ErrPreconditionFailed
+	}
+	return v, nil
 }
 {{end -}}

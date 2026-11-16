@@ -55,7 +55,7 @@ func newAPI(d dependencies) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return edge.Chain(operations,
+	return edge.Chain(operations, edge.ResponseHeaders,
 {{- with slot "rest.middleware" .}}
 {{.}}
 {{- end}}

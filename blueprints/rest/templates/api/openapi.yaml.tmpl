@@ -15,7 +15,9 @@ info:
     `invalid_request` (400) for a request that does not match this contract,
     `not_found` (404), `method_not_allowed` (405), `not_acceptable` (406),
     `in_use` (409) for deleting a record others point at,
-    `request_too_large` (413), `unsupported_media_type` (415),{{if accessLine .Entities (index .Entities 0) "read"}}
+    `request_too_large` (413), `unsupported_media_type` (415),
+    `precondition_failed` (412) and `precondition_required` (428) for If-Match
+    (a record's ETag is its `version`),{{if accessLine .Entities (index .Entities 0) "read"}}
     `unauthorized` (401) without a session or a token, `forbidden` (403) for
     one that may not, `csrf` (403) for a change with a session cookie but
     without its X-CSRF-Token,{{end}}
@@ -162,6 +164,8 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -186,6 +190,8 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Deleted.
@@ -242,6 +248,8 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{$e.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Added.
@@ -256,6 +264,8 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{$e.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Removed.
@@ -281,6 +291,15 @@ components:
       required: false
       description: How many to read, 25 by default.
       schema: {type: integer, minimum: 1, maximum: 100}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: |
+        The ETag the record was read with ("3"): the change is made only if
+        the record is still that version, else precondition_failed (412).
+        `*` is any version.
+      schema: {type: string}
     Page:
       name: page
       in: query

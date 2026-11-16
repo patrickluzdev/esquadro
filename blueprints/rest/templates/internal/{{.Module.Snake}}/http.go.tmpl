@@ -30,6 +30,7 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.
 	if err != nil {
 		return nil, problemOf(err)
 	}
+	edge.SetETag(ctx, created.Version)
 	answer := {{.Camel}}Answer(created)
 	return &answer, nil
 }
@@ -43,6 +44,7 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 	if err != nil {
 		return nil, problemOf(err)
 	}
+	edge.SetETag(ctx, found.Version)
 	answer := {{.Camel}}Answer(found)
 	return &answer, nil
 }
@@ -181,10 +183,15 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 		return nil, security.Refusal(ctx)
 	}
 {{- end}}
-	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), 0, n)
+	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
+	if err != nil {
+		return nil, err
+	}
+	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, n)
 	if err != nil {
 		return nil, problemOf(err)
 	}
+	edge.SetETag(ctx, updated.Version)
 	answer := {{.Camel}}Answer(updated)
 	return &answer, nil
 }
@@ -199,7 +206,11 @@ func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params
 		return security.Refusal(ctx)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}}), 0))
+	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
+	if err != nil {
+		return err
+	}
+	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}}), version))
 }
 {{- if $pol}}
 
@@ -265,7 +276,11 @@ func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{
 		return problemOf(err)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), 0, uuid.UUID(params.{{$o}})))
+	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
+	if err != nil {
+		return err
+	}
+	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), version, uuid.UUID(params.{{$o}})))
 }
 
 func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFrom{{$P}}{{$R}}Params) error {
@@ -274,7 +289,11 @@ func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFr
 		return problemOf(err)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), 0, uuid.UUID(params.{{$o}})))
+	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
+	if err != nil {
+		return err
+	}
+	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), version, uuid.UUID(params.{{$o}})))
 }
 {{- end}}
 {{- end}}
@@ -465,6 +484,10 @@ func problemOf(err error) error {
 		return nil
 	case errors.Is(err, postgres.ErrBadCursor), errors.Is(err, postgres.ErrBadSort):
 		return edge.ErrInvalidRequest
+{{- range $m.Entities}}
+	case errors.Is(err, Err{{.Pascal}}Changed):
+		return edge.ErrPreconditionFailed
+{{- end}}
 {{- range $m.Entities}}
 	case errors.Is(err, Err{{.Pascal}}NotFound):
 		return edge.NotFound({{quote (printf "No such %s." (lower .Label))}})

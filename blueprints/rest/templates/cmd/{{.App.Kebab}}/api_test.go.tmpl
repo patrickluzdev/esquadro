@@ -119,6 +119,47 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 	}
 }
 
+// TestAPI{{.Plural.Pascal}}IfMatch changes a {{lower .Label}} with the ETag it was read with,
+// and is refused with an older one.
+func TestAPI{{.Plural.Pascal}}IfMatch(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL + "/api/v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.Get(srv.URL + "/api/v1/{{.Plural.Kebab}}/" + created.ID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	etag := res.Header.Get("ETag")
+	if etag != `"1"` {
+		t.Fatalf("ETag %q, want \"1\"", etag)
+	}
+	if updated, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{- $id}}: created.ID, IfMatch: apigen.NewOptString(etag)}); err != nil || updated.Version != 2 {
+		t.Fatalf("update with the ETag read: %+v, %v", updated, err)
+	}
+	refused := func(what string, err error, status int) {
+		t.Helper()
+		if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != status {
+			t.Errorf("%s: %v, want %d", what, err, status)
+		}
+	}
+	_, err = c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 3), apigen.Update{{$P}}Params{ {{- $id}}: created.ID, IfMatch: apigen.NewOptString(etag)})
+	refused("update with an old ETag", err, 412)
+	refused("delete with an old ETag", c.Delete{{$P}}(ctx, apigen.Delete{{$P}}Params{ {{- $id}}: created.ID, IfMatch: apigen.NewOptString(etag)}), 412)
+{{- if ifMatchRequired $e $.Options}}
+	_, err = c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 4), apigen.Update{{$P}}Params{ {{- $id}}: created.ID})
+	refused("update without If-Match", err, 428)
+{{- end}}
+}
+
 func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -147,10 +188,10 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	}
 {{- end}}
 {{- end}}
-	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID }); err != nil {
+	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}} }); err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	if err := c.Delete{{$P}}(ctx, apigen.Delete{{$P}}Params{ {{$id}}: created.ID }); err != nil {
+	if err := c.Delete{{$P}}(ctx, apigen.Delete{{$P}}Params{ {{$id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}} }); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	_, err = c.Get{{$P}}(ctx, apigen.Get{{$P}}Params{ {{$id}}: created.ID })
