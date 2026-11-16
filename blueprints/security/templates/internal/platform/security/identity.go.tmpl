@@ -27,7 +27,9 @@ type Realm struct {
 	Name        string
 	Providers   []string // password, google, github
 	Signup      string   // open, invite or closed
-	VerifyEmail string // required, optional or off
+	VerifyEmail string   // required, optional or off
+	// PasswordReset sends links that set a new password.
+	PasswordReset bool
 	Policy      PasswordPolicy
 	// Create makes the principal (the entity) from the fields of a sign-up
 	// other than the email and the password, with the given id; it answers
@@ -58,6 +60,16 @@ func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
 			mux.HandleFunc("DELETE "+base+"/providers/"+name, s.unlink(r, name))
 		}
 		mux.HandleFunc("GET "+base+"/providers", s.providers(r))
+		if r.VerifyEmail != "off" {
+			mux.HandleFunc("POST "+base+"/verify-email/send", s.sendVerifyEmail(r))
+			mux.HandleFunc("POST "+base+"/verify-email", s.verifyEmail(r))
+		}
+		if r.PasswordReset {
+			mux.HandleFunc("POST "+base+"/password/forgot", s.forgotPassword(r))
+			mux.HandleFunc("POST "+base+"/password/reset", s.resetPassword(r))
+		}
+		mux.HandleFunc("POST "+base+"/email", s.changeEmail(r))
+		mux.HandleFunc("POST "+base+"/email/confirm", s.confirmEmail(r))
 		mux.HandleFunc("POST "+base+"/sign-out", s.signOut(r))
 		mux.HandleFunc("GET "+base+"/session", s.session(r))
 		mux.HandleFunc("POST "+base+"/token", s.token(r))
@@ -73,6 +85,8 @@ func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
 type credentials struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	// Redirect is the page of the app a verification link opens.
+	Redirect string `json:"redirect,omitempty"`
 	// Cookie false answers the session token in the body, for clients that
 	// are not browsers; they send it back as Authorization: Bearer.
 	Cookie *bool `json:"cookie,omitempty"`
@@ -114,54 +128,66 @@ func (s *Security) signUp(realm Realm) http.HandlerFunc {
 			s.refusePassword(w, r, err)
 			return
 		}
+		redirect, ok := s.redirectOf(w, r, in.Redirect)
+		if !ok {
+			return
+		}
 		if err := realm.Validate(body); err != nil {
 			s.fail(w, r, err)
 			return
 		}
-		created, err := s.createAccount(r.Context(), realm, email, in.Password, body)
+		id, err := s.createAccount(r.Context(), realm, email, in.Password, body)
 		if err != nil {
 			s.fail(w, r, err)
 			return
 		}
-		s.event(r.Context(), "sign_up", realm.Name, "created", created)
+		if id != uuid.Nil() {
+			s.event(r.Context(), "sign_up", realm.Name, id.String(), true)
+			if realm.VerifyEmail != "off" {
+				if err := s.sendVerification(r.Context(), realm.Name, id, email, redirect); err != nil {
+					s.fail(w, r, err)
+					return
+				}
+			}
+		}
 		w.WriteHeader(http.StatusAccepted)
 		writeJSON(w, map[string]string{"status": "signed_up"})
 	}
 }
 
 // createAccount creates an identity with a password and its principal, with
-// the same id. It reports whether it created one: an email that already has
-// an account creates nothing, without an error.
-func (s *Security) createAccount(ctx context.Context, realm Realm, email, password string, fields json.RawMessage) (bool, error) {
+// the same id, and answers it: uuid.Nil() for an email that already has an
+// account, which creates nothing, without an error.
+func (s *Security) createAccount(ctx context.Context, realm Realm, email, password string, fields json.RawMessage) (uuid.UUID, error) {
 	hash, err := s.hasher.Hash(password)
 	if err != nil {
-		return false, err
+		return uuid.Nil(), err
 	}
 	id := uuid.NewV7()
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return false, err
+		return uuid.Nil(), err
 	}
 	defer tx.Rollback(ctx)
 	tag, err := tx.Exec(ctx, `INSERT INTO {{$identities}} (id, realm, email) VALUES ($1, $2, $3) ON CONFLICT (realm, email) DO NOTHING`,
 		id, realm.Name, email)
 	if err != nil || tag.RowsAffected() == 0 {
-		return false, err
+		return uuid.Nil(), err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)`,
 		uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
-		return false, err
+		return uuid.Nil(), err
 	}
 	// The principal is made by its module; if anything fails after, it is
 	// deleted, so that no principal is left without its identity.
 	if err := realm.Create(ctx, id, fields); err != nil {
-		return false, err
+		return uuid.Nil(), err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		_ = realm.Delete(context.WithoutCancel(ctx), id)
-		return false, err
+		return uuid.Nil(), err
 	}
-	return true, nil
+	return id, nil
 }
 
 // signIn opens a session for an email and its password.

@@ -1,0 +1,55 @@
+{{- if realms .Entities -}}
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"{{.App.Module}}/internal/platform/security"
+)
+
+// newMailer is how {{.App.Label}} sends security's emails. In
+// {{index .Environments 0}} it writes them to the log, links included, to
+// click them there. Elsewhere, write how they go: an SMTP server
+// (net/smtp), or the API of an email service.
+func newMailer(env string, logger *slog.Logger) security.Mailer {
+	if env == "{{index .Environments 0}}" {
+		return logMailer{logger}
+	}
+	return noMailer{}
+}
+
+// logMailer writes emails to the log.
+type logMailer struct{ logger *slog.Logger }
+
+func (m logMailer) Send(ctx context.Context, msg security.Message) error {
+	subject, text := write(msg)
+	m.logger.InfoContext(ctx, "email", "to", msg.To, "subject", subject, "text", text)
+	return nil
+}
+
+// noMailer refuses every email, until newMailer says how they go.
+type noMailer struct{}
+
+func (noMailer) Send(context.Context, security.Message) error {
+	return errors.New("security: no way to send emails: write it in cmd/{{.App.Kebab}}/mailer.go")
+}
+
+// write is the subject and the text of an email.
+func write(m security.Message) (subject, text string) {
+	expires := m.Expires.Format("January 2, 15:04 MST")
+	switch m.Kind {
+	case "verify_email":
+		return "Verify your email", fmt.Sprintf("Open this link to verify your email:\n\n%s\n\nIt works until %s.", m.Link, expires)
+	case "reset_password":
+		return "Reset your password", fmt.Sprintf("Open this link to choose a new password:\n\n%s\n\nIt works until %s. If you did not ask for it, ignore this email.", m.Link, expires)
+	case "confirm_email_change":
+		return "Confirm your new email", fmt.Sprintf("Open this link to use this email in your account:\n\n%s\n\nIt works until %s.", m.Link, expires)
+	case "email_changed":
+		return "Your email was changed", "The email of your account was changed. If you did not do it, reset your password now."
+	}
+	return m.Kind, m.Link
+}
+{{end -}}

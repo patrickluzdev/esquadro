@@ -185,7 +185,22 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 	}
 
 	options(p, set, &diags)
+	maintenance(p, set, realms, &diags)
 	return diags
+}
+
+// maintenance warns when nothing cleans up the expired sessions and links:
+// jobs or the worker do it every hour.
+func maintenance(p *project.Project, set *blueprint.Set, realms []*Realm, diags *diag.List) {
+	if len(realms) == 0 || set.Get("jobs") != nil || set.Get("worker") != nil {
+		return
+	}
+	for _, r := range p.App.Blueprints {
+		if r.Name == "security" {
+			diags.Warnf(r.Pos, r.Pos, "nothing cleans up expired sessions and email links, nor rotates the signing keys: add blueprint jobs or worker, or run %s security cleanup on a schedule", p.App.Kebab).
+				Suggestion = "blueprint worker"
+		}
+	}
 }
 
 // options checks the blueprint's own options, in the app block.

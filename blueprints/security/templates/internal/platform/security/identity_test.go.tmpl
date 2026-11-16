@@ -24,6 +24,7 @@ type flow struct {
 	now     *time.Time
 	handler http.Handler
 	fake    *fakeProvider
+	mail    *fakeMailer
 	mu      sync.Mutex
 	people  map[uuid.UUID]string
 }
@@ -34,9 +35,12 @@ func newFlow(t *testing.T) *flow {
 	s.cfg.PublicURL = "http://test.example"
 	s.cfg.RedirectURLs = []string{"https://app.example/signed-in"}
 	s.cfg.Providers = map[string]Provider{"fake": f.fake.provider()}
+	s.cfg.VerifyEmailHours, s.cfg.PasswordResetMinutes = 24, 60
+	f.mail = &fakeMailer{}
+	s.mailer, s.sendNow = f.mail, true
 	policy := PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists"}
 	person := Realm{
-		Name: "person", Providers: []string{"password", "fake"}, Signup: "open", VerifyEmail: "optional", Policy: policy,
+		Name: "person", Providers: []string{"password", "fake"}, Signup: "open", VerifyEmail: "optional", PasswordReset: true, Policy: policy,
 		Validate: func(fields json.RawMessage) error {
 			var in struct{ Name string }
 			if json.Unmarshal(fields, &in) != nil || in.Name == "" {

@@ -58,6 +58,7 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 |---|---|
 | `jobs.imports` | Imports of internal/platform/jobs/jobs.go. |
 | `jobs.middleware` | Code in Queue.Open that changes River's config before the client is made, e.g. config.Middleware = append(config.Middleware, ...). |
+| `jobs.register` | Code in open that registers other blueprints' jobs on registry, a *jobs.Registry, before the queue opens; d is the dependencies. |
 
 ## Go modules
 

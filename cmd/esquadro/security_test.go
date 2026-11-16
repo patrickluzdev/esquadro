@@ -120,3 +120,25 @@ func TestSecurityProviderVariables(t *testing.T) {
 		t.Fatalf("dependencies:\n%s", deps)
 	}
 }
+
+// Expired sessions and links are cleaned up by jobs, else by the worker,
+// else the check says nothing does.
+func TestSecurityMaintenance(t *testing.T) {
+	accounts := "package accounts\n\nentity User {\n  name string required\n  @security(principal, read user, write user)\n}\n"
+	for _, tc := range []struct{ blueprints, file, want string }{
+		{"  blueprint worker\n  blueprint jobs\n", "cmd/shop/dependencies.go", "d.security.RegisterJobs(registry)"},
+		{"  blueprint worker\n", "cmd/shop/worker.go", `{Name: "security", Run: d.security.Maintain},`},
+	} {
+		dir := securityProject(t, accounts, "  blueprint postgres\n"+tc.blueprints)
+		if code, out, errOut := esq(t, "gen", dir); code != 0 || strings.Contains(errOut, "nothing cleans up") {
+			t.Fatalf("gen: %s%s", out, errOut)
+		}
+		if got := read(t, filepath.Join(dir, tc.file)); !strings.Contains(got, tc.want) {
+			t.Errorf("%s has no %s:\n%s", tc.file, tc.want, got)
+		}
+	}
+	dir := securityProject(t, accounts, "")
+	if _, _, errOut := esq(t, "check", dir); !strings.Contains(errOut, "nothing cleans up expired sessions") {
+		t.Fatalf("no warning:\n%s", errOut)
+	}
+}

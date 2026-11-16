@@ -1,0 +1,4 @@
+{{- if realms .Entities}}
+	case "security":
+		return securityCommand(ctx, os.Args[2:])
+{{- end}}

@@ -50,6 +50,12 @@ type Config struct {
 	RedirectURLs []string
 	// Providers sign in with other accounts, by name: google, github.
 	Providers map[string]Provider
+	// Mailer sends the emails: verification, password reset, email change.
+	Mailer Mailer
+	// How long the links of the emails work.
+	VerifyEmailHours, PasswordResetMinutes int
+	// RotateKeysDays makes a new JWT signing key that often; 0 never does.
+	RotateKeysDays int
 }
 
 // Security holds what the security of the app works with.
@@ -59,9 +65,15 @@ type Security struct {
 	hasher  Hasher
 	csrfKey []byte
 	keyKey  []byte
+	jobsKey []byte
 	keys    keyCache
 	lists   map[string]bool
 	prefix  string
+	mailer  Mailer
+	// enqueue sends an email by the job queue, when there is one; sendNow
+	// sends it before the request ends, for tests.
+	enqueue func(ctx context.Context, m Message) error
+	sendNow bool
 	logger  *slog.Logger
 	now     func() time.Time
 }
@@ -79,12 +91,16 @@ func New(db *pgxpool.Pool, cfg Config, logger *slog.Logger) (*Security, error) {
 	if err != nil {
 		return nil, err
 	}
+	jobsKey, err := derive(cfg.Secret, "jobs")
+	if err != nil {
+		return nil, err
+	}
 	lists, err := ReadPasswordLists(cfg.PasswordLists...)
 	if err != nil {
 		return nil, err
 	}
 	return &Security{
-		db: db, cfg: cfg, csrfKey: csrfKey, keyKey: keyKey, lists: lists, logger: logger, now: time.Now,
+		db: db, cfg: cfg, csrfKey: csrfKey, keyKey: keyKey, jobsKey: jobsKey, lists: lists, mailer: cfg.Mailer, logger: logger, now: time.Now,
 		hasher: Hasher{
 			Memory: uint32(cfg.Argon2MemoryKiB), Iterations: uint32(cfg.Argon2Iterations),
 			Parallelism: uint8(cfg.Argon2Parallelism), Pepper: []byte(cfg.Pepper),

@@ -1,0 +1,38 @@
+{{- if realms .Entities -}}
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+)
+
+// securityCommand runs {{.App.Kebab}} security <command>.
+func securityCommand(ctx context.Context, args []string) error {
+	usage := fmt.Errorf("usage: {{.App.Kebab}} security <command>; commands: cleanup (delete expired sessions, links and keys), rotate-keys (a new JWT signing key)")
+	if len(args) != 1 {
+		return usage
+	}
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	switch args[0] {
+	case "cleanup":
+		n, err := d.security.Cleanup(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "deleted %d expired rows\n", n)
+		return nil
+	case "rotate-keys":
+		if err := d.security.RotateKeys(ctx); err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout, "a new signing key signs the tokens; the old ones check theirs until they expire")
+		return nil
+	}
+	return usage
+}
+{{end -}}

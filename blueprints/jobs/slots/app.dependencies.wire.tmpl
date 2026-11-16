@@ -2,6 +2,9 @@
 {{- range .Modules}}{{if .Jobs}}
 	d.{{.Camel}}.RegisterJobs(registry)
 {{- end}}{{end}}
+{{- with slot "jobs.register" .}}
+{{.}}
+{{- end}}
 	if err = d.jobs.Open(d.pool, registry, jobs.Config{Workers: d.config.JobsWorkers, Queues: d.config.JobsQueues}, d.logger); err != nil {
 		release()
 		return d, nil, err

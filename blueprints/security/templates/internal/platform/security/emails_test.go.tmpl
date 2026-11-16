@@ -1,0 +1,166 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+package security
+
+import (
+	"context"
+	"net/url"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// fakeMailer keeps the emails it is given.
+type fakeMailer struct {
+	mu   sync.Mutex
+	sent []Message
+}
+
+func (m *fakeMailer) Send(_ context.Context, msg Message) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sent = append(m.sent, msg)
+	return nil
+}
+
+// last is the newest email of kind, and the token of its link.
+func (m *fakeMailer) last(t *testing.T, kind string) (Message, string) {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, msg := range slices.Backward(m.sent) {
+		if msg.Kind == kind {
+			u, _ := url.Parse(msg.Link)
+			return msg, u.Query().Get("token")
+		}
+	}
+	t.Fatalf("no %s email in %+v", kind, m.sent)
+	return Message{}, ""
+}
+
+func (m *fakeMailer) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.sent)
+}
+
+func TestVerifyEmail(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana", "redirect": "/verify"}), 202, "")
+	msg, token := f.mail.last(t, "verify_email")
+	if msg.To != "ana@example.com" || !strings.HasPrefix(msg.Link, "http://test.example/verify?token=") {
+		t.Fatalf("email: %+v", msg)
+	}
+	// Signing up again with the email sends nothing.
+	f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"})
+	if f.mail.count() != 1 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+
+	f.expect(f.call("POST", "/identity/person/verify-email", map[string]string{"token": "nope"}), 400, "invalid_link")
+	f.expect(f.call("POST", "/identity/person/verify-email", map[string]string{"token": token}), 204, "")
+	f.expect(f.call("POST", "/identity/person/verify-email", map[string]string{"token": token}), 400, "invalid_link")
+	var verified bool
+	_ = f.s.db.QueryRow(t.Context(), `SELECT email_verified FROM {{securityTable "identities" (optionsOf "postgres")}} WHERE email = 'ana@example.com'`).Scan(&verified)
+	if !verified {
+		t.Fatal("not verified")
+	}
+
+	// Sending again answers the same for any email, and sends nothing to a
+	// verified one.
+	f.expect(f.call("POST", "/identity/person/verify-email/send", map[string]string{"email": "ana@example.com"}), 202, "")
+	f.expect(f.call("POST", "/identity/person/verify-email/send", map[string]string{"email": "nobody@example.com"}), 202, "")
+	f.expect(f.call("POST", "/identity/person/verify-email/send", map[string]string{"email": "x@example.com", "redirect": "https://evil.example"}), 400, "invalid_redirect")
+	if f.mail.count() != 1 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+}
+
+func TestPasswordReset(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
+	cookie, _ := f.signIn(password)
+
+	f.expect(f.call("POST", "/identity/person/password/forgot", map[string]string{"email": "nobody@example.com"}), 202, "")
+	f.expect(f.call("POST", "/identity/person/password/forgot", map[string]string{"email": "Ana@example.com", "redirect": "https://app.example/signed-in/reset"}), 202, "")
+	msg, token := f.mail.last(t, "reset_password")
+	if !strings.HasPrefix(msg.Link, "https://app.example/signed-in/reset?token=") || msg.Expires.Sub(*f.now) != time.Hour {
+		t.Fatalf("email: %+v", msg)
+	}
+
+	// A weak password does not use the link up.
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "short"}), 422, "invalid_fields")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "a brand new passphrase"}), 204, "")
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": token, "newPassword": "a brand new passphrase"}), 400, "invalid_link")
+
+	// Every session ended; the new password signs in.
+	f.expect(f.call("GET", "/identity/person/session", nil, cookie), 401, "unauthorized")
+	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+	f.signIn("a brand new passphrase")
+
+	// An hour later, a link no longer works.
+	f.call("POST", "/identity/person/password/forgot", map[string]string{"email": "ana@example.com"})
+	_, late := f.mail.last(t, "reset_password")
+	*f.now = f.now.Add(61 * time.Minute)
+	f.expect(f.call("POST", "/identity/person/password/reset", map[string]string{"token": late, "newPassword": "yet another passphrase"}), 400, "invalid_link")
+}
+
+func TestChangeEmail(t *testing.T) {
+	f := newFlow(t)
+	for _, email := range []string{"ana@example.com", "bia@example.com"} {
+		f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": email, "password": password, "name": "X"}), 202, "")
+	}
+	cookie, csrf := f.signIn(password)
+
+	// Another account's email sends nothing, and answers the same.
+	before := f.mail.count()
+	f.expect(f.call("POST", "/identity/person/email", map[string]string{"email": "bia@example.com"}, cookie, csrf), 202, "")
+	if f.mail.count() != before {
+		t.Fatal("an email went to another account's address")
+	}
+	f.expect(f.call("POST", "/identity/person/email", map[string]string{"email": "ana.new@example.com"}, cookie, csrf), 202, "")
+	msg, token := f.mail.last(t, "confirm_email_change")
+	if msg.To != "ana.new@example.com" {
+		t.Fatalf("sent to %s", msg.To)
+	}
+	f.expect(f.call("POST", "/identity/person/email/confirm", map[string]string{"token": token}), 204, "")
+	if notice, _ := f.mail.last(t, "email_changed"); notice.To != "ana@example.com" || notice.Link != "" {
+		t.Fatalf("notice: %+v", notice)
+	}
+	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana.new@example.com", "password": password}), 200, "")
+
+	// Changing it needs a recent sign-in.
+	*f.now = f.now.Add(11 * time.Minute)
+	f.expect(f.call("POST", "/identity/person/email", map[string]string{"email": "ana.other@example.com"}, cookie, csrf), 403, "reauthentication_required")
+}
+
+func TestCleanupAndRotation(t *testing.T) {
+	ctx := t.Context()
+	s, now := testSecurity(t)
+	ana := newIdentity(t, s, "user", "ana@example.com")
+	s.StartSession(ctx, s.db, ana, "", "")
+	s.newVerification(ctx, s.db, "user", "verify_email", ana, "", time.Hour)
+	s.Failed(ctx, "account:user:ana@example.com", 3)
+	if n, err := s.Cleanup(ctx); err != nil || n != 0 {
+		t.Fatalf("nothing expired: %d %v", n, err)
+	}
+	*now = now.Add(48 * time.Hour)
+	if n, err := s.Cleanup(ctx); err != nil || n != 3 {
+		t.Fatalf("expired: %d %v", n, err)
+	}
+
+	s.cfg.RotateKeysDays = 30
+	if rotated, err := s.RotateKeysIfDue(ctx); err != nil || !rotated {
+		t.Fatalf("the first key: %v %v", rotated, err)
+	}
+	*now = now.Add(29 * 24 * time.Hour)
+	if rotated, _ := s.RotateKeysIfDue(ctx); rotated {
+		t.Fatal("rotated before its days")
+	}
+	*now = now.Add(2 * 24 * time.Hour)
+	if rotated, _ := s.RotateKeysIfDue(ctx); !rotated {
+		t.Fatal("not rotated after its days")
+	}
+}
+{{end -}}

@@ -11,7 +11,7 @@
 blueprint security {
   version "0.1.0"
   requires app, env, domain, http, postgres, migrations
-  optional jobs, rest, api_docs, i18n, observability, testcontainers, compose, docker
+  optional jobs, worker, rest, api_docs, i18n, observability, testcontainers, compose, docker
 
   /// Signs CSRF tokens and encrypts the JWT signing keys; esquadro
   /// generates one for development.
@@ -58,8 +58,13 @@ blueprint security {
   option session_user_agent bool default(true)
   /// Minutes a JWT lasts.
   option token_minutes int default(15)
-  /// Days between rotations of the JWT signing key, with jobs; 0 is never.
+  /// Days between rotations of the JWT signing key, checked every hour by
+  /// jobs or the worker; 0 is never.
   option rotate_keys_days int default(0)
+  /// Hours an email verification link works, and minutes a password reset
+  /// link does.
+  option verify_email_hours int default(24)
+  option password_reset_minutes int default(60)
 
   /// The shortest password. NIST asks for 15 when the password is the only
   /// factor.

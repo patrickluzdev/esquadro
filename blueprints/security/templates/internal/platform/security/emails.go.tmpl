@@ -1,0 +1,392 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+{{- $credentials := securityTable "credentials" $pg -}}
+{{- $verifications := securityTable "verifications" $pg -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/edge"
+	"{{.App.Module}}/internal/platform/postgres"
+)
+
+// Message is an email security sends: the Mailer writes it, in the
+// person's language and the app's voice.
+type Message struct {
+	// Kind is verify_email, reset_password, confirm_email_change (to the
+	// new address) or email_changed (a notice to the old one).
+	Kind  string
+	Realm string
+	To    string
+	// Link is where the person goes on, with a token used once; empty for
+	// a notice.
+	Link string
+	// Expires is when the link stops working.
+	Expires time.Time
+}
+
+// Mailer sends security's emails.
+type Mailer interface {
+	Send(ctx context.Context, m Message) error
+}
+
+// The problems of the email links.
+var (
+	ErrBadLink    = &edge.Problem{Status: http.StatusBadRequest, Code: "invalid_link", Title: "The link is not valid, or it expired."}
+	ErrEmailTaken = &edge.Problem{Status: http.StatusConflict, Code: "email_taken", Title: "Another account has this email."}
+)
+
+// send sends m in the background: by the job queue when there is one, else
+// in this process. It never fails the request: a lost email is sent again
+// on request.
+func (s *Security) send(ctx context.Context, m Message) {
+	if s.mailer == nil {
+		s.logError(ctx, errors.New("security: no mailer to send "+m.Kind))
+		return
+	}
+	if s.enqueue != nil {
+		if err := s.enqueue(ctx, m); err != nil {
+			s.logError(ctx, err)
+		}
+		return
+	}
+	work := func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if err := s.mailer.Send(ctx, m); err != nil {
+			s.logError(ctx, err)
+		}
+	}
+	if s.sendNow {
+		work()
+		return
+	}
+	go work()
+}
+
+// newVerification makes a link token for purpose, replacing the earlier
+// ones of the identity: only the newest link works.
+func (s *Security) newVerification(ctx context.Context, q Querier, realm, purpose string, identity uuid.UUID, data string, ttl time.Duration) (string, time.Time, error) {
+	if _, err := q.Exec(ctx, `DELETE FROM {{$verifications}} WHERE realm = $1 AND purpose = $2 AND identifier = $3`, realm, purpose, identity.String()); err != nil {
+		return "", time.Time{}, err
+	}
+	token, hash := newToken()
+	expires := s.now().Add(ttl)
+	if _, err := q.Exec(ctx, `INSERT INTO {{$verifications}} (id, realm, purpose, identifier, value_hash, data, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		uuid.NewV7(), realm, purpose, identity.String(), hash, data, expires); err != nil {
+		return "", time.Time{}, err
+	}
+	return token, expires, nil
+}
+
+// verification is the identity and the data of a link token that still
+// works; take uses it up, in q.
+func (s *Security) verification(ctx context.Context, q Querier, realm, purpose, token string, take bool) (uuid.UUID, string, error) {
+	query := `SELECT identifier, COALESCE(data, '') FROM {{$verifications}} WHERE value_hash = $1 AND realm = $2 AND purpose = $3 AND expires_at > $4`
+	if take {
+		query = `DELETE FROM {{$verifications}} WHERE value_hash = $1 AND realm = $2 AND purpose = $3 AND expires_at > $4 RETURNING identifier, COALESCE(data, '')`
+	}
+	var identifier, data string
+	err := q.QueryRow(ctx, query, hashToken(token), realm, purpose, s.now()).Scan(&identifier, &data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil(), "", ErrBadLink
+	}
+	if err != nil {
+		return uuid.Nil(), "", err
+	}
+	id, err := uuid.Parse(identifier)
+	if err != nil {
+		return uuid.Nil(), "", ErrBadLink
+	}
+	return id, data, nil
+}
+
+// link is the address an email sends the person to: redirect, one of the
+// app's paths or of RedirectURLs, with the token.
+func (s *Security) link(redirect, token string) string {
+	if strings.HasPrefix(redirect, "/") {
+		redirect = strings.TrimSuffix(s.cfg.PublicURL, "/") + redirect
+	}
+	return withQuery(redirect, "token", token)
+}
+
+// emailRequest is a request that sends an email: to whom, and the page of
+// the app the link opens, which posts the token back.
+type emailRequest struct {
+	Email    string `json:"email"`
+	Redirect string `json:"redirect"`
+}
+
+func (s *Security) redirectOf(w http.ResponseWriter, r *http.Request, redirect string) (string, bool) {
+	if redirect == "" {
+		return "/", true
+	}
+	if !s.allowedRedirect(redirect) {
+		edge.Write(w, r, ErrBadRedirect)
+		return "", false
+	}
+	return redirect, true
+}
+
+// sendVerification sends the link that verifies an identity's email.
+func (s *Security) sendVerification(ctx context.Context, realm string, id uuid.UUID, email, redirect string) error {
+	token, expires, err := s.newVerification(ctx, s.db, realm, "verify_email", id, "", time.Duration(s.cfg.VerifyEmailHours)*time.Hour)
+	if err != nil {
+		return err
+	}
+	s.send(ctx, Message{Kind: "verify_email", Realm: realm, To: email, Link: s.link(redirect, token), Expires: expires})
+	return nil
+}
+
+// limited counts a request that sends an email to address, and reports
+// whether there were too many: emails are not a way to flood an inbox.
+func (s *Security) limited(ctx context.Context, realm, address string) bool {
+	key := "email:" + realm + ":" + address
+	if wait, err := s.Locked(ctx, key); err != nil || wait > 0 {
+		return true
+	}
+	return s.Failed(ctx, key, s.cfg.LockoutAttempts) != nil
+}
+
+// sendVerifyEmail sends the verification link again: to the signed-in
+// identity, or to an email, answering the same whether it has an account
+// or not.
+func (s *Security) sendVerifyEmail(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in emailRequest
+		_ = decode(w, r, &in)
+		redirect, ok := s.redirectOf(w, r, in.Redirect)
+		if !ok {
+			return
+		}
+		var id uuid.UUID
+		var email string
+		var verified bool
+		var err error
+		if p, ok := PrincipalIn(ctx, realm.Name); ok {
+			err = s.db.QueryRow(ctx, `SELECT id, email, email_verified FROM {{$identities}} WHERE id = $1`, p.ID).Scan(&id, &email, &verified)
+		} else {
+			email = normalEmail(in.Email)
+			err = s.db.QueryRow(ctx, `SELECT id, email, email_verified FROM {{$identities}} WHERE realm = $1 AND email = $2 AND disabled_at IS NULL`, realm.Name, email).Scan(&id, &email, &verified)
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			s.fail(w, r, err)
+			return
+		}
+		if err == nil && !verified && !s.limited(ctx, realm.Name, email) {
+			if err := s.sendVerification(ctx, realm.Name, id, email, redirect); err != nil {
+				s.fail(w, r, err)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// verifyEmail verifies an email with the token of its link.
+func (s *Security) verifyEmail(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in struct {
+			Token string `json:"token"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		id, _, err := s.verification(ctx, s.db, realm.Name, "verify_email", in.Token, true)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if _, err := s.db.Exec(ctx, `UPDATE {{$identities}} SET email_verified = true, updated_at = now() WHERE id = $1`, id); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "email_verified", realm.Name, id.String(), true)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// forgotPassword sends the link that sets a new password; it answers the
+// same whether the email has an account or not.
+func (s *Security) forgotPassword(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in emailRequest
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		redirect, ok := s.redirectOf(w, r, in.Redirect)
+		if !ok {
+			return
+		}
+		email := normalEmail(in.Email)
+		var id uuid.UUID
+		err := s.db.QueryRow(ctx, `SELECT id FROM {{$identities}} WHERE realm = $1 AND email = $2 AND disabled_at IS NULL`, realm.Name, email).Scan(&id)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			s.fail(w, r, err)
+			return
+		}
+		if err == nil && !s.limited(ctx, realm.Name, email) {
+			token, expires, err := s.newVerification(ctx, s.db, realm.Name, "reset_password", id, "", time.Duration(s.cfg.PasswordResetMinutes)*time.Minute)
+			if err != nil {
+				s.fail(w, r, err)
+				return
+			}
+			s.send(ctx, Message{Kind: "reset_password", Realm: realm.Name, To: email, Link: s.link(redirect, token), Expires: expires})
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// resetPassword sets a new password with the token of a reset link: every
+// session ends, and the email counts as verified, as its inbox was reached.
+func (s *Security) resetPassword(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in struct {
+			Token       string `json:"token"`
+			NewPassword string `json:"newPassword"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		// The token is checked, then the password, and only then used up: a
+		// weak password does not cost the link.
+		id, _, err := s.verification(ctx, s.db, realm.Name, "reset_password", in.Token, false)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		var email string
+		if err := s.db.QueryRow(ctx, `SELECT email FROM {{$identities}} WHERE id = $1`, id).Scan(&email); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		policy := realm.Policy
+		policy.Lists = s.lists
+		if err := policy.Check(ctx, in.NewPassword, email, strings.Split(email, "@")[0], s.cfg.App); err != nil {
+			s.refusePassword(w, r, err)
+			return
+		}
+		hash, err := s.hasher.Hash(in.NewPassword)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			if _, _, err := s.verification(ctx, tx, realm.Name, "reset_password", in.Token, true); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, realm, provider, subject, password_hash) VALUES ($1, $2, $3, 'password', $4, $5)
+				ON CONFLICT (realm, provider, subject) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`, uuid.NewV7(), id, realm.Name, id.String(), hash); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE {{$identities}} SET email_verified = true, updated_at = now() WHERE id = $1`, id); err != nil {
+				return err
+			}
+			return s.EndSessions(ctx, tx, id, uuid.Nil())
+		})
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		_ = s.Succeeded(ctx, "account:"+realm.Name+":"+email)
+		s.event(ctx, "password_reset", realm.Name, id.String(), true)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// changeEmail sends a link to the new email, which changes it once
+// followed; it needs a recent sign-in, and answers the same whether another
+// account has the email or not.
+func (s *Security) changeEmail(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.freshPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		var in emailRequest
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		redirect, ok := s.redirectOf(w, r, in.Redirect)
+		if !ok {
+			return
+		}
+		email := normalEmail(in.Email)
+		if email == "" {
+			edge.Write(w, r, invalidEmail)
+			return
+		}
+		var taken bool
+		if err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM {{$identities}} WHERE realm = $1 AND email = $2)`, realm.Name, email).Scan(&taken); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if !taken && !s.limited(ctx, realm.Name, email) {
+			token, expires, err := s.newVerification(ctx, s.db, realm.Name, "change_email", p.ID, email, time.Duration(s.cfg.VerifyEmailHours)*time.Hour)
+			if err != nil {
+				s.fail(w, r, err)
+				return
+			}
+			s.send(ctx, Message{Kind: "confirm_email_change", Realm: realm.Name, To: email, Link: s.link(redirect, token), Expires: expires})
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// confirmEmail changes the email with the token of the link sent to the new
+// one, and tells the old one.
+func (s *Security) confirmEmail(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in struct {
+			Token string `json:"token"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		var old string
+		var id uuid.UUID
+		err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			var email string
+			var err error
+			if id, email, err = s.verification(ctx, tx, realm.Name, "change_email", in.Token, true); err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, `SELECT email FROM {{$identities}} WHERE id = $1`, id).Scan(&old); err != nil {
+				return err
+			}
+			_, err = tx.Exec(ctx, `UPDATE {{$identities}} SET email = $2, email_verified = true, updated_at = now() WHERE id = $1`, id, email)
+			if _, kind, ok := postgres.Violation(err); ok && kind == "unique" {
+				return ErrEmailTaken
+			}
+			return err
+		})
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.send(ctx, Message{Kind: "email_changed", Realm: realm.Name, To: old})
+		s.event(ctx, "email_changed", realm.Name, id.String(), true)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+{{end -}}

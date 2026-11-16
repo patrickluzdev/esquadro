@@ -1,0 +1,3 @@
+{{- if and (realms .Entities) (not (uses "jobs"))}}
+		{Name: "security", Run: d.security.Maintain},
+{{- end}}

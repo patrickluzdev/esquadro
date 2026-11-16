@@ -1,0 +1,4 @@
+{{- if realms .Entities}}
+	d.security.RegisterJobs(registry)
+	d.security.UseJobs(d.jobs)
+{{- end}}

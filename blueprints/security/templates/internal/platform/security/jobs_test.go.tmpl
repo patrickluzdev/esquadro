@@ -1,0 +1,43 @@
+{{- if and (realms .Entities) (uses "jobs") (uses "testcontainers") -}}
+package security
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"{{.App.Module}}/internal/platform/jobs"
+)
+
+func TestEmailsGoByTheQueueSealed(t *testing.T) {
+	ctx := t.Context()
+	s, _ := testSecurity(t)
+	s.mailer = &fakeMailer{}
+	q, registry := jobs.NewQueue(), jobs.NewRegistry()
+	s.RegisterJobs(registry)
+	if err := q.Open(s.db, registry, jobs.Config{Workers: 1, Queues: []string{"default"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	s.UseJobs(q)
+	s.send(ctx, Message{Kind: "reset_password", Realm: "user", To: "ana@example.com", Link: "http://test.example/reset?token=SECRET-TOKEN"})
+
+	var raw []byte
+	if err := s.db.QueryRow(ctx, `SELECT args FROM river_job WHERE kind = 'security_email'`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "SECRET-TOKEN") || strings.Contains(string(raw), "ana@example.com") {
+		t.Fatalf("the job shows the email: %s", raw)
+	}
+	var args emailArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		t.Fatal(err)
+	}
+	plain, err := open(s.jobsKey, args.Sealed)
+	if err != nil || !strings.Contains(string(plain), "SECRET-TOKEN") {
+		t.Fatalf("unsealed: %s %v", plain, err)
+	}
+	if n, _ := q.Count(ctx, "security_cleanup"); n != 0 {
+		t.Fatalf("the cleanup is periodic, not enqueued now: %d", n)
+	}
+}
+{{end -}}

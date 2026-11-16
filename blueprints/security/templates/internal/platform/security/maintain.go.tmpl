@@ -1,0 +1,76 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $sessions := securityTable "sessions" $pg -}}
+{{- $verifications := securityTable "verifications" $pg -}}
+{{- $attempts := securityTable "attempts" $pg -}}
+{{- $keys := securityTable "signing_keys" $pg -}}
+package security
+
+import (
+	"context"
+	"fmt"
+	"time"
+)
+
+// Cleanup deletes what no longer works: expired sessions and links,
+// forgotten attempts, and signing keys a day after they stop checking
+// tokens. It answers how many rows it deleted.
+func (s *Security) Cleanup(ctx context.Context) (int64, error) {
+	now := s.now()
+	idle := now.Add(-time.Duration(s.cfg.SessionIdleHours) * time.Hour)
+	window := now.Add(-time.Duration(s.cfg.LockoutMinutes) * time.Minute)
+	var total int64
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM {{$sessions}} WHERE expires_at < $1 OR max_expires_at < $1 OR last_seen_at < $2`, []any{now, idle}},
+		{`DELETE FROM {{$verifications}} WHERE expires_at < $1`, []any{now}},
+		{`DELETE FROM {{$attempts}} WHERE window_start < $1 AND (locked_until IS NULL OR locked_until < $2)`, []any{window, now}},
+		{`DELETE FROM {{$keys}} WHERE expires_at < $1`, []any{now.Add(-24 * time.Hour)}},
+	} {
+		tag, err := s.db.Exec(ctx, q.sql, q.args...)
+		if err != nil {
+			return total, fmt.Errorf("security: clean up: %w", err)
+		}
+		total += tag.RowsAffected()
+	}
+	return total, nil
+}
+
+// RotateKeysIfDue makes a new signing key when the newest is older than
+// RotateKeysDays; it reports whether it did.
+func (s *Security) RotateKeysIfDue(ctx context.Context) (bool, error) {
+	if s.cfg.RotateKeysDays <= 0 {
+		return false, nil
+	}
+	var newest *time.Time
+	if err := s.db.QueryRow(ctx, `SELECT max(created_at) FROM {{$keys}} WHERE expires_at IS NULL`).Scan(&newest); err != nil {
+		return false, fmt.Errorf("security: read keys: %w", err)
+	}
+	if newest != nil && s.now().Sub(*newest) < time.Duration(s.cfg.RotateKeysDays)*24*time.Hour {
+		return false, nil
+	}
+	return true, s.RotateKeys(ctx)
+}
+
+// Maintain cleans up and rotates the keys every hour until ctx ends: a
+// process of the worker, for apps without a job queue.
+func (s *Security) Maintain(ctx context.Context) error {
+	tick := time.NewTicker(time.Hour)
+	defer tick.Stop()
+	for {
+		if _, err := s.Cleanup(ctx); err != nil && ctx.Err() == nil {
+			s.logError(ctx, err)
+		}
+		if _, err := s.RotateKeysIfDue(ctx); err != nil && ctx.Err() == nil {
+			s.logError(ctx, err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tick.C:
+		}
+	}
+}
+{{end -}}

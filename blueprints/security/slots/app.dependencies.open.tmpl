@@ -18,6 +18,9 @@
 		PasswordLists: {{goStrings .}},
 {{- end}}
 		PublicURL: {{printf "%q" .Options.public_url}},
+		Mailer: newMailer(d.config.Env, d.logger),
+		VerifyEmailHours: {{.Options.verify_email_hours}}, PasswordResetMinutes: {{.Options.password_reset_minutes}},
+		RotateKeysDays: {{.Options.rotate_keys_days}},
 {{- with strs .Options.redirect_urls}}
 		RedirectURLs: {{goStrings .}},
 {{- end}}

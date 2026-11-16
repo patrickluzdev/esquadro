@@ -140,7 +140,7 @@ func (s *Security) RotateKeys(ctx context.Context) error {
 	if _, err := tx.Exec(ctx, `UPDATE {{$keys}} SET expires_at = $1 WHERE expires_at IS NULL`, retire); err != nil {
 		return fmt.Errorf("security: rotate keys: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO {{$keys}} (id, algorithm, public_key, private_key) VALUES ($1, 'EdDSA', $2, $3)`, id, []byte(pub), sealed); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO {{$keys}} (id, algorithm, public_key, private_key, created_at) VALUES ($1, 'EdDSA', $2, $3, $4)`, id, []byte(pub), sealed, now); err != nil {
 		return fmt.Errorf("security: rotate keys: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {

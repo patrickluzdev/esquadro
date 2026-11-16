@@ -28,6 +28,9 @@ blueprint jobs {
   /// Code in Queue.Open that changes River's config before the client is
   /// made, e.g. config.Middleware = append(config.Middleware, ...).
   slot "jobs.middleware"
+  /// Code in open that registers other blueprints' jobs on registry, a
+  /// *jobs.Registry, before the queue opens; d is the dependencies.
+  slot "jobs.register"
 
   annotation job {
     /// When to enqueue the job, as cron: "0 3 * * *" (every day at 3:00),

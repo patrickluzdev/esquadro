@@ -16,7 +16,7 @@ blueprint security
 ## Works with
 
 - **Requires** [app](../app/), [env](../env/), [domain](../domain/), [http](../http/), [postgres](../postgres/), [migrations](../migrations/): the app must use them too.
-- **Works with** [jobs](../jobs/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/), [docker](../docker/) when the app uses them.
+- **Works with** [jobs](../jobs/), [worker](../worker/), [rest](../rest/), [api_docs](../api_docs/), [i18n](../i18n/), [observability](../observability/), [testcontainers](../testcontainers/), [compose](../compose/), [docker](../docker/) when the app uses them.
 
 ## Options
 
@@ -33,7 +33,9 @@ blueprint security
 | `session_ip` | bool | `true` | Keep the address and the browser of each session. |
 | `session_user_agent` | bool | `true` |  |
 | `token_minutes` | int | `15` | Minutes a JWT lasts. |
-| `rotate_keys_days` | int | `0` | Days between rotations of the JWT signing key, with jobs; 0 is never. |
+| `rotate_keys_days` | int | `0` | Days between rotations of the JWT signing key, checked every hour by jobs or the worker; 0 is never. |
+| `verify_email_hours` | int | `24` | Hours an email verification link works, and minutes a password reset link does. |
+| `password_reset_minutes` | int | `60` |  |
 | `password_min` | int | `12` | The shortest password. NIST asks for 15 when the password is the only factor. |
 | `password_max` | int | `128` |  |
 | `password_blocklist` | name | `"none"` | none, lists (the passwords of password_lists, and those made of a sequence, a repetition, the app's name or the person's email) or pwned (all that, and Pwned Passwords). |
