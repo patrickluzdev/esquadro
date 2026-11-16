@@ -1,0 +1,9 @@
+{{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}
+  # Emails: Mailpit catches every email the app sends in development, to
+  # read at http://localhost:{{composePort "mailpit_ui" "8025"}}; it receives SMTP at localhost:{{composePort "mailpit" "1025"}}.
+  mailpit:
+    container_name: {{$name}}-mailpit
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - "{{composePort "mailpit_ui" "8025"}}:8025"
+      - "{{composePort "mailpit" "1025"}}:1025"

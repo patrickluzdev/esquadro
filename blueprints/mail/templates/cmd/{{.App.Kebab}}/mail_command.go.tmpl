@@ -1,0 +1,33 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"{{.App.Module}}/internal/platform/mail"
+)
+
+// mailCommand runs {{.App.Kebab}} mail test <address>: an email sent now,
+// past the queue, with the configuration of the environment, to see that
+// it works.
+func mailCommand(ctx context.Context, args []string) error {
+	if len(args) != 2 || args[0] != "test" {
+		return errors.New("usage: {{.App.Kebab}} mail test <address>: sends an email with this environment's MAIL_URL")
+	}
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	msg := mail.Message{
+		To:      []string{args[1]},
+		Subject: "{{.App.Label}}: email works",
+		Text:    "This email was sent by {{.App.Kebab}} mail test, in " + d.config.Env + ".\n",
+	}
+	if err := d.mail.Deliver(ctx, msg); err != nil {
+		return err
+	}
+	fmt.Printf("sent to %s\n", args[1])
+	return nil
+}

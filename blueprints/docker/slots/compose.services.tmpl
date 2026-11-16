@@ -11,8 +11,18 @@
     ports:
       - "{{$port}}:{{$port}}"
 {{- end}}
-{{- if $env}}
+{{- if uses "env"}}
+    # Run as development, with the secrets of .env.{{index .Environments 0}}; the
+    # services' addresses below replace localhost's.
+    env_file:
+      - path: .env.{{index .Environments 0}}
+        required: false
+{{- end}}
+{{- if or $env (uses "env")}}
     environment:
+{{- if uses "env"}}
+      APP_ENV: {{index .Environments 0}}
+{{- end}}
 {{- range $env}}
 {{.}}
 {{- end}}

@@ -1,0 +1,18 @@
+package mailtest
+
+import (
+	"testing"
+
+	"{{.App.Module}}/internal/platform/mail"
+)
+
+func TestCapture(t *testing.T) {
+	m, c := Capture(t)
+	if err := m.Send(t.Context(), mail.Email{To: []string{"ana@example.com"}, Template: "welcome", Data: map[string]any{"Name": "Ana"}}); err != nil {
+		t.Fatal(err)
+	}
+	got := c.Last("ana@example.com")
+	if got.Subject != "Welcome, Ana" || len(c.Sent()) != 1 {
+		t.Fatalf("%+v", got)
+	}
+}

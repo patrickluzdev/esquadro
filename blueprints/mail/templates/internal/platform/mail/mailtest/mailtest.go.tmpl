@@ -1,0 +1,69 @@
+// Package mailtest catches the emails of tests: a Mailer that keeps what
+// it would send.
+package mailtest
+
+import (
+	"context"
+	"net/url"
+	"regexp"
+	"slices"
+	"sync"
+	"testing"
+
+	"{{.App.Module}}/internal/platform/mail"
+)
+
+// Catcher keeps the emails sent through its Mailer.
+type Catcher struct {
+	t    testing.TB
+	mu   sync.Mutex
+	sent []mail.Message
+}
+
+// Capture is a Mailer that sends nothing, and the Catcher of what it would
+// have sent; Send hands each email over before it returns.
+func Capture(t testing.TB) (*mail.Mailer, *Catcher) {
+	c := &Catcher{t: t}
+	return mail.NewWith(c, "Test <test@example.com>"), c
+}
+
+// Deliver keeps a message.
+func (c *Catcher) Deliver(_ context.Context, m mail.Message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sent = append(c.sent, m)
+	return nil
+}
+
+// Sent are the emails sent so far.
+func (c *Catcher) Sent() []mail.Message {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.sent)
+}
+
+// Last is the newest email sent to address, failing the test without one.
+func (c *Catcher) Last(address string) mail.Message {
+	c.t.Helper()
+	sent := c.Sent()
+	for _, m := range slices.Backward(sent) {
+		if slices.Contains(m.To, address) {
+			return m
+		}
+	}
+	c.t.Fatalf("no email to %s, of %d sent", address, len(sent))
+	return mail.Message{}
+}
+
+var linkRE = regexp.MustCompile(`https?://\S+`)
+
+// Link is the first link of an email's text, and its query.
+func Link(t testing.TB, m mail.Message) (string, url.Values) {
+	t.Helper()
+	link := linkRE.FindString(m.Text)
+	u, err := url.Parse(link)
+	if link == "" || err != nil {
+		t.Fatalf("no link in %q", m.Text)
+	}
+	return link, u.Query()
+}
