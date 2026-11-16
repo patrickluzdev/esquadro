@@ -79,6 +79,16 @@ func Require(ctx context.Context, permission string) error {
 	return ErrForbidden
 }
 
+// Who is whom the request of ctx comes from, as "realm:id", or "" for no
+// one: what the API's idempotency keys belong to.
+func Who(ctx context.Context) string {
+	p, ok := PrincipalOf(ctx)
+	if !ok {
+		return ""
+	}
+	return p.Realm + ":" + p.ID.String()
+}
+
 // Anonymous reports whether no one signed in to the request of ctx.
 func Anonymous(ctx context.Context) bool {
 	principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)

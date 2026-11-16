@@ -15,7 +15,7 @@ blueprint rest
 
 ## Works with
 
-- **Requires** [http](../http/), [store](../store/): the app must use them too.
+- **Requires** [http](../http/), [store](../store/), [migrations](../migrations/): the app must use them too.
 - **Works with** [i18n](../i18n/), [rate_limit](../rate_limit/), [testcontainers](../testcontainers/) when the app uses them.
 
 ## Options
@@ -27,6 +27,8 @@ blueprint rest
 | `pagination` | list | `["cursor", "page"]` | How lists page, unless an entity says otherwise: cursor (after, limit, next), page (page, per_page, total) or both; [] lists every record, up to unpaged_max. |
 | `unpaged_max` | int | `1000` | The most records a list without pagination answers; above it, the list answers too_many_records. |
 | `if_match` | name | `"optional"` | Whether changing or deleting a record needs If-Match with the ETag it was read with: optional (it is checked when sent) or required (428 without it). |
+| `idempotency` | name | `"optional"` | Whether a POST needs an Idempotency-Key: optional (a retry with it answers the same) or required (428 without it); and how long a key answers retries. |
+| `idempotency_hours` | int | `24` |  |
 
 ```esquadro
 blueprint rest {
@@ -49,6 +51,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `pagination` | list | How the entity's list pages: cursor, page, both, or [] (none). |
 | entity | `unpaged_max` | int | The most records its list answers without pagination. |
 | entity | `if_match` | name | optional or required, for the entity: see the if_match option. |
+| entity | `idempotency` | name | optional or required, for creating the entity: see the idempotency option. |
 
 An annotation is written `@rest(key value)` on the element.
 

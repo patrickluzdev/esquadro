@@ -39,12 +39,14 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		}
 	}
 	modes := []string{"optional", "required"}
-	if v, ok := set.Options["rest"]["if_match"].(string); ok && !slices.Contains(modes, v) {
-		diags.Errorf(p.App.Pos, p.App.Pos, "if_match %q is not optional or required", v)
-	}
-	for _, e := range p.Entities {
-		if v, ok := e.Ann["rest"]["if_match"].(string); ok && !slices.Contains(modes, v) {
-			diags.Errorf(e.Pos, e.Pos, "%s: if_match %q is not optional or required", e.Raw, v)
+	for _, key := range []string{"if_match", "idempotency"} {
+		if v, ok := set.Options["rest"][key].(string); ok && !slices.Contains(modes, v) {
+			diags.Errorf(p.App.Pos, p.App.Pos, "%s %q is not optional or required", key, v)
+		}
+		for _, e := range p.Entities {
+			if v, ok := e.Ann["rest"][key].(string); ok && !slices.Contains(modes, v) {
+				diags.Errorf(e.Pos, e.Pos, "%s: %s %q is not optional or required", e.Raw, key, v)
+			}
 		}
 	}
 	if n, ok := set.Options["rest"]["unpaged_max"].(int64); ok && n < 1 {
@@ -74,5 +76,14 @@ func IfMatchRequired(e *project.Entity, opts map[string]any) bool {
 		return v == "required"
 	}
 	v, _ := opts["if_match"].(string)
+	return v == "required"
+}
+
+// IdempotencyRequired reports whether creating e needs an Idempotency-Key.
+func IdempotencyRequired(e *project.Entity, opts map[string]any) bool {
+	if v, ok := e.Ann["rest"]["idempotency"].(string); ok {
+		return v == "required"
+	}
+	v, _ := opts["idempotency"].(string)
 	return v == "required"
 }

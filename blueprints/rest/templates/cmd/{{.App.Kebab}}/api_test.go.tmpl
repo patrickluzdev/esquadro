@@ -1,7 +1,7 @@
 {{- if and .Entities (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" (and (linkTests .Entities) "uuid") (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {
@@ -41,11 +41,25 @@ func newTestServerOf(t *testing.T, d dependencies) (*httptest.Server, dependenci
 	return srv, d
 }
 
+// testClient sends a new Idempotency-Key with each POST, as a client
+// should: a retry of the same operation would send the same one again.
+var testClient = &http.Client{Transport: idempotentTransport{}}
+
+type idempotentTransport struct{}
+
+func (idempotentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.Method == http.MethodPost && r.Header.Get("Idempotency-Key") == "" {
+		r = r.Clone(r.Context())
+		r.Header.Set("Idempotency-Key", uuid.NewV7().String())
+	}
+	return http.DefaultTransport.RoundTrip(r)
+}
+
 // newTestClient returns ogen's client for a new test server, so tests go
 // through the whole contract: JSON, decoding, the module, Postgres and back.
 func newTestClient(t *testing.T) *apigen.Client {
 	t.Helper()
-	c, err := apigen.NewClient(newTestServer(t).URL + "/api/v1")
+	c, err := apigen.NewClient(newTestServer(t).URL+"/api/v1", apigen.WithClient(testClient))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +114,7 @@ func TestAPIEdge(t *testing.T) {
 func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.Client, i int) *apigen.New{{$P}} {
 	t.Helper()
 {{- range apiParents $e}}
-	{{.Camel}}, err := c.Create{{.Target.Pascal}}(context.Background(), givenAPI{{.Target.Pascal}}(t, c, i))
+	{{.Camel}}, err := c.Create{{.Target.Pascal}}(context.Background(), givenAPI{{.Target.Pascal}}(t, c, i), apigen.Create{{.Target.Pascal}}Params{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,11 +139,11 @@ func TestAPI{{.Plural.Pascal}}IfMatch(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	srv := newTestServer(t)
-	c, err := apigen.NewClient(srv.URL + "/api/v1")
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1), apigen.Create{{$P}}Params{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,6 +172,15 @@ func TestAPI{{.Plural.Pascal}}IfMatch(t *testing.T) {
 	_, err = c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 4), apigen.Update{{$P}}Params{ {{- $id}}: created.ID})
 	refused("update without If-Match", err, 428)
 {{- end}}
+{{- if idempotencyRequired $e $.Options}}
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/{{.Plural.Kebab}}", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	if res, err := http.DefaultClient.Do(req); err != nil || res.StatusCode != 428 {
+		t.Errorf("create without an Idempotency-Key: %v %v, want 428", res, err)
+	} else {
+		res.Body.Close()
+	}
+{{- end}}
 }
 
 func TestAPI{{.Plural.Pascal}}(t *testing.T) {
@@ -165,7 +188,7 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	ctx := context.Background()
 	c := newTestClient(t)
 
-	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1), apigen.Create{{$P}}Params{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,14 +230,14 @@ func TestAPI{{$P}}{{$R}}(t *testing.T) {
 	ctx := context.Background()
 	c := newTestClient(t)
 
-	owner, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1))
+	owner, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, 1), apigen.Create{{$P}}Params{})
 	if err != nil {
 		t.Fatal(err)
 	}
 {{- if .CrossesModules}}
 	otherID := ogenuuid.UUID(uuid.NewV7()) // of the {{.Target.Module.Snake}} module: no foreign key
 {{- else}}
-	other, err := c.Create{{.Target.Pascal}}(ctx, givenAPI{{.Target.Pascal}}(t, c, 2))
+	other, err := c.Create{{.Target.Pascal}}(ctx, givenAPI{{.Target.Pascal}}(t, c, 2), apigen.Create{{.Target.Pascal}}Params{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,4 +271,85 @@ func TestAPI{{$P}}{{$R}}(t *testing.T) {
 }
 {{- end}}{{end}}
 {{- end}}
+{{- $first := ""}}{{range .Entities}}{{if and (not $first) (canSampleAPI .)}}{{$first = .Pascal}}{{end}}{{end}}
+{{- range .Entities}}{{if eq .Pascal $first}}
+
+// TestAPIIdempotency sends a {{lower .Label}} with an Idempotency-Key again: the same
+// answer, one record; another body with the key is refused; two at once
+// make one.
+func TestAPIIdempotency(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := func(i int) string {
+		b, err := json.Marshal(givenAPI{{.Pascal}}(t, c, i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	post := func(key, body string) (int, string, http.Header) {
+		t.Helper()
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/{{.Plural.Kebab}}", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", key)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var answer struct {
+			ID   string `json:"id"`
+			Code string `json:"code"`
+		}
+		_ = json.NewDecoder(res.Body).Decode(&answer)
+		if answer.Code != "" {
+			return res.StatusCode, answer.Code, res.Header
+		}
+		return res.StatusCode, answer.ID, res.Header
+	}
+	count := func() int {
+		page, err := c.List{{.Plural.Pascal}}(ctx, apigen.List{{.Plural.Pascal}}Params{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(page.Items)
+	}
+	before := count()
+
+	first := body(1)
+	status, id, _ := post("key-1", first)
+	again, idAgain, header := post("key-1", first)
+	if status != 201 || again != 201 || id != idAgain || header.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("sent again: %d %s, then %d %s %v", status, id, again, idAgain, header)
+	}
+	if n := count(); n != before+1 {
+		t.Fatalf("%d records made, want 1", n-before)
+	}
+	if status, code, _ := post("key-1", body(2)); status != 422 || code != "idempotency_key_reused" {
+		t.Fatalf("another body with the key: %d %s", status, code)
+	}
+
+	// Two at once with one key: one record, the same answer.
+	before = count()
+	same := body(3)
+	var wg sync.WaitGroup
+	ids := make([]string, 2)
+	for i := range 2 {
+		wg.Go(func() {
+			if status, got, _ := post("key-2", same); status == 201 {
+				ids[i] = got
+			}
+		})
+	}
+	wg.Wait()
+	if n := count(); n != before+1 || ids[0] != ids[1] {
+		t.Fatalf("two at once: %d records, ids %v", n-before, ids)
+	}
+}
+{{- end}}{{end}}
 {{end -}}

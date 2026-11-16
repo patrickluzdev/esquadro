@@ -1,0 +1,6 @@
+{{- if .Entities}}
+	// The table of the API's idempotency keys.
+	if err := restmigrations.Apply(ctx, db); err != nil {
+		return err
+	}
+{{- end}}

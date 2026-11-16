@@ -17,7 +17,9 @@ info:
     `in_use` (409) for deleting a record others point at,
     `request_too_large` (413), `unsupported_media_type` (415),
     `precondition_failed` (412) and `precondition_required` (428) for If-Match
-    (a record's ETag is its `version`),{{if accessLine .Entities (index .Entities 0) "read"}}
+    (a record's ETag is its `version`), `idempotency_in_progress` (409),
+    `idempotency_key_reused` (422) and `idempotency_key_required` (428) for
+    Idempotency-Key,{{if accessLine .Entities (index .Entities 0) "read"}}
     `unauthorized` (401) without a session or a token, `forbidden` (403) for
     one that may not, `csrf` (403) for a change with a session cookie but
     without its X-CSRF-Token,{{end}}
@@ -114,6 +116,8 @@ paths:
         {{.}}
 {{- end}}
       tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -291,6 +295,15 @@ components:
       required: false
       description: How many to read, 25 by default.
       schema: {type: integer, minimum: 1, maximum: 100}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        A new random UUID for each operation: sending it again (a retry)
+        answers what the first answered, without creating twice; another
+        body with it answers idempotency_key_reused (422).
+      schema: {type: string, maxLength: 255}
     IfMatch:
       name: If-Match
       in: header

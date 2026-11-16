@@ -10,7 +10,7 @@ blueprint rest {
 
   /// The largest request body the API reads, in KB; 0 is no limit.
   env MAX_BODY_KB int prefixed field(MaxBodyKB) default("{{.Options.max_body_kb}}")
-  requires http, store
+  requires http, store, migrations
   optional i18n, rate_limit, testcontainers
 
   /// Title of the API in the contract; the app's name when empty.
@@ -29,6 +29,11 @@ blueprint rest {
   /// was read with: optional (it is checked when sent) or required (428
   /// without it).
   option if_match name default(optional)
+  /// Whether a POST needs an Idempotency-Key: optional (a retry with it
+  /// answers the same) or required (428 without it); and how long a key
+  /// answers retries.
+  option idempotency name default(optional)
+  option idempotency_hours int default(24)
 
   annotation entity {
     /// How the entity's list pages: cursor, page, both, or [] (none).
@@ -37,6 +42,9 @@ blueprint rest {
     unpaged_max int
     /// optional or required, for the entity: see the if_match option.
     if_match name
+    /// optional or required, for creating the entity: see the idempotency
+    /// option.
+    idempotency name
   }
 
   /// Tags of your own operations in api/openapi.yaml, indented by two.

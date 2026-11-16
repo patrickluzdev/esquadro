@@ -13,7 +13,7 @@ func NewHTTP(m *{{$m.Pascal}}) HTTP { return HTTP{ {{$p}}: m} }
 {{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
 {{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
 
-func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.{{$P}}, error) {
+func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.Create{{$P}}Params) (*apigen.{{$P}}, error) {
 	n, unread := new{{$P}}Of(req)
 	if unread != nil {
 		return nil, problemOf(refuse{{$P}}(n, unread))

@@ -1,0 +1,220 @@
+{{- if .Entities -}}
+package edge
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"io"
+	"maps"
+	"net/http"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"{{.App.Module}}/internal/platform/postgres"
+)
+
+// The problems of Idempotency-Key.
+var (
+	ErrIdempotencyInProgress = &Problem{Status: 409, Code: "idempotency_in_progress", Title: "A request with this Idempotency-Key is still running: try again shortly."}
+	ErrIdempotencyKeyReused  = &Problem{Status: 422, Code: "idempotency_key_reused", Title: "This Idempotency-Key was used for another request."}
+	ErrIdempotencyRequired   = &Problem{Status: 428, Code: "idempotency_key_required", Title: "Send an Idempotency-Key, a new random UUID for each operation."}
+)
+
+// Idempotency is how the API answers a POST sent again.
+type Idempotency struct {
+	DB *pgxpool.Pool
+	// Find is the operation of a request; Required, whether it needs a
+	// key.
+	Find     func(method, path string) (string, bool)
+	Required func(op string) bool
+	// Scope is whom a key belongs to, so that one's key never answers
+	// another: the principal of the request, or "".
+	Scope func(context.Context) string
+	// Hours a key answers retries.
+	Hours int
+	// MaxBody is the largest body read, in bytes.
+	MaxBody int64
+}
+
+// stored is the answer kept for a key.
+type stored struct {
+	status  int
+	headers map[string]string
+	body    []byte
+}
+
+// kept are the headers of an answer a retry gets again.
+var kept = []string{"Content-Type", "Content-Language", "ETag", "Location"}
+
+// Middleware runs a POST with an Idempotency-Key once: in one transaction
+// with the key, so that the record and the key are stored together or not
+// at all. The same key again answers what the first answered, without
+// running; a retry that comes while the first runs waits for it.
+func (i Idempotency) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			next.ServeHTTP(w, r)
+			return
+		}
+		op, found := i.Find(r.Method, r.URL.Path)
+		if !found {
+			next.ServeHTTP(w, r)
+			return
+		}
+		key := r.Header.Get("Idempotency-Key")
+		switch {
+		case key == "" && i.Required != nil && i.Required(op):
+			Write(w, r, ErrIdempotencyRequired)
+			return
+		case key == "":
+			next.ServeHTTP(w, r)
+			return
+		case len(key) > 255:
+			Write(w, r, ErrInvalidRequest)
+			return
+		}
+		limit := i.MaxBody
+		if limit <= 0 {
+			limit = 10 << 20
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
+		if err != nil {
+			Write(w, r, ErrInvalidRequest)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		sum := sha256.Sum256(append([]byte(op+"\n"), body...))
+		scope := ""
+		if i.Scope != nil {
+			scope = i.Scope(r.Context())
+		}
+		i.serve(w, r, next, op, scope, key, sum[:])
+	})
+}
+
+func (i Idempotency) serve(w http.ResponseWriter, r *http.Request, next http.Handler, op, scope, key string, hash []byte) {
+	ctx := r.Context()
+	tx, err := i.DB.Begin(ctx)
+	if err != nil {
+		Write(w, r, ErrInternal)
+		return
+	}
+	defer tx.Rollback(context.WithoutCancel(ctx))
+	// A retry waits for the first, but not forever.
+	if _, err := tx.Exec(ctx, "SET LOCAL lock_timeout = '5s'"); err != nil {
+		Write(w, r, ErrInternal)
+		return
+	}
+	// A few expired keys go with each request: the table stays small
+	// without a job.
+	if _, err := tx.Exec(ctx, `DELETE FROM rest_idempotency_keys WHERE ctid IN (
+		SELECT ctid FROM rest_idempotency_keys WHERE expires_at < now() LIMIT 100)`); err != nil {
+		i.answerError(w, r, err)
+		return
+	}
+	tag, err := tx.Exec(ctx, `INSERT INTO rest_idempotency_keys (scope, key, operation, request_hash, expires_at)
+		VALUES ($1, $2, $3, $4, now() + make_interval(hours => $5)) ON CONFLICT (scope, key) DO NOTHING`,
+		scope, key, op, hash, i.Hours)
+	if err != nil {
+		i.answerError(w, r, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		i.replay(w, r, tx, op, scope, key, hash)
+		return
+	}
+
+	rec := &answerRecorder{header: http.Header{}, status: http.StatusOK}
+	next.ServeHTTP(rec, r.WithContext(postgres.WithTx(ctx, tx)))
+	if rec.status >= 500 {
+		// The transaction rolls back, key included: the retry runs.
+		rec.writeTo(w)
+		return
+	}
+	headers := map[string]string{}
+	for _, h := range kept {
+		if v := rec.header.Get(h); v != "" {
+			headers[h] = v
+		}
+	}
+	raw, _ := json.Marshal(headers)
+	if _, err := tx.Exec(ctx, `UPDATE rest_idempotency_keys SET status = $3, headers = $4, body = $5 WHERE scope = $1 AND key = $2`,
+		scope, key, rec.status, raw, rec.body.Bytes()); err != nil {
+		i.answerError(w, r, err)
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		i.answerError(w, r, err)
+		return
+	}
+	rec.writeTo(w)
+}
+
+// replay answers a key already used: with the stored answer, if it is the
+// same request.
+func (i Idempotency) replay(w http.ResponseWriter, r *http.Request, tx pgx.Tx, op, scope, key string, hash []byte) {
+	var s stored
+	var storedOp string
+	var storedHash, headers []byte
+	err := tx.QueryRow(r.Context(), `SELECT operation, request_hash, status, headers, body FROM rest_idempotency_keys WHERE scope = $1 AND key = $2`,
+		scope, key).Scan(&storedOp, &storedHash, &s.status, &headers, &s.body)
+	if err != nil {
+		i.answerError(w, r, err)
+		return
+	}
+	if storedOp != op || !bytes.Equal(storedHash, hash) {
+		Write(w, r, ErrIdempotencyKeyReused)
+		return
+	}
+	_ = json.Unmarshal(headers, &s.headers)
+	for k, v := range s.headers {
+		w.Header().Set(k, v)
+	}
+	w.Header().Set("Idempotent-Replayed", "true")
+	w.WriteHeader(s.status)
+	_, _ = w.Write(s.body)
+}
+
+// answerError answers a database error: a retry that waited too long for
+// the first gets idempotency_in_progress.
+func (Idempotency) answerError(w http.ResponseWriter, r *http.Request, err error) {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "55P03" { // lock_not_available
+		Write(w, r, ErrIdempotencyInProgress)
+		return
+	}
+	Write(w, r, ErrInternal)
+}
+
+// answerRecorder keeps an answer, to store it before it is sent.
+type answerRecorder struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+	wrote  bool
+}
+
+func (r *answerRecorder) Header() http.Header { return r.header }
+
+func (r *answerRecorder) WriteHeader(status int) {
+	if !r.wrote {
+		r.status, r.wrote = status, true
+	}
+}
+
+func (r *answerRecorder) Write(b []byte) (int, error) {
+	r.wrote = true
+	return r.body.Write(b)
+}
+
+func (r *answerRecorder) writeTo(w http.ResponseWriter) {
+	maps.Copy(w.Header(), r.header)
+	w.WriteHeader(r.status)
+	_, _ = w.Write(r.body.Bytes())
+}
+{{end -}}

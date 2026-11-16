@@ -47,14 +47,14 @@ func TestAPIAccess(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	srv, d := newTestServerOf(t, newTestDependencies(t))
-	c, err := apigen.NewClient(srv.URL + "/api/v1")
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
 	if err != nil {
 		t.Fatal(err)
 	}
 {{- range $i, $e := .Entities}}{{if canSampleAPI $e}}{{$P := $e.Pascal}}{{$m := $e.Module}}{{$own := ownerField $.Entities $e}}
 	t.Run("{{$P}}", func(t *testing.T) {
 		// Records of its own (i), apart from the other entities'.
-		created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, {{$i}}+100))
+		created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, {{$i}}+100), apigen.Create{{$P}}Params{})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -12,6 +12,9 @@ import (
 
 	"{{.App.Module}}/internal/apigen"
 	"{{.App.Module}}/internal/platform/edge"
+{{- if policies .Entities}}
+	"{{.App.Module}}/internal/platform/security"
+{{- end}}
 {{- range .Modules}}{{if .Entities}}
 	"{{$.App.Module}}/internal/{{.Snake}}"
 {{- end}}{{end}}
@@ -55,10 +58,32 @@ func newAPI(d dependencies) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return edge.Chain(operations, edge.ResponseHeaders,
+	idempotency := edge.Idempotency{
+		DB: d.pool,
+		Find: func(method, path string) (string, bool) {
+			route, ok := operations.FindRoute(method, path)
+			return route.OperationID(), ok
+		},
+		Required: func(op string) bool {
+			switch op {
+{{- range .Entities}}
+			case "create{{.Pascal}}":
+				return {{idempotencyRequired . $.Options}}
+{{- end}}
+			}
+			return {{eq (index $.Options "idempotency") "required"}}
+		},
+{{- if policies .Entities}}
+		Scope: security.Who,
+{{- end}}
+		Hours:   {{index $.Options "idempotency_hours"}},
+		MaxBody: int64(d.config.MaxBodyKB) * 1024,
+	}
+	return edge.Chain(operations,
 {{- with slot "rest.middleware" .}}
 {{.}}
 {{- end}}
+		idempotency.Middleware, edge.ResponseHeaders,
 		edge.JSONOnly, edge.LimitBody(int64(d.config.MaxBodyKB)*1024)), nil
 }
 
