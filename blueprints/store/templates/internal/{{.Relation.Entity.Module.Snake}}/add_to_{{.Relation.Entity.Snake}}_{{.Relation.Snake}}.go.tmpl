@@ -9,7 +9,7 @@ package {{$m.Snake}}
 // record. It changes the {{lower $e.Label}}: its version goes up, and with a version
 // (not 0), only that version is changed (Err{{$e.Pascal}}Changed).
 func ({{$r}} *{{$m.Pascal}}) AddTo{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Context, id uuid.UUID, version int, {{$l.OtherParam}} uuid.UUID) error {
-	return pgx.BeginFunc(ctx, {{$r}}.Pool, func(tx pgx.Tx) error {
+	return pgx.BeginFunc(ctx, postgres.Querier(ctx, {{$r}}.Pool), func(tx pgx.Tx) error {
 		q := sqlgen.New(tx)
 		touched, err := q.Touch{{$e.Pascal}}(ctx, sqlgen.Touch{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 		if err != nil {

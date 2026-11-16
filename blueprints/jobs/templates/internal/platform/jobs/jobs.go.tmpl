@@ -15,6 +15,8 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/robfig/cron/v3"
+
+	"{{.App.Module}}/internal/platform/postgres"
 {{- with slot "jobs.imports" .}}
 {{.}}
 {{- end}}
@@ -119,7 +121,9 @@ func (q *Queue) Open(pool *pgxpool.Pool, r *Registry, cfg Config, logger *slog.L
 	return nil
 }
 
-// Enqueue adds a job to the queue, once its arguments are valid.
+// Enqueue adds a job to the queue, once its arguments are valid; in the
+// transaction of ctx when it has one (postgres.WithTx), so that it is
+// enqueued only if that commits.
 func (q *Queue) Enqueue(ctx context.Context, args river.JobArgs) error {
 	return q.insert(ctx, nil, args)
 }
@@ -138,6 +142,11 @@ func (q *Queue) insert(ctx context.Context, tx pgx.Tx, args river.JobArgs) error
 		if err := v.Validate(); err != nil {
 			return err
 		}
+	}
+	if tx == nil {
+		// A request's transaction, as the use cases take it: the job is
+		// enqueued only if what made it commits.
+		tx, _ = postgres.TxOf(ctx)
 	}
 	var err error
 	if tx != nil {

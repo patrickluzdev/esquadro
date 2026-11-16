@@ -100,7 +100,7 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, q {{$
 	}
 	f := q.Filter
 	_ = f
-	qs := sqlgen.New({{$r}}.Pool)
+	qs := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
 	var page {{$e.Pascal}}Page
 	switch sort {
 {{- range $ss}}{{$s := .}}

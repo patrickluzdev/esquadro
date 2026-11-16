@@ -14,12 +14,12 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 {{- if $ws}}
 	params := update{{$e.Pascal}}Params(id, n)
 	params.IfVersion = postgres.Version(version)
-	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, params)
+	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Update{{$e.Pascal}}(ctx, params)
 {{- else}}
-	row, err := sqlgen.New({{$r}}.Pool).Update{{$e.Pascal}}(ctx, sqlgen.Update{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Update{{$e.Pascal}}(ctx, sqlgen.Update{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 {{- end}}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return {{$e.Pascal}}{}, {{$e.Camel}}Gone(ctx, {{$r}}.Pool, id)
+		return {{$e.Pascal}}{}, {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
 	}
 	if err != nil {
 		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)

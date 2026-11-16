@@ -6,7 +6,7 @@ package {{$m.Snake}}
 // other records still point at it. With a version (not 0), only that
 // version: Err{{$e.Pascal}}Changed when someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
-	deleted, err := sqlgen.New({{$r}}.Pool).Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+	deleted, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 	if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
 		return Err{{$e.Pascal}}InUse
 	}
@@ -14,7 +14,7 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		return err
 	}
 	if deleted == 0 {
-		return {{$e.Camel}}Gone(ctx, {{$r}}.Pool, id)
+		return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
 	}
 	return nil
 }

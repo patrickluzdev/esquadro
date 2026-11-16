@@ -23,7 +23,7 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Pascal}}{{$rel.Pascal}}(ctx context.Contex
 		return {{$page}}{}, err
 	}
 	limit = min(max(limit, 1), Max{{if $rel.CrossesModules}}{{$e.Pascal}}{{else}}{{$t.Pascal}}{{end}}Page)
-	rows, err := sqlgen.New({{$r}}.Pool).List{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.List{{$e.Pascal}}{{$rel.Pascal}}Params{
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).List{{$e.Pascal}}{{$rel.Pascal}}(ctx, sqlgen.List{{$e.Pascal}}{{$rel.Pascal}}Params{
 		OwnID:    postgres.UUID(id),
 		After:    postgres.UUID(after),
 		PageSize: int32(limit + 1),

@@ -55,6 +55,33 @@ func TestCreateAndRead{{$e.Pascal}}(t *testing.T) {
 	}
 }
 
+func Test{{$e.Pascal}}InATransaction(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pool := postgrestest.Fresh(t)
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: pool})
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inTx := postgres.WithTx(ctx, tx)
+	created, err := {{$r}}.Create{{$e.Pascal}}(inTx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := {{$r}}.Read{{$e.Pascal}}(inTx, created.ID); err != nil {
+		t.Fatalf("read in the transaction: %v", err)
+	}
+	// What the transaction wrote goes with it.
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := {{$r}}.Read{{$e.Pascal}}(ctx, created.ID); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("after the rollback: %v", err)
+	}
+}
+
 func TestList{{$e.Plural.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
