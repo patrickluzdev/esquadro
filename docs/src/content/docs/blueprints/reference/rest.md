@@ -24,6 +24,8 @@ blueprint rest
 |---|---|---|---|
 | `title` | string | `""` | Title of the API in the contract; the app's name when empty. |
 | `max_body_kb` | int | `1024` | Largest request body, in KB; 0 turns the limit off. &lt;APP>_MAX_BODY_KB overrides it. |
+| `pagination` | list | `["cursor", "page"]` | How lists page, unless an entity says otherwise: cursor (after, limit, next), page (page, per_page, total) or both; [] lists every record, up to unpaged_max. |
+| `unpaged_max` | int | `1000` | The most records a list without pagination answers; above it, the list answers too_many_records. |
 
 ```esquadro
 blueprint rest {
@@ -38,6 +40,15 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | Variable | Type | Value | |
 |---|---|---|---|
 | `<APP>_MAX_BODY_KB` | int | the max_body_kb option | The largest request body the API reads, in KB; 0 is no limit. |
+
+## Annotations
+
+| Where | Key | Type | |
+|---|---|---|---|
+| entity | `pagination` | list | How the entity's list pages: cursor, page, both, or [] (none). |
+| entity | `unpaged_max` | int | The most records its list answers without pagination. |
+
+An annotation is written `@rest(key value)` on the element.
 
 ## Slots
 

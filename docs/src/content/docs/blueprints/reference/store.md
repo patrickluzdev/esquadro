@@ -18,6 +18,29 @@ blueprint store
 - **Requires** [domain](../domain/), [postgres](../postgres/), [migrations](../migrations/): the app must use them too.
 - **Works with** [testcontainers](../testcontainers/) when the app uses them.
 
+## Options
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `search_language` | name | `"simple"` | The language of the search column, as PostgreSQL's text search names it: simple (words as written), portuguese, english, spanish...; it decides how words are reduced to their root. |
+
+```esquadro
+blueprint store {
+  search_language "simple"
+}
+```
+
+## Annotations
+
+| Where | Key | Type | |
+|---|---|---|---|
+| field | `filter` | bool | Lists may filter by it: by value, by range (numbers and dates), or by a list of values (enums). |
+| field | `sort` | bool | Lists may be ordered by it; only a required field, so that pages keep every record. |
+| field | `search` | bool | Lists may search its text (q). |
+| relation | `filter` | bool | Lists may filter by the related record's id. |
+
+An annotation is written `@store(key value)` on the element.
+
 ## Hooks
 
 - `post-gen` sqlc, writes `internal/*/sqlgen/**`

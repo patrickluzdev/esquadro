@@ -18,6 +18,20 @@ blueprint rest {
   /// Largest request body, in KB; 0 turns the limit off.
   /// <APP>_MAX_BODY_KB overrides it.
   option max_body_kb int default(1024)
+  /// How lists page, unless an entity says otherwise: cursor (after,
+  /// limit, next), page (page, per_page, total) or both; [] lists every
+  /// record, up to unpaged_max.
+  option pagination list default(["cursor", "page"])
+  /// The most records a list without pagination answers; above it, the
+  /// list answers too_many_records.
+  option unpaged_max int default(1000)
+
+  annotation entity {
+    /// How the entity's list pages: cursor, page, both, or [] (none).
+    pagination list
+    /// The most records its list answers without pagination.
+    unpaged_max int
+  }
 
   /// Tags of your own operations in api/openapi.yaml, indented by two.
   slot "rest.tags"

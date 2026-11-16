@@ -37,6 +37,8 @@ var builtinHooks = map[string]hook.Func{
 
 func init() {
 	blueprint.Checks["security"] = security.Check
+	blueprint.Checks["store"] = store.Check
+	blueprint.Checks["rest"] = rest.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

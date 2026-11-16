@@ -9,4 +9,24 @@ blueprint store {
   optional testcontainers
 
   hook post-gen "sqlc" writes "internal/*/sqlgen/**"
+
+  /// The language of the search column, as PostgreSQL's text search names
+  /// it: simple (words as written), portuguese, english, spanish...; it
+  /// decides how words are reduced to their root.
+  option search_language name default(simple)
+
+  annotation field {
+    /// Lists may filter by it: by value, by range (numbers and dates), or
+    /// by a list of values (enums).
+    filter bool
+    /// Lists may be ordered by it; only a required field, so that pages
+    /// keep every record.
+    sort bool
+    /// Lists may search its text (q).
+    search bool
+  }
+  annotation relation {
+    /// Lists may filter by the related record's id.
+    filter bool
+  }
 }
