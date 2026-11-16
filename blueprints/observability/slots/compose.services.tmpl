@@ -1,0 +1,10 @@
+{{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}{{$grafana := "3000"}}{{$otlp := "4318"}}
+{{- range strs (index (optionsOf "compose") "ports")}}{{if hasPrefix . "grafana:"}}{{$grafana = trimPrefix . "grafana:"}}{{end}}{{if hasPrefix . "otlp:"}}{{$otlp = trimPrefix . "otlp:"}}{{end}}{{end}}
+  # Traces, metrics and logs: Grafana at http://localhost:{{$grafana}} (admin,
+  # admin), receiving OTLP at localhost:{{$otlp}}.
+  otel-lgtm:
+    container_name: {{$name}}-otel-lgtm
+    image: grafana/otel-lgtm:0.39.0
+    ports:
+      - "{{$grafana}}:3000"
+      - "{{$otlp}}:4318"

@@ -49,6 +49,7 @@ var blueprintOrder = []string{
 	"app", "domain", "http", "worker", "jobs",
 	"postgres", "migrations", "store", "testcontainers", "compose",
 	"rest", "api_docs", "cors", "security_headers", "rate_limit", "compression", "i18n",
+	"observability",
 	"docker", "github_actions",
 	"git",
 }

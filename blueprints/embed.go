@@ -24,6 +24,7 @@ import "embed"
 //go:embed i18n/blueprint.esq all:i18n/templates i18n/slots
 //go:embed worker/blueprint.esq all:worker/templates worker/slots
 //go:embed jobs/blueprint.esq all:jobs/templates jobs/slots
+//go:embed observability/blueprint.esq all:observability/templates observability/slots
 //go:embed docker/blueprint.esq all:docker/templates docker/slots
 //go:embed github_actions/blueprint.esq all:github_actions/templates
 //go:embed git/blueprint.esq

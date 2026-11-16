@@ -6,6 +6,9 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+{{- with slot "postgres.imports" .}}
+{{.}}
+{{- end}}
 )
 
 // Open connects to the database at url with at most maxConns connections and
@@ -16,6 +19,9 @@ func Open(ctx context.Context, url string, maxConns int) (*pgxpool.Pool, error) 
 		return nil, fmt.Errorf("postgres: %w", err)
 	}
 	config.MaxConns = int32(maxConns)
+{{- with slot "postgres.config" .}}
+{{.}}
+{{- end}}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)

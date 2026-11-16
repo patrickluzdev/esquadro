@@ -38,8 +38,33 @@ func Identify(next http.Handler) http.Handler {
 			id = uuid.NewV7().String()
 		}
 		w.Header().Set("X-Request-Id", id)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDKey{}, id)))
+		ctx := context.WithValue(r.Context(), requestIDKey{}, id)
+		ctx = context.WithValue(ctx, routeKey{}, new(string))
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// routeKey is the context key of where Routes writes the request's route.
+type routeKey struct{}
+
+// Routes serves mux, writing the pattern that matched the request where
+// RouteOf reads it, for the middleware around it (the log, traces).
+func Routes(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if route, ok := r.Context().Value(routeKey{}).(*string); ok {
+			_, *route = mux.Handler(r)
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
+// RouteOf is the pattern that matched the request of ctx, such as
+// "GET /healthz", once it is served; empty before, or outside a request.
+func RouteOf(ctx context.Context) string {
+	if route, ok := ctx.Value(routeKey{}).(*string); ok {
+		return *route
+	}
+	return ""
 }
 
 // RequestIDOf is the ID of the request of ctx, empty outside one.
@@ -78,6 +103,7 @@ func Log(logger *slog.Logger, trustProxy bool) Middleware {
 			logger.LogAttrs(r.Context(), level, "request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
+				slog.String("route", RouteOf(r.Context())),
 				slog.Int("status", rec.status),
 				slog.Int64("bytes", rec.bytes),
 				slog.Duration("duration", time.Since(start)),

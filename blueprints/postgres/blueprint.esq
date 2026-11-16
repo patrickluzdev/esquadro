@@ -15,6 +15,12 @@ blueprint postgres {
   /// after the module; the others use public.
   option schemas list default([])
 
+  /// Imports of internal/platform/postgres/postgres.go.
+  slot "postgres.imports"
+  /// Code in postgres.Open that changes the pool's config before it opens,
+  /// e.g. config.ConnConfig.Tracer = ....
+  slot "postgres.config"
+
   annotation entity {
     /// Table name, when it should differ from the plural snake case name.
     table        name

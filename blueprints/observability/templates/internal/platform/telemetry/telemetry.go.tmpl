@@ -1,0 +1,177 @@
+// Package telemetry sends {{.App.Label}}'s traces, metrics and logs with
+// OpenTelemetry, over OTLP.
+package telemetry
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"os"
+	"time"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
+{{- if uses "postgres"}}
+
+	"github.com/exaring/otelpgx"
+	"github.com/jackc/pgx/v5/pgxpool"
+{{- end}}
+)
+
+// Config is where and how the telemetry goes.
+type Config struct {
+	// Service and Version name what sends it; Env is the environment.
+	Service, Version, Env string
+	// Endpoint is the OTLP/HTTP endpoint, e.g. http://localhost:4318;
+	// nothing is sent when it is empty.
+	Endpoint string
+	// SampleRatio is the share of traces kept, from 0 to 1.
+	SampleRatio float64
+}
+
+// Setup makes the global tracer, meter and logger providers send to the
+// endpoint, and returns stop, which sends what is still buffered, for up to
+// five seconds, and stops them. Without an endpoint, they stay the no-op
+// ones and stop does nothing. The standard OTEL_*
+// variables apply: OTEL_EXPORTER_OTLP_HEADERS for an API key,
+// OTEL_TRACES_SAMPLER to replace the sampler...
+func Setup(ctx context.Context, cfg Config) (stop func(), err error) {
+	shutdown, err := setup(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(ctx); err != nil {
+			slog.Default().Warn("telemetry: not everything was sent", "error", err)
+		}
+	}, nil
+}
+
+func setup(ctx context.Context, cfg Config) (shutdown func(context.Context) error, err error) {
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	if cfg.Endpoint == "" {
+		return func(context.Context) error { return nil }, nil
+	}
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
+		attribute.String("service.name", cfg.Service),
+		attribute.String("service.version", cfg.Version),
+		attribute.String("deployment.environment.name", cfg.Env),
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	// OTEL_EXPORTER_OTLP_ENDPOINT, when set, is read by the exporters
+	// themselves, with the other OTEL_EXPORTER_OTLP_* variables; otherwise
+	// the endpoint is the configured one.
+	fromEnv := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
+	var traceOpts []otlptracehttp.Option
+	var metricOpts []otlpmetrichttp.Option
+	var logOpts []otlploghttp.Option
+	if !fromEnv {
+		traceOpts = append(traceOpts, otlptracehttp.WithEndpointURL(cfg.Endpoint+"/v1/traces"))
+		metricOpts = append(metricOpts, otlpmetrichttp.WithEndpointURL(cfg.Endpoint+"/v1/metrics"))
+		logOpts = append(logOpts, otlploghttp.WithEndpointURL(cfg.Endpoint+"/v1/logs"))
+	}
+
+	var stops []func(context.Context) error
+	shutdown = func(ctx context.Context) error {
+		var errs []error
+		for _, stop := range stops {
+			errs = append(errs, stop(ctx))
+		}
+		return errors.Join(errs...)
+	}
+	fail := func(err error) (func(context.Context) error, error) {
+		return nil, errors.Join(err, shutdown(ctx))
+	}
+
+	traces, err := otlptracehttp.New(ctx, traceOpts...)
+	if err != nil {
+		return fail(err)
+	}
+	traceProviderOpts := []sdktrace.TracerProviderOption{sdktrace.WithBatcher(traces), sdktrace.WithResource(res)}
+	if os.Getenv("OTEL_TRACES_SAMPLER") == "" {
+		traceProviderOpts = append(traceProviderOpts, sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.SampleRatio))))
+	}
+	tracerProvider := sdktrace.NewTracerProvider(traceProviderOpts...)
+	stops = append(stops, tracerProvider.Shutdown)
+	otel.SetTracerProvider(tracerProvider)
+
+	metrics, err := otlpmetrichttp.New(ctx, metricOpts...)
+	if err != nil {
+		return fail(err)
+	}
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metrics)), sdkmetric.WithResource(res))
+	stops = append(stops, meterProvider.Shutdown)
+	otel.SetMeterProvider(meterProvider)
+	if err := runtime.Start(); err != nil {
+		return fail(err)
+	}
+
+	logs, err := otlploghttp.New(ctx, logOpts...)
+	if err != nil {
+		return fail(err)
+	}
+	loggerProvider := sdklog.NewLoggerProvider(sdklog.WithProcessor(sdklog.NewBatchProcessor(logs)), sdklog.WithResource(res))
+	stops = append(stops, loggerProvider.Shutdown)
+	otel.SetLoggerProvider(loggerProvider)
+	return shutdown, nil
+}
+
+// Handler is h that also sends each record to OpenTelemetry, and adds to
+// it the trace and span of its context, so that a log line leads to its
+// trace.
+func Handler(h slog.Handler, service string) slog.Handler {
+	return &handler{out: h, otel: otelslog.NewHandler(service)}
+}
+
+type handler struct{ out, otel slog.Handler }
+
+func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.out.Enabled(ctx, level) || h.otel.Enabled(ctx, level)
+}
+
+func (h *handler) Handle(ctx context.Context, r slog.Record) error {
+	var errs []error
+	if h.otel.Enabled(ctx, r.Level) {
+		errs = append(errs, h.otel.Handle(ctx, r))
+	}
+	if h.out.Enabled(ctx, r.Level) {
+		if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+			r = r.Clone()
+			r.AddAttrs(slog.String("trace_id", sc.TraceID().String()), slog.String("span_id", sc.SpanID().String()))
+		}
+		errs = append(errs, h.out.Handle(ctx, r))
+	}
+	return errors.Join(errs...)
+}
+
+func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &handler{out: h.out.WithAttrs(attrs), otel: h.otel.WithAttrs(attrs)}
+}
+
+func (h *handler) WithGroup(name string) slog.Handler {
+	return &handler{out: h.out.WithGroup(name), otel: h.otel.WithGroup(name)}
+}
+{{- if uses "postgres"}}
+
+// RecordPoolStats records the metrics of the database pool: connections in
+// use, idle, waited for.
+func RecordPoolStats(pool *pgxpool.Pool) error {
+	return otelpgx.RecordStats(pool)
+}
+{{- end}}

@@ -25,7 +25,7 @@ var blueprintGroups = map[string]string{
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
-	"docker": "ship", "github_actions": "ship",
+	"docker": "ship", "github_actions": "ship", "observability": "ship",
 	"git": "tools",
 }
 
@@ -34,7 +34,7 @@ var groupTitles = map[string]string{
 	"base":  "the program, its modules and how it runs",
 	"data":  "PostgreSQL: connection, migrations, use cases, tests and local services",
 	"api":   "the JSON API and what every request goes through",
-	"ship":  "the container image and the CI",
+	"ship":  "running it in production: telemetry, the container image and the CI",
 	"tools": "the repository",
 }
 

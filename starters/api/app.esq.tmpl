@@ -23,7 +23,8 @@ app {{.Name}} {
   blueprint compression
   blueprint i18n
 
-  // the container image and the CI
+  // running it in production: telemetry, the container image and the CI
+  blueprint observability
   blueprint docker
   blueprint github_actions
 {{- if .Git}}

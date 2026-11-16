@@ -4,13 +4,22 @@ package logging
 import (
 	"log/slog"
 	"os"
+{{- with slot "app.logging.imports" .}}
+{{.}}
+{{- end}}
 )
 
 // New returns a JSON logger in production and a readable text logger, with
 // debug messages, everywhere else.
 func New(env string) *slog.Logger {
+	var h slog.Handler
 	if env == "production" {
-		return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		h = slog.NewJSONHandler(os.Stdout, nil)
+	} else {
+		h = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	}
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+{{- with slot "app.logging.handler" .}}
+{{.}}
+{{- end}}
+	return slog.New(h)
 }

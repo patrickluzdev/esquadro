@@ -20,7 +20,7 @@ func (d dependencies) routes() (http.Handler, error) {
 {{.}}
 {{- end}}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { edge.Write(w, r, edge.ErrNotFound) })
-	return edge.Chain(mux,
+	return edge.Chain(edge.Routes(mux),
 		edge.Identify,
 {{- with slot "http.middleware.context" .}}
 {{.}}

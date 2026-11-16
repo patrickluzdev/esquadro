@@ -1,0 +1,15 @@
+	stopTelemetry, err := telemetry.Setup(ctx, telemetry.Config{
+		Service: "{{.App.Kebab}}", Version: appVersion(), Env: d.config.Env,
+		Endpoint: d.config.TelemetryEndpoint, SampleRatio: d.config.TraceSampleRatio,
+	})
+	if err != nil {
+		release()
+		return d, nil, err
+	}
+	opened = append(opened, stopTelemetry)
+{{- if uses "postgres"}}
+	if err = telemetry.RecordPoolStats(d.pool); err != nil {
+		release()
+		return d, nil, err
+	}
+{{- end}}

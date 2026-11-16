@@ -9,10 +9,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -42,13 +45,25 @@ func TestLifecycle(t *testing.T) {
 	e.esquadro(0, "new", "-starter", "api", "-module", "example.com/shop", dir)
 	e.run(nil, "go", "vet", "./...")
 
-	// 2. Running against Postgres, with records.
+	// 2. Running against Postgres, with records, and its telemetry sent to
+	// an OTLP endpoint of the test's.
 	db := e.postgres()
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
-	stop := e.serve(db)
+	otlp := newOTLPReceiver(t)
+	stop := e.serve(append(db, "OTEL_EXPORTER_OTLP_ENDPOINT="+otlp.URL))
 	category := e.call("POST", "/categories", `{"name":"Books"}`, 201)
 	product := e.call("POST", "/products", fmt.Sprintf(`{"name":"Dune","price":"39.90","categoryId":%q}`, category["id"]), 201)
 	stop()
+	// The spans of the request, of the API's operation and of its query;
+	// logs and metrics too.
+	for _, want := range []string{"POST /api/v1/", "CreateCategory", "INSERT"} {
+		if !strings.Contains(otlp.got("/v1/traces"), want) {
+			t.Errorf("no span %q reached the OTLP endpoint", want)
+		}
+	}
+	if otlp.got("/v1/logs") == "" || otlp.got("/v1/metrics") == "" {
+		t.Error("no logs or no metrics reached the OTLP endpoint")
+	}
 
 	// 3. Code of one's own, and a generated file changed by hand.
 	mine := filepath.Join(dir, "internal", "catalog", "discount.go")
@@ -192,7 +207,18 @@ func (e *lifecycle) serve(db []string) func() {
 	if err := cmd.Start(); err != nil {
 		e.t.Fatal(err)
 	}
-	stop := func() { cmd.Process.Kill(); cmd.Wait() }
+	// Stopped as a platform stops it: SIGTERM, then a kill if it hangs.
+	stop := func() {
+		cmd.Process.Signal(syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() { cmd.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(15 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}
 	e.base = fmt.Sprintf("http://127.0.0.1:%d", port)
 	deadline := time.Now().Add(30 * time.Second)
 	for {
@@ -236,4 +262,30 @@ func (e *lifecycle) call(method, path, body string, status int) map[string]any {
 		}
 	}
 	return doc
+}
+
+// otlpReceiver is an OTLP/HTTP endpoint that keeps what it is sent, by
+// path: protobuf, in which names are plain strings.
+type otlpReceiver struct {
+	*httptest.Server
+	mu     sync.Mutex
+	bodies map[string][]byte
+}
+
+func newOTLPReceiver(t *testing.T) *otlpReceiver {
+	o := &otlpReceiver{bodies: map[string][]byte{}}
+	o.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		o.mu.Lock()
+		o.bodies[r.URL.Path] = append(o.bodies[r.URL.Path], body...)
+		o.mu.Unlock()
+	}))
+	t.Cleanup(o.Close)
+	return o
+}
+
+func (o *otlpReceiver) got(path string) string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return string(o.bodies[path])
 }

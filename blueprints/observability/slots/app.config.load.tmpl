@@ -1,0 +1,9 @@
+{{- $otlp := "4318"}}{{range strs (index (optionsOf "compose") "ports")}}{{if hasPrefix . "otlp:"}}{{$otlp = trimPrefix . "otlp:"}}{{end}}{{end -}}
+	c.TelemetryEndpoint = l.text("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+{{- if uses "compose"}}
+	if c.TelemetryEndpoint == "" && c.Env != "production" {
+		// The local Grafana of compose.yaml (task up).
+		c.TelemetryEndpoint = "http://localhost:{{$otlp}}"
+	}
+{{- end}}
+	c.TraceSampleRatio = l.ratio("{{upper .App.Snake}}_TRACE_SAMPLE_RATIO", {{.Options.sample_ratio}})

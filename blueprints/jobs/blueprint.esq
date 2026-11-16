@@ -18,6 +18,12 @@ blueprint jobs {
   /// @jobs(queue ...) says otherwise.
   option queues list default(["default"])
 
+  /// Imports of internal/platform/jobs/jobs.go.
+  slot "jobs.imports"
+  /// Code in Queue.Open that changes River's config before the client is
+  /// made, e.g. config.Middleware = append(config.Middleware, ...).
+  slot "jobs.middleware"
+
   annotation job {
     /// When to enqueue the job, as cron: "0 3 * * *" (every day at 3:00),
     /// or "@every 10m", "@hourly", "@daily". Its arguments are then their

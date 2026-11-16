@@ -2,10 +2,11 @@
 {{- $number := contains $load "l.number(" -}}
 {{- $flag := contains $load "l.flag(" -}}
 {{- $list := contains $load "l.list(" -}}
+{{- $ratio := contains $load "l.ratio(" -}}
 // Package config reads the service's configuration from the environment.
 package config
 
-{{importBlock (and (or $number $flag) "fmt") "os" (and (or $number $flag) "strconv") (and $list "strings")}}
+{{importBlock (and (or $number $flag $ratio) "fmt") "os" (and (or $number $flag $ratio) "strconv") (and $list "strings")}}
 // Config is the service's configuration.
 type Config struct {
 	// Env is "production" in production; anything else is development.
@@ -49,6 +50,21 @@ func (l *loader) number(name string, fallback int) int {
 		l.err = fmt.Errorf("config: %s must be a number: %w", name, err)
 	}
 	return n
+}
+{{- end}}
+{{- if $ratio}}
+
+// ratio is the variable name as a number from 0 to 1, or fallback.
+func (l *loader) ratio(name string, fallback float64) float64 {
+	v := l.text(name, "")
+	if v == "" {
+		return fallback
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if (err != nil || f < 0 || f > 1) && l.err == nil {
+		l.err = fmt.Errorf("config: %s must be a number from 0 to 1, got %q", name, v)
+	}
+	return f
 }
 {{- end}}
 {{- if $flag}}

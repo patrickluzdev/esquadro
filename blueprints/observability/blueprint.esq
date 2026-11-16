@@ -1,0 +1,31 @@
+/// Traces, metrics and logs with OpenTelemetry, sent over OTLP to any
+/// backend (Grafana, Honeycomb, Datadog, a collector): set
+/// OTEL_EXPORTER_OTLP_ENDPOINT, and the standard OTEL_* variables for the
+/// rest. Without it, nothing is sent and nothing costs. Logs carry the
+/// trace and span of their request. With http, each request is a span named
+/// after its route; with postgres, each query, and the pool's metrics; with
+/// jobs, each job, in the trace of whoever enqueued it. With compose, a
+/// local Grafana (otel-lgtm) receives everything outside production, at
+/// http://localhost:3000.
+blueprint observability {
+  version "0.1.0"
+  requires app
+  optional http, postgres, jobs, compose, docker
+
+  /// The share of traces kept, from 0 to 1; <APP>_TRACE_SAMPLE_RATIO
+  /// overrides it, and OTEL_TRACES_SAMPLER replaces the sampler.
+  option sample_ratio number default(1.0)
+
+  go_require "go.opentelemetry.io/otel" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/sdk" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/sdk/metric" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/sdk/log" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp" "v1.47.0"
+  go_require "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp" "v0.23.0"
+  go_require "go.opentelemetry.io/contrib/bridges/otelslog" "v0.21.0"
+  go_require "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp" "v0.72.0"
+  go_require "go.opentelemetry.io/contrib/instrumentation/runtime" "v0.72.0"
+  go_require "github.com/exaring/otelpgx" "v0.13.0"
+  go_require "github.com/riverqueue/rivercontrib/otelriver" "v0.12.0"
+}

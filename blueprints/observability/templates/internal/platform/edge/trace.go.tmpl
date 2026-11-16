@@ -1,0 +1,40 @@
+{{- if uses "http" -}}
+package edge
+
+import (
+	"net/http"
+	"strings"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+)
+
+// Trace makes each request a span, named after the route that served it
+// (GET /api/v1/products/{id}), and records the standard HTTP server
+// metrics. A caller's traceparent header continues its trace. Health
+// checks are left out.
+func Trace(next http.Handler) http.Handler {
+	named := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		if route := RouteOf(r.Context()); route != "" {
+			trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("http.route", route))
+		}
+	})
+	return otelhttp.NewHandler(named, "http.request",
+		// The name is set again once served, when the route is known.
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			route := RouteOf(r.Context())
+			switch {
+			case route == "":
+				return r.Method
+			case !strings.Contains(route, " "):
+				// A pattern without a method, such as a mounted prefix.
+				return r.Method + " " + route
+			}
+			return route
+		}),
+		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" }),
+	)
+}
+{{end -}}

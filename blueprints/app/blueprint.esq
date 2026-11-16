@@ -8,7 +8,8 @@ blueprint app {
   slot "app.config.fields"
   /// Code in config.Load that fills those fields from the environment with
   /// the loader l: l.text(name, "default"), l.number(name, 1),
-  /// l.flag(name, true) or l.list(name, []string{"a"}); c is the Config.
+  /// l.ratio(name, 0.5), l.flag(name, true) or l.list(name, []string{"a"});
+  /// c is the Config.
   slot "app.config.load"
   /// Cases of the command switch in run, each returning the command's
   /// error, e.g. case "migrate": return migrate(ctx). The case "" is the
@@ -26,6 +27,10 @@ blueprint app {
   /// Code in open, after every resource is open, that builds what uses them
   /// (each module...).
   slot "app.dependencies.wire"
+  /// Imports of internal/platform/logging/logging.go.
+  slot "app.logging.imports"
+  /// Code in logging.New that wraps the handler h, e.g. h = otherHandler(h).
+  slot "app.logging.handler"
   /// Tasks of Taskfile.esquadro.yml, indented by two spaces; a blank line
   /// goes between contributions.
   slot "app.tasks"
