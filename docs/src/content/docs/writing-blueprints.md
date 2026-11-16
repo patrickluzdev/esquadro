@@ -29,6 +29,8 @@ billing/
     docs/billing.md.once.tmpl
   slots/                 code added to other blueprints' slots
     http.routes.tmpl
+  partials/              templates its templates and slots share (optional)
+    invoice.tmpl
   hooks/                 programs run before or after generating (optional)
     stamp
 ```
@@ -159,6 +161,18 @@ options, in the order of the app's blueprints. Contributing to a slot nobody
 declares is an error, unless the slot's blueprint is `optional` and the app
 does not use it. The [reference](/esquadro/blueprints/overview/) lists every
 built-in slot.
+
+## Partials
+
+What a template and a slot contribution both write lives once in
+`partials/`: each file there `{{define}}`s templates that every template and
+slot of the blueprint may use with `{{template "name" .}}`.
+
+```
+{{- define "invoice-fields"}}
+  number string required
+{{- end}}
+```
 
 ## Hooks
 

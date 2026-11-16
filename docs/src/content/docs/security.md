@@ -117,9 +117,11 @@ operation of your own, which is not an entity's, needs someone signed in.
 
 ## Signing in
 
-The routes of each realm are under `/identity/<realm>/` (the `path` option),
-described by `/identity/openapi.yaml`; with `api_docs`, `/identity/docs` shows
-them as `/docs` shows the API. Every JSON name is snake_case.
+The routes of each realm are under `/identity/<realm>/` (the `path` option).
+With the [rest](/esquadro/blueprints/reference/rest/) blueprint they are part
+of the API's contract, `/api/openapi.yaml` (and of `/docs`, with `api_docs`),
+sign-up with the password's and the entity's rules; without it,
+`/identity/openapi.yaml` describes them. Every JSON name is snake_case.
 
 | Route | |
 |---|---|
