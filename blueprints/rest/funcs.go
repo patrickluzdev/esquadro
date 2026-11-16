@@ -11,14 +11,21 @@ import (
 	"unicode"
 
 	"github.com/patrickluzdev/esquadro/blueprints/security"
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
 // TemplateFuncs are the helpers the api blueprint's templates use.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"jsonName":   jsonName,
-		"accessLine": accessLine,
+		"jsonName":       jsonName,
+		"paginationOf":   PaginationOf,
+		"unpagedMax":     UnpagedMax,
+		"apiFilters":     APIFilters,
+		"sortsOf":        SortsOf,
+		"searchFieldsOf": store.SearchFields,
+		"has":            has,
+		"accessLine":     accessLine,
 		// policies reports whether the API asks the entities' policies:
 		// when something signs in.
 		"policies":     func(entities []*project.Entity) bool { return len(security.RealmsOf(entities)) > 0 },

@@ -48,7 +48,76 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 }
 
 func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
-	q := {{$P}}Query{After: params.After.Or(""), Limit: params.Limit.Or(25)}
+{{- $pag := paginationOf $e (optionsOf "rest")}}
+	q := {{$P}}Query{}
+	if v, ok := params.Sort.Get(); ok {
+		q.Sort = string(v)
+	}
+{{- if searchFieldsOf $e}}
+	q.Search = params.Q.Or("")
+{{- end}}
+{{- $dec := false}}{{range apiFilters $e}}{{if eq .Go "decimal.Decimal"}}{{$dec = true}}{{end}}{{end}}
+{{- if $dec}}
+	var invalid []edge.FieldProblem
+{{- end}}
+{{- range apiFilters $e}}{{$g := ogenName .Param}}
+{{- if eq .Kind "in"}}
+	for _, v := range params.{{$g}} {
+		q.Filter.{{.Field}} = append(q.Filter.{{.Field}}, {{.Go}}(v))
+	}
+{{- else if eq .Go "decimal.Decimal"}}
+	if v, ok := params.{{$g}}.Get(); ok {
+		if d, err := decimal.NewFromString(v); err != nil {
+			invalid = append(invalid, edge.FieldProblem{Field: {{quote .Param}}, Code: "invalid_value"})
+		} else {
+{{- if eq .Kind "eq"}}
+			q.Filter.{{.Field}}Min, q.Filter.{{.Field}}Max = &d, &d
+{{- else if eq .Kind "min"}}
+			q.Filter.{{.Field}}Min = &d
+{{- else}}
+			q.Filter.{{.Field}}Max = &d
+{{- end}}
+		}
+	}
+{{- else}}
+	if v, ok := params.{{$g}}.Get(); ok {
+{{- if eq .Go "uuid.UUID"}}
+		q.Filter.{{.Field}} = uuid.UUID(v)
+{{- else if eq .Kind "min"}}
+		q.Filter.{{.Field}}Min = &v
+{{- else if eq .Kind "max"}}
+		q.Filter.{{.Field}}Max = &v
+{{- else if or (eq .Go "int") (eq .Go "int64") (eq .Go "time.Time")}}
+		q.Filter.{{.Field}}Min, q.Filter.{{.Field}}Max = &v, &v
+{{- else}}
+		q.Filter.{{.Field}} = &v
+{{- end}}
+	}
+{{- end}}
+{{- end}}
+{{- if $dec}}
+	if invalid != nil {
+		return nil, edge.InvalidFields(invalid)
+	}
+{{- end}}
+{{- if and (has $pag "cursor") (has $pag "page")}}
+	if params.Page.IsSet() && params.After.IsSet() {
+		return nil, edge.ErrInvalidRequest
+	}
+{{- end}}
+	switch {
+{{- if has $pag "page"}}
+	case {{if has $pag "cursor"}}params.Page.IsSet() || params.PerPage.IsSet(){{else}}true{{end}}:
+		q.Page, q.PerPage = params.Page.Or(1), params.PerPage.Or(25)
+{{- end}}
+{{- if has $pag "cursor"}}
+	default:
+		q.After, q.Limit = params.After.Or(""), params.Limit.Or(25)
+{{- else if not $pag}}
+	default:
+		q.Limit, q.Unpaged = {{unpagedMax $e (optionsOf "rest")}}, true
+{{- end}}
+	}
 {{- if $pol}}
 	scope := {{$P}}Policy{}.List(ctx)
 {{- if ownerColumn $.Entities $e}}
@@ -69,13 +138,27 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 	if err != nil {
 		return nil, problemOf(err)
 	}
+{{- if not $pag}}
+	if page.Next != "" {
+		return nil, edge.TooManyRecords({{quote (lower .Plural.Label)}}, {{unpagedMax $e (optionsOf "rest")}})
+	}
+{{- end}}
 	answer := apigen.{{$P}}Page{Items: make([]apigen.{{$P}}, 0, len(page.{{.Plural.Pascal}}))}
 	for _, listed := range page.{{.Plural.Pascal}} {
 		answer.Items = append(answer.Items, {{.Camel}}Answer(listed))
 	}
+{{- if has $pag "page"}}
+	if q.Page > 0 {
+		answer.Page, answer.PerPage = apigen.NewOptInt(q.Page), apigen.NewOptInt(q.PerPage)
+		answer.Total = apigen.NewOptInt64(page.Total)
+		answer.TotalPages = apigen.NewOptInt(int((page.Total + int64(q.PerPage) - 1) / int64(q.PerPage)))
+	}
+{{- end}}
+{{- if has $pag "cursor"}}
 	if page.Next != "" {
 		answer.Next = apigen.NewOptString(page.Next)
 	}
+{{- end}}
 	return &answer, nil
 }
 

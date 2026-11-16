@@ -41,17 +41,57 @@ paths:
     get:
       operationId: list{{.Plural.Pascal}}
       summary: {{quote (printf "List %s" (lower .Plural.Label))}}
+{{- $pag := paginationOf $e $.Options}}
       description: |
-        The {{lower .Plural.Label}} in the order they were created, in pages of
-        `limit` (25 by default, at most 100). `next` is the cursor of the next
-        page, absent on the last one: pass it as `after`.
+        The {{lower .Plural.Label}}, the newest first unless `sort` says otherwise{{if searchFieldsOf $e}}
+        (with `q`, the most relevant first){{end}}.
+{{- if has $pag "cursor"}}
+        By cursor: `limit` per page (25 by default, at most 100); `next` is the
+        cursor of the next page, absent on the last one: pass it as `after`.
+{{- end}}
+{{- if has $pag "page"}}
+        By page{{if has $pag "cursor"}}, with `page`{{end}}: `page` from 1, `per_page` per page (25 by default,
+        at most 100), with `total` and `total_pages`.
+{{- end}}
+{{- if not $pag}}
+        Every one at once, up to {{unpagedMax $e $.Options}}; past it, `too_many_records` (422).
+{{- end}}
+        Filters ending in `_min` and `_max` are inclusive bounds.
 {{- with accessLine $.Entities $e "list"}}
         {{.}}
 {{- end}}
       tags: [{{.Module.Snake}}]
       parameters:
+{{- if has $pag "cursor"}}
         - $ref: "#/components/parameters/After"
         - $ref: "#/components/parameters/Limit"
+{{- end}}
+{{- if has $pag "page"}}
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+{{- end}}
+        - name: sort
+          in: query
+          required: false
+          description: The order; - is descending.
+          schema: {type: string, enum: [{{range $i, $s := sortsOf $e (optionsOf "postgres")}}{{if $i}}, {{end}}{{quote $s}}{{end}}]}
+{{- if searchFieldsOf $e}}
+        - name: q
+          in: query
+          required: false
+          description: Text to search for; words in quotes are a phrase, and -word leaves out.
+          schema: {type: string}
+{{- end}}
+{{- range apiFilters $e}}
+        - name: {{.Param}}
+          in: query
+          required: false
+{{- if .Array}}
+          style: form
+          explode: false
+{{- end}}
+          schema: {{.Schema}}
+{{- end}}
       responses:
         "200":
           description: {{quote (printf "A page of %s." (lower .Plural.Label))}}
@@ -241,6 +281,18 @@ components:
       required: false
       description: How many to read, 25 by default.
       schema: {type: integer, minimum: 1, maximum: 100}
+    Page:
+      name: page
+      in: query
+      required: false
+      description: The page to read, from 1.
+      schema: {type: integer, minimum: 1}
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: How many a page holds, 25 by default.
+      schema: {type: integer, minimum: 1, maximum: 100}
   responses:
     Problem:
       description: The operation failed; `code` says why.
@@ -320,6 +372,10 @@ components:
           items:
             $ref: "#/components/schemas/{{.Pascal}}"
         next: {type: string, description: The cursor of the next page; absent on the last one.}
+        page: {type: integer, description: By page, the page.}
+        per_page: {type: integer, description: By page, how many a page holds.}
+        total: {type: integer, format: int64, description: By page, how many in all.}
+        total_pages: {type: integer, description: By page, how many pages.}
 {{- range links $e}}{{if .CrossesModules}}
     {{$e.Pascal}}{{.Pascal}}Page:
       type: object

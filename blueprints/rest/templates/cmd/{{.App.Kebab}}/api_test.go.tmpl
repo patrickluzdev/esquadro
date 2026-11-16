@@ -136,6 +136,17 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	if err != nil || len(page.Items) != 1 || page.Items[0].ID != created.ID {
 		t.Fatalf("list: %+v, %v", page, err)
 	}
+{{- $pag := paginationOf $e $.Options}}
+{{- if has $pag "page"}}
+	if numbered, err := c.List{{.Plural.Pascal}}(ctx, apigen.List{{.Plural.Pascal}}Params{Page: apigen.NewOptInt(1), PerPage: apigen.NewOptInt(1)}); err != nil || numbered.Total.Or(0) != 1 || numbered.TotalPages.Or(0) != 1 {
+		t.Fatalf("list by page: %+v, %v", numbered, err)
+	}
+{{- if has $pag "cursor"}}
+	if _, err := c.List{{.Plural.Pascal}}(ctx, apigen.List{{.Plural.Pascal}}Params{Page: apigen.NewOptInt(1), After: apigen.NewOptString("x")}); err == nil {
+		t.Fatal("page and after together passed")
+	}
+{{- end}}
+{{- end}}
 	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID }); err != nil {
 		t.Fatalf("update: %v", err)
 	}
