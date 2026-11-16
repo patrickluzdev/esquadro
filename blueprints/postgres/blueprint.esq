@@ -5,6 +5,12 @@
 /// write their SQL (migrations, store).
 blueprint postgres {
   version "0.2.0"
+
+  /// Where the PostgreSQL database is; in development, the one compose.yaml
+  /// starts.
+  env DATABASE_URL string secret required development("postgres://postgres:postgres@localhost:{{composePort \"postgres\" \"5432\"}}/{{.App.Snake}}?sslmode=disable")
+  /// The most connections the pool opens.
+  env POOL_MAX int prefixed default("{{.Options.pool_max}}")
   requires app
   optional compose, docker
 

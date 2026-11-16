@@ -29,7 +29,7 @@ func open({{if $open}}ctx{{else}}_{{end}} context.Context) (d dependencies, rele
 	if d.config, err = config.Load(); err != nil {
 		return d, nil, err
 	}
-	d.logger = logging.New(d.config.Env)
+	d.logger = logging.New(d.config.Env).With("app", d.config.AppName)
 	var opened []func()
 	release = func() {
 		for _, free := range slices.Backward(opened) {

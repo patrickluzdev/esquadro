@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
@@ -106,4 +107,27 @@ func envValues(v *project.EnvVar, envs []string) string {
 		return "nil"
 	}
 	return "map[string]string{" + strings.Join(parts, ", ") + "}"
+}
+
+// checkEnvText says what is wrong with a value rendered from a template for
+// a variable of type t, or nothing.
+func checkEnvText(text string, t project.EnvType) string {
+	if text == "" {
+		return ""
+	}
+	var err error
+	switch t {
+	case project.EnvInt:
+		_, err = strconv.Atoi(text)
+	case project.EnvNumber:
+		_, err = strconv.ParseFloat(text, 64)
+	case project.EnvBool:
+		_, err = strconv.ParseBool(text)
+	case project.EnvDuration:
+		_, err = time.ParseDuration(text)
+	}
+	if err != nil {
+		return "it is not a " + string(t)
+	}
+	return ""
 }

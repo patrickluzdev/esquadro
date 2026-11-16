@@ -52,7 +52,7 @@ func TestAddWritesTheBlueprintsWithWhatTheyRequire(t *testing.T) {
 	if !strings.Contains(out, "added rate_limit (and http, which it requires) to app.esq") {
 		t.Fatalf("out: %s", out)
 	}
-	want := "  // mine: keep this\n  blueprint app\n" +
+	want := "  // mine: keep this\n  blueprint app\n  blueprint env\n" +
 		"  blueprint http {\n    // port 8080\n    // trust_proxy false\n  }\n" +
 		"  blueprint rate_limit {\n    // per_minute 120\n  }\n\n" +
 		"  // Add more with esquadro add <blueprint>; see them with esquadro blueprint list.\n}\n"
@@ -85,7 +85,7 @@ func TestAddGoesBeforeGit(t *testing.T) {
 		t.Fatal(errOut)
 	}
 	got := read(t, filepath.Join(dir, "esquadro", "app.esq"))
-	if !strings.Contains(got, "  blueprint app\n  blueprint http {") || !strings.Contains(got, "  }\n  blueprint git {") {
+	if !strings.Contains(got, "  blueprint env\n  blueprint http {") || !strings.Contains(got, "  }\n  blueprint git {") {
 		t.Fatalf("app.esq:\n%s", got)
 	}
 }

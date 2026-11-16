@@ -2,6 +2,9 @@
 /// and their preflight requests are answered.
 blueprint cors {
   version "0.1.0"
+
+  /// The origins browsers may call the API from, comma-separated; * is any.
+  env CORS_ORIGINS list prefixed field(CORSOrigins) default("{{join \",\" (strs .Options.origins)}}")
   requires http
 
   /// Origins browsers may call the API from, or ["*"] for any; none lets

@@ -5,6 +5,11 @@
 /// addresses. Other blueprints add routes and middleware.
 blueprint http {
   version "0.1.0"
+
+  /// The port the HTTP server listens on.
+  env PORT int default("{{.Options.port}}")
+  /// Take the client's address from X-Forwarded-For.
+  env TRUST_PROXY bool prefixed default("{{.Options.trust_proxy}}")
   requires app
 
   /// Port the server listens on; PORT overrides it.

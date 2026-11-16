@@ -3,6 +3,9 @@
 /// of the service.
 blueprint rate_limit {
   version "0.1.0"
+
+  /// Requests a minute each client may make; 0 is no limit.
+  env RATE_LIMIT int prefixed default("{{.Options.per_minute}}")
   requires http
   optional i18n
 

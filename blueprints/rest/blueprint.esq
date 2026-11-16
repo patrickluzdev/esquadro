@@ -7,6 +7,9 @@
 /// the operations get tests through the whole contract.
 blueprint rest {
   version "0.1.0"
+
+  /// The largest request body the API reads, in KB; 0 is no limit.
+  env MAX_BODY_KB int prefixed field(MaxBodyKB) default("{{.Options.max_body_kb}}")
   requires http, store
   optional i18n, rate_limit, security_headers, testcontainers
 

@@ -480,6 +480,9 @@ func (r *resolver) env() {
 		if c.Field == "" {
 			c.Field = project.FieldName(c.Name)
 		}
+		if c.RequiredOutsideDevelopment {
+			c.Required = slices.Concat(c.Required, envs[1:])
+		}
 		if prev, ok := byName[c.Full]; ok {
 			owner := "the app"
 			if prev.Blueprint != "" {
@@ -488,14 +491,23 @@ func (r *resolver) env() {
 			r.errorf(c.Span, "%s is already declared by %s", c.Full, owner)
 			return
 		}
+		// A blueprint does not know the app's environments: what it says
+		// of one the app does not have is left out, with a warning.
+		unknown := func(e string) {
+			if c.Blueprint == "" {
+				r.errorf(c.Span, "%s: %s is not an environment of the app (%s)", c.Full, e, strings.Join(envs, ", "))
+				return
+			}
+			r.diags.Warnf(c.Span.Pos, c.Span.End, "%s: %s is not an environment of the app (%s); blueprint %s's value for it is left out", c.Full, e, strings.Join(envs, ", "), c.Blueprint)
+		}
 		for _, e := range c.Required {
 			if !slices.Contains(envs, e) {
-				r.errorf(c.Span, "%s: %s is not an environment of the app (%s)", c.Full, e, strings.Join(envs, ", "))
+				unknown(e)
 			}
 		}
 		for e := range c.ByEnv {
 			if !slices.Contains(envs, e) {
-				r.errorf(c.Span, "%s: %s is not an environment of the app (%s)", c.Full, e, strings.Join(envs, ", "))
+				unknown(e)
 			} else if c.Secret && e != development {
 				r.errorf(c.Span, "%s is a secret: only %s may have a value in the code", c.Full, development)
 			}

@@ -24,7 +24,7 @@ testdata/projects/envresolve/app.esq:19:7: error: staging is not an environment 
 19 |   env staging {
    |       ^^^^^^^
 
-testdata/projects/envresolve/blueprints/db/blueprint.esq:5:3: error: DATABASE_URL: staging is not an environment of the app (development, qa, production)
+testdata/projects/envresolve/blueprints/db/blueprint.esq:5:3: warning: DATABASE_URL: staging is not an environment of the app (development, qa, production); blueprint db's value for it is left out
   |
 5 |   env DATABASE_URL string secret required(staging, production) development("postgres://localhost") production("postgres://prod")
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -34,4 +34,4 @@ testdata/projects/envresolve/blueprints/db/blueprint.esq:5:3: error: DATABASE_UR
 5 |   env DATABASE_URL string secret required(staging, production) development("postgres://localhost") production("postgres://prod")
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-7 errors
+6 errors, 1 warning

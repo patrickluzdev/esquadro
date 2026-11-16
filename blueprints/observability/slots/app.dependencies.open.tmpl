@@ -1,5 +1,5 @@
 	stopTelemetry, err := telemetry.Setup(ctx, telemetry.Config{
-		Service: "{{.App.Kebab}}", Version: appVersion(), Env: d.config.Env,
+		Service: d.config.AppName, Version: appVersion(), Env: d.config.Env,
 		Endpoint: d.config.TelemetryEndpoint, SampleRatio: d.config.TraceSampleRatio,
 	})
 	if err != nil {

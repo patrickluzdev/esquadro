@@ -73,6 +73,12 @@ Modules:
 
 ## Configuration
 
-Everything has a default that suits development; environment variables
-change it in production. See `internal/platform/config/config.go` for the
-whole list.
+Everything has a value in development: the project runs as it is.
+{{- if uses "env"}} The
+environments are {{join ", " .Environments}}; `APP_ENV` picks one. Every variable
+is documented in `.env.example`; each environment's values go in its
+`.env.<environment>` file (out of git) or on its platform, and
+`go run ./cmd/{{.App.Kebab}} env` shows where each value comes from, secrets hidden.
+{{- else}} Environment variables change it in production: see
+`internal/platform/config/config.go` for the whole list.
+{{- end}}

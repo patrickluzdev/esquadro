@@ -45,6 +45,29 @@ func TestLifecycle(t *testing.T) {
 	e.esquadro(0, "new", "-starter", "api", "-module", "example.com/shop", dir)
 	e.run(nil, "go", "vet", "./...")
 
+	// Its environments: a file each, for the user only and out of git;
+	// production refuses to start without its database, saying so.
+	for _, env := range []string{"development", "staging", "production"} {
+		info, err := os.Stat(filepath.Join(dir, ".env."+env))
+		if err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf(".env.%s: %v %v", env, err, info)
+		}
+	}
+	if ignore := e.read(filepath.Join(dir, ".gitignore")); !strings.Contains(ignore, ".env.production") {
+		t.Fatalf(".gitignore:\n%s", ignore)
+	}
+	cmd := exec.Command("go", "run", "./cmd/shop", "check")
+	cmd.Dir, cmd.Env = dir, append(os.Environ(), "APP_ENV=production")
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "config (production): DATABASE_URL is not set") {
+		t.Fatalf("production without DATABASE_URL: %v\n%s", err, out)
+	}
+	if out := e.esquadro(1, "env", "check", "production", dir); !strings.Contains(out, "DATABASE_URL is required in production") {
+		t.Fatalf("esquadro env check production:\n%s", out)
+	}
+	if out := e.run(nil, "go", "run", "./cmd/shop", "env"); !strings.Contains(out, "postgres://postgres:xxxxx@localhost") || !strings.Contains(out, "APP_NAME") {
+		t.Fatalf("shop env:\n%s", out)
+	}
+
 	// 2. Running against Postgres, with records, and its telemetry sent to
 	// an OTLP endpoint of the test's.
 	db := e.postgres()

@@ -46,6 +46,11 @@ type Input struct {
 	Files []string `json:"files"`
 	// GoRequires are the Go modules every blueprint of the project needs.
 	GoRequires []GoRequire `json:"go_requires"`
+	// Env are the project's environment variables, with their values by
+	// environment, and Environments its environments, the first one where
+	// development happens.
+	Env          []project.EnvDescription `json:"env"`
+	Environments []string                 `json:"environments"`
 	// ProjectDir is the project folder, absolute; external hooks also run
 	// in it.
 	ProjectDir string `json:"project_dir"`
@@ -142,7 +147,9 @@ func CheckOverlaps(set *blueprint.Set, res *compose.Result) diag.List {
 	var diags diag.List
 	for _, hk := range Hooks(set, "post-gen") {
 		for _, f := range res.Files {
-			if MatchAny(hk.Hook.Writes, f.Path) || MatchAny(hk.Hook.Edits, f.Path) {
+			// A file written once is the user's, as the files a hook edits
+			// are: the hook may edit it too.
+			if MatchAny(hk.Hook.Writes, f.Path) || (MatchAny(hk.Hook.Edits, f.Path) && !f.Once) {
 				diags.Errorf(hk.Hook.Span.Pos, hk.Hook.Span.End,
 					"hook %s may change %s, which blueprint %s also generates from %s", ID(hk.Blueprint, hk.Hook), f.Path, f.Blueprint, f.Template)
 			}
@@ -234,6 +241,7 @@ func (r *Runner) input(p *project.Project, set *blueprint.Set, res *compose.Resu
 	return Input{
 		Event: hk.Hook.Event, Blueprint: hk.Blueprint.Manifest.Name, Project: p.Describe(),
 		Options: set.Options[hk.Blueprint.Manifest.Name], Blueprints: set.Options, Files: files, GoRequires: reqs,
+		Env: res.Env, Environments: res.Environments,
 		ProjectDir: dir, Previous: r.Previous, DryRun: dryRun,
 	}
 }

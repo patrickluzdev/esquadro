@@ -9,6 +9,8 @@ blueprint stripe {
 //^^^^^^^^ keyword.other.esquadro
   optional i18n
 //^^^^^^^^ keyword.other.esquadro
+  env STRIPE_KEY string secret required
+//^^^ keyword.other.esquadro
   option currency string default("BRL")
 //^^^^^^ keyword.other.esquadro
 //                ^^^^^^ support.type.esquadro

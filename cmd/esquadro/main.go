@@ -25,6 +25,7 @@ func commands() []command {
 		{"blueprint", "list, inspect, update, write and test blueprints", runBlueprint, false},
 		{"check", "check the project for errors", runCheck, false},
 		{"doctor", "check that the tools the project needs are installed", runDoctor, false},
+		{"env", "list and check the project's environment variables", runEnv, false},
 		{"explain", "tell where a generated file came from", runExplain, false},
 		{"fmt", "format .esq files", runFmt, false},
 		{"gen", "generate the project", runGen, false},

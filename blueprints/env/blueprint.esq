@@ -1,0 +1,18 @@
+/// The project's environments (development, staging and production) and its
+/// environment variables, all declared in the model: by the blueprints that
+/// read them and in app.esq's env blocks. It writes .env.example, with every
+/// variable documented, and keeps a .env.<environment> file per environment
+/// (yours, out of git): new variables are added, commented, and your values
+/// never change. The app reads its environment's file, picked by APP_ENV,
+/// and the env command shows where each value comes from, secrets hidden.
+/// In development everything has a value, so the project runs as it is.
+blueprint env {
+  version "0.1.0"
+  requires app
+
+  /// The environments, in order; the first is where development happens,
+  /// the one APP_ENV defaults to.
+  option environments list default(["development", "staging", "production"])
+
+  hook post-gen "files" edits [".env.development", ".env.staging", ".env.production", ".gitignore"]
+}

@@ -118,7 +118,7 @@
       "patterns": [
         {
           "name": "keyword.other.esquadro",
-          "match": "\\b(module|blueprint|version|requires|optional|option|annotation|slot|go_require|hook|writes|edits)\\b"
+          "match": "\\b(module|blueprint|env|version|requires|optional|option|annotation|slot|go_require|hook|writes|edits)\\b"
         },
         {
           "name": "keyword.other.event.esquadro",
@@ -165,7 +165,7 @@
           "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
         },
         {
-          "match": "^\\s*(?!(?:app|package|entity|enum|job|module|blueprint|version|requires|optional|option|annotation|slot|go_require|hook)\\b)([a-z_][A-Za-z0-9_]*)(?=\\s)",
+          "match": "^\\s*(?!(?:app|package|entity|enum|job|module|blueprint|env|version|requires|optional|option|annotation|slot|go_require|hook)\\b)([a-z_][A-Za-z0-9_]*)(?=\\s)",
           "captures": {
             "1": {
               "name": "variable.other.property.esquadro"

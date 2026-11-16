@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/patrickluzdev/esquadro/internal/project"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -46,7 +49,7 @@ func runDocs(args []string, _, stderr io.Writer) int {
 // blueprintOrder lists the built-in blueprints as the site presents them:
 // by group, in the order an app lists them.
 var blueprintOrder = []string{
-	"app", "domain", "http", "worker", "jobs",
+	"app", "env", "domain", "http", "worker", "jobs",
 	"postgres", "migrations", "store", "testcontainers", "compose",
 	"rest", "api_docs", "cors", "security_headers", "rate_limit", "compression", "i18n",
 	"observability",
@@ -118,6 +121,12 @@ func blueprintPage(m *blueprint.Manifest, order int) string {
 			fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", o.Name, o.Type, def, cell(o.Doc))
 		}
 		fmt.Fprintf(&b, "\n```esquadro\nblueprint %s {\n  %s %s\n}\n```\n", m.Name, m.Options[0].Name, example(m.Options[0]))
+	}
+	if len(m.Env) > 0 {
+		b.WriteString("\n## Environment variables\n\nRead when the app starts; see [Environment variables](/esquadro/language/environment/).\n\n| Variable | Type | Value | |\n|---|---|---|---|\n")
+		for _, v := range m.Env {
+			fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", envDisplayName(v), envKind(v), escape(envDefaults(v)), cell(v.Doc))
+		}
 	}
 	if len(m.Annotations) > 0 {
 		b.WriteString("\n## Annotations\n\n| Where | Key | Type | |\n|---|---|---|---|\n")
@@ -251,15 +260,86 @@ func cliPage() string {
 		var help bytes.Buffer
 		c.run([]string{"-h"}, &help, &help)
 		fmt.Fprintf(&b, "```\n%s\n```\n\n", strings.TrimSpace(help.String()))
-		if c.name != "blueprint" {
-			continue
-		}
-		for _, sub := range blueprintCommands() {
+		subs := map[string][]command{"blueprint": blueprintCommands(), "env": envCommands()}[c.name]
+		for _, sub := range subs {
 			help.Reset()
 			sub.run([]string{"-h"}, &help, &help)
-			fmt.Fprintf(&b, "### esquadro blueprint %s\n\n%s.\n\n```\n%s\n```\n\n", sub.name,
+			fmt.Fprintf(&b, "### esquadro %s %s\n\n%s.\n\n```\n%s\n```\n\n", c.name, sub.name,
 				strings.ToUpper(sub.short[:1])+sub.short[1:], strings.TrimSpace(help.String()))
 		}
 	}
 	return strings.TrimRight(b.String(), "\n") + "\n"
 }
+
+// envDisplayName is a variable's name as a reference page shows it: with
+// the app's prefix as <APP>_.
+func envDisplayName(v *project.EnvVar) string {
+	if v.Prefixed {
+		return "<APP>_" + v.Name
+	}
+	return v.Name
+}
+
+// envKind is a variable's type, with secret and where it is required.
+func envKind(v *project.EnvVar) string {
+	kind := string(v.Type)
+	if v.Secret {
+		kind += ", secret"
+	}
+	switch {
+	case v.RequiredOutsideDevelopment:
+		kind += ", required outside development"
+	case len(v.Required) > 0:
+		kind += ", required in " + strings.Join(v.Required, ", ")
+	}
+	return kind
+}
+
+// envDefaults are a variable's declared values, templates shown as they
+// are written.
+func envDefaults(v *project.EnvVar) string {
+	code := func(val any) string {
+		shown := envShown(val)
+		if strings.HasPrefix(shown, "the ") && (strings.HasSuffix(shown, " option") || strings.HasSuffix(shown, " options")) {
+			return shown
+		}
+		return "`" + shown + "`"
+	}
+	var parts []string
+	if v.Default != nil {
+		parts = append(parts, code(v.Default))
+	}
+	for _, e := range slices.Sorted(maps.Keys(v.ByEnv)) {
+		if v.Secret {
+			parts = append(parts, "a value in "+e)
+			continue
+		}
+		parts = append(parts, e+": "+code(v.ByEnv[e]))
+	}
+	if v.Generate > 0 {
+		parts = append(parts, "generated in development")
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, "; ")
+}
+
+func envShown(val any) string {
+	switch val := val.(type) {
+	case []string:
+		return strings.Join(val, ",")
+	case string:
+		// An option's value, from a template: name the option.
+		if m := optionRef.FindStringSubmatch(val); m != nil && strings.TrimSpace(val) == m[0] {
+			return "the " + m[1] + " option"
+		}
+		if strings.Contains(val, "{{") {
+			return "the app's, from its blueprints and options"
+		}
+		return val
+	}
+	return fmt.Sprint(val)
+}
+
+var optionRef = regexp.MustCompile(`\{\{\s*\.Options\.([a-z_]+)\s*\}\}`)

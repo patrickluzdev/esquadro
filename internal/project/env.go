@@ -43,8 +43,12 @@ type EnvVar struct {
 	// Secret values never show: not in logs, not in errors, not in
 	// esquadro's output.
 	Secret bool
-	// Required are the environments the variable must be set in.
-	Required []string
+	// Required are the environments the variable must be set in; a
+	// declaration that says only "required" means every environment but
+	// development, the first, which is RequiredOutsideDevelopment until
+	// blueprints are resolved.
+	Required                   []string
+	RequiredOutsideDevelopment bool
 	// Default is the value in every environment, and ByEnv the value in
 	// one: string, int64, float64, bool or []string. A string may be a
 	// template, rendered with the declaring blueprint's data.
@@ -128,8 +132,12 @@ func EnvVarOf(d *dsl.EnvDecl, errorf func(dsl.Span, string, ...any)) *EnvVar {
 			v.Secret = v.Secret || name == "secret"
 			v.Prefixed = v.Prefixed || name == "prefixed"
 		case "required":
-			if !m.HasParens || len(m.Args) == 0 {
-				errorf(m.Span, "required needs the environments, e.g. required(staging, production)")
+			if !m.HasParens {
+				v.RequiredOutsideDevelopment = true
+				continue
+			}
+			if len(m.Args) == 0 {
+				errorf(m.Span, "required needs the environments, e.g. required(staging, production), or none: required alone is every environment but development")
 				ok = false
 				continue
 			}
@@ -202,8 +210,13 @@ func EnvVarOf(d *dsl.EnvDecl, errorf func(dsl.Span, string, ...any)) *EnvVar {
 }
 
 // ConvertEnv converts a value written in a .esq file to a variable's type:
-// string, int64, float64, bool or []string.
+// string, int64, float64, bool or []string. A string with {{ is a template,
+// whatever the type: rendered with the declaring blueprint's data, then
+// checked.
 func ConvertEnv(v dsl.Value, t EnvType) (any, string) {
+	if v.Kind == dsl.StringValue && strings.Contains(v.Text, "{{") && t != EnvString {
+		return v.Text, ""
+	}
 	switch t {
 	case EnvString:
 		if v.Kind == dsl.StringValue {
@@ -261,4 +274,18 @@ func FieldName(name string) string {
 		return name
 	}
 	return n.Pascal
+}
+
+// EnvDescription is a variable as hooks see it: its values are text, as an
+// environment variable holds them, by environment (only those it has one
+// in).
+type EnvDescription struct {
+	Name      string            `json:"name"`
+	Type      EnvType           `json:"type"`
+	Doc       []string          `json:"doc,omitempty"`
+	Secret    bool              `json:"secret,omitempty"`
+	Required  []string          `json:"required,omitempty"`
+	Values    map[string]string `json:"values,omitempty"`
+	Generate  int               `json:"generate,omitempty"`
+	Blueprint string            `json:"blueprint,omitempty"`
 }

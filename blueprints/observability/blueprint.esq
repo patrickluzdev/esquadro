@@ -9,6 +9,12 @@
 /// http://localhost:3000.
 blueprint observability {
   version "0.1.0"
+
+  /// Where traces, metrics and logs go, over OTLP/HTTP; nothing is sent
+  /// when it is empty. In development, the local Grafana of compose.yaml.
+  env OTEL_EXPORTER_OTLP_ENDPOINT string field(TelemetryEndpoint) development("{{if uses \"compose\"}}http://localhost:{{composePort \"otlp\" \"4318\"}}{{end}}")
+  /// The share of traces kept, from 0 to 1.
+  env TRACE_SAMPLE_RATIO number prefixed default("{{.Options.sample_ratio}}")
   requires app
   optional http, postgres, jobs, compose, docker
 

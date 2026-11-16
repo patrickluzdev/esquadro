@@ -261,6 +261,16 @@ func blueprintInfo(b *blueprint.Blueprint) string {
 		}
 		s.WriteString("\n")
 	}
+	if len(m.Env) > 0 {
+		s.WriteString("Environment variables:\n")
+		for _, v := range m.Env {
+			fmt.Fprintf(&s, "  %s %s; %s\n", envDisplayName(v), envKind(v), strings.ReplaceAll(envDefaults(v), "`", ""))
+			if len(v.Doc) > 0 {
+				fmt.Fprintf(&s, "%s\n", wrap(strings.Join(v.Doc, " "), "      "))
+			}
+		}
+		s.WriteString("\n")
+	}
 	if len(m.Annotations) > 0 {
 		fmt.Fprintf(&s, "Annotations, written @%s(key value):\n", m.Name)
 		for _, t := range []blueprint.Target{blueprint.TargetApp, blueprint.TargetEntity, blueprint.TargetField, blueprint.TargetRelation, blueprint.TargetJob} {

@@ -75,6 +75,10 @@ type SlotUse struct {
 // Result is the set of generated files, sorted by path.
 type Result struct {
 	Files []*File
+	// Env are the project's variables as hooks see them, and Environments
+	// its environments.
+	Env          []project.EnvDescription
+	Environments []string
 }
 
 // File returns the generated file at path, or nil.
@@ -255,7 +259,17 @@ func (c *composer) compose() *Result {
 		}
 	}
 
-	res := &Result{}
+	res := &Result{Environments: c.set.Environments}
+	for _, v := range c.env {
+		d := project.EnvDescription{Name: v.Full, Type: v.Type, Doc: v.Doc, Secret: v.Secret, Required: v.Required,
+			Generate: v.Generate, Blueprint: v.Blueprint, Values: map[string]string{}}
+		for _, e := range c.set.Environments {
+			if text := envValue(v, e); text != "" {
+				d.Values[e] = text
+			}
+		}
+		res.Env = append(res.Env, d)
+	}
 	for _, f := range files {
 		res.Files = append(res.Files, f)
 	}
@@ -679,6 +693,9 @@ func (c *composer) renderEnv() []*project.EnvVar {
 				if err := t.Execute(&b, data); err != nil {
 					c.errorf(name, 0, "the value of %s: %s", v.Full, cleanTemplateMsg(err.Error()))
 					return val
+				}
+				if msg := checkEnvText(b.String(), v.Type); msg != "" {
+					c.errorf(name, 0, "the value of %s renders to %q: %s", v.Full, b.String(), msg)
 				}
 				return b.String()
 			}

@@ -3,6 +3,9 @@
 /// A handler may replace them for itself, as the documentation page does.
 blueprint security_headers {
   version "0.1.0"
+
+  /// Send Strict-Transport-Security, behind HTTPS only.
+  env HSTS bool prefixed field(HSTS) default("{{.Options.hsts}}")
   requires http
 
   /// Send Strict-Transport-Security; only behind HTTPS. <APP>_HSTS

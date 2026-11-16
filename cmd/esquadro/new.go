@@ -21,7 +21,7 @@ import (
 // blueprintGroups name what the built-in blueprints are for, as comments
 // over them in an app.esq written from a list of blueprints.
 var blueprintGroups = map[string]string{
-	"app": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
+	"app": "base", "env": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
@@ -45,7 +45,7 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	module := flags.String("module", "", "Go module path (default: github.com/<git config github.user>/<name>, or example.com/<name>)")
 	starter := flags.String("starter", "", "start from a starter: "+strings.Join(starterNames(), ", "))
-	bps := flags.String("blueprints", "", "comma-separated blueprints of the app, instead of a starter (default: app)")
+	bps := flags.String("blueprints", "", "comma-separated blueprints of the app, instead of a starter (default: app,env)")
 	noGit := flags.Bool("no-git", false, "leave out the git blueprint: no repository, no first commit")
 	noGen := flags.Bool("no-gen", false, "write the .esq files only, without generating")
 	flags.Usage = func() {
@@ -94,7 +94,7 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "esquadro new: there is no starter %q; the starters are %s\n", *starter, strings.Join(starterNames(), ", "))
 		return 2
 	}
-	chosen := []string{"app"}
+	chosen := []string{"app", "env"}
 	if *bps != "" {
 		chosen = nil
 		for b := range strings.SplitSeq(*bps, ",") {

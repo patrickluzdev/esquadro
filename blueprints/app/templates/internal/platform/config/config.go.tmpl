@@ -17,7 +17,7 @@
 // directory{{end}}, the value the model gives that environment, its default.
 package config
 
-{{importBlock (and $file "bufio") (and $file "errors") "fmt" (and $file "io/fs") "os" "slices" (and (or $integer $real $boolean) "strconv") "strings" (and $duration "time")}}
+{{importBlock (and $file "bufio") (and $file "errors") "fmt" (and $file "io/fs") "os" "slices" (and (or $integer $real $boolean $file) "strconv") "strings" (and $duration "time")}}
 // Environments are the environments {{.App.Label}} runs in; APP_ENV picks one,
 // and the first is the one when APP_ENV is not set.
 var Environments = {{goStrings .Environments}}
@@ -129,6 +129,7 @@ func (l *loader) read(v variable) (string, bool) {
 	return value, true
 }
 
+{{- if or $integer $real $boolean $duration}}
 // refuse records a value that is not of its variable's type.
 func (l *loader) refuse(v variable, value, want string) {
 	if v.secret {
@@ -137,7 +138,7 @@ func (l *loader) refuse(v variable, value, want string) {
 	}
 	l.problems = append(l.problems, fmt.Sprintf("%s must be %s, got %q", v.name, want, value))
 }
-
+{{end}}
 func (l *loader) err() error {
 	if len(l.problems) == 0 {
 		return nil

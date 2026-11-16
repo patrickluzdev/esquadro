@@ -8,6 +8,11 @@
 /// schedule.
 blueprint jobs {
   version "0.1.0"
+
+  /// Jobs each queue works at once, per process.
+  env JOBS_WORKERS int prefixed default("{{.Options.workers}}")
+  /// The queues the worker works, comma-separated.
+  env JOBS_QUEUES list prefixed default("{{join \",\" (strs .Options.queues)}}")
   requires app, domain, postgres, migrations, worker
   optional testcontainers
 
