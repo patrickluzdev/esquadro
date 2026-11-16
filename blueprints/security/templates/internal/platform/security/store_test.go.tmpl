@@ -1,0 +1,152 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+	"uuid"
+
+	"{{.App.Module}}/internal/platform/postgres/postgrestest"
+)
+
+// testSecurity is security on a fresh database, with a clock the test moves.
+func testSecurity(t *testing.T) (*Security, *time.Time) {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Second)
+	s, err := New(postgrestest.Fresh(t), Config{
+		App: "test", Secret: strings.Repeat("s", 43), SessionDays: 7, SessionIdleHours: 24, SessionMaxDays: 30,
+		KeepIP: true, KeepUserAgent: true, TokenMinutes: 15, Issuer: "https://test.example",
+		Argon2MemoryKiB: 19456, Argon2Iterations: 2, Argon2Parallelism: 1, LockoutAttempts: 3, LockoutMinutes: 15,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.now = func() time.Time { return now }
+	return s, &now
+}
+
+func newIdentity(t *testing.T, s *Security, realm, email string) uuid.UUID {
+	t.Helper()
+	id := uuid.NewV7()
+	if _, err := s.db.Exec(context.Background(), `INSERT INTO {{$identities}} (id, realm, email) VALUES ($1, $2, $3)`, id, realm, email); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func TestSessions(t *testing.T) {
+	ctx := t.Context()
+	s, now := testSecurity(t)
+	ana := newIdentity(t, s, "user", "ana@example.com")
+	token, ses, err := s.StartSession(ctx, s.db, ana, "203.0.113.7", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.SessionByToken(ctx, token)
+	if err != nil || got.ID != ses.ID || got.Realm != "user" || got.IPAddress != "203.0.113.7" {
+		t.Fatalf("the session: %+v %v", got, err)
+	}
+	if _, err := s.SessionByToken(ctx, token+"x"); !errors.Is(err, ErrNoSession) {
+		t.Fatalf("another token: %v", err)
+	}
+
+	// Used every 23 hours, it lives on until its longest life, 30 days.
+	var ended error
+	for range 40 {
+		*now = now.Add(23 * time.Hour)
+		if _, ended = s.SessionByToken(ctx, token); ended != nil {
+			break
+		}
+	}
+	if lived := now.Sub(ses.CreatedAt); !errors.Is(ended, ErrNoSession) || lived <= 30*24*time.Hour || lived > 31*24*time.Hour {
+		t.Fatalf("ended after %v: %v", lived, ended)
+	}
+
+	// Idle for more than a day, it ends.
+	token, _, _ = s.StartSession(ctx, s.db, ana, "", "")
+	*now = now.Add(25 * time.Hour)
+	if _, err := s.SessionByToken(ctx, token); !errors.Is(err, ErrNoSession) {
+		t.Fatalf("idle: %v", err)
+	}
+
+	// Ending the others keeps this one.
+	keep, kept, _ := s.StartSession(ctx, s.db, ana, "", "")
+	other, _, _ := s.StartSession(ctx, s.db, ana, "", "")
+	if err := s.EndSessions(ctx, s.db, ana, kept.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionByToken(ctx, keep); err != nil {
+		t.Fatalf("kept: %v", err)
+	}
+	if _, err := s.SessionByToken(ctx, other); !errors.Is(err, ErrNoSession) {
+		t.Fatalf("the other: %v", err)
+	}
+	if list, _ := s.Sessions(ctx, ana); len(list) != 1 {
+		t.Fatalf("%d sessions", len(list))
+	}
+}
+
+func TestAttemptsLockAndForget(t *testing.T) {
+	ctx := t.Context()
+	s, now := testSecurity(t)
+	key := "account:user:ana@example.com"
+	for range 3 {
+		if err := s.Failed(ctx, key, 3); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if wait, _ := s.Locked(ctx, key, "ip:203.0.113.7"); wait <= 0 || wait > 15*time.Minute {
+		t.Fatalf("locked for %v", wait)
+	}
+	*now = now.Add(16 * time.Minute)
+	if wait, _ := s.Locked(ctx, key); wait != 0 {
+		t.Fatalf("after the lockout: %v", wait)
+	}
+	s.Failed(ctx, key, 3)
+	s.Succeeded(ctx, key)
+	if wait, _ := s.Locked(ctx, key); wait != 0 {
+		t.Fatal("a success forgets")
+	}
+}
+
+func TestTokensAndKeys(t *testing.T) {
+	ctx := t.Context()
+	s, now := testSecurity(t)
+	p := Principal{ID: uuid.NewV7(), Realm: "user", Roles: []string{"admin"}}
+	raw, _, err := s.IssueToken(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.VerifyToken(ctx, raw, "user")
+	if err != nil || got.ID != p.ID || len(got.Roles) != 1 || got.Roles[0] != "admin" {
+		t.Fatalf("verified: %+v %v", got, err)
+	}
+	if _, err := s.VerifyToken(ctx, raw, "customer"); !errors.Is(err, ErrBadToken) {
+		t.Fatalf("another realm: %v", err)
+	}
+	if _, err := s.VerifyToken(ctx, raw[:len(raw)-2]+"xx", "user"); !errors.Is(err, ErrBadToken) {
+		t.Fatalf("tampered: %v", err)
+	}
+
+	// After a rotation, old tokens still verify until they expire.
+	if err := s.RotateKeys(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.VerifyToken(ctx, raw, "user"); err != nil {
+		t.Fatalf("an old token after rotation: %v", err)
+	}
+	jwks, _ := s.JWKS(ctx)
+	if strings.Count(string(jwks), `"kid"`) != 2 {
+		t.Fatalf("JWKS: %s", jwks)
+	}
+	*now = now.Add(21 * time.Minute)
+	if _, err := s.VerifyToken(ctx, raw, "user"); !errors.Is(err, ErrBadToken) {
+		t.Fatalf("an expired token: %v", err)
+	}
+}
+{{end -}}

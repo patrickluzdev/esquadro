@@ -1,0 +1,110 @@
+{{- if realms .Entities -}}
+// Package security is who signs in to {{.App.Label}} and what each one may do:
+// passwords, sessions, tokens, CSRF and the limits on guessing. Identities
+// live in the security_ tables, apart from the entities that sign in, and
+// share their id.
+package security
+
+import (
+	"context"
+	"crypto/hkdf"
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Config is how security works: its secrets, from the environment, and the
+// blueprint's options.
+type Config struct {
+	// App names the cookies.
+	App string
+	// Secure sends cookies over HTTPS only, with the __Host- prefix: every
+	// environment but development.
+	Secure bool
+	// Secret signs CSRF tokens and encrypts the signing keys; Pepper, when
+	// set, is mixed into every password hash.
+	Secret, Pepper string
+
+	SessionDays, SessionIdleHours, SessionMaxDays int
+	KeepIP, KeepUserAgent                         bool
+	TokenMinutes                                  int
+	Issuer                                        string
+
+	Argon2MemoryKiB, Argon2Iterations, Argon2Parallelism int
+	LockoutAttempts, LockoutMinutes                      int
+}
+
+// Security holds what the security of the app works with.
+type Security struct {
+	db      *pgxpool.Pool
+	cfg     Config
+	hasher  Hasher
+	csrfKey []byte
+	keyKey  []byte
+	keys    keyCache
+	logger  *slog.Logger
+	now     func() time.Time
+}
+
+// New returns the security of the app on db.
+func New(db *pgxpool.Pool, cfg Config, logger *slog.Logger) (*Security, error) {
+	if len(cfg.Secret) < 32 {
+		return nil, errors.New("security: SECURITY_SECRET must be at least 32 characters")
+	}
+	csrfKey, err := derive(cfg.Secret, "csrf")
+	if err != nil {
+		return nil, err
+	}
+	keyKey, err := derive(cfg.Secret, "signing-keys")
+	if err != nil {
+		return nil, err
+	}
+	return &Security{
+		db: db, cfg: cfg, csrfKey: csrfKey, keyKey: keyKey, logger: logger, now: time.Now,
+		hasher: Hasher{
+			Memory: uint32(cfg.Argon2MemoryKiB), Iterations: uint32(cfg.Argon2Iterations),
+			Parallelism: uint8(cfg.Argon2Parallelism), Pepper: []byte(cfg.Pepper),
+		},
+	}, nil
+}
+
+// derive is a key for one use, from the secret: a leak of one does not
+// reveal the others.
+func derive(secret, use string) ([]byte, error) {
+	key, err := hkdf.Key(sha256.New, []byte(secret), nil, "{{.App.Kebab}} security "+use, 32)
+	if err != nil {
+		return nil, fmt.Errorf("security: %w", err)
+	}
+	return key, nil
+}
+
+// Principal is who a request comes from: an identity of a realm, with its
+// roles. Its ID is also the id of the entity that signed in.
+type Principal struct {
+	ID    uuid.UUID
+	Realm string
+	Roles []string
+	// SessionID is the session the request came with; nil with a token.
+	SessionID *uuid.UUID
+	// AuthenticatedAt is when the identity last proved who it is.
+	AuthenticatedAt time.Time
+}
+
+type principalKey struct{}
+
+// WithPrincipal is ctx with the request's principal.
+func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return context.WithValue(ctx, principalKey{}, p)
+}
+
+// PrincipalOf is the principal of ctx, and whether there is one.
+func PrincipalOf(ctx context.Context) (Principal, bool) {
+	p, ok := ctx.Value(principalKey{}).(Principal)
+	return p, ok
+}
+{{end -}}

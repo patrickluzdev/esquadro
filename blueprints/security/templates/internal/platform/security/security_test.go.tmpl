@@ -1,0 +1,152 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+	"uuid"
+)
+
+var testTime = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+func testHasher() Hasher { return Hasher{Memory: 19456, Iterations: 2, Parallelism: 1} }
+
+func TestHashAndVerify(t *testing.T) {
+	h := testHasher()
+	encoded, err := h.Hash("correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(encoded, "$argon2id$v=19$m=19456,t=2,p=1$") {
+		t.Fatalf("not PHC: %s", encoded)
+	}
+	if ok, rehash, err := h.Verify("correct horse battery staple", encoded); !ok || rehash || err != nil {
+		t.Fatalf("the right password: %v %v %v", ok, rehash, err)
+	}
+	if ok, _, _ := h.Verify("correct horse battery stapler", encoded); ok {
+		t.Fatal("a wrong password passed")
+	}
+	again, _ := h.Hash("correct horse battery staple")
+	if again == encoded {
+		t.Fatal("two hashes of one password are equal: the salt is not random")
+	}
+
+	// A higher cost asks for the hash again.
+	stronger := testHasher()
+	stronger.Iterations = 3
+	if ok, rehash, _ := stronger.Verify("correct horse battery staple", encoded); !ok || !rehash {
+		t.Fatalf("a hash below the cost: ok %v, rehash %v", ok, rehash)
+	}
+
+	// The same characters, typed composed or decomposed, are one password.
+	composed, _ := h.Hash("café com leite!")
+	if ok, _, _ := h.Verify("café com leite!", composed); !ok {
+		t.Fatal("NFC: a decomposed é did not match")
+	}
+
+	// A pepper changes the hash: without it, the hash does not verify.
+	peppered := testHasher()
+	peppered.Pepper = []byte("a pepper kept out of the database")
+	withPepper, _ := peppered.Hash("correct horse battery staple")
+	if ok, _, _ := h.Verify("correct horse battery staple", withPepper); ok {
+		t.Fatal("a peppered hash verified without the pepper")
+	}
+	if ok, _, _ := peppered.Verify("correct horse battery staple", withPepper); !ok {
+		t.Fatal("a peppered hash did not verify with the pepper")
+	}
+}
+
+func TestPasswordPolicy(t *testing.T) {
+	p := PasswordPolicy{Min: 12, Max: 128, Blocklist: "common"}
+	for password, reason := range map[string]string{
+		"short":                  "too_short",
+		strings.Repeat("a", 129): "too_long",
+		"password1234":           "common",
+		"aaaaaaaaaaaa":           "common",
+		"123456789012":           "common",
+		"qwertyuiopas":           "common",
+		"abcabcabcabc":           "common",
+		"lojadoana2026":          "common",
+	} {
+		var weak *WeakPassword
+		if err := p.Check(context.Background(), password, "lojadoana2026", "ana@example.com"); !errors.As(err, &weak) || weak.Reason != reason {
+			t.Errorf("%q: got %v, want %s", password, err, reason)
+		}
+	}
+	if err := p.Check(context.Background(), "correct horse battery staple"); err != nil {
+		t.Fatalf("a good passphrase: %v", err)
+	}
+	if err := p.Check(context.Background(), "ação 🔐 açaí ok!"); err != nil {
+		t.Fatalf("unicode and spaces count, and are allowed: %v", err)
+	}
+	if err := (PasswordPolicy{Min: 12, Max: 128, Blocklist: "none"}).Check(context.Background(), "password1234"); err != nil {
+		t.Fatalf("no blocklist: %v", err)
+	}
+}
+
+func TestTokensAreKeptAsHashes(t *testing.T) {
+	token, hash := newToken()
+	if len(token) < 40 || string(hash) == token || string(hashToken(token)) != string(hash) {
+		t.Fatalf("token %q, hash %x", token, hash)
+	}
+	other, _ := newToken()
+	if other == token {
+		t.Fatal("two tokens are equal")
+	}
+}
+
+func TestCSRF(t *testing.T) {
+	s, err := New(nil, Config{App: "shop", Secret: strings.Repeat("s", 43)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, two := uuid.NewV7(), uuid.NewV7()
+	if !s.CheckCSRF(one, s.CSRFToken(one)) || s.CheckCSRF(two, s.CSRFToken(one)) || s.CheckCSRF(one, "") {
+		t.Fatal("a CSRF token is the session's only")
+	}
+	other, _ := New(nil, Config{App: "shop", Secret: strings.Repeat("t", 43)}, nil)
+	if other.CheckCSRF(one, s.CSRFToken(one)) {
+		t.Fatal("a CSRF token of another secret passed")
+	}
+	if _, err := New(nil, Config{Secret: "short"}, nil); err == nil {
+		t.Fatal("a short secret passed")
+	}
+}
+
+func TestSameOrigin(t *testing.T) {
+	r := func(site, origin string) bool {
+		req := httptest.NewRequest("POST", "https://shop.com/x", nil)
+		if site != "" {
+			req.Header.Set("Sec-Fetch-Site", site)
+		}
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		return SameOrigin(req, []string{"https://admin.shop.com"})
+	}
+	if !r("same-origin", "") || !r("", "") || !r("cross-site", "https://admin.shop.com") || !r("", "https://shop.com") {
+		t.Fatal("the app's own pages and the allowed origins pass")
+	}
+	if r("cross-site", "https://evil.example") || r("cross-site", "") || r("", "https://evil.example") {
+		t.Fatal("another site passed")
+	}
+}
+
+func TestSessionCookies(t *testing.T) {
+	dev, _ := New(nil, Config{App: "shop", Secret: strings.Repeat("s", 43)}, nil)
+	prod, _ := New(nil, Config{App: "shop", Secure: true, Secret: strings.Repeat("s", 43)}, nil)
+	if c := dev.SessionCookie("user", "t", testTime); c.Name != "shop_user_session" || c.Secure || !c.HttpOnly {
+		t.Fatalf("development: %+v", c)
+	}
+	if c := prod.SessionCookie("customer", "t", testTime); c.Name != "__Host-shop_customer_session" || !c.Secure || c.Path != "/" || c.Domain != "" {
+		t.Fatalf("production: %+v", c)
+	}
+	if c := prod.SessionCookie("user", "", testTime); c.MaxAge != -1 {
+		t.Fatal("an empty token clears the cookie")
+	}
+}
+{{end -}}

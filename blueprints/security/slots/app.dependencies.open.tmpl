@@ -1,0 +1,21 @@
+{{- if realms .Entities}}
+{{- if .Options.pepper}}
+	if d.config.SecurityPepper == "" {
+		release()
+		return d, nil, errors.New("security: the pepper option needs SECURITY_PEPPER")
+	}
+{{- end}}
+	d.security, err = security.New(d.pool, security.Config{
+		App: "{{.App.Snake}}", Secure: d.config.Env != "{{index .Environments 0}}",
+		Secret: d.config.SecuritySecret,{{if .Options.pepper}} Pepper: d.config.SecurityPepper,{{end}}
+		SessionDays: {{.Options.session_days}}, SessionIdleHours: {{.Options.session_idle_hours}}, SessionMaxDays: {{.Options.session_max_days}},
+		KeepIP: {{.Options.session_ip}}, KeepUserAgent: {{.Options.session_user_agent}},
+		TokenMinutes: {{.Options.token_minutes}}, Issuer: {{printf "%q" .Options.public_url}},
+		Argon2MemoryKiB: {{.Options.argon2_memory_kib}}, Argon2Iterations: {{.Options.argon2_iterations}}, Argon2Parallelism: {{.Options.argon2_parallelism}},
+		LockoutAttempts: {{.Options.lockout_attempts}}, LockoutMinutes: {{.Options.lockout_minutes}},
+	}, d.logger)
+	if err != nil {
+		release()
+		return d, nil, err
+	}
+{{- end}}

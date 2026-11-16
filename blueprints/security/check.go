@@ -37,9 +37,12 @@ type Realm struct {
 
 // Realms are the entities of the project marked @security(principal), with
 // their settings and defaults.
-func Realms(p *project.Project) []*Realm {
+func Realms(p *project.Project) []*Realm { return RealmsOf(p.Entities) }
+
+// RealmsOf is Realms of a list of entities, for templates.
+func RealmsOf(entities []*project.Entity) []*Realm {
 	var out []*Realm
-	for _, e := range p.Entities {
+	for _, e := range entities {
 		a := e.Ann["security"]
 		if principal, _ := a["principal"].(bool); !principal {
 			continue

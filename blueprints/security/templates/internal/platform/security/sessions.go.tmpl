@@ -1,0 +1,182 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $sessions := securityTable "sessions" $pg -}}
+{{- $identities := securityTable "identities" $pg -}}
+{{- $roles := securityTable "role_assignments" $pg -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+)
+
+// Querier runs queries: the pool, or a transaction to join.
+type Querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// ErrNoSession is a session token that does not open a session: unknown,
+// expired, idle too long, or of a disabled identity.
+var ErrNoSession = errors.New("security: no session")
+
+// Session is a session of an identity, on one device.
+type Session struct {
+	ID, IdentityID  uuid.UUID
+	Realm           string
+	ExpiresAt       time.Time
+	MaxExpiresAt    time.Time
+	LastSeenAt      time.Time
+	AuthenticatedAt time.Time
+	CreatedAt       time.Time
+	IPAddress       string
+	UserAgent       string
+}
+
+// StartSession opens a session for an identity that just proved who it is,
+// and returns its token, which only the client keeps. Each sign-in gets a
+// new token, so a token planted before it is worthless.
+func (s *Security) StartSession(ctx context.Context, q Querier, identity uuid.UUID, ip, userAgent string) (string, Session, error) {
+	now := s.now()
+	token, hash := newToken()
+	ses := Session{
+		ID: uuid.NewV7(), IdentityID: identity, CreatedAt: now, LastSeenAt: now, AuthenticatedAt: now,
+		MaxExpiresAt: now.AddDate(0, 0, s.cfg.SessionMaxDays),
+	}
+	ses.ExpiresAt = earliest(now.AddDate(0, 0, s.cfg.SessionDays), ses.MaxExpiresAt)
+	if s.cfg.KeepIP {
+		ses.IPAddress = ip
+	}
+	if s.cfg.KeepUserAgent {
+		ses.UserAgent = userAgent
+	}
+	err := q.QueryRow(ctx, `INSERT INTO {{$sessions}} (id, identity_id, token_hash, expires_at, max_expires_at, last_seen_at, authenticated_at, ip_address, user_agent)
+		VALUES ($1, $2, $3, $4, $5, $6, $6, NULLIF($7, ''), NULLIF($8, ''))
+		RETURNING (SELECT realm FROM {{$identities}} WHERE id = $2)`,
+		ses.ID, identity, hash, ses.ExpiresAt, ses.MaxExpiresAt, now, ses.IPAddress, ses.UserAgent).Scan(&ses.Realm)
+	if err != nil {
+		return "", Session{}, fmt.Errorf("security: start a session: %w", err)
+	}
+	return token, ses, nil
+}
+
+// SessionByToken is the session a token opens. A session ends when it
+// expires, when it has been idle too long, when it reaches its longest
+// life, or when its identity is disabled; using it pushes its expiry back.
+func (s *Security) SessionByToken(ctx context.Context, token string) (Session, error) {
+	var ses Session
+	var disabled *time.Time
+	var ip, ua *string
+	err := s.db.QueryRow(ctx, `SELECT s.id, s.identity_id, i.realm, s.expires_at, s.max_expires_at, s.last_seen_at, s.authenticated_at, s.created_at, s.ip_address, s.user_agent, i.disabled_at
+		FROM {{$sessions}} s JOIN {{$identities}} i ON i.id = s.identity_id WHERE s.token_hash = $1`, hashToken(token)).
+		Scan(&ses.ID, &ses.IdentityID, &ses.Realm, &ses.ExpiresAt, &ses.MaxExpiresAt, &ses.LastSeenAt, &ses.AuthenticatedAt, &ses.CreatedAt, &ip, &ua, &disabled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNoSession
+	}
+	if err != nil {
+		return Session{}, fmt.Errorf("security: read a session: %w", err)
+	}
+	ses.IPAddress, ses.UserAgent = deref(ip), deref(ua)
+	now := s.now()
+	idle := ses.LastSeenAt.Add(time.Duration(s.cfg.SessionIdleHours) * time.Hour)
+	if disabled != nil || now.After(ses.ExpiresAt) || now.After(ses.MaxExpiresAt) || now.After(idle) {
+		if _, err := s.db.Exec(ctx, `DELETE FROM {{$sessions}} WHERE id = $1`, ses.ID); err != nil {
+			return Session{}, fmt.Errorf("security: end a session: %w", err)
+		}
+		return Session{}, ErrNoSession
+	}
+	// Renewed at most every five minutes, not on every request.
+	if now.Sub(ses.LastSeenAt) > 5*time.Minute {
+		ses.LastSeenAt = now
+		ses.ExpiresAt = earliest(now.AddDate(0, 0, s.cfg.SessionDays), ses.MaxExpiresAt)
+		if _, err := s.db.Exec(ctx, `UPDATE {{$sessions}} SET last_seen_at = $2, expires_at = $3, updated_at = $2 WHERE id = $1`, ses.ID, now, ses.ExpiresAt); err != nil {
+			return Session{}, fmt.Errorf("security: renew a session: %w", err)
+		}
+	}
+	return ses, nil
+}
+
+// Sessions are an identity's open sessions, the most recently used first.
+func (s *Security) Sessions(ctx context.Context, identity uuid.UUID) ([]Session, error) {
+	rows, err := s.db.Query(ctx, `SELECT s.id, s.identity_id, i.realm, s.expires_at, s.max_expires_at, s.last_seen_at, s.authenticated_at, s.created_at, COALESCE(s.ip_address, ''), COALESCE(s.user_agent, '')
+		FROM {{$sessions}} s JOIN {{$identities}} i ON i.id = s.identity_id
+		WHERE s.identity_id = $1 AND s.expires_at > $2 ORDER BY s.last_seen_at DESC`, identity, s.now())
+	if err != nil {
+		return nil, fmt.Errorf("security: list sessions: %w", err)
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Session, error) {
+		var ses Session
+		err := row.Scan(&ses.ID, &ses.IdentityID, &ses.Realm, &ses.ExpiresAt, &ses.MaxExpiresAt, &ses.LastSeenAt, &ses.AuthenticatedAt, &ses.CreatedAt, &ses.IPAddress, &ses.UserAgent)
+		return ses, err
+	})
+}
+
+// EndSession ends one session of an identity.
+func (s *Security) EndSession(ctx context.Context, q Querier, identity, session uuid.UUID) error {
+	if _, err := q.Exec(ctx, `DELETE FROM {{$sessions}} WHERE id = $1 AND identity_id = $2`, session, identity); err != nil {
+		return fmt.Errorf("security: end a session: %w", err)
+	}
+	return nil
+}
+
+// EndSessions ends every session of an identity but keep (the uuid.Nil()
+// keeps none): after a password changes, the other devices sign in again.
+func (s *Security) EndSessions(ctx context.Context, q Querier, identity, keep uuid.UUID) error {
+	if _, err := q.Exec(ctx, `DELETE FROM {{$sessions}} WHERE identity_id = $1 AND id <> $2`, identity, keep); err != nil {
+		return fmt.Errorf("security: end sessions: %w", err)
+	}
+	return nil
+}
+
+// Fresh reports whether a session proved who it is recently enough for
+// what changes an account: a password, an email, the account itself.
+func (s *Security) Fresh(ses Session) bool {
+	return s.now().Sub(ses.AuthenticatedAt) < 10*time.Minute
+}
+
+// Roles are an identity's roles.
+func (s *Security) Roles(ctx context.Context, q Querier, identity uuid.UUID) ([]string, error) {
+	rows, err := q.Query(ctx, `SELECT role FROM {{$roles}} WHERE identity_id = $1 ORDER BY role`, identity)
+	if err != nil {
+		return nil, fmt.Errorf("security: read roles: %w", err)
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// Grant gives an identity a role.
+func (s *Security) Grant(ctx context.Context, q Querier, identity uuid.UUID, role string) error {
+	if _, err := q.Exec(ctx, `INSERT INTO {{$roles}} (identity_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING`, identity, role); err != nil {
+		return fmt.Errorf("security: grant %s: %w", role, err)
+	}
+	return nil
+}
+
+// Revoke takes a role from an identity.
+func (s *Security) Revoke(ctx context.Context, q Querier, identity uuid.UUID, role string) error {
+	if _, err := q.Exec(ctx, `DELETE FROM {{$roles}} WHERE identity_id = $1 AND role = $2`, identity, role); err != nil {
+		return fmt.Errorf("security: revoke %s: %w", role, err)
+	}
+	return nil
+}
+
+func earliest(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+{{end -}}

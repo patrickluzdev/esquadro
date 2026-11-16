@@ -9,7 +9,7 @@ import (
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"securityTable": Table,
-		"realms":        Realms,
+		"realms":        RealmsOf,
 	}
 }
 

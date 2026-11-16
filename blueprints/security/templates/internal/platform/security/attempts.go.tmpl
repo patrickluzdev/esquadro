@@ -1,0 +1,52 @@
+{{- if realms .Entities -}}
+{{- $attempts := securityTable "attempts" (optionsOf "postgres") -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// Locked is how long sign-ins under any of the keys are refused: an
+// account ("account:<realm>:<email>") or an address ("ip:<address>").
+func (s *Security) Locked(ctx context.Context, keys ...string) (time.Duration, error) {
+	var until *time.Time
+	err := s.db.QueryRow(ctx, `SELECT max(locked_until) FROM {{$attempts}} WHERE key = ANY($1)`, keys).Scan(&until)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return 0, fmt.Errorf("security: read attempts: %w", err)
+	}
+	if until == nil || !until.After(s.now()) {
+		return 0, nil
+	}
+	return until.Sub(s.now()), nil
+}
+
+// Failed counts a failed sign-in under key; after limit of them within the
+// lockout window, the key is locked for the lockout's minutes.
+func (s *Security) Failed(ctx context.Context, key string, limit int) error {
+	now := s.now()
+	window := time.Duration(s.cfg.LockoutMinutes) * time.Minute
+	_, err := s.db.Exec(ctx, `INSERT INTO {{$attempts}} AS a (key, count, window_start) VALUES ($1, 1, $2)
+		ON CONFLICT (key) DO UPDATE SET
+			count = CASE WHEN a.window_start < $3 THEN 1 ELSE a.count + 1 END,
+			window_start = CASE WHEN a.window_start < $3 THEN $2 ELSE a.window_start END,
+			locked_until = CASE WHEN a.window_start >= $3 AND a.count + 1 >= $4 THEN $5::timestamptz ELSE a.locked_until END`,
+		key, now, now.Add(-window), limit, now.Add(window))
+	if err != nil {
+		return fmt.Errorf("security: count an attempt: %w", err)
+	}
+	return nil
+}
+
+// Succeeded forgets the failed sign-ins under key.
+func (s *Security) Succeeded(ctx context.Context, key string) error {
+	if _, err := s.db.Exec(ctx, `DELETE FROM {{$attempts}} WHERE key = $1`, key); err != nil {
+		return fmt.Errorf("security: forget attempts: %w", err)
+	}
+	return nil
+}
+{{end -}}

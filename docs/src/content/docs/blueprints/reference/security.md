@@ -51,6 +51,15 @@ blueprint security {
 }
 ```
 
+## Environment variables
+
+Read when the app starts; see [Environment variables](/esquadro/language/environment/).
+
+| Variable | Type | Value | |
+|---|---|---|---|
+| `SECURITY_SECRET` | string, secret, required outside development | generated in development | Signs CSRF tokens and encrypts the JWT signing keys; esquadro generates one for development. |
+| `SECURITY_PEPPER` | string, secret | - | With the pepper option, the key every password hash is mixed with; kept out of the database. Changing it means resetting every password. |
+
 ## Annotations
 
 | Where | Key | Type | |
@@ -76,3 +85,9 @@ blueprint security {
 | entity | `write` | list |  |
 
 An annotation is written `@security(key value)` on the element.
+
+## Go modules
+
+- `golang.org/x/crypto` v0.58.0
+- `golang.org/x/text` v0.43.0
+- `github.com/go-jose/go-jose/v4` v4.1.7

@@ -1,0 +1,242 @@
+{{- if realms .Entities -}}
+{{- $keys := securityTable "signing_keys" (optionsOf "postgres") -}}
+package security
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+	"uuid"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/jackc/pgx/v5"
+)
+
+// ErrBadToken is a JWT that does not let its bearer in: badly signed,
+// expired, or of another realm.
+var ErrBadToken = errors.New("security: bad token")
+
+// keyCache keeps the signing key and the public keys, read once.
+type keyCache struct {
+	mu      sync.Mutex
+	current *signingKey
+	public  map[string]ed25519.PublicKey
+}
+
+type signingKey struct {
+	id      string
+	private ed25519.PrivateKey
+}
+
+// claims are what a JWT says besides the registered claims.
+type claims struct {
+	Roles []string `json:"roles,omitempty"`
+}
+
+// IssueToken is a short JWT for a principal, signed with EdDSA (Ed25519):
+// its subject is the identity, its audience the realm, so that a token of
+// one realm is refused in another.
+func (s *Security) IssueToken(ctx context.Context, p Principal) (string, time.Time, error) {
+	key, err := s.signingKey(ctx)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: key.private},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", key.id))
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("security: %w", err)
+	}
+	now := s.now()
+	expires := now.Add(time.Duration(s.cfg.TokenMinutes) * time.Minute)
+	raw, err := jwt.Signed(signer).Claims(jwt.Claims{
+		Issuer: s.cfg.Issuer, Subject: p.ID.String(), Audience: jwt.Audience{p.Realm},
+		IssuedAt: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(expires), ID: uuid.NewV7().String(),
+	}).Claims(claims{Roles: p.Roles}).Serialize()
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("security: sign a token: %w", err)
+	}
+	return raw, expires, nil
+}
+
+// VerifyToken is the principal of a JWT of realm.
+func (s *Security) VerifyToken(ctx context.Context, raw, realm string) (Principal, error) {
+	tok, err := jwt.ParseSigned(raw, []jose.SignatureAlgorithm{jose.EdDSA})
+	if err != nil || len(tok.Headers) != 1 {
+		return Principal{}, ErrBadToken
+	}
+	pub, err := s.publicKey(ctx, tok.Headers[0].KeyID)
+	if err != nil {
+		return Principal{}, err
+	}
+	var std jwt.Claims
+	var extra claims
+	if err := tok.Claims(pub, &std, &extra); err != nil {
+		return Principal{}, ErrBadToken
+	}
+	expected := jwt.Expected{Issuer: s.cfg.Issuer, AnyAudience: jwt.Audience{realm}, Time: s.now()}
+	if err := std.ValidateWithLeeway(expected, 30*time.Second); err != nil {
+		return Principal{}, ErrBadToken
+	}
+	id, err := uuid.Parse(std.Subject)
+	if err != nil {
+		return Principal{}, ErrBadToken
+	}
+	return Principal{ID: id, Realm: realm, Roles: extra.Roles, AuthenticatedAt: std.IssuedAt.Time()}, nil
+}
+
+// JWKS is the JSON Web Key Set of the keys that sign the app's tokens, for
+// /.well-known/jwks.json: other services check the tokens with it.
+func (s *Security) JWKS(ctx context.Context) ([]byte, error) {
+	set := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{}}
+	rows, err := s.db.Query(ctx, `SELECT id, public_key FROM {{$keys}} WHERE expires_at IS NULL OR expires_at > $1 ORDER BY created_at`, s.now())
+	if err != nil {
+		return nil, fmt.Errorf("security: read keys: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var pub []byte
+		if err := rows.Scan(&id, &pub); err != nil {
+			return nil, err
+		}
+		set.Keys = append(set.Keys, jose.JSONWebKey{Key: ed25519.PublicKey(pub), KeyID: id, Algorithm: string(jose.EdDSA), Use: "sig"})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return json.Marshal(set)
+}
+
+// RotateKeys makes a new signing key; the ones before it keep checking the
+// tokens they signed until those expire.
+func (s *Security) RotateKeys(ctx context.Context) error {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+	sealed, err := seal(s.keyKey, priv.Seed())
+	if err != nil {
+		return err
+	}
+	idBytes := make([]byte, 9)
+	rand.Read(idBytes)
+	id := base64.RawURLEncoding.EncodeToString(idBytes)
+	now := s.now()
+	retire := now.Add(time.Duration(s.cfg.TokenMinutes)*time.Minute + 5*time.Minute)
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("security: rotate keys: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `UPDATE {{$keys}} SET expires_at = $1 WHERE expires_at IS NULL`, retire); err != nil {
+		return fmt.Errorf("security: rotate keys: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO {{$keys}} (id, algorithm, public_key, private_key) VALUES ($1, 'EdDSA', $2, $3)`, id, []byte(pub), sealed); err != nil {
+		return fmt.Errorf("security: rotate keys: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("security: rotate keys: %w", err)
+	}
+	s.keys.mu.Lock()
+	s.keys.current, s.keys.public = nil, nil
+	s.keys.mu.Unlock()
+	return nil
+}
+
+// signingKey is the key new tokens are signed with; the first is made on
+// first use.
+func (s *Security) signingKey(ctx context.Context) (*signingKey, error) {
+	s.keys.mu.Lock()
+	current := s.keys.current
+	s.keys.mu.Unlock()
+	if current != nil {
+		return current, nil
+	}
+	var id string
+	var sealed []byte
+	err := s.db.QueryRow(ctx, `SELECT id, private_key FROM {{$keys}} WHERE expires_at IS NULL ORDER BY created_at DESC LIMIT 1`).Scan(&id, &sealed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err := s.RotateKeys(ctx); err != nil {
+			return nil, err
+		}
+		return s.signingKey(ctx)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("security: read the signing key: %w", err)
+	}
+	seed, err := open(s.keyKey, sealed)
+	if err != nil {
+		return nil, fmt.Errorf("security: the signing key does not open with SECURITY_SECRET: %w", err)
+	}
+	key := &signingKey{id: id, private: ed25519.NewKeyFromSeed(seed)}
+	s.keys.mu.Lock()
+	s.keys.current = key
+	s.keys.mu.Unlock()
+	return key, nil
+}
+
+// publicKey is the public key of a signing key that still checks tokens.
+func (s *Security) publicKey(ctx context.Context, id string) (ed25519.PublicKey, error) {
+	s.keys.mu.Lock()
+	pub, ok := s.keys.public[id]
+	s.keys.mu.Unlock()
+	if ok {
+		return pub, nil
+	}
+	var raw []byte
+	err := s.db.QueryRow(ctx, `SELECT public_key FROM {{$keys}} WHERE id = $1 AND (expires_at IS NULL OR expires_at > $2)`, id, s.now()).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrBadToken
+	}
+	if err != nil {
+		return nil, fmt.Errorf("security: read a key: %w", err)
+	}
+	s.keys.mu.Lock()
+	if s.keys.public == nil {
+		s.keys.public = map[string]ed25519.PublicKey{}
+	}
+	s.keys.public[id] = raw
+	s.keys.mu.Unlock()
+	return raw, nil
+}
+
+// seal encrypts with AES-256-GCM, the nonce first.
+func seal(key, plain []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	rand.Read(nonce)
+	return gcm.Seal(nonce, nonce, plain, nil), nil
+}
+
+// open decrypts what seal encrypted.
+func open(key, sealed []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(sealed) < gcm.NonceSize() {
+		return nil, errors.New("too short")
+	}
+	return gcm.Open(nil, sealed[:gcm.NonceSize()], sealed[gcm.NonceSize():], nil)
+}
+{{end -}}

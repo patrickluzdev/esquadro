@@ -1,0 +1,89 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
+	"net/http"
+	"net/url"
+	"slices"
+	"strings"
+	"time"
+	"uuid"
+)
+
+// newToken is a random token, as the client keeps it, and its hash, as the
+// database does: a leaked database does not let anyone in.
+func newToken() (token string, hash []byte) {
+	b := make([]byte, 32)
+	rand.Read(b)
+	token = base64.RawURLEncoding.EncodeToString(b)
+	return token, hashToken(token)
+}
+
+// hashToken is the hash a token is kept as.
+func hashToken(token string) []byte {
+	sum := sha256.Sum256([]byte(token))
+	return sum[:]
+}
+
+// CSRFToken is the token a browser sends back, in the X-CSRF-Token header,
+// with every request that changes something under a session cookie: it is
+// signed with the session, so only a page of the app can know it.
+func (s *Security) CSRFToken(session uuid.UUID) string {
+	mac := hmac.New(sha256.New, s.csrfKey)
+	mac.Write(session[:])
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// CheckCSRF reports whether token is the session's CSRF token.
+func (s *Security) CheckCSRF(session uuid.UUID, token string) bool {
+	return subtle.ConstantTimeCompare([]byte(s.CSRFToken(session)), []byte(token)) == 1
+}
+
+// SameOrigin reports whether a request comes from a page of the app or of
+// an allowed origin, by its Sec-Fetch-Site and Origin headers; a request
+// without them (not from a browser) passes.
+func SameOrigin(r *http.Request, origins []string) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return r.Header.Get("Sec-Fetch-Site") == ""
+	}
+	if slices.Contains(origins, origin) {
+		return true
+	}
+	u, err := url.Parse(origin)
+	return err == nil && strings.EqualFold(u.Host, r.Host)
+}
+
+// SessionCookieName is the name of a realm's session cookie: with the
+// __Host- prefix when cookies are secure, which binds it to the app's host
+// and to HTTPS.
+func (s *Security) SessionCookieName(realm string) string {
+	name := s.cfg.App + "_" + realm + "_session"
+	if s.cfg.Secure {
+		return "__Host-" + name
+	}
+	return name
+}
+
+// SessionCookie is the cookie of a session token, until expires; an empty
+// token clears it.
+func (s *Security) SessionCookie(realm, token string, expires time.Time) *http.Cookie {
+	c := &http.Cookie{
+		Name: s.SessionCookieName(realm), Value: token, Path: "/",
+		HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, Expires: expires,
+	}
+	if token == "" {
+		c.MaxAge = -1
+	}
+	return c
+}
+{{end -}}

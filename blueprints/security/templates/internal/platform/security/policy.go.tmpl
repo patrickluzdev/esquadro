@@ -1,0 +1,144 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"bufio"
+	"context"
+	"crypto/sha1"
+	_ "embed"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
+)
+
+// PasswordPolicy is what a new password must be: NIST SP 800-63B's rules,
+// with no composition rules and no expiry.
+type PasswordPolicy struct {
+	Min, Max int
+	// Blocklist is none, common (a list of common passwords) or pwned (the
+	// list and Pwned Passwords, which only ever sees the first five
+	// characters of the password's SHA-1).
+	Blocklist string
+	// PwnedFailOpen accepts a password when Pwned Passwords does not answer.
+	PwnedFailOpen bool
+	// Client asks Pwned Passwords; http.DefaultClient when nil.
+	Client *http.Client
+}
+
+// WeakPassword is a password the policy refuses, and why: too_short,
+// too_long, common or breached.
+type WeakPassword struct{ Reason string }
+
+func (e *WeakPassword) Error() string { return "security: weak password: " + e.Reason }
+
+// Check refuses a password too short, too long, common, made of what the
+// app or the person is called (context), or breached. Each character (code
+// point) counts once.
+func (p PasswordPolicy) Check(ctx context.Context, password string, context ...string) error {
+	n := utf8.RuneCountInString(norm.NFC.String(password))
+	switch {
+	case n < p.Min:
+		return &WeakPassword{Reason: "too_short"}
+	case n > p.Max:
+		return &WeakPassword{Reason: "too_long"}
+	}
+	if p.Blocklist == "none" {
+		return nil
+	}
+	lower := strings.ToLower(password)
+	if commonPasswords[lower] || repetitive(lower) {
+		return &WeakPassword{Reason: "common"}
+	}
+	for _, c := range context {
+		if c = strings.ToLower(strings.TrimSpace(c)); len(c) >= 4 && (lower == c || strings.Trim(lower, "0123456789!@#$%&*.") == c) {
+			return &WeakPassword{Reason: "common"}
+		}
+	}
+	if p.Blocklist != "pwned" {
+		return nil
+	}
+	breached, err := p.pwned(ctx, password)
+	if err != nil {
+		if p.PwnedFailOpen {
+			return nil
+		}
+		return fmt.Errorf("security: Pwned Passwords did not answer: %w", err)
+	}
+	if breached {
+		return &WeakPassword{Reason: "breached"}
+	}
+	return nil
+}
+
+// repetitive reports passwords that are one character repeated, a run of
+// the keyboard or the alphabet, or a short piece repeated: 111111111111,
+// 1234567890ab, qwertyuiop, abcabcabcabc.
+func repetitive(p string) bool {
+	runs := []string{"0123456789012345678901234567890", "9876543210987654321098765432109",
+		"abcdefghijklmnopqrstuvwxyz", "qwertyuiopasdfghjklzxcvbnm", "qwertzuiopasdfghjklyxcvbnm", "azertyuiopqsdfghjklmwxcvbn"}
+	for _, r := range runs {
+		if len(p) >= 6 && strings.Contains(r, p) {
+			return true
+		}
+	}
+	for size := 1; size <= len(p)/2; size++ {
+		if len(p)%size == 0 && strings.Repeat(p[:size], len(p)/size) == p {
+			return true
+		}
+	}
+	return false
+}
+
+// pwned asks Pwned Passwords whether the password is in a breach, sending
+// only the first five characters of its SHA-1 (k-anonymity).
+func (p PasswordPolicy) pwned(ctx context.Context, password string) (bool, error) {
+	sum := sha1.Sum([]byte(password))
+	hash := strings.ToUpper(hex.EncodeToString(sum[:]))
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.pwnedpasswords.com/range/"+hash[:5], nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Add-Padding", "true")
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("status %s", res.Status)
+	}
+	s := bufio.NewScanner(res.Body)
+	for s.Scan() {
+		suffix, count, _ := strings.Cut(s.Text(), ":")
+		if suffix == hash[5:] && strings.TrimSpace(count) != "0" {
+			return true, nil
+		}
+	}
+	return false, s.Err()
+}
+
+//go:embed common_passwords.txt
+var commonPasswordsText string
+
+// commonPasswords are passwords too common to use, lower case.
+var commonPasswords = func() map[string]bool {
+	m := map[string]bool{}
+	for line := range strings.Lines(commonPasswordsText) {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			m[strings.ToLower(line)] = true
+		}
+	}
+	return m
+}()
+{{end -}}
