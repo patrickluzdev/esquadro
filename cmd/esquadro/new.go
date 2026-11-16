@@ -26,7 +26,7 @@ var blueprintGroups = map[string]string{
 	"rest": "api", "api_docs": "api", "cors": "api", "security_headers": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
 	"docker": "ship", "github_actions": "ship", "observability": "ship",
-	"git": "tools",
+	"git": "tools", "branching": "tools",
 }
 
 // groupTitles are the comments over each group.
@@ -164,6 +164,9 @@ func nextSteps(dir string, files map[string]string) string {
 	fmt.Fprintf(&b, "  change the model in %s/ (one .esq file per module) and run esquadro gen\n", workspace.Dir)
 	if strings.Contains(files["app.esq"], "blueprint compose") {
 		b.WriteString("  task up, task migrate and task run start it locally; README.md has the rest\n")
+	}
+	if strings.Contains(files["app.esq"], "blueprint git {") {
+		b.WriteString("  esquadro add branching    gitflow, or another branching model, for the repository\n")
 	}
 	return b.String()
 }

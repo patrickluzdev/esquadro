@@ -1,0 +1,24 @@
+/// The branching model of the repository, as an option: gitflow (the
+/// default), github_flow, gitlab_flow, trunk or release_flow. It creates the
+/// model's branches after the first commit (develop, for gitflow), writes
+/// tasks that run the model with plain git (task feature:start -- login,
+/// task release:finish...), which never push, runs the CI on the model's
+/// branches, and explains the model in CONTRIBUTING.md. task github:protect
+/// asks GitHub to require pull requests and a green CI on the long-lived
+/// branches, when you run it.
+blueprint branching {
+  version "0.1.0"
+  requires app, git
+  optional github_actions
+
+  /// gitflow, github_flow, gitlab_flow, trunk or release_flow.
+  option model string default("gitflow")
+  /// The branch of what is in production.
+  option main string default("main")
+  /// gitflow: the branch where work is integrated.
+  option develop string default("develop")
+  /// gitlab_flow: the environment branches, in the order code is promoted.
+  option environments list default(["staging", "production"])
+
+  hook post-gen "setup"
+}

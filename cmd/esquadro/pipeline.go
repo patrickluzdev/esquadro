@@ -8,6 +8,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/blueprints/app"
+	"github.com/patrickluzdev/esquadro/blueprints/branching"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
 	"github.com/patrickluzdev/esquadro/blueprints/jobs"
@@ -28,6 +29,7 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("store", "sqlc"):       store.SQLC,
 	hook.Key("rest", "ogen"):        rest.Ogen,
 	hook.Key("git", "init"):         git.Init,
+	hook.Key("branching", "setup"):  branching.Setup,
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

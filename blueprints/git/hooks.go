@@ -15,8 +15,9 @@ import (
 )
 
 // Init is the post-gen hook "init": it creates the repository when the
-// project has none and, unless initial_commit is false, commits everything
-// when the repository has no commit yet.
+// project has none, on the branch option (or branching's main), and, unless
+// initial_commit is false, commits everything when the repository has no
+// commit yet.
 func Init(ctx context.Context, in hook.Input) (hook.Output, error) {
 	var out hook.Output
 	gitcmd, err := exec.LookPath("git")
@@ -32,7 +33,14 @@ func Init(ctx context.Context, in hook.Input) (hook.Output, error) {
 		return strings.TrimSpace(buf.String()), err
 	}
 	if _, err := os.Stat(filepath.Join(in.ProjectDir, ".git")); errors.Is(err, os.ErrNotExist) {
-		if msg, err := git("init", "-q"); err != nil {
+		branch, _ := in.Options["branch"].(string)
+		if main, ok := in.Blueprints["branching"]["main"].(string); ok && main != "" {
+			branch = main
+		}
+		if branch == "" {
+			branch = "main"
+		}
+		if msg, err := git("init", "-q", "-b", branch); err != nil {
 			return out, fmt.Errorf("git init: %w\n%s", err, msg)
 		}
 		out.Messages = append(out.Messages, hook.Message{Level: "info", Text: "created a git repository"})

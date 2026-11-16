@@ -1,0 +1,77 @@
+{{- $model := .Options.model -}}
+{{- $run := "sh scripts/branching.sh" -}}
+{{- $args := "{{.CLI_ARGS}}" -}}
+{{- if eq $model "gitflow"}}
+  feature:start:
+    desc: "Start a feature from {{.Options.develop}}: task feature:start -- <name>"
+    cmds:
+      - {{$run}} feature-start {{$args}}
+
+  feature:finish:
+    desc: Merge the current feature into {{.Options.develop}}
+    cmds:
+      - {{$run}} feature-finish
+
+  bugfix:start:
+    desc: "Start a bug fix from {{.Options.develop}}: task bugfix:start -- <name>"
+    cmds:
+      - {{$run}} bugfix-start {{$args}}
+
+  bugfix:finish:
+    desc: Merge the current bug fix into {{.Options.develop}}
+    cmds:
+      - {{$run}} bugfix-finish
+
+  release:start:
+    desc: "Start a release from {{.Options.develop}}: task release:start -- <X.Y.Z>"
+    cmds:
+      - {{$run}} release-start {{$args}}
+
+  release:finish:
+    desc: Merge the current release into {{.Options.main}}, tag it and merge it back into {{.Options.develop}}
+    cmds:
+      - {{$run}} release-finish
+
+  hotfix:start:
+    desc: "Start a hot fix from {{.Options.main}}: task hotfix:start -- <X.Y.Z>"
+    cmds:
+      - {{$run}} hotfix-start {{$args}}
+
+  hotfix:finish:
+    desc: Merge the current hot fix into {{.Options.main}}, tag it and merge it into {{.Options.develop}}
+    cmds:
+      - {{$run}} hotfix-finish
+{{- else if or (eq $model "github_flow") (eq $model "gitlab_flow") (eq $model "release_flow")}}
+  feature:start:
+    desc: "Start a feature from {{.Options.main}}: task feature:start -- <name>"
+    cmds:
+      - {{$run}} feature-start {{$args}}
+{{- end}}
+{{- if eq $model "gitlab_flow"}}
+
+  promote:
+    desc: "Promote to an environment, from the one before it: task promote -- <{{join "|" (strs .Options.environments)}}>"
+    cmds:
+      - {{$run}} promote {{$args}}
+{{- else if eq $model "trunk"}}
+  sync:
+    desc: Bring {{.Options.main}} up to date, rebasing your commits on it
+    cmds:
+      - {{$run}} sync
+{{- else if eq $model "release_flow"}}
+
+  release:cut:
+    desc: "Cut a release branch from {{.Options.main}}: task release:cut -- <X.Y>"
+    cmds:
+      - {{$run}} release-cut {{$args}}
+
+  release:pick:
+    desc: "Cherry-pick a fix into a release branch: task release:pick -- <commit> <X.Y>"
+    cmds:
+      - {{$run}} release-pick {{$args}}
+{{- end}}
+
+  github:protect:
+    desc: Make GitHub require pull requests{{if uses "github_actions"}} and a green CI{{end}} on the long-lived branches
+    cmds:
+      - {{$run}} protect

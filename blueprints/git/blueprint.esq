@@ -8,6 +8,9 @@ blueprint git {
   option initial_commit bool default(true)
   /// Message of the first commit.
   option message string default("chore: generate project with esquadro")
+  /// The branch a new repository starts on, whatever git's own default is;
+  /// with branching, its main option decides.
+  option branch string default("main")
 
   hook post-gen "init"
 }

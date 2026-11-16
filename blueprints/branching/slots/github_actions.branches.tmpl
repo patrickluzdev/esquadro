@@ -1,0 +1,6 @@
+{{- $model := .Options.model -}}
+{{- if eq $model "gitflow"}}{{quote .Options.main}}, {{quote .Options.develop}}
+{{- else if eq $model "gitlab_flow"}}{{quote .Options.main}}{{range strs .Options.environments}}, {{quote .}}{{end}}
+{{- else if eq $model "release_flow"}}{{quote .Options.main}}, "releases/**"
+{{- else}}{{quote .Options.main}}
+{{- end}}

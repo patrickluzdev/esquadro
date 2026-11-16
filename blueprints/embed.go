@@ -27,5 +27,6 @@ import "embed"
 //go:embed observability/blueprint.esq all:observability/templates observability/slots
 //go:embed docker/blueprint.esq all:docker/templates docker/slots
 //go:embed github_actions/blueprint.esq all:github_actions/templates
+//go:embed branching/blueprint.esq all:branching/templates branching/slots
 //go:embed git/blueprint.esq
 var FS embed.FS

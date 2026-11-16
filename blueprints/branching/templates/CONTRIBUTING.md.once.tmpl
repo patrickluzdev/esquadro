@@ -1,0 +1,70 @@
+{{- $m := .Options.model -}}
+{{- $main := .Options.main -}}
+# Contributing to {{.App.Label}}
+
+This file is yours: esquadro wrote it once and leaves it alone.
+
+## Branches: {{if eq $m "gitflow"}}GitFlow{{else if eq $m "github_flow"}}GitHub Flow{{else if eq $m "gitlab_flow"}}GitLab Flow{{else if eq $m "trunk"}}trunk-based development{{else}}Release Flow{{end}}
+{{if eq $m "gitflow"}}
+- `{{$main}}` is what is in production: it changes only by releases and hot
+  fixes, and each change is a version tag (`v1.2.0`).
+- `{{.Options.develop}}` is where work comes together, for the next release.
+- `feature/<name>` and `bugfix/<name>` start from `{{.Options.develop}}` and go back into it.
+- `release/<X.Y.Z>` starts from `{{.Options.develop}}` to prepare a version: only
+  fixes go into it. It goes into `{{$main}}`, with its tag, and back into `{{.Options.develop}}`.
+- `hotfix/<X.Y.Z>` starts from `{{$main}}` to fix production, and goes into both.
+
+```sh
+task feature:start -- login     # feature/login, from {{.Options.develop}}
+task feature:finish             # merges it into {{.Options.develop}}
+task release:start -- 1.2.0     # release/1.2.0
+task release:finish             # into {{$main}} as v1.2.0, and back into {{.Options.develop}}
+task hotfix:start -- 1.2.1      # hotfix/1.2.1, from {{$main}}
+task hotfix:finish
+```
+{{else if eq $m "github_flow"}}
+- `{{$main}}` can always be deployed.
+- Each change is a short branch from `{{$main}}` (`feature/<name>`), merged by a
+  pull request once its CI is green and it is reviewed.
+- A version is a tag on `{{$main}}`: `git tag -a v1.2.0 -m v1.2.0`.
+
+```sh
+task feature:start -- login     # feature/login, from {{$main}}
+```
+{{else if eq $m "gitlab_flow"}}
+- `{{$main}}` is where work comes together, by pull requests from short branches.
+- The environment branches, {{range $i, $e := strs .Options.environments}}{{if $i}}, then {{end}}`{{$e}}`{{end}}, each
+  hold what runs there: code moves down by promotion, never up.
+
+```sh
+task feature:start -- login     # feature/login, from {{$main}}
+task promote -- {{index (strs .Options.environments) 0}}         # {{$main}} into {{index (strs .Options.environments) 0}}
+```
+{{else if eq $m "trunk"}}
+- Everyone commits to `{{$main}}`, small and often, at least daily.
+- Work that is not ready hides behind a feature flag instead of a long branch.
+- `{{$main}}`'s CI must stay green: fix or revert at once.
+
+```sh
+task sync                       # rebase your commits on {{$main}}
+```
+{{else}}
+- Work goes into `{{$main}}` by pull requests from short branches.
+- Each version is a branch cut from `{{$main}}`, `releases/<X.Y>`, deployed and
+  tagged from there. A fix lands in `{{$main}}` first, then is cherry-picked
+  into the release branches that need it.
+
+```sh
+task feature:start -- login     # feature/login, from {{$main}}
+task release:cut -- 1.2         # releases/1.2, from {{$main}}
+task release:pick -- <commit> 1.2
+```
+{{end}}
+The tasks never push: each one says what to send. `task github:protect`
+makes GitHub require pull requests{{if uses "github_actions"}} and a green CI{{end}} on the long-lived
+branches.
+
+## Commits
+
+Write commit messages as [Conventional Commits](https://www.conventionalcommits.org):
+`feat: ...`, `fix: ...`, `docs: ...`.

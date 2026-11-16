@@ -51,7 +51,7 @@ var blueprintOrder = []string{
 	"rest", "api_docs", "cors", "security_headers", "rate_limit", "compression", "i18n",
 	"observability",
 	"docker", "github_actions",
-	"git",
+	"git", "branching",
 }
 
 // referencePages returns the generated pages by path, relative to the

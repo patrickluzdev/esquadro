@@ -1,0 +1,14 @@
+{{- if uses "github_actions" -}}
+## What
+
+<!-- What this changes, and why. -->
+
+## How it was tested
+
+<!-- Commands run, cases checked. -->
+
+- [ ] The CI is green.
+{{- if eq .Options.model "gitflow"}}
+- [ ] The branch follows gitflow: feature/* or bugfix/* into {{.Options.develop}}; release/* or hotfix/* into {{.Options.main}}.
+{{- end}}
+{{end -}}

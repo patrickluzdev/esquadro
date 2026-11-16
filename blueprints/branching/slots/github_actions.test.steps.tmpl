@@ -1,0 +1,15 @@
+{{- if eq .Options.model "gitflow"}}
+      - name: The branch is named as gitflow says
+        if: github.event_name == 'pull_request'
+        env:
+          BRANCH: {{"${{"}} github.head_ref {{"}}"}}
+          BASE: {{"${{"}} github.base_ref {{"}}"}}
+        run: |
+          case "$BASE:$BRANCH" in
+            {{.Options.develop}}:feature/* | {{.Options.develop}}:bugfix/* | {{.Options.develop}}:release/* | {{.Options.develop}}:hotfix/* | {{.Options.main}}:release/* | {{.Options.main}}:hotfix/*) ;;
+            *)
+              echo "::error::$BRANCH into $BASE does not follow gitflow: feature/* and bugfix/* go into {{.Options.develop}}, release/* and hotfix/* into {{.Options.main}} and {{.Options.develop}} (see CONTRIBUTING.md)"
+              exit 1
+              ;;
+          esac
+{{- end}}
