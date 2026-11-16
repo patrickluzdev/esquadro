@@ -1,0 +1,68 @@
+{{- if realms .Entities -}}
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"uuid"
+{{range $m := .Modules}}{{range realms $m.Entities}}{{if eq .Entity.Module $m}}
+	"{{$.App.Module}}/internal/{{$m.Snake}}"
+{{- break}}{{end}}{{end}}{{end}}
+	"{{.App.Module}}/internal/platform/edge"
+	"{{.App.Module}}/internal/platform/security"
+)
+
+// realms are the kinds of principal that sign in, each with its module.
+func (d dependencies) realms() []security.Realm {
+	return []security.Realm{
+{{- range realms .Entities}}{{$e := .Entity}}{{$m := $e.Module}}
+		{
+			Name: "{{.Name}}", Signup: "{{.Signup}}", VerifyEmail: "{{.VerifyEmail}}",
+			Policy: security.PasswordPolicy{
+				Min: {{or .PasswordMin $.Options.password_min}}, Max: {{or .PasswordMax $.Options.password_max}},
+				Blocklist: "{{or .Blocklist $.Options.password_blocklist}}", PwnedFailOpen: {{eq $.Options.pwned_fail "open"}}, Client: http.DefaultClient,
+			},
+			Validate: func(fields json.RawMessage) error {
+				var n {{$m.Snake}}.New{{$e.Pascal}}
+				if err := json.Unmarshal(fields, &n); err != nil {
+					return security.ErrBadRequest
+				}
+				return refusal{{$m.Pascal}}(n.WithDefaults().Validate())
+			},
+			Create: func(ctx context.Context, id uuid.UUID, fields json.RawMessage) error {
+				var n {{$m.Snake}}.New{{$e.Pascal}}
+				if err := json.Unmarshal(fields, &n); err != nil {
+					return security.ErrBadRequest
+				}
+				m := *d.{{$m.Camel}}
+				m.NewID = func() uuid.UUID { return id }
+				_, err := m.Create{{$e.Pascal}}(ctx, n)
+				return refusal{{$m.Pascal}}(err)
+			},
+			Delete: func(ctx context.Context, id uuid.UUID) error {
+				if err := d.{{$m.Camel}}.Delete{{$e.Pascal}}(ctx, id); err != nil && !errors.Is(err, {{$m.Snake}}.Err{{$e.Pascal}}NotFound) {
+					return err
+				}
+				return nil
+			},
+		},
+{{- end}}
+	}
+}
+{{range $m := .Modules}}{{range realms $m.Entities}}{{if eq .Entity.Module $m}}
+// refusal{{$m.Pascal}} is a value {{$m.Snake}} refuses, as the answer to a sign-up.
+func refusal{{$m.Pascal}}(err error) error {
+	invalid, ok := errors.AsType[*{{$m.Snake}}.InvalidFields](err)
+	if !ok {
+		return err
+	}
+	fields := make([]edge.FieldProblem, 0, len(invalid.Fields))
+	for _, f := range invalid.Fields {
+		fields = append(fields, edge.FieldProblem{Field: f.Field, Code: f.Code})
+	}
+	return &edge.Problem{Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
+}
+{{break}}{{end}}{{end}}{{end -}}
+{{end -}}

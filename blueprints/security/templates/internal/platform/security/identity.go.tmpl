@@ -1,0 +1,545 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+{{- $credentials := securityTable "credentials" $pg -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/mail"
+	"strings"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// Realm is a kind of principal, with the entity it is and how it signs in.
+type Realm struct {
+	Name        string
+	Signup      string // open, invite or closed
+	VerifyEmail string // required, optional or off
+	Policy      PasswordPolicy
+	// Create makes the principal (the entity) from the fields of a sign-up
+	// other than the email and the password, with the given id; it answers
+	// an *edge.Problem for fields that are not valid. Delete deletes it.
+	Create   func(ctx context.Context, id uuid.UUID, fields json.RawMessage) error
+	Validate func(fields json.RawMessage) error
+	Delete   func(ctx context.Context, id uuid.UUID) error
+}
+
+// Routes are the identity routes of each realm, under prefix:
+// <prefix>/<realm>/sign-up, sign-in, sign-out, session, token, sessions,
+// password, and the account itself.
+func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
+	for _, r := range realms {
+		base := prefix + "/" + r.Name
+		mux.HandleFunc("POST "+base+"/sign-up", s.signUp(r))
+		mux.HandleFunc("POST "+base+"/sign-in", s.signIn(r))
+		mux.HandleFunc("POST "+base+"/sign-out", s.signOut(r))
+		mux.HandleFunc("GET "+base+"/session", s.session(r))
+		mux.HandleFunc("POST "+base+"/token", s.token(r))
+		mux.HandleFunc("GET "+base+"/sessions", s.sessions(r))
+		mux.HandleFunc("DELETE "+base+"/sessions", s.endOtherSessions(r))
+		mux.HandleFunc("DELETE "+base+"/sessions/{id}", s.endSession(r))
+		mux.HandleFunc("POST "+base+"/password", s.changePassword(r))
+		mux.HandleFunc("DELETE "+base, s.deleteAccount(r))
+	}
+}
+
+// credentials are an email and a password, as a request sends them.
+type credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	// Cookie false answers the session token in the body, for clients that
+	// are not browsers; they send it back as Authorization: Bearer.
+	Cookie *bool `json:"cookie,omitempty"`
+}
+
+// normalEmail is an email as it is kept and compared: trimmed, lower case;
+// empty when it is not an email.
+func normalEmail(email string) string {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if a, err := mail.ParseAddress(email); err != nil || a.Address != email {
+		return ""
+	}
+	return email
+}
+
+// signUp creates an account. Its answer is the same whether the email is
+// new or already has an account, so that sign-up does not tell who has one:
+// the person then signs in.
+func (s *Security) signUp(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if realm.Signup != "open" {
+			edge.Write(w, r, ErrSignupClosed)
+			return
+		}
+		var body json.RawMessage
+		var in credentials
+		if !decode(w, r, &body) || json.Unmarshal(body, &in) != nil {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		email := normalEmail(in.Email)
+		if email == "" {
+			edge.Write(w, r, invalidEmail)
+			return
+		}
+		policy := realm.Policy
+		policy.Lists = s.lists
+		if err := policy.Check(r.Context(), in.Password, email, strings.Split(email, "@")[0], s.cfg.App); err != nil {
+			s.refusePassword(w, r, err)
+			return
+		}
+		if err := realm.Validate(body); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		created, err := s.createAccount(r.Context(), realm, email, in.Password, body)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(r.Context(), "sign_up", realm.Name, "created", created)
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(w, map[string]string{"status": "signed_up"})
+	}
+}
+
+// createAccount creates an identity with a password and its principal, with
+// the same id. It reports whether it created one: an email that already has
+// an account creates nothing, without an error.
+func (s *Security) createAccount(ctx context.Context, realm Realm, email, password string, fields json.RawMessage) (bool, error) {
+	hash, err := s.hasher.Hash(password)
+	if err != nil {
+		return false, err
+	}
+	id := uuid.NewV7()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `INSERT INTO {{$identities}} (id, realm, email) VALUES ($1, $2, $3) ON CONFLICT (realm, email) DO NOTHING`,
+		id, realm.Name, email)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO {{$credentials}} (id, identity_id, provider, subject, password_hash) VALUES ($1, $2, 'password', $3, $4)`,
+		uuid.NewV7(), id, id.String(), hash); err != nil {
+		return false, err
+	}
+	// The principal is made by its module; if anything fails after, it is
+	// deleted, so that no principal is left without its identity.
+	if err := realm.Create(ctx, id, fields); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		_ = realm.Delete(context.WithoutCancel(ctx), id)
+		return false, err
+	}
+	return true, nil
+}
+
+// signIn opens a session for an email and its password.
+func (s *Security) signIn(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var in credentials
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		email := normalEmail(in.Email)
+		account, address := "account:"+realm.Name+":"+email, "ip:"+clientIP(r)
+		wait, err := s.Locked(ctx, account, address)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if wait > 0 {
+			w.Header().Set("Retry-After", fmt.Sprint(int(wait.Seconds())+1))
+			edge.Write(w, r, ErrTooManyAttempts)
+			return
+		}
+		id, verified, hash, err := s.passwordOf(ctx, realm.Name, email)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		ok, rehash := false, false
+		if hash == "" {
+			s.hasher.Waste(in.Password)
+		} else if ok, rehash, err = s.hasher.Verify(in.Password, hash); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if !ok {
+			_ = s.Failed(ctx, account, s.cfg.LockoutAttempts)
+			_ = s.Failed(ctx, address, s.cfg.LockoutAttempts*10)
+			s.event(ctx, "sign_in_failed", realm.Name, "", false)
+			edge.Write(w, r, ErrInvalidCredentials)
+			return
+		}
+		if realm.VerifyEmail == "required" && !verified {
+			edge.Write(w, r, ErrEmailNotVerified)
+			return
+		}
+		_ = s.Succeeded(ctx, account)
+		if rehash {
+			if again, err := s.hasher.Hash(in.Password); err == nil {
+				_, _ = s.db.Exec(ctx, `UPDATE {{$credentials}} SET password_hash = $2, updated_at = now() WHERE identity_id = $1 AND provider = 'password'`, id, again)
+			}
+		}
+		s.startSession(w, r, realm.Name, id, in.Cookie == nil || *in.Cookie)
+	}
+}
+
+// passwordOf is an identity of a realm by email, whether its email is
+// verified, and its password hash; all empty when there is none or it is
+// disabled.
+func (s *Security) passwordOf(ctx context.Context, realm, email string) (uuid.UUID, bool, string, error) {
+	var id uuid.UUID
+	var verified bool
+	var hash *string
+	err := s.db.QueryRow(ctx, `SELECT i.id, i.email_verified, c.password_hash FROM {{$identities}} i
+		LEFT JOIN {{$credentials}} c ON c.identity_id = i.id AND c.provider = 'password'
+		WHERE i.realm = $1 AND i.email = $2 AND i.disabled_at IS NULL`, realm, email).Scan(&id, &verified, &hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil(), false, "", nil
+	}
+	if err != nil {
+		return uuid.Nil(), false, "", err
+	}
+	return id, verified, deref(hash), nil
+}
+
+// startSession opens a session and answers it: in a cookie, with the CSRF
+// token the app sends back, or as a token in the body.
+func (s *Security) startSession(w http.ResponseWriter, r *http.Request, realm string, id uuid.UUID, cookie bool) {
+	ctx := r.Context()
+	token, ses, err := s.StartSession(ctx, s.db, id, clientIP(r), r.UserAgent())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	roles, err := s.Roles(ctx, s.db, id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.event(ctx, "sign_in", realm, id.String(), true)
+	answer := sessionAnswer{ID: id, Realm: realm, Roles: roles, ExpiresAt: ses.ExpiresAt}
+	if cookie {
+		http.SetCookie(w, s.SessionCookie(realm, token, ses.MaxExpiresAt))
+		answer.CSRFToken = s.CSRFToken(ses.ID)
+	} else {
+		answer.SessionToken = token
+	}
+	writeJSON(w, answer)
+}
+
+// sessionAnswer is who signed in.
+type sessionAnswer struct {
+	ID           uuid.UUID `json:"id"`
+	Realm        string    `json:"realm"`
+	Roles        []string  `json:"roles"`
+	ExpiresAt    time.Time `json:"expiresAt,omitzero"`
+	CSRFToken    string    `json:"csrfToken,omitempty"`
+	SessionToken string    `json:"sessionToken,omitempty"`
+}
+
+// signOut ends the session of the request.
+func (s *Security) signOut(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.sessionPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		if err := s.EndSession(r.Context(), s.db, p.ID, *p.SessionID); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		http.SetCookie(w, s.SessionCookie(realm.Name, "", s.now()))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// session answers who the request comes from, and the CSRF token of its
+// session.
+func (s *Security) session(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := PrincipalIn(r.Context(), realm.Name)
+		if !ok {
+			edge.Write(w, r, ErrUnauthorized)
+			return
+		}
+		answer := sessionAnswer{ID: p.ID, Realm: p.Realm, Roles: p.Roles}
+		if p.SessionID != nil {
+			answer.CSRFToken = s.CSRFToken(*p.SessionID)
+		}
+		writeJSON(w, answer)
+	}
+}
+
+// token answers a short JWT for the principal of the session.
+func (s *Security) token(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.sessionPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		raw, expires, err := s.IssueToken(r.Context(), p)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, map[string]any{"token": raw, "expiresAt": expires})
+	}
+}
+
+// sessionView is a session as its owner sees it.
+type sessionView struct {
+	ID         uuid.UUID `json:"id"`
+	Current    bool      `json:"current"`
+	CreatedAt  time.Time `json:"createdAt"`
+	LastSeenAt time.Time `json:"lastSeenAt"`
+	IPAddress  string    `json:"ipAddress,omitempty"`
+	UserAgent  string    `json:"userAgent,omitempty"`
+}
+
+// sessions answers the open sessions of the principal: its devices.
+func (s *Security) sessions(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.sessionPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		list, err := s.Sessions(r.Context(), p.ID)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		out := make([]sessionView, 0, len(list))
+		for _, ses := range list {
+			out = append(out, sessionView{ID: ses.ID, Current: ses.ID == *p.SessionID, CreatedAt: ses.CreatedAt,
+				LastSeenAt: ses.LastSeenAt, IPAddress: ses.IPAddress, UserAgent: ses.UserAgent})
+		}
+		writeJSON(w, out)
+	}
+}
+
+// endSession ends one session of the principal, such as a lost device.
+func (s *Security) endSession(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.sessionPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			edge.Write(w, r, edge.ErrNotFound)
+			return
+		}
+		if err := s.EndSession(r.Context(), s.db, p.ID, id); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// endOtherSessions ends every session of the principal but this one; it
+// needs a recent sign-in.
+func (s *Security) endOtherSessions(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.freshPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		if err := s.EndSessions(r.Context(), s.db, p.ID, *p.SessionID); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// changePassword sets a new password, given the current one; the other
+// sessions end.
+func (s *Security) changePassword(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.sessionPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		var in struct {
+			Current string `json:"currentPassword"`
+			New     string `json:"newPassword"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		var email, hash string
+		err := s.db.QueryRow(ctx, `SELECT i.email, COALESCE(c.password_hash, '') FROM {{$identities}} i
+			LEFT JOIN {{$credentials}} c ON c.identity_id = i.id AND c.provider = 'password' WHERE i.id = $1`, p.ID).Scan(&email, &hash)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if ok, _, err := s.hasher.Verify(in.Current, hash); err != nil || !ok {
+			edge.Write(w, r, ErrInvalidCredentials)
+			return
+		}
+		policy := realm.Policy
+		policy.Lists = s.lists
+		if err := policy.Check(ctx, in.New, email, strings.Split(email, "@")[0], s.cfg.App); err != nil {
+			s.refusePassword(w, r, err)
+			return
+		}
+		again, err := s.hasher.Hash(in.New)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		defer tx.Rollback(ctx)
+		if _, err := tx.Exec(ctx, `UPDATE {{$credentials}} SET password_hash = $2, updated_at = now() WHERE identity_id = $1 AND provider = 'password'`, p.ID, again); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if err := s.EndSessions(ctx, tx, p.ID, *p.SessionID); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if err := tx.Commit(ctx); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "password_changed", realm.Name, p.ID.String(), true)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// deleteAccount deletes the principal's account: its principal, then its
+// identity, with its credentials, sessions and roles. It needs a recent
+// sign-in.
+func (s *Security) deleteAccount(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.freshPrincipal(w, r, realm)
+		if !ok {
+			return
+		}
+		if err := s.DeleteAccount(ctx, realm, p.ID); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		http.SetCookie(w, s.SessionCookie(realm.Name, "", s.now()))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// DeleteAccount deletes an account: its principal, then its identity, with
+// its credentials, sessions and roles.
+func (s *Security) DeleteAccount(ctx context.Context, realm Realm, id uuid.UUID) error {
+	if err := realm.Delete(ctx, id); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(ctx, `DELETE FROM {{$identities}} WHERE id = $1`, id); err != nil {
+		return err
+	}
+	s.event(ctx, "account_deleted", realm.Name, id.String(), true)
+	return nil
+}
+
+// sessionPrincipal is the principal of the request, which must have come
+// with a session of the realm (not a JWT): what changes an account needs a
+// session that can be ended.
+func (s *Security) sessionPrincipal(w http.ResponseWriter, r *http.Request, realm Realm) (Principal, bool) {
+	p, ok := PrincipalIn(r.Context(), realm.Name)
+	if !ok || p.SessionID == nil {
+		edge.Write(w, r, ErrUnauthorized)
+		return Principal{}, false
+	}
+	return p, true
+}
+
+// freshPrincipal is sessionPrincipal for a session that signed in recently.
+func (s *Security) freshPrincipal(w http.ResponseWriter, r *http.Request, realm Realm) (Principal, bool) {
+	p, ok := s.sessionPrincipal(w, r, realm)
+	if !ok {
+		return Principal{}, false
+	}
+	if s.now().Sub(p.AuthenticatedAt) >= 10*time.Minute {
+		edge.Write(w, r, ErrReauthenticate)
+		return Principal{}, false
+	}
+	return p, true
+}
+
+// refusePassword answers a password the policy refuses.
+func (s *Security) refusePassword(w http.ResponseWriter, r *http.Request, err error) {
+	if weak, ok := errors.AsType[*WeakPassword](err); ok {
+		edge.Write(w, r, weakPassword(weak.Reason))
+		return
+	}
+	s.fail(w, r, err)
+}
+
+// fail answers an error: a problem as it is, anything else as internal,
+// logged.
+func (s *Security) fail(w http.ResponseWriter, r *http.Request, err error) {
+	if p, ok := errors.AsType[*edge.Problem](err); ok {
+		edge.Write(w, r, p)
+		return
+	}
+	if s.logger != nil {
+		s.logger.ErrorContext(r.Context(), "security", "error", err)
+	}
+	edge.Write(w, r, edge.ErrInternal)
+}
+
+// event logs what happened to an identity, for audit and alerts; never a
+// password, a token or an email.
+func (s *Security) event(ctx context.Context, name, realm, identity string, ok bool) {
+	if s.logger != nil {
+		s.logger.InfoContext(ctx, "security event", "event", name, "realm", realm, "identity", identity, "ok", ok)
+	}
+}
+
+// decode reads a JSON body of at most 64 KB.
+func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	return json.NewDecoder(r.Body).Decode(v) == nil
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// clientIP is the address the request came from.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+{{end -}}

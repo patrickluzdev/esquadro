@@ -13,6 +13,9 @@ func newTestServer(t *testing.T) *httptest.Server {
 {{- range .Modules}}{{if .Entities}}
 	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{Pool: pool})
 {{- end}}{{end}}
+{{- with slot "rest.test.dependencies" .}}
+{{.}}
+{{- end}}
 	h, err := d.routes()
 	if err != nil {
 		t.Fatal(err)

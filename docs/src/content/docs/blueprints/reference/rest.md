@@ -46,6 +46,7 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 | Slot | |
 |---|---|
 | `rest.tags` | Tags of your own operations in api/openapi.yaml, indented by two. |
+| `rest.test.dependencies` | Code in the API tests' newTestServer that sets more of d, the dependencies, given t and pool. |
 | `rest.paths` | Paths of your own operations, indented by two. |
 | `rest.schemas` | Schemas of your own operations, indented by four. |
 

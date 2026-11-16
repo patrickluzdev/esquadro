@@ -21,6 +21,9 @@ blueprint rest {
 
   /// Tags of your own operations in api/openapi.yaml, indented by two.
   slot "rest.tags"
+  /// Code in the API tests' newTestServer that sets more of d, the
+  /// dependencies, given t and pool.
+  slot "rest.test.dependencies"
   /// Paths of your own operations, indented by two.
   slot "rest.paths"
   /// Schemas of your own operations, indented by four.

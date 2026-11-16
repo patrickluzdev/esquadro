@@ -33,6 +33,9 @@ type Realm struct {
 	Grants        map[string][]string // role -> its own permissions
 	VerifyEmail   string
 	PasswordReset bool
+	// The realm's own password rules; zero or empty takes the blueprint's.
+	PasswordMin, PasswordMax int64
+	Blocklist                string
 }
 
 // Realms are the entities of the project marked @security(principal), with
@@ -66,6 +69,9 @@ func RealmsOf(entities []*project.Entity) []*Realm {
 		if b, ok := a["password_reset"].(bool); ok {
 			r.PasswordReset = b
 		}
+		r.PasswordMin, _ = a["password_min"].(int64)
+		r.PasswordMax, _ = a["password_max"].(int64)
+		r.Blocklist, _ = a["password_blocklist"].(string)
 		out = append(out, r)
 	}
 	return out

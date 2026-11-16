@@ -1,0 +1,220 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+	"uuid"
+)
+
+// flow is the identity routes on a fresh database, with a realm open to
+// sign-up (person) and one closed (staff), whose principals are kept in
+// memory.
+type flow struct {
+	t       *testing.T
+	s       *Security
+	now     *time.Time
+	handler http.Handler
+	mu      sync.Mutex
+	people  map[uuid.UUID]string
+}
+
+func newFlow(t *testing.T) *flow {
+	s, now := testSecurity(t)
+	f := &flow{t: t, s: s, now: now, people: map[uuid.UUID]string{}}
+	policy := PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists"}
+	person := Realm{
+		Name: "person", Signup: "open", VerifyEmail: "optional", Policy: policy,
+		Validate: func(json.RawMessage) error { return nil },
+		Create: func(_ context.Context, id uuid.UUID, fields json.RawMessage) error {
+			var in struct{ Name string }
+			_ = json.Unmarshal(fields, &in)
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			f.people[id] = in.Name
+			return nil
+		},
+		Delete: func(_ context.Context, id uuid.UUID) error {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			delete(f.people, id)
+			return nil
+		},
+	}
+	staff := person
+	staff.Name, staff.Signup = "staff", "closed"
+	mux := http.NewServeMux()
+	s.Routes(mux, "/identity", []Realm{person, staff})
+	f.handler = s.Authenticate([]string{"person", "staff"}, nil)(mux)
+	return f
+}
+
+// answer is a response, its JSON body read.
+type answer struct {
+	status int
+	body   map[string]any
+	header http.Header
+}
+
+func (a answer) str(key string) string { s, _ := a.body[key].(string); return s }
+
+// call sends a request with a JSON body and headers, as "Name: value".
+func (f *flow) call(method, path string, body any, headers ...string) answer {
+	f.t.Helper()
+	var raw string
+	if body != nil {
+		b, _ := json.Marshal(body)
+		raw = string(b)
+	}
+	req := httptest.NewRequest(method, "http://test.example"+path, strings.NewReader(raw))
+	for _, h := range headers {
+		k, v, _ := strings.Cut(h, ": ")
+		req.Header.Add(k, v)
+	}
+	rec := httptest.NewRecorder()
+	f.handler.ServeHTTP(rec, req)
+	a := answer{status: rec.Code, header: rec.Header()}
+	_ = json.Unmarshal(rec.Body.Bytes(), &a.body)
+	return a
+}
+
+func (f *flow) expect(a answer, status int, code string) {
+	f.t.Helper()
+	if a.status != status || (code != "" && a.str("code") != code) {
+		f.t.Fatalf("got %d %v, want %d %s", a.status, a.body, status, code)
+	}
+}
+
+// signIn signs ana in, with a session cookie: the cookie header to send
+// back, and the CSRF token.
+func (f *flow) signIn(password string) (string, string) {
+	f.t.Helper()
+	a := f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password})
+	f.expect(a, 200, "")
+	cookie, _, _ := strings.Cut(a.header.Get("Set-Cookie"), ";")
+	if !strings.HasPrefix(cookie, "test_person_session=") || a.str("csrfToken") == "" {
+		f.t.Fatalf("sign-in: %q %v", cookie, a.body)
+	}
+	return "Cookie: " + cookie, "X-CSRF-Token: " + a.str("csrfToken")
+}
+
+const password = "correct horse battery staple"
+
+func TestSignUpAndSignIn(t *testing.T) {
+	f := newFlow(t)
+	ana := map[string]string{"email": " Ana@Example.com ", "password": password, "name": "Ana"}
+
+	f.expect(f.call("POST", "/identity/staff/sign-up", ana), 403, "signup_closed")
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana", "password": password}), 422, "invalid_fields")
+	weak := f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": "short"})
+	f.expect(weak, 422, "invalid_fields")
+	if !strings.Contains(strings.ToLower(f.callBody(weak)), "too_short") {
+		t.Fatalf("weak: %v", weak.body)
+	}
+
+	// Signing up twice answers the same: sign-up does not tell who has an
+	// account.
+	f.expect(f.call("POST", "/identity/person/sign-up", ana), 202, "")
+	f.expect(f.call("POST", "/identity/person/sign-up", ana), 202, "")
+	if len(f.people) != 1 {
+		t.Fatalf("%d people", len(f.people))
+	}
+
+	// A wrong password and an unknown email answer alike.
+	wrong := f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": "wrong password!"})
+	unknown := f.call("POST", "/identity/person/sign-in", map[string]string{"email": "bia@example.com", "password": password})
+	f.expect(wrong, 401, "invalid_credentials")
+	f.expect(unknown, 401, "invalid_credentials")
+	// An account of one realm does not sign in to another.
+	f.expect(f.call("POST", "/identity/staff/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+
+	cookie, csrf := f.signIn(password)
+	me := f.call("GET", "/identity/person/session", nil, cookie)
+	f.expect(me, 200, "")
+	if me.str("realm") != "person" || me.header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("session: %v", me.body)
+	}
+	f.expect(f.call("GET", "/identity/staff/session", nil, cookie), 401, "unauthorized")
+
+	// What changes something needs the CSRF token, from the app's origin.
+	f.expect(f.call("POST", "/identity/person/token", nil, cookie), 403, "csrf")
+	f.expect(f.call("POST", "/identity/person/token", nil, cookie, csrf, "Origin: https://evil.example", "Sec-Fetch-Site: cross-site"), 403, "csrf")
+	tok := f.call("POST", "/identity/person/token", nil, cookie, csrf)
+	f.expect(tok, 200, "")
+
+	// The JWT says who it is, but cannot change the account.
+	bearer := "Authorization: Bearer " + tok.str("token")
+	f.expect(f.call("GET", "/identity/person/session", nil, bearer), 200, "")
+	f.expect(f.call("POST", "/identity/person/sign-out", nil, bearer), 401, "unauthorized")
+	f.expect(f.call("GET", "/identity/person/session", nil, "Authorization: Bearer nope"), 401, "unauthorized")
+
+	f.expect(f.call("POST", "/identity/person/sign-out", nil, cookie, csrf), 204, "")
+	f.expect(f.call("GET", "/identity/person/session", nil, cookie), 401, "unauthorized")
+}
+
+func (f *flow) callBody(a answer) string { b, _ := json.Marshal(a.body); return string(b) }
+
+func TestSessionsAndPassword(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password}), 202, "")
+	cookie, csrf := f.signIn(password)
+
+	// A client that is not a browser gets the session token in the body.
+	phone := f.call("POST", "/identity/person/sign-in", map[string]any{"email": "ana@example.com", "password": password, "cookie": false})
+	f.expect(phone, 200, "")
+	if phone.header.Get("Set-Cookie") != "" || phone.str("sessionToken") == "" {
+		t.Fatalf("no cookie: %v", phone.body)
+	}
+	other := "Authorization: Bearer " + phone.str("sessionToken")
+	list := f.call("GET", "/identity/person/sessions", nil, cookie)
+	f.expect(list, 200, "")
+
+	// A new password needs the current one, and ends the other sessions.
+	change := func(current string) answer {
+		return f.call("POST", "/identity/person/password", map[string]string{"currentPassword": current, "newPassword": "another long passphrase"}, cookie, csrf)
+	}
+	f.expect(change("wrong password!"), 401, "invalid_credentials")
+	f.expect(change(password), 204, "")
+	f.expect(f.call("GET", "/identity/person/session", nil, other), 401, "unauthorized")
+	f.expect(f.call("GET", "/identity/person/session", nil, cookie), 200, "")
+	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+	f.signIn("another long passphrase")
+}
+
+func TestLockout(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password}), 202, "")
+	for range 3 {
+		f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": "wrong password!"})
+	}
+	locked := f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password})
+	f.expect(locked, 429, "too_many_attempts")
+	if locked.header.Get("Retry-After") == "" {
+		t.Fatal("no Retry-After")
+	}
+	*f.now = f.now.Add(16 * time.Minute)
+	f.signIn(password)
+}
+
+func TestDeleteAccount(t *testing.T) {
+	f := newFlow(t)
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]any{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
+	cookie, csrf := f.signIn(password)
+
+	// Deleting needs a recent sign-in.
+	*f.now = f.now.Add(11 * time.Minute)
+	f.expect(f.call("DELETE", "/identity/person", nil, cookie, csrf), 403, "reauthentication_required")
+	cookie, csrf = f.signIn(password)
+	f.expect(f.call("DELETE", "/identity/person", nil, cookie, csrf), 204, "")
+	if len(f.people) != 0 {
+		t.Fatal("the principal was not deleted")
+	}
+	f.expect(f.call("POST", "/identity/person/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+}
+{{end -}}

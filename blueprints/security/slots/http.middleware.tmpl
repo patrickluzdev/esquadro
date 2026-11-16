@@ -1,0 +1,3 @@
+{{- if realms .Entities}}
+		d.security.Authenticate([]string{ {{- range $i, $r := realms .Entities}}{{if $i}}, {{end}}"{{$r.Name}}"{{end -}} }, {{goStrings (strs .Options.origins)}}),
+{{- end}}

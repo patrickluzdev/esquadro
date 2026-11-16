@@ -1,0 +1,37 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"net/http"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// The problems security answers with. A sign-in that fails says only that
+// the email or the password is wrong, never which.
+var (
+	ErrUnauthorized       = &edge.Problem{Status: http.StatusUnauthorized, Code: "unauthorized", Title: "Sign in to do this."}
+	ErrForbidden          = &edge.Problem{Status: http.StatusForbidden, Code: "forbidden", Title: "You may not do this."}
+	ErrInvalidCredentials = &edge.Problem{Status: http.StatusUnauthorized, Code: "invalid_credentials", Title: "The email or the password is wrong."}
+	ErrTooManyAttempts    = &edge.Problem{Status: http.StatusTooManyRequests, Code: "too_many_attempts", Title: "Too many attempts. Try again later."}
+	ErrEmailNotVerified   = &edge.Problem{Status: http.StatusForbidden, Code: "email_not_verified", Title: "Verify your email first."}
+	ErrSignupClosed       = &edge.Problem{Status: http.StatusForbidden, Code: "signup_closed", Title: "Accounts are not open to sign-up."}
+	ErrReauthenticate     = &edge.Problem{Status: http.StatusForbidden, Code: "reauthentication_required", Title: "Sign in again to do this."}
+	ErrCSRF               = &edge.Problem{Status: http.StatusForbidden, Code: "csrf", Title: "The request did not come from the app."}
+	ErrBadRequest         = &edge.Problem{Status: http.StatusBadRequest, Code: "bad_request", Title: "The request is not valid JSON of the expected shape."}
+)
+
+// weakPassword is a password the policy refuses, saying why.
+func weakPassword(reason string) *edge.Problem {
+	return &edge.Problem{
+		Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "Some fields are not valid.",
+		Errors: []edge.FieldProblem{ {Field: "password", Code: reason} },
+	}
+}
+
+// invalidEmail is an email that is not one.
+var invalidEmail = &edge.Problem{
+	Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "Some fields are not valid.",
+	Errors: []edge.FieldProblem{ {Field: "email", Code: "pattern"} },
+}
+{{end -}}

@@ -1,0 +1,114 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"slices"
+	"strings"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+type principalsKey struct{}
+
+// PrincipalIn is the principal of a realm the request of ctx came with.
+func PrincipalIn(ctx context.Context, realm string) (Principal, bool) {
+	principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
+	p, ok := principals[realm]
+	return p, ok
+}
+
+// Authenticate finds who a request comes from: a session cookie of each
+// realm, or an Authorization: Bearer header with a JWT or a session token.
+// With a session cookie, a request that changes something must come from
+// the app (Origin, Sec-Fetch-Site) and carry the session's CSRF token in
+// X-CSRF-Token. A request that comes from no one goes on, for the routes
+// open to anyone.
+func (s *Security) Authenticate(realms []string, origins []string) edge.Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			principals := map[string]Principal{}
+			unsafe := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
+			if unsafe && !SameOrigin(r, origins) {
+				edge.Write(w, r, ErrCSRF)
+				return
+			}
+			if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+				p, err := s.bearer(ctx, strings.TrimSpace(bearer), realms)
+				if err != nil {
+					edge.Write(w, r, ErrUnauthorized)
+					return
+				}
+				principals[p.Realm] = p
+			}
+			for _, realm := range realms {
+				c, err := r.Cookie(s.SessionCookieName(realm))
+				if err != nil || c.Value == "" {
+					continue
+				}
+				p, err := s.principal(ctx, c.Value)
+				if errors.Is(err, ErrNoSession) {
+					http.SetCookie(w, s.SessionCookie(realm, "", s.now()))
+					continue
+				}
+				if err != nil {
+					edge.Write(w, r, edge.ErrInternal)
+					return
+				}
+				if unsafe && !s.CheckCSRF(*p.SessionID, r.Header.Get("X-CSRF-Token")) {
+					edge.Write(w, r, ErrCSRF)
+					return
+				}
+				principals[realm] = p
+			}
+			if len(principals) > 0 {
+				ctx = context.WithValue(ctx, principalsKey{}, principals)
+				for _, realm := range realms {
+					if p, ok := principals[realm]; ok {
+						ctx = WithPrincipal(ctx, p)
+						break
+					}
+				}
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// bearer is the principal of a bearer token: a JWT of one of the realms, or
+// a session token.
+func (s *Security) bearer(ctx context.Context, token string, realms []string) (Principal, error) {
+	if strings.Count(token, ".") == 2 {
+		for _, realm := range realms {
+			if p, err := s.VerifyToken(ctx, token, realm); err == nil {
+				return p, nil
+			}
+		}
+		return Principal{}, ErrBadToken
+	}
+	p, err := s.principal(ctx, token)
+	if err != nil {
+		return Principal{}, err
+	}
+	if !slices.Contains(realms, p.Realm) {
+		return Principal{}, ErrNoSession
+	}
+	return p, nil
+}
+
+// principal is the principal of a session token, with its roles.
+func (s *Security) principal(ctx context.Context, token string) (Principal, error) {
+	ses, err := s.SessionByToken(ctx, token)
+	if err != nil {
+		return Principal{}, err
+	}
+	roles, err := s.Roles(ctx, s.db, ses.IdentityID)
+	if err != nil {
+		return Principal{}, err
+	}
+	return Principal{ID: ses.IdentityID, Realm: ses.Realm, Roles: roles, SessionID: &ses.ID, AuthenticatedAt: ses.AuthenticatedAt}, nil
+}
+{{end -}}

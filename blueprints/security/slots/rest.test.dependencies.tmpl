@@ -1,0 +1,3 @@
+{{- if and (realms .Entities) (uses "testcontainers")}}
+	d.security = testSecurity(t, pool)
+{{- end}}
