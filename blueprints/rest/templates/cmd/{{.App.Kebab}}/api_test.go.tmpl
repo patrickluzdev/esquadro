@@ -497,4 +497,45 @@ func TestAPIInclude(t *testing.T) {
 	}
 }
 {{- end}}{{end}}
+{{- $short := ""}}{{range .Entities}}{{if and (not $short) (canSampleAPI .) (shortable .)}}{{$short = .Pascal}}{{end}}{{end}}
+{{- range .Entities}}{{if eq .Pascal $short}}{{$f := shortable .}}
+
+// TestAPIRulesAnswerInvalidFields sends a {{lower .Label}} that breaks a rule the contract
+// publishes: the API still answers invalid_fields with the field, as the
+// domain does, not invalid_request.
+func TestAPIRulesAnswerInvalidFields(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	sample, _ := json.Marshal(givenAPI{{.Pascal}}(t, c, 1))
+	if err := json.Unmarshal(sample, &body); err != nil {
+		t.Fatal(err)
+	}
+	body[{{quote (jsonName $f)}}] = "x"
+	raw, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/{{.Plural.Kebab}}", strings.NewReader(string(raw)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", uuid.NewV7().String())
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var doc struct {
+		Code   string `json:"code"`
+		Errors []struct {
+			Field string `json:"field"`
+			Code  string `json:"code"`
+		} `json:"errors"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&doc); err != nil || res.StatusCode != 422 || doc.Code != "invalid_fields" ||
+		len(doc.Errors) != 1 || doc.Errors[0].Field != {{quote (jsonName $f)}} || doc.Errors[0].Code != "too_short" {
+		t.Fatalf("a {{jsonName $f}} too short: %d %+v %v", res.StatusCode, doc, err)
+	}
+}
+{{- end}}{{end}}
 {{end -}}

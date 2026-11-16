@@ -55,7 +55,7 @@ blueprint rest {
   /// Code in newTestServer that wraps h, the service's handler, before the
   /// test server serves it.
   slot "rest.test.handler"
-  /// Paths of your own operations, indented by two.
+  /// Paths of your own operations, indented by two, in full: /api/v1/....
   slot "rest.paths"
   /// Schemas of your own operations, indented by four.
   slot "rest.schemas"

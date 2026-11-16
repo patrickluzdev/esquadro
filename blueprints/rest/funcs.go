@@ -73,6 +73,8 @@ func TemplateFuncs() template.FuncMap {
 		"ogenName":         ogenName,
 		"schema":           schema,
 		"changeSchema":     changeSchema,
+		"writeSchema":      writeSchema,
+		"shortable":        shortable,
 		"clearable":        clearable,
 		"includable":       includable,
 		"includedFrom":     includedFrom,
@@ -179,6 +181,105 @@ func schema(f *project.Field) string {
 		return fmt.Sprintf("{$ref: \"#/components/schemas/%s\"}", enumName(f.Enum))
 	}
 	return "{type: string}"
+}
+
+// ruleMark ends each line of a model rule in the contract: the document
+// ogen generates the server from leaves them out, so that the domain
+// checks them and refuses with invalid_fields, every field at once.
+const ruleMark = " # model rule"
+
+// portablePattern reports whether a Go pattern means the same in the
+// ECMAScript of OpenAPI and JavaScript clients.
+func portablePattern(p string) bool {
+	for _, s := range []string{"(?", `\A`, `\z`, `\p{`, `\P{`, `\Q`, "[[:", `\C`} {
+		if strings.Contains(p, s) {
+			return false
+		}
+	}
+	return true
+}
+
+// rules are the lines of f's model rules in a write body's schema, at the
+// given indent, each ending with ruleMark.
+func rules(f *project.Field, indent int) []string {
+	pad := strings.Repeat(" ", indent)
+	var out []string
+	line := func(format string, args ...any) { out = append(out, pad+fmt.Sprintf(format, args...)+ruleMark) }
+	switch f.Type {
+	case project.TypeString, project.TypeText:
+		if f.Min != nil {
+			line("minLength: %s", f.Min.Text)
+		}
+		if f.Max != nil {
+			line("maxLength: %s", f.Max.Text)
+		}
+		if f.Pattern != "" && portablePattern(f.Pattern) {
+			line("pattern: '%s'", strings.ReplaceAll(f.Pattern, "'", "''"))
+		}
+	case project.TypeInt, project.TypeInt64:
+		if f.Min != nil {
+			line("minimum: %s", f.Min.Text)
+		}
+		if f.Max != nil {
+			line("maximum: %s", f.Max.Text)
+		}
+	case project.TypeDecimal:
+		if f.Min != nil {
+			line("x-minimum: %q", f.Min.Text)
+		}
+		if f.Max != nil {
+			line("x-maximum: %q", f.Max.Text)
+		}
+	}
+	return out
+}
+
+// writeSchema is f's schema in a write body (create, PUT, or PATCH when
+// changes): with its model rules, in block style when it has some. Rules
+// apply only to texts and numbers, never to an enum's $ref.
+func writeSchema(f *project.Field, changes bool) string {
+	rs := rules(f, 10)
+	if len(rs) == 0 {
+		if changes {
+			return changeSchema(f)
+		}
+		return schema(f)
+	}
+	const pad = "          "
+	var lines []string
+	switch f.Type {
+	case project.TypeInt:
+		lines = append(lines, pad+"type: integer")
+	case project.TypeInt64:
+		lines = append(lines, pad+"type: integer", pad+"format: int64")
+	default:
+		lines = append(lines, pad+"type: string")
+	}
+	if f.Type == project.TypeDecimal {
+		var bounds []string
+		if f.Min != nil {
+			bounds = append(bounds, "at least "+f.Min.Text)
+		}
+		if f.Max != nil {
+			bounds = append(bounds, "at most "+f.Max.Text)
+		}
+		lines = append(lines, pad+`description: 'A decimal number written as a string, e.g. "19.90"; `+strings.Join(bounds, " and ")+".'")
+	}
+	if changes && clearable(f) {
+		lines = append(lines, pad+"nullable: true")
+	}
+	return "\n" + strings.Join(append(lines, rs...), "\n")
+}
+
+// shortable is the first text field of e with a minimum length of 2 or
+// more, which "x" breaks; nil when there is none.
+func shortable(e *project.Entity) *project.Field {
+	for _, f := range inRequest(e) {
+		if (f.Type == project.TypeString || f.Type == project.TypeText) && f.Min != nil && f.Min.Value >= 2 && f.Pattern == "" {
+			return f
+		}
+	}
+	return nil
 }
 
 // clearable reports whether a PATCH may send f as null: a field without a

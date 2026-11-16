@@ -30,7 +30,7 @@ info:
     Retry-After){{end}} and `internal` (500). Every response carries X-Request-Id,
     which errors repeat as `request_id`. Every JSON name is snake_case.
 servers:
-  - url: /api/v1
+  - url: /
 tags:
 {{- range .Modules}}{{if .Entities}}
   - name: {{.Snake}}
@@ -41,7 +41,7 @@ tags:
 {{- end}}
 paths:
 {{- range .Entities}}{{$e := .}}{{$id := printf "%sId" .Camel}}
-  /{{.Plural.Kebab}}:
+  /api/v1/{{.Plural.Kebab}}:
     get:
       operationId: list{{.Plural.Pascal}}
       summary: {{quote (printf "List %s" (lower .Plural.Label))}}
@@ -149,7 +149,7 @@ paths:
                 $ref: "#/components/schemas/{{.Pascal}}"
         default:
           $ref: "#/components/responses/Problem"
-  /{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}:
+  /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}:
     parameters:
       - name: {{$id}}
         in: path
@@ -264,7 +264,7 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 {{- range links $e}}{{$rel := .}}{{$other := linkParam .}}
-  /{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}:
+  /api/v1/{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}:
     parameters:
       - name: {{$id}}
         in: path
@@ -294,7 +294,7 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 {{- if not .Inferred}}
-  /{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}/{{"{"}}{{$other}}{{"}"}}:
+  /api/v1/{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}/{{"{"}}{{$other}}{{"}"}}:
     parameters:
       - name: {{$id}}
         in: path
@@ -475,7 +475,7 @@ components:
 {{- end}}
       properties:
 {{- range inRequest $e}}
-        {{jsonName .}}: {{schema .}}
+        {{jsonName .}}: {{writeSchema . false}}
 {{- end}}
 {{- range keys $e}}
         {{keyName .}}: {type: string, format: uuid}
@@ -487,7 +487,7 @@ components:
       description: Changes to a {{lower .Label}}; only the fields sent change.
       properties:
 {{- range inRequest $e}}
-        {{jsonName .}}: {{changeSchema .}}
+        {{jsonName .}}: {{writeSchema . true}}
 {{- end}}
 {{- range keys $e}}
         {{keyName .}}: {type: string, format: uuid{{if not .Required}}, nullable: true{{end}}}
