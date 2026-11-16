@@ -53,12 +53,10 @@ jobs:
       - name: Publish the extension to the VS Code Marketplace
         working-directory: editors/vscode
         run: npx vsce publish --oidc --packagePath esquadro-*.vsix
-      # Until the patrickluzdev namespace is verified on Open VSX (claimed once
-      # the extension is on the Marketplace), this may fail without failing
-      # the release.
+      # Open VSX trusts this workflow for patrickluzdev.esquadro (registered
+      # in its settings, Trusted Publishers).
       - name: Publish the extension to Open VSX
         working-directory: editors/vscode
-        continue-on-error: true
         run: npx ovsx publish --trusted-publishing esquadro-*.vsix
 
   homebrew:
