@@ -1,0 +1,27 @@
+package catalog
+
+enum Status { ACTIVE INACTIVE SOLD_OUT }
+
+entity Category {
+  name     string required
+  products < Product.category
+}
+
+entity Product {
+  name        string  required @store(search, sort)
+  description int
+  price       decimal required default(0) @store(filter, sort)
+  stock       int     required default(10)
+  status      Status  @store(filter)
+  launched_on date    default(now)
+  details     json    default("{}")
+  sku         string  unique @store(search, filter)
+  category    > Category @store(filter)
+  maker       > Maker required on_delete(cascade)
+
+  @postgres(index [name], unique_index [sku])
+}
+
+entity Maker {
+  name string required
+}

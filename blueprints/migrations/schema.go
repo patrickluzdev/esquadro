@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/patrickluzdev/esquadro/blueprints/postgres"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -66,6 +67,9 @@ type column struct {
 	// def is the default as an SQL expression, or "".
 	def    string
 	unique bool
+	// generated is the expression of a column PostgreSQL computes and
+	// stores (GENERATED ALWAYS AS ... STORED), or "".
+	generated string
 }
 
 type foreignKey struct {
@@ -78,6 +82,8 @@ type index struct {
 	name    string
 	columns []string
 	unique  bool
+	// method is the index's access method: "" (btree) or gin.
+	method string
 }
 
 var sqlTypes = map[project.Type]string{
@@ -280,6 +286,7 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 			t.indexes = append(t.indexes, index{name: t.name + "_" + c.name + "_idx", columns: []string{c.name}})
 		}
 	}
+	listIndexes(l, e, &t)
 	for _, key := range []string{"index", "unique_index"} {
 		names, _ := e.Ann["postgres"][key].([]any)
 		if len(names) == 0 {
@@ -307,6 +314,55 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 		})
 	}
 	return t
+}
+
+// SearchColumn is the column lists search: the text of the fields marked
+// @store(search), as PostgreSQL's text search reads it.
+const SearchColumn = "search_vector"
+
+// listIndexes are what the lists of the store need: (created_at, id) for
+// the default order, (column, id) for each field marked @store(sort), an
+// index for each field marked @store(filter) without one, and the search
+// column with its GIN index for the fields marked @store(search).
+func listIndexes(l layout, e project.EntityDescription, t *table) {
+	flag := func(f project.FieldDescription, key string) bool {
+		on, _ := f.Ann["store"][key].(bool)
+		return on
+	}
+	t.indexes = append(t.indexes, index{name: t.name + "_created_at_id_idx", columns: []string{"created_at", "id"}})
+	var searched []string
+	for _, f := range e.Fields {
+		c := columnName(f)
+		switch {
+		case f.Implicit:
+			continue
+		case flag(f, "sort"):
+			t.indexes = append(t.indexes, index{name: t.name + "_" + c + "_id_idx", columns: []string{c, "id"}})
+		case flag(f, "filter") && !f.Unique:
+			t.indexes = append(t.indexes, index{name: t.name + "_" + c + "_idx", columns: []string{c}})
+		}
+		if flag(f, "search") {
+			searched = append(searched, "coalesce("+postgres.Ident(c)+", '')")
+		}
+	}
+	if len(searched) == 0 {
+		return
+	}
+	lang, _ := l.d.App.Options("store")["search_language"].(string)
+	if lang == "" {
+		lang = "simple"
+	}
+	expr := "to_tsvector(" + quoteLiteral(lang) + "::regconfig, " + strings.Join(searched, " || ' ' || ") + ")"
+	// It goes before created_at and updated_at, which stay last.
+	at := len(t.columns)
+	for i, c := range t.columns {
+		if c.name == "created_at" {
+			at = i
+			break
+		}
+	}
+	t.columns = slices.Insert(t.columns, at, column{name: SearchColumn, sqlType: "tsvector", generated: expr})
+	t.indexes = append(t.indexes, index{name: t.name + "_search_idx", columns: []string{SearchColumn}, method: "gin"})
 }
 
 // onDelete is the ON DELETE action of a relation's foreign key: the one it

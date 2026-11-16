@@ -1,0 +1,8 @@
+app shop {
+  module "github.com/example/shop"
+  blueprint app
+  blueprint domain
+  blueprint postgres
+  blueprint migrations
+  blueprint store
+}

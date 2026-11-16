@@ -175,8 +175,19 @@ func plan(from, to database) *steps {
 // alterTable compares two versions of a table.
 func alterTable(s *steps, from, to table) {
 	q := to.qualified()
+	// regenerated are the generated columns whose expression changed: they
+	// are dropped and added again, and their indexes with them.
+	regenerated := map[string]bool{}
 	for _, c := range to.columns {
 		prev := from.column(c.name)
+		if prev != nil && (prev.generated != "" || c.generated != "") && prev.generated != c.generated {
+			s.alterColumns = append(s.alterColumns,
+				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s;", q, postgres.Ident(c.name)),
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s;", q, columnSQL(c)))
+			s.labels = append(s.labels, "change_"+to.name+"_"+c.name)
+			regenerated[c.name] = true
+			continue
+		}
 		if prev == nil {
 			stmt := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s;", q, columnSQL(c))
 			if c.notNull && c.def == "" {
@@ -241,10 +252,11 @@ func alterTable(s *steps, from, to table) {
 
 	for _, ix := range to.indexes {
 		prev := findIndex(from, ix.name)
-		if prev != nil && slices.Equal(prev.columns, ix.columns) && prev.unique == ix.unique {
+		dropped := slices.ContainsFunc(ix.columns, func(c string) bool { return regenerated[c] })
+		if prev != nil && slices.Equal(prev.columns, ix.columns) && prev.unique == ix.unique && prev.method == ix.method && !dropped {
 			continue
 		}
-		if prev != nil {
+		if prev != nil && !dropped {
 			s.dropIndexes = append(s.dropIndexes, "DROP INDEX "+to.schema+"."+ix.name+";")
 		}
 		s.createIndexes = append(s.createIndexes, createIndex(to, ix))
@@ -289,6 +301,9 @@ func idents(names []string) string {
 
 func columnSQL(c column) string {
 	s := postgres.Ident(c.name) + " " + c.sqlType
+	if c.generated != "" {
+		return s + " GENERATED ALWAYS AS (" + c.generated + ") STORED"
+	}
 	if c.notNull {
 		s += " NOT NULL"
 	}
@@ -314,7 +329,11 @@ func createIndex(t table, ix index) string {
 	if ix.unique {
 		kind = "UNIQUE INDEX"
 	}
-	return fmt.Sprintf("CREATE %s %s ON %s (%s);", kind, ix.name, t.qualified(), idents(ix.columns))
+	using := ""
+	if ix.method != "" {
+		using = " USING " + ix.method
+	}
+	return fmt.Sprintf("CREATE %s %s ON %s%s (%s);", kind, ix.name, t.qualified(), using, idents(ix.columns))
 }
 
 func findEnum(db database, key string) *enumType {
