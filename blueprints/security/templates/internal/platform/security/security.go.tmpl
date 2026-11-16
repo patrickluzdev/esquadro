@@ -119,6 +119,10 @@ type Principal struct {
 	SessionID *uuid.UUID
 	// AuthenticatedAt is when the identity last proved who it is.
 	AuthenticatedAt time.Time
+	// OwnsAll makes the principal the owner of every record of its realm's
+	// owner rule: for the tests of what the API does, never set by a
+	// sign-in.
+	OwnsAll bool
 }
 
 type principalKey struct{}

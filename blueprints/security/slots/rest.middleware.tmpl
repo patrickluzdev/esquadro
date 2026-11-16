@@ -2,5 +2,5 @@
 		d.security.Authorize(func(method, path string) (string, bool) {
 			route, ok := operations.FindRoute(method, path)
 			return route.OperationID(), ok
-		}, access),
+		}, byPolicy),
 {{- end}}

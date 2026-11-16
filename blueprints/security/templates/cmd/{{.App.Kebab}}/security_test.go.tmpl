@@ -1,15 +1,8 @@
 {{- if and (realms .Entities) (uses "rest") (uses "testcontainers") -}}
-{{- $target := ""}}{{$allowed := ""}}{{$denied := ""}}
-{{- range .Entities}}{{$rules := access $.Entities . "list"}}{{if and (not $target) $rules (not (contains (goElems $rules) "\"public\""))}}
-{{- $target = .Plural.Kebab}}{{$allowed = index $rules 0}}
-{{- range realms $.Entities}}{{if and (not $denied) (not (contains (goElems $rules) (printf "\"%s" .Name)))}}{{$denied = .Name}}{{end}}{{end}}
-{{- end}}{{end}}
 package main
 
 import (
 	"net/http"
-	"net/http/httptest"
-	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -34,27 +27,40 @@ func testSecurity(t *testing.T, pool *pgxpool.Pool) *security.Security {
 	return s
 }
 
-// everyone is a principal of each realm, with every role.
+// everyone is a principal of each realm, with every role, owning every
+// record.
 var everyone = []security.Principal{
 {{- range realms .Entities}}
-	{ID: uuid.NewV7(), Realm: "{{.Name}}", Roles: {{goStrings .Roles}}},
+	{ID: uuid.NewV7(), Realm: "{{.Name}}", Roles: {{goStrings .Roles}}, OwnsAll: true},
 {{- end}}
+}
+
+// principalOf is the principal X-Test-Principal names: "user" (no roles),
+// "user.admin", "customer@<id>" (that one), or "nobody".
+func principalOf(who string) (security.Principal, bool) {
+	if who == "nobody" {
+		return security.Principal{}, false
+	}
+	name, id, hasID := strings.Cut(who, "@")
+	realm, role, hasRole := strings.Cut(name, ".")
+	p := security.Principal{ID: uuid.NewV7(), Realm: realm}
+	if hasRole {
+		p.Roles = []string{role}
+	}
+	if hasID {
+		p.ID, _ = uuid.Parse(id)
+	}
+	return p, true
 }
 
 // signedInAsEveryone signs every request in as everyone, for the tests of
 // what the API does; TestAPIAccess checks who may do it. A request with
-// X-Test-Principal is signed in as that one alone: "user" (no roles),
-// "user.admin", or "nobody"; asTestPrincipal sets it.
+// X-Test-Principal is signed in as that one alone; asTestPrincipal sets it.
 func signedInAsEveryone(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if who := r.Header.Get("X-Test-Principal"); who != "" {
-			realm, role, hasRole := strings.Cut(who, ".")
-			if who != "nobody" {
-				p := security.Principal{ID: uuid.NewV7(), Realm: realm}
-				if hasRole {
-					p.Roles = []string{role}
-				}
+			if p, ok := principalOf(who); ok {
 				ctx = security.WithPrincipal(ctx, p)
 			}
 		} else {
@@ -66,9 +72,7 @@ func signedInAsEveryone(h http.Handler) http.Handler {
 	})
 }
 
-{{- if $target}}
-// asTestPrincipal is an HTTP client whose requests sign in as who, for
-// ogen's client: apigen.NewClient(url, apigen.WithClient(asTestPrincipal("user.staff"))).
+// asTestPrincipal is an HTTP client whose requests sign in as who.
 func asTestPrincipal(who string) *http.Client {
 	return &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
 		r = r.Clone(r.Context())
@@ -80,73 +84,4 @@ func asTestPrincipal(who string) *http.Client {
 type roundTrip func(*http.Request) (*http.Response, error)
 
 func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-{{- end}}
-
-// TestAPIAccess runs every operation of access as each kind of principal:
-// no one, each realm without roles, and each role alone.
-func TestAPIAccess(t *testing.T) {
-	s := testSecurity(t, nil)
-	h := s.Authorize(func(_, path string) (string, bool) { return strings.TrimPrefix(path, "/"), true }, access)(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
-	type who struct {
-		name string
-		p    *security.Principal
-	}
-	whos := []who{ {name: "no one"} }
-	for _, e := range everyone {
-		whos = append(whos, who{e.Realm, &security.Principal{ID: e.ID, Realm: e.Realm}})
-		for _, role := range e.Roles {
-			whos = append(whos, who{e.Realm + "." + role, &security.Principal{ID: e.ID, Realm: e.Realm, Roles: []string{role}}})
-		}
-	}
-	run := func(op string, w who) int {
-		req := httptest.NewRequest("GET", "/"+op, nil)
-		if w.p != nil {
-			req = req.WithContext(security.WithPrincipal(req.Context(), *w.p))
-		}
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		return rec.Code
-	}
-	for op, rules := range access {
-		for _, w := range whos {
-			want := http.StatusNoContent
-			if !slices.Contains(rules, "public") {
-				switch {
-				case w.p == nil:
-					want = http.StatusUnauthorized
-				case !slices.Contains(rules, w.p.Realm) && !slices.ContainsFunc(w.p.Roles, func(role string) bool { return slices.Contains(rules, w.p.Realm+"."+role) }):
-					want = http.StatusForbidden
-				}
-			}
-			if got := run(op, w); got != want {
-				t.Errorf("%s as %s: %d, want %d (rules %v)", op, w.name, got, want, rules)
-			}
-		}
-	}
-	// An operation of your own needs someone signed in.
-	if run("yourOwnOperation", whos[0]) != http.StatusUnauthorized || run("yourOwnOperation", whos[1]) != http.StatusNoContent {
-		t.Error("an operation access does not name")
-	}
-}
-
-{{- if $target}}
-
-// TestAPISignIn lists {{$target}} through the whole service: no one is
-// refused with 401{{if $denied}}, a {{$denied}} with 403{{end}}, and {{$allowed}} lets in.
-func TestAPISignIn(t *testing.T) {
-	t.Parallel()
-	srv := newTestServer(t)
-	for who, want := range map[string]int{"nobody": http.StatusUnauthorized, {{printf "%q" $allowed}}: http.StatusOK{{if $denied}}, {{printf "%q" $denied}}: http.StatusForbidden{{end}}} {
-		res, err := asTestPrincipal(who).Get(srv.URL + "/api/v1/{{$target}}")
-		if err != nil {
-			t.Fatal(err)
-		}
-		res.Body.Close()
-		if res.StatusCode != want {
-			t.Errorf("as %s: %d, want %d", who, res.StatusCode, want)
-		}
-	}
-}
-{{- end}}
 {{end -}}

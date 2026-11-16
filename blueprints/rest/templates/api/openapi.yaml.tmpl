@@ -298,9 +298,9 @@ components:
         updated_at: {type: string, format: date-time}
     New{{.Pascal}}:
       type: object
-{{- $req := false}}{{range inRequest $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}{{range keys $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}
+{{- $req := false}}{{range inRequest $e}}{{if .Required}}{{$req = true}}{{end}}{{end}}{{range keys $e}}{{if keyInRequest $.Entities $e .}}{{$req = true}}{{end}}{{end}}
 {{- if $req}}
-      required: [{{$first := true}}{{range inRequest $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{keyName .}}{{end}}{{end}}]
+      required: [{{$first := true}}{{range inRequest $e}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{jsonName .}}{{end}}{{end}}{{range keys $e}}{{if keyInRequest $.Entities $e .}}{{if not $first}}, {{end}}{{$first = false}}{{keyName .}}{{end}}{{end}}]
 {{- end}}
       properties:
 {{- range inRequest $e}}

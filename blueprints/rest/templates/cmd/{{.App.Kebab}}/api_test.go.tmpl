@@ -2,10 +2,9 @@
 package main
 
 {{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "strings" "testing" (apiSampleImports .Entities) "encoding/json" (and (linkTests .Entities) "uuid") (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
-// newTestServer serves everything the service answers, behind its
-// middleware, on a database of its own; settings left at zero turn limits
-// off.
-func newTestServer(t *testing.T) *httptest.Server {
+// newTestDependencies are the service's dependencies on a database of its
+// own; settings left at zero turn limits off.
+func newTestDependencies(t *testing.T) dependencies {
 	t.Helper()
 	pool := postgrestest.Fresh(t)
 	d := dependencies{logger: slog.New(slog.DiscardHandler), pool: pool}
@@ -16,6 +15,20 @@ func newTestServer(t *testing.T) *httptest.Server {
 {{- with slot "rest.test.dependencies" .}}
 {{.}}
 {{- end}}
+	return d
+}
+
+// newTestServer serves everything the service answers, behind its
+// middleware, on a database of its own.
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv, _ := newTestServerOf(t, newTestDependencies(t))
+	return srv
+}
+
+// newTestServerOf serves d, and answers it.
+func newTestServerOf(t *testing.T, d dependencies) (*httptest.Server, dependencies) {
+	t.Helper()
 	h, err := d.routes()
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +38,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 {{- end}}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return srv
+	return srv, d
 }
 
 // newTestClient returns ogen's client for a new test server, so tests go
@@ -96,11 +109,11 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 {{- range inRequest $e}}{{if .Required}}
 		{{ogenName (jsonName .)}}: {{apiSample . "i"}},
 {{- end}}{{end}}
-{{- range keys $e}}{{if .Required}}
+{{- range keys $e}}{{if .Required}}{{$in := keyInRequest $.Entities $e .}}
 {{- if eq .Target.Module $e.Module}}
-		{{ogenName (keyName .)}}: {{.Camel}}.ID,
+		{{ogenName (keyName .)}}: {{if $in}}{{.Camel}}.ID{{else}}apigen.NewOptUUID({{.Camel}}.ID){{end}},
 {{- else}}
-		{{ogenName (keyName .)}}: ogenuuid.UUID(uuid.NewV7()), // another module: no foreign key
+		{{ogenName (keyName .)}}: {{if $in}}ogenuuid.UUID(uuid.NewV7()){{else}}apigen.NewOptUUID(ogenuuid.UUID(uuid.NewV7())){{end}}, // another module: no foreign key
 {{- end}}
 {{- end}}{{end}}
 	}

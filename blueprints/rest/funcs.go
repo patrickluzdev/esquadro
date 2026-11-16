@@ -17,8 +17,49 @@ import (
 // TemplateFuncs are the helpers the api blueprint's templates use.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"jsonName":         jsonName,
-		"accessLine":       accessLine,
+		"jsonName":   jsonName,
+		"accessLine": accessLine,
+		// policies reports whether the API asks the entities' policies:
+		// when something signs in.
+		"policies":     func(entities []*project.Entity) bool { return len(security.RealmsOf(entities)) > 0 },
+		"keyInRequest": keyInRequest,
+		"whosOf":       security.WhosOf,
+		// ownerField is the Go field of the owner of e's records: its
+		// relation's key, or ID in a principal; empty without.
+		"ownerField": func(entities []*project.Entity, e *project.Entity) string {
+			o, ok := security.OwnerUsed(entities, e)
+			switch {
+			case !ok:
+				return ""
+			case o.Relation == nil:
+				return "ID"
+			}
+			return o.Relation.Pascal + "ID"
+		},
+		// declaredLinks are e's many-to-many relations it links and unlinks.
+		"declaredLinks": func(e *project.Entity) bool {
+			for _, r := range e.Relations {
+				if r.Kind == project.ManyToMany && !r.Inferred {
+					return true
+				}
+			}
+			return false
+		},
+		// ownerColumn reports whether e lists by owner.
+		"ownerColumn": func(entities []*project.Entity, e *project.Entity) bool {
+			_, ok := security.OwnerUsed(entities, e)
+			return ok
+		},
+		// publicRead reports whether anyone may read e, signed in or not.
+		"publicRead": func(entities []*project.Entity, e *project.Entity) bool {
+			return slices.Contains(security.Access(entities, e, "read"), "public")
+		},
+		// claims reports whether e's policy gives new and updated records
+		// their owner (Claim).
+		"claims": func(entities []*project.Entity, e *project.Entity) bool {
+			o, ok := security.OwnerUsed(entities, e)
+			return ok && o.Relation != nil
+		},
 		"keyName":          keyName,
 		"ogenName":         ogenName,
 		"schema":           schema,
@@ -343,4 +384,15 @@ func accessLine(entities []*project.Entity, e *project.Entity, op string) string
 		return ""
 	}
 	return "Who may: " + security.AccessText(rules) + "."
+}
+
+// keyInRequest reports whether a request that creates or replaces an e must
+// carry r's key: a required relation, unless it is the owner's and create
+// lets the owner in, who is then the record's owner.
+func keyInRequest(entities []*project.Entity, e *project.Entity, r *project.Relation) bool {
+	if !r.Required {
+		return false
+	}
+	o, ok := security.OwnerUsed(entities, e)
+	return !(ok && o.Relation == r && security.RulesOf(entities, e, "create").Owner)
 }

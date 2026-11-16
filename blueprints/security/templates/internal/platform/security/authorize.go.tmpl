@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"uuid"
 
 	"{{.App.Module}}/internal/platform/edge"
 )
@@ -78,37 +79,61 @@ func Require(ctx context.Context, permission string) error {
 	return ErrForbidden
 }
 
-// Authorize lets a request of the API in when access, by operation ID,
-// says who it comes from may: find is the operation of a request. An
-// operation that access does not name, one of your own, needs a principal
-// of any realm; check more with Allows or Require in its code.
-func (s *Security) Authorize(find func(method, path string) (string, bool), access map[string][]string) edge.Middleware {
+// Anonymous reports whether no one signed in to the request of ctx.
+func Anonymous(ctx context.Context) bool {
+	principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
+	return len(principals) == 0
+}
+
+// Refusal is the problem for a request a policy refuses: unauthorized
+// (401) when no one signed in, forbidden (403) otherwise.
+func Refusal(ctx context.Context) error {
+	if Anonymous(ctx) {
+		return ErrUnauthorized
+	}
+	return ErrForbidden
+}
+
+// Owns reports whether the request of ctx comes from owner, a principal of
+// realm: the owner rule of the policies.
+func Owns(ctx context.Context, realm string, owner uuid.UUID) bool {
+	p, ok := PrincipalIn(ctx, realm)
+	return ok && (p.ID == owner || p.OwnsAll)
+}
+
+// OwnerScope is the scope of the records the request of ctx owns, when it
+// comes from a principal of realm.
+func OwnerScope(ctx context.Context, realm string) (Scope, bool) {
+	p, ok := PrincipalIn(ctx, realm)
+	switch {
+	case !ok:
+		return Scope{}, false
+	case p.OwnsAll:
+		return All(), true
+	}
+	return OwnedBy(p.ID), true
+}
+
+// Authorize lets the requests of the API in: an operation in byPolicy is
+// left to its entity's policy, which the API asks; any other, one of your
+// own, needs a principal of any realm (check more with Allows or Require in
+// its code). find is the operation of a request.
+func (s *Security) Authorize(find func(method, path string) (string, bool), byPolicy map[string]bool) edge.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			op, found := find(r.Method, r.URL.Path)
-			if !found {
-				// Not an operation: ogen answers not_found or
-				// method_not_allowed.
+			if !found || byPolicy[op] {
+				// Not an operation (ogen answers not_found or
+				// method_not_allowed), or the policy's to decide.
 				next.ServeHTTP(w, r)
 				return
 			}
-			ctx := r.Context()
-			rules, named := access[op]
-			principals, _ := ctx.Value(principalsKey{}).(map[string]Principal)
-			switch {
-			case named && Allows(ctx, rules...):
-			case !named && len(principals) > 0:
-			case len(principals) == 0:
+			if Anonymous(r.Context()) {
 				w.Header().Set("WWW-Authenticate", `Bearer realm="{{.App.Snake}}"`)
 				edge.Write(w, r, ErrUnauthorized)
 				return
-			default:
-				edge.Write(w, r, ErrForbidden)
-				return
 			}
-			if len(principals) > 0 {
-				w.Header().Set("Cache-Control", "no-store")
-			}
+			w.Header().Set("Cache-Control", "no-store")
 			next.ServeHTTP(w, r)
 		})
 	}

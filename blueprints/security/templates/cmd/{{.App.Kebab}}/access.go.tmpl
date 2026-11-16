@@ -1,20 +1,23 @@
 {{- if and (realms .Entities) (uses "rest") -}}
 package main
 
-// access is who may run each operation of the API, by its ID, as the
-// @security annotations of the model say: "public", a realm, or a realm's
-// role.
-var access = map[string][]string{
+// byPolicy are the operations of the API on entities, by ID: the edge lets
+// them through to the handlers, which ask the entity's policy
+// (internal/<module>/<entity>_policy.go). Any other operation, one of your
+// own, needs someone signed in.
+var byPolicy = map[string]bool{
 {{- range $e := .Entities}}
-	"list{{$e.Plural.Pascal}}": {{goElems (access $.Entities $e "list")}},
-	"create{{$e.Pascal}}": {{goElems (access $.Entities $e "create")}},
-	"get{{$e.Pascal}}": {{goElems (access $.Entities $e "read")}},
-	"update{{$e.Pascal}}": {{goElems (access $.Entities $e "update")}},
-	"delete{{$e.Pascal}}": {{goElems (access $.Entities $e "delete")}},
+	"list{{$e.Plural.Pascal}}": true,
+	"create{{$e.Pascal}}": true,
+	"get{{$e.Pascal}}": true,
+	"update{{$e.Pascal}}": true,
+	"delete{{$e.Pascal}}": true,
 {{- range manyToMany $e}}
-	"list{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "read")}},
-	"addTo{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "update")}},
-	"removeFrom{{$e.Pascal}}{{.Pascal}}": {{goElems (access $.Entities $e "update")}},
+	"list{{$e.Pascal}}{{.Pascal}}": true,
+{{- if not .Inferred}}
+	"addTo{{$e.Pascal}}{{.Pascal}}": true,
+	"removeFrom{{$e.Pascal}}{{.Pascal}}": true,
+{{- end}}
 {{- end}}
 {{- end}}
 }

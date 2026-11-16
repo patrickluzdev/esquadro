@@ -6,12 +6,8 @@
 
 package {{$m.Snake}}
 
-{{- $usesKey := and $o (or (rulesOf .Entities $e "read").Owner (rulesOf .Entities $e "update").Owner (rulesOf .Entities $e "delete").Owner (and $o.Relation (rulesOf .Entities $e "create").Owner))}}
 import (
 	"context"
-{{- if $usesKey}}
-	"uuid"
-{{- end}}
 
 	"{{.App.Module}}/internal/platform/security"
 )
@@ -29,44 +25,27 @@ func ({{$R}}) List(ctx context.Context) security.Scope {
 	}
 {{- end}}
 {{- if and $l.Owner $o}}
-	if p, ok := security.PrincipalIn(ctx, "{{$o.Realm}}"); ok {
-		return security.OwnedBy(p.ID)
+	if scope, ok := security.OwnerScope(ctx, "{{$o.Realm}}"); ok {
+		return scope
 	}
 {{- end}}
 	return security.Nobody()
 }
 {{range $op := list "Read" "Update" "Delete"}}
 // {{$op}} reports whether the request of ctx may {{lower $op}} x.
-func (r {{$R}}) {{$op}}(ctx context.Context, x {{$e.Pascal}}) bool {
-	return {{allowExpr (rulesOf $.Entities $e (lower $op)) "r.owns(ctx, x)"}}
+func ({{$R}}) {{$op}}(ctx context.Context, x {{$e.Pascal}}) bool {
+	return {{allowExpr (rulesOf $.Entities $e (lower $op)) (printf "security.Owns(ctx, %q, x.%s)" (or (and $o $o.Realm) "") $field)}}
 }
 {{end}}
 // Create reports whether the request of ctx may create n.
-func (r {{$R}}) Create(ctx context.Context, n New{{$e.Pascal}}) bool {
+func ({{$R}}) Create(ctx context.Context, n New{{$e.Pascal}}) bool {
 {{- if and $o $o.Relation}}
-	return {{allowExpr (rulesOf .Entities $e "create") (printf "r.ownsKey(ctx, n.%s)" $field)}}
+	return {{allowExpr (rulesOf .Entities $e "create") (printf "security.Owns(ctx, %q, n.%s)" $o.Realm $field)}}
 {{- else}}
 	return {{allowExpr (rulesOf .Entities $e "create") "false"}}
 {{- end}}
 }
-{{- $ro := or (rulesOf .Entities $e "read").Owner (rulesOf .Entities $e "update").Owner (rulesOf .Entities $e "delete").Owner}}
-{{- $co := and $o $o.Relation (rulesOf .Entities $e "create").Owner}}
 {{- with $o}}
-{{- if $ro}}
-
-// owns reports whether the request of ctx comes from the {{.Realm}} x belongs
-// to.
-func (r {{$R}}) owns(ctx context.Context, x {{$e.Pascal}}) bool {
-	return r.ownsKey(ctx, x.{{$field}})
-}
-{{- end}}
-{{- if or $ro $co}}
-
-func ({{$R}}) ownsKey(ctx context.Context, owner uuid.UUID) bool {
-	p, ok := security.PrincipalIn(ctx, "{{.Realm}}")
-	return ok && p.ID == owner
-}
-{{- end}}
 {{- if .Relation}}
 
 // Claim gives n its owner when the request of ctx is let in only as the

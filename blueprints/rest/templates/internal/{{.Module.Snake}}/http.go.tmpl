@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module)}}
+{{importBlock "context" "errors" "slices" "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -11,12 +11,21 @@ type HTTP struct{ {{$p}} *{{$m.Pascal}} }
 // NewHTTP returns the API's operations on m.
 func NewHTTP(m *{{$m.Pascal}}) HTTP { return HTTP{ {{$p}}: m} }
 {{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
+{{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
 
 func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.{{$P}}, error) {
 	n, unread := new{{$P}}Of(req)
 	if unread != nil {
 		return nil, problemOf(refuse{{$P}}(n, unread))
 	}
+{{- if $pol}}
+{{- if $claims}}
+	{{$P}}Policy{}.Claim(ctx, &n, nil)
+{{- end}}
+	if !({{$P}}Policy{}).Create(ctx, n) {
+		return nil, security.Refusal(ctx)
+	}
+{{- end}}
 	created, err := h.{{$p}}.Create{{$P}}(ctx, n)
 	if err != nil {
 		return nil, problemOf(err)
@@ -26,7 +35,11 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}) (*apigen.
 }
 
 func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*apigen.{{$P}}, error) {
+{{- if $pol}}
+	found, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+{{- else}}
 	found, err := h.{{$p}}.Read{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+{{- end}}
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -39,7 +52,25 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 	if err != nil {
 		return nil, err
 	}
+{{- if $pol}}
+	var page {{$P}}Page
+	scope := {{$P}}Policy{}.List(ctx)
+{{- if ownerColumn $.Entities $e}}
+	owner, owned := scope.Owner()
+{{- end}}
+	switch {
+	case scope.All():
+		page, err = h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
+{{- if ownerColumn $.Entities $e}}
+	case owned:
+		page, err = h.{{$p}}.List{{.Plural.Pascal}}OwnedBy(ctx, owner, after, params.Limit.Or(25))
+{{- end}}
+	default:
+		return nil, security.Refusal(ctx)
+	}
+{{- else}}
 	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, after, params.Limit.Or(25))
+{{- end}}
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -54,10 +85,24 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 }
 
 func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params apigen.Update{{$P}}Params) (*apigen.{{$P}}, error) {
+{{- if $pol}}
+	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	if err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
 	n, unread := new{{$P}}Of(req)
 	if unread != nil {
 		return nil, problemOf(refuse{{$P}}(n, unread))
 	}
+{{- if $pol}}
+{{- if $claims}}
+	{{$P}}Policy{}.Claim(ctx, &n, &stored)
+{{- end}}
+	if !({{$P}}Policy{}).Update(ctx, stored) {
+		return nil, security.Refusal(ctx)
+	}
+{{- end}}
 	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), n)
 	if err != nil {
 		return nil, problemOf(err)
@@ -67,8 +112,35 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 }
 
 func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
+{{- if $pol}}
+	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	if err != nil {
+		return problemOf(err)
+	}
+	if !({{$P}}Policy{}).Delete(ctx, stored) {
+		return security.Refusal(ctx)
+	}
+{{- end}}
 	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}})))
 }
+{{- if $pol}}
+
+// readable{{$P}} is the {{lower .Label}} id, when the request of ctx may read it;
+// else, as if it did not exist{{if not (publicRead $.Entities $e)}}, and unauthorized to a request no one signed
+// in to, so that it does not learn which ids exist{{end}}.
+func (h HTTP) readable{{$P}}(ctx context.Context, id uuid.UUID) ({{$P}}, error) {
+	found, err := h.{{$p}}.Read{{$P}}(ctx, id)
+	if err == nil && !({{$P}}Policy{}).Read(ctx, found) {
+		err = Err{{$P}}NotFound
+	}
+{{- if not (publicRead $.Entities $e)}}
+	if errors.Is(err, Err{{$P}}NotFound) && security.Anonymous(ctx) {
+		return {{$P}}{}, security.ErrUnauthorized
+	}
+{{- end}}
+	return found, err
+}
+{{- end}}
 {{- range links $e}}{{$R := .Pascal}}{{$o := ogenName (linkParam .)}}
 
 func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R}}Params) (*apigen.{{if .CrossesModules}}{{$P}}{{$R}}{{else}}{{.Target.Pascal}}{{end}}Page, error) {
@@ -76,6 +148,11 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 	if err != nil {
 		return nil, err
 	}
+{{- if $pol}}
+	if _, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
 	page, err := h.{{$p}}.List{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), after, params.Limit.Or(25))
 	if err != nil {
 		return nil, problemOf(err)
@@ -99,13 +176,38 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 {{- if not .Inferred}}
 
 func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{$R}}Params) error {
+{{- if $pol}}
+	if err := h.updatable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return problemOf(err)
+	}
+{{- end}}
 	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
 }
 
 func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFrom{{$P}}{{$R}}Params) error {
+{{- if $pol}}
+	if err := h.updatable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return problemOf(err)
+	}
+{{- end}}
 	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), uuid.UUID(params.{{$o}})))
 }
 {{- end}}
+{{- end}}
+{{- if and $pol (declaredLinks $e)}}
+
+// updatable{{$P}} answers nil when the request of ctx may change the
+// {{lower .Label}} id: its links to others are part of it.
+func (h HTTP) updatable{{$P}}(ctx context.Context, id uuid.UUID) error {
+	stored, err := h.readable{{$P}}(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !({{$P}}Policy{}).Update(ctx, stored) {
+		return security.Refusal(ctx)
+	}
+	return nil
+}
 {{- end}}
 
 // new{{$P}}Of reads a New{{$P}} as the contract writes it, with the fields
@@ -153,7 +255,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 {{- end}}
 {{- end}}
 {{- range keys $e}}{{$g := ogenName (keyName .)}}
-{{- if .Required}}
+{{- if keyInRequest $.Entities $e .}}
 	n.{{.Pascal}}ID = uuid.UUID(req.{{$g}})
 {{- else}}
 	if v, ok := req.{{$g}}.Get(); ok {

@@ -1,0 +1,116 @@
+{{- if and (policies .Entities) (uses "testcontainers") -}}
+package main
+
+{{importBlock "context" "encoding/json" "net/http" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
+// call answers the status of a request as who, and the IDs of the list it
+// answered, if any.
+func call(t *testing.T, method, url, who string) (int, map[string]bool) {
+	t.Helper()
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := asTestPrincipal(who).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var page struct{ Items []struct{ ID string } }
+	_ = json.NewDecoder(res.Body).Decode(&page)
+	ids := map[string]bool{}
+	for _, item := range page.Items {
+		ids[item.ID] = true
+	}
+	return res.StatusCode, ids
+}
+
+// as is the context of a request that comes from who.
+func as(who string) context.Context {
+	if p, ok := principalOf(who); ok {
+		return security.WithPrincipal(context.Background(), p)
+	}
+	return context.Background()
+}
+
+// refused is the status of a request a policy refuses.
+func refused(who string) int {
+	if who == "nobody" {
+		return http.StatusUnauthorized
+	}
+	return http.StatusForbidden
+}
+
+// TestAPIAccess checks that the API answers as each entity's policy says:
+// it asks the policy that runs, generated from the model or written in the
+// project, as each kind of request, and compares the API's answer.
+func TestAPIAccess(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv, d := newTestServerOf(t, newTestDependencies(t))
+	c, err := apigen.NewClient(srv.URL + "/api/v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- range $i, $e := .Entities}}{{if canSampleAPI $e}}{{$P := $e.Pascal}}{{$m := $e.Module}}{{$own := ownerField $.Entities $e}}
+	t.Run("{{$P}}", func(t *testing.T) {
+		// Records of its own (i), apart from the other entities'.
+		created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, {{$i}}+100))
+		if err != nil {
+			t.Fatal(err)
+		}
+		stored, err := d.{{$m.Camel}}.Read{{$P}}(ctx, uuid.UUID(created.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		policy := {{$m.Snake}}.{{$P}}Policy{}
+		url := srv.URL + "/api/v1/{{$e.Plural.Kebab}}"
+		for _, who := range []string{
+{{- range whosOf $.Entities $e}}
+{{- if .Owns}} "{{.Realm}}@" + stored.{{$own}}.String(),
+{{- else if .Realm}} {{printf "%q" .Name}},
+{{- else}} "nobody",
+{{- end}}
+{{- end}} } {
+			read := policy.Read(as(who), stored)
+			want := http.StatusOK
+			if !read {
+				want = http.StatusNotFound
+{{- if not (publicRead $.Entities $e)}}
+				if who == "nobody" {
+					want = http.StatusUnauthorized
+				}
+{{- end}}
+			}
+			if got, _ := call(t, "GET", url+"/"+stored.ID.String(), who); got != want {
+				t.Errorf("get as %s: %d, want %d", who, got, want)
+			}
+
+			scope := policy.List(as(who))
+			owner, owned := scope.Owner()
+			got, ids := call(t, "GET", url, who)
+			switch {
+			case !scope.All() && !owned:
+				if got != refused(who) {
+					t.Errorf("list as %s: %d, want %d", who, got, refused(who))
+				}
+			case got != http.StatusOK:
+				t.Errorf("list as %s: %d", who, got)
+			case ids[stored.ID.String()] != (scope.All(){{with $own}} || owner == stored.{{.}}{{end}}):
+				t.Errorf("list as %s: the {{$e.Snake}} listed %v", who, ids[stored.ID.String()])
+			}
+{{- if not $own}}
+			_ = owner
+{{- end}}
+
+			// Refusals only: a delete let through would change what the
+			// next one sees.
+			if read && !policy.Delete(as(who), stored) {
+				if got, _ := call(t, "DELETE", url+"/"+stored.ID.String(), who); got != refused(who) {
+					t.Errorf("delete as %s: %d, want %d", who, got, refused(who))
+				}
+			}
+		}
+	})
+{{- end}}{{end}}
+}
+{{end -}}
