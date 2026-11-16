@@ -119,6 +119,8 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("the example module changed: update the line this test replaces")
 	}
 	catalog += "\n/// Who makes a product.\nentity Brand {\n  name string required\n}\n"
+	// A record with an owner: each customer's own reviews.
+	catalog += "\n/// What a customer thinks of a product.\nentity Review {\n  text     string required\n  customer > Customer required\n  product  > Product required\n  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	e.esquadro(0, "gen", dir)
 	migrations, _ := filepath.Glob(filepath.Join(dir, "migrations", "*.sql"))
@@ -149,6 +151,8 @@ func TestLifecycle(t *testing.T) {
 	if !strings.Contains(fmt.Sprint(refused["errors"]), "taken") {
 		t.Fatalf("a taken sku was not refused: %v", refused)
 	}
+
+	e.ownerScenario(added["id"].(string))
 
 	// 6. Its own tests pass on the new model.
 	e.run(nil, "go", "test", "./...")
@@ -209,6 +213,47 @@ func (e *lifecycle) securityScenario() {
 	e.request("POST", "/api/v1/products", product, cookie, 403)
 	cookie["X-CSRF-Token"] = admin.body["csrf_token"].(string)
 	e.request("POST", "/api/v1/products", product, cookie, 422) // let in: the category does not exist
+}
+
+// ownerScenario checks the owner rule through the running service: each
+// customer sees and changes only its own reviews.
+func (e *lifecycle) ownerScenario(product string) {
+	e.t.Helper()
+	customer := func(email string) map[string]string {
+		e.request("POST", "/identity/customer/sign-up", `{"email":"`+email+`","password":"correct horse battery staple","name":"Someone"}`, nil, 202)
+		signedIn := e.request("POST", "/identity/customer/sign-in", `{"email":"`+email+`","password":"correct horse battery staple","cookie":false}`, nil, 200)
+		return map[string]string{"Authorization": "Bearer " + signedIn.body["session_token"].(string)}
+	}
+	carla, davi := customer("carla@example.com"), customer("davi@example.com")
+	carlaID := e.request("GET", "/identity/customer/session", "", carla, 200).body["id"].(string)
+
+	// Carla's review is hers, whatever the body says.
+	review := e.request("POST", "/api/v1/reviews", `{"text":"Great","product_id":"`+product+`"}`, carla, 201).body
+	if review["customer_id"] != carlaID {
+		e.t.Fatalf("the review's owner: %v, want %s", review["customer_id"], carlaID)
+	}
+	path := "/api/v1/reviews/" + review["id"].(string)
+
+	// Davi does not see it, nor change it, and lists none.
+	e.request("GET", path, "", davi, 404)
+	e.request("PUT", path, `{"text":"Bad","product_id":"`+product+`"}`, davi, 404)
+	e.request("DELETE", path, "", davi, 404)
+	if items := e.request("GET", "/api/v1/reviews", "", davi, 200).body["items"].([]any); len(items) != 0 {
+		e.t.Fatalf("davi lists %v", items)
+	}
+	// No one signed in learns nothing; an admin sees it.
+	e.request("GET", path, "", nil, 401)
+	e.request("GET", path, "", map[string]string{"Authorization": e.auth}, 200)
+
+	// Carla lists it, and cannot hand it over to Davi.
+	if items := e.request("GET", "/api/v1/reviews", "", carla, 200).body["items"].([]any); len(items) != 1 {
+		e.t.Fatalf("carla lists %v", items)
+	}
+	daviID := e.request("GET", "/identity/customer/session", "", davi, 200).body["id"].(string)
+	kept := e.request("PUT", path, `{"text":"Still great","product_id":"`+product+`","customer_id":"`+daviID+`"}`, carla, 200).body
+	if kept["customer_id"] != carlaID || kept["text"] != "Still great" {
+		e.t.Fatalf("the review after carla's update: %v", kept)
+	}
 }
 
 // answer is a response: its status, headers and JSON object.

@@ -98,19 +98,19 @@ func TestList{{$e.Plural.Pascal}}PagesThroughEveryOne(t *testing.T) {
 
 	var created []{{$p}}.{{$e.Pascal}}
 	for i := range 2 {
-		c, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
+		x, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i))
 		if err != nil {
 			t.Fatal(err)
 		}
-		created = append(created, c)
+		created = append(created, x)
 	}
-	for _, c := range created {
-		page, err := {{$r}}.List{{$e.Plural.Pascal}}OwnedBy(ctx, c.{{.}}, uuid.Nil(), 10)
+	for _, x := range created {
+		page, err := {{$r}}.List{{$e.Plural.Pascal}}OwnedBy(ctx, x.{{.}}, uuid.Nil(), 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(page.{{$e.Plural.Pascal}}) != 1 || page.{{$e.Plural.Pascal}}[0].ID != c.ID {
-			t.Fatalf("the {{$e.Plural.Snake}} of %s: %+v", c.{{.}}, page.{{$e.Plural.Pascal}})
+		if len(page.{{$e.Plural.Pascal}}) != 1 || page.{{$e.Plural.Pascal}}[0].ID != x.ID {
+			t.Fatalf("the {{$e.Plural.Snake}} of %s: %+v", x.{{.}}, page.{{$e.Plural.Pascal}})
 		}
 	}
 }
