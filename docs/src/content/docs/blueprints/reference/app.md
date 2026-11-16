@@ -20,12 +20,14 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 | Slot | |
 |---|---|
 | `app.config.fields` | Fields of config.Config. |
-| `app.config.load` | Code in config.Load that fills those fields from the environment with the loader l: l.text(name, "default"), l.number(name, 1), l.flag(name, true) or l.list(name, []string{"a"}); c is the Config. |
+| `app.config.load` | Code in config.Load that fills those fields from the environment with the loader l: l.text(name, "default"), l.number(name, 1), l.ratio(name, 0.5), l.flag(name, true) or l.list(name, []string{"a"}); c is the Config. |
 | `app.commands` | Cases of the command switch in run, each returning the command's error, e.g. case "migrate": return migrate(ctx). The case "" is the command run without arguments. The app's own command is check, which opens every dependency to see that the configuration works. |
 | `app.dependencies.imports` | Imports of cmd/&lt;app>/dependencies.go. |
 | `app.dependencies` | Fields of the dependencies struct. |
 | `app.dependencies.open` | Code in open that opens a resource (a database pool...): d is the dependencies, opened a list of functions that release what was opened, and on failure it returns d, nil and the error after release(). |
 | `app.dependencies.wire` | Code in open, after every resource is open, that builds what uses them (each module...). |
+| `app.logging.imports` | Imports of internal/platform/logging/logging.go. |
+| `app.logging.handler` | Code in logging.New that wraps the handler h, e.g. h = otherHandler(h). |
 | `app.tasks` | Tasks of Taskfile.esquadro.yml, indented by two spaces; a blank line goes between contributions. |
 
 ## Hooks

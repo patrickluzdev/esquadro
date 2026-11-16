@@ -79,7 +79,7 @@ shop/
   internal/platform/   config, logging, the HTTP edge, Postgres
   migrations/          one migration per change in the model
   api/openapi.yaml     the API's contract
-  compose.yaml         Postgres for development (and the app, in the app profile)
+  compose.yaml         Postgres and Grafana for development (and the app, in the app profile)
   Dockerfile           the app's container image
   .github/workflows/   the CI: tests, the generated code in step, the image
 ```
@@ -91,13 +91,14 @@ Its module path comes from `git config github.user`
 ## Run it
 
 ```sh
-task up        # start Postgres (compose.yaml) and wait until it is ready
+task up        # start Postgres and Grafana (compose.yaml) and wait until they are ready
 task migrate   # create the tables
 task run       # serve on http://localhost:8080
 ```
 
 Open http://localhost:8080/docs: the API's documentation, where every
-operation can be tried. `task test` runs the generated tests, against a real
+operation can be tried. Each request's trace, with its queries, is in
+Grafana at http://localhost:3000 (see [Observability](/esquadro/observability/)). `task test` runs the generated tests, against a real
 Postgres they start themselves.
 
 ## Change the model

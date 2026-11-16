@@ -41,6 +41,15 @@ blueprint jobs {
 
 An annotation is written `@jobs(key value)` on the element.
 
+## Slots
+
+Other blueprints add code at these points (see [Writing a blueprint](/esquadro/writing-blueprints/#slots)).
+
+| Slot | |
+|---|---|
+| `jobs.imports` | Imports of internal/platform/jobs/jobs.go. |
+| `jobs.middleware` | Code in Queue.Open that changes River's config before the client is made, e.g. config.Middleware = append(config.Middleware, ...). |
+
 ## Go modules
 
 - `github.com/riverqueue/river` v0.50.0

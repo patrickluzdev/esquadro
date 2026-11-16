@@ -28,8 +28,9 @@ entity Product {
 From a model like this, the `api` starter's blueprints write a JSON API on
 PostgreSQL: the OpenAPI contract and its server, each entity's use cases,
 the migrations, Problem Details errors in the client's language, security
-headers, a rate limit, tests against a real Postgres, a `compose.yaml` to run
-it all locally, a container image and a CI. Blueprints are small and
+headers, a rate limit, tests against a real Postgres, traces, metrics and
+logs with OpenTelemetry (and a local Grafana), a `compose.yaml` to run it all
+locally, a container image and a CI. Blueprints are small and
 optional: the `worker` and `cli` starters, or a project built blueprint by
 blueprint, take only what they need.
 

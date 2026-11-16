@@ -42,6 +42,15 @@ blueprint postgres {
 
 An annotation is written `@postgres(key value)` on the element.
 
+## Slots
+
+Other blueprints add code at these points (see [Writing a blueprint](/esquadro/writing-blueprints/#slots)).
+
+| Slot | |
+|---|---|
+| `postgres.imports` | Imports of internal/platform/postgres/postgres.go. |
+| `postgres.config` | Code in postgres.Open that changes the pool's config before it opens, e.g. config.ConnConfig.Tracer = .... |
+
 ## Go modules
 
 - `github.com/jackc/pgx/v5` v5.7.1
