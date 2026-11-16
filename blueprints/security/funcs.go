@@ -16,7 +16,27 @@ func TemplateFuncs() template.FuncMap {
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
-		"has":           slices.Contains[[]string],
+		"rulesOf":       RulesOf,
+		"whosOf":        WhosOf,
+		"allowed":       Allowed,
+		"listScope":     ListScope,
+		"allowExpr":     AllowExpr,
+		"list":          func(items ...string) []string { return items },
+		"lower":         strings.ToLower,
+		"goList": func(items []string) string {
+			quoted := make([]string, len(items))
+			for i, s := range items {
+				quoted[i] = strconv.Quote(s)
+			}
+			return strings.Join(quoted, ", ")
+		},
+		"ownerOf": func(entities []*project.Entity, e *project.Entity) *Owner {
+			if o, ok := OwnerUsed(entities, e); ok {
+				return &o
+			}
+			return nil
+		},
+		"has": slices.Contains[[]string],
 		// goElems is a []string literal without its type, for the values of
 		// a map: {"a", "b"}.
 		"goElems": func(items []string) string {

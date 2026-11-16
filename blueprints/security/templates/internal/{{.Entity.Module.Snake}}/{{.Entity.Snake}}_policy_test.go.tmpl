@@ -1,0 +1,59 @@
+{{- if realms .Entities -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$o := ownerOf .Entities $e}}{{$R := printf "%sRules" $e.Camel}}
+{{- $field := ""}}{{with $o}}{{if .Relation}}{{$field = printf "%sID" .Relation.Pascal}}{{else}}{{$field = "ID"}}{{end}}{{end -}}
+package {{$m.Snake}}
+
+import (
+	"context"
+	"testing"
+	"uuid"
+
+	"{{.App.Module}}/internal/platform/security"
+)
+
+// Test{{$e.Pascal}}Rules asks the model's rules of {{$e.Plural.Snake}} as each kind of
+// request; the answers are worked out by esquadro from the model.
+func Test{{$e.Pascal}}Rules(t *testing.T) {
+	owner := uuid.NewV7()
+	x := {{$e.Pascal}}{ {{- with $field}}{{.}}: owner{{end -}} }
+	n := New{{$e.Pascal}}{ {{- if and $o $o.Relation}}{{$field}}: owner{{end -}} }
+	as := func(realm string, owns bool, roles ...string) context.Context {
+		if realm == "" {
+			return context.Background()
+		}
+		id := uuid.NewV7()
+		if owns {
+			id = owner
+		}
+		return security.WithPrincipal(context.Background(), security.Principal{ID: id, Realm: realm, Roles: roles})
+	}
+	r := {{$R}}{}
+	for _, c := range []struct {
+		who                          string
+		ctx                          context.Context
+		list                         string
+		read, create, update, delete bool
+	}{
+{{- range $w := whosOf .Entities $e}}
+		{ {{- printf "%q" $w.Name}}, as({{printf "%q" $w.Realm}}, {{$w.Owns}}{{with $w.Roles}}, {{goList .}}{{end}}), {{printf "%q" (listScope $.Entities $e $w)}},
+			{{allowed $.Entities $e "read" $w}}, {{allowed $.Entities $e "create" $w}}, {{allowed $.Entities $e "update" $w}}, {{allowed $.Entities $e "delete" $w -}} },
+{{- end}}
+	} {
+		scope := r.List(c.ctx)
+		_, isOwned := scope.Owner()
+		got := map[bool]string{true: "all"}[scope.All()]
+		if got == "" && isOwned {
+			got = "owned"
+		} else if got == "" {
+			got = "nobody"
+		}
+		if got != c.list {
+			t.Errorf("%s: list %s, want %s", c.who, got, c.list)
+		}
+		if r.Read(c.ctx, x) != c.read || r.Create(c.ctx, n) != c.create || r.Update(c.ctx, x) != c.update || r.Delete(c.ctx, x) != c.delete {
+			t.Errorf("%s: read %v, create %v, update %v, delete %v; want %v, %v, %v, %v", c.who,
+				r.Read(c.ctx, x), r.Create(c.ctx, n), r.Update(c.ctx, x), r.Delete(c.ctx, x), c.read, c.create, c.update, c.delete)
+		}
+	}
+}
+{{end -}}

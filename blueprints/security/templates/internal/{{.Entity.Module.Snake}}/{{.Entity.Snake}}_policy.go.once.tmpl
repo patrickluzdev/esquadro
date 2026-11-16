@@ -1,0 +1,18 @@
+{{- if realms .Entities -}}
+{{- $e := .Entity}}{{$m := $e.Module -}}
+package {{$m.Snake}}
+
+// {{$e.Pascal}}Policy says who may do what with {{$e.Plural.Snake}}: the rules of
+// the model (@security), from {{$e.Snake}}_policy_gen.go, unless this file says
+// otherwise. To change an action, write it here; it replaces the model's:
+//
+//	func (p {{$e.Pascal}}Policy) Update(ctx context.Context, x {{$e.Pascal}}) bool {
+//		return p.{{$e.Camel}}Rules.Update(ctx, x) && ...
+//	}
+//
+// The API asks it before each operation on {{$e.Plural.Snake}}; ask it in your
+// own code too.
+type {{$e.Pascal}}Policy struct {
+	{{$e.Camel}}Rules
+}
+{{end -}}

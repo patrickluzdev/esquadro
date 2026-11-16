@@ -102,3 +102,38 @@ func TestOwnerOf(t *testing.T) {
 		t.Error(got)
 	}
 }
+
+func TestPolicyRules(t *testing.T) {
+	customer := &project.Entity{Ann: project.Ann{"security": {"principal": true}}}
+	customer.Snake, customer.Raw = "customer", "Customer"
+	user := &project.Entity{Ann: project.Ann{"security": {"principal": true, "roles": []any{"admin"}}}}
+	user.Snake, user.Raw = "user", "User"
+	order := &project.Entity{Ann: project.Ann{"security": {"read": []any{"owner", "user"}, "create": []any{"owner", "user.admin"}}}}
+	order.Snake, order.Raw = "order", "Order"
+	r := &project.Relation{Kind: project.ManyToOne, Entity: order, Target: customer}
+	r.Snake, r.Raw = "customer", "customer"
+	order.Relations = []*project.Relation{r}
+	all := []*project.Entity{customer, user, order}
+
+	if got := RulesOf(all, order, "read"); !got.Owner || !slices.Equal(got.Others, []string{"user"}) {
+		t.Fatalf("%+v", got)
+	}
+	if got := AllowExpr(RulesOf(all, order, "create"), "owns"); got != `security.Allows(ctx, "user.admin") || owns` {
+		t.Fatal(got)
+	}
+	if got := AllowExpr(Rules{}, "owns"); got != "false" {
+		t.Fatal(got)
+	}
+	owner := Who{Realm: "customer", Owns: true}
+	other := Who{Realm: "customer"}
+	admin := Who{Realm: "user", Roles: []string{"admin"}}
+	if !Allowed(all, order, "read", owner) || Allowed(all, order, "read", other) || !Allowed(all, order, "read", admin) || Allowed(all, order, "read", Who{}) {
+		t.Error("Allowed read")
+	}
+	if ListScope(all, order, admin) != "all" || ListScope(all, order, other) != "owned" || ListScope(all, order, Who{}) != "nobody" {
+		t.Error("ListScope")
+	}
+	if n := len(WhosOf(all, order)); n != 5 { // no one, customer, customer owner, user, user.admin
+		t.Errorf("%d kinds of requests", n)
+	}
+}

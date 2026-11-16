@@ -1,0 +1,36 @@
+{{- if realms .Entities -}}
+package security
+
+import "uuid"
+
+// Scope is which records of an entity a request may list: all of them,
+// those of an owner, or none. The API turns it into the query, so that
+// pages stay whole.
+type Scope struct {
+	kind  scopeKind
+	owner uuid.UUID
+}
+
+type scopeKind int
+
+const (
+	nobody scopeKind = iota
+	all
+	owned
+)
+
+// All is every record.
+func All() Scope { return Scope{kind: all} }
+
+// Nobody is no record.
+func Nobody() Scope { return Scope{kind: nobody} }
+
+// OwnedBy is the records that belong to owner.
+func OwnedBy(owner uuid.UUID) Scope { return Scope{kind: owned, owner: owner} }
+
+// All reports whether the scope is every record.
+func (s Scope) All() bool { return s.kind == all }
+
+// Owner is the owner whose records the scope is, if it is one.
+func (s Scope) Owner() (uuid.UUID, bool) { return s.owner, s.kind == owned }
+{{end -}}
