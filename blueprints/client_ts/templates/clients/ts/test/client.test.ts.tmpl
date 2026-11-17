@@ -50,4 +50,12 @@ test("{{$e.Plural.Snake}}: the client's rules and the API's refuse the same", as
 })
 {{- break}}{{end}}{{end}}{{end}}
 {{- end}}{{end}}
+{{- range .Reports}}
+
+test("the {{.Snake}} report answers its rows", async () => {
+{{- $req := false}}{{range .Params}}{{if .Required}}{{$req = true}}{{end}}{{end}}
+  const rows = await api.reports.{{.Camel}}({{if $req}}{ {{- range .Params}}{{if .Required}} {{.Snake}}: {{reportSample .}},{{end}}{{end}} }{{end}})
+  assert.ok(Array.isArray(rows))
+})
+{{- end}}
 {{end -}}

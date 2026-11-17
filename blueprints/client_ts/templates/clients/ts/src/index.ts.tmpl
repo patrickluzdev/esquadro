@@ -6,6 +6,9 @@
 import { links, records, Transport } from "./runtime.ts"
 import type { ClientOptions, RequestOptions } from "./runtime.ts"
 import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
+{{- if .Reports}}
+import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
+{{- end}}
 {{- if $realms}}
 import { {{range $i, $r := $realms}}{{if $i}}, {{end}}{{$r.Entity.Camel}}Identity{{end}} } from "./identity.ts"
 {{- end}}
@@ -13,6 +16,9 @@ import { {{range $i, $r := $realms}}{{if $i}}, {{end}}{{$r.Entity.Camel}}Identit
 export * from "./runtime.ts"
 export * from "./records.ts"
 export * from "./validate.ts"
+{{- if .Reports}}
+export * from "./reports.ts"
+{{- end}}
 {{- if $realms}}
 export type { Credentials, Device, Session } from "./identity.ts"
 {{- end}}
@@ -44,6 +50,15 @@ export function createClient(options: ClientOptions) {
     identity: {
 {{- range $realms}}
       {{.Entity.Camel}}: {{.Entity.Camel}}Identity(t, cookie),
+{{- end}}
+    },
+{{- end}}
+{{- if .Reports}}
+    /** The reports: each answers its rows, up to its limit. */
+    reports: {
+{{- range .Reports}}{{$req := false}}{{range .Params}}{{if .Required}}{{$req = true}}{{end}}{{end}}
+      {{.Camel}}: async (params{{if not $req}}?{{end}}: {{.Pascal}}Params) =>
+        (await t.request<{ items: {{.Pascal}}Row[] }>("GET", "/api/v1/reports/{{.Kebab}}", { query: {{if $req}}{ ...params }{{else}}{ ...(params ?? {}) }{{end}} })).items,
 {{- end}}
     },
 {{- end}}

@@ -30,10 +30,35 @@ func TemplateFuncs() template.FuncMap {
 		"clearable":    rest.Clearable,
 		"realms":       security.RealmsOf,
 		"tsType":       tsType,
-		"tsFilter":     tsFilter,
-		"tsString":     strconv.Quote,
-		"tsPattern":    tsPattern,
-		"enumName":     func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
+		"reportSample": func(f *project.Field) string {
+			switch f.Type {
+			case project.TypeInt, project.TypeInt64:
+				return "1"
+			case project.TypeDecimal:
+				return `"1"`
+			case project.TypeBool:
+				return "true"
+			case project.TypeTime:
+				return `"2026-01-01T00:00:00Z"`
+			case project.TypeDate:
+				return `"2026-01-01"`
+			case project.TypeUUID:
+				return "crypto.randomUUID()"
+			case project.TypeEnum:
+				return strconv.Quote(f.Enum.Values[0].Raw)
+			}
+			return `"x"`
+		},
+		"reportTS": func(f *project.Field) string {
+			if f.Type == project.TypeEnum {
+				return "string"
+			}
+			return tsType(f)
+		},
+		"tsFilter":  tsFilter,
+		"tsString":  strconv.Quote,
+		"tsPattern": tsPattern,
+		"enumName":  func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
 		"manyToMany": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {
