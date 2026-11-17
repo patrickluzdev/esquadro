@@ -57,6 +57,9 @@ type Manifest struct {
 	Name    string
 	Version string
 	Doc     []string
+	// For are the kinds of project the blueprint is made for: app unless
+	// the manifest says otherwise.
+	For []project.Kind
 	// Requires are the blueprints this one needs: an app without them is an
 	// error.
 	Requires []Dep
@@ -231,6 +234,23 @@ func (v *validator) manifest(f *dsl.File) *Manifest {
 			}
 			m.Version = it.Version.Text
 		case *dsl.DependsItem:
+			if it.Keyword.Name == "for" {
+				if !once("for", it.Span) {
+					continue
+				}
+				for _, n := range it.Names {
+					k := project.Kind(n.Name)
+					switch {
+					case k != project.KindApp && k != project.KindPlatform:
+						v.errorf(n.Span, "%s is not a kind of project", n.Name).Suggestion = "write app, platform, or both"
+					case slices.Contains(m.For, k):
+						v.errorf(n.Span, "%s is already listed", n.Name)
+					default:
+						m.For = append(m.For, k)
+					}
+				}
+				continue
+			}
 			for _, n := range it.Names {
 				switch {
 				case n.Name == m.Name:
@@ -296,6 +316,9 @@ func (v *validator) manifest(f *dsl.File) *Manifest {
 	}
 	if m.Version == "" {
 		v.errorf(decl.Name.Span, "blueprint %s has no version", m.Name).Suggestion = `add: version "0.1.0"`
+	}
+	if len(m.For) == 0 {
+		m.For = []project.Kind{project.KindApp}
 	}
 	return m
 }

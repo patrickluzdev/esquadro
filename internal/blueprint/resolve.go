@@ -73,6 +73,7 @@ func (r *resolver) resolve() {
 	r.byName = map[string]*Blueprint{}
 	r.failed = map[string]bool{}
 	r.l.unfetched = 0
+	r.l.Kind = r.p.Kind
 	for _, ref := range r.p.App.Blueprints {
 		b, diags := r.l.Load(ref)
 		r.diags = append(r.diags, diags...)
@@ -105,7 +106,7 @@ func (r *resolver) resolve() {
 	r.annotations()
 	r.env()
 	for _, b := range r.set.Blueprints {
-		if check := Checks[b.Manifest.Name]; check != nil && b.Ref.Source == project.SourceBuiltin {
+		if check := Checks[b.Key]; check != nil && b.Ref.Source == project.SourceBuiltin {
 			r.diags = append(r.diags, check(r.p, r.set)...)
 		}
 	}

@@ -3,6 +3,7 @@
 /// generations commit nothing: review the diff and commit when you want.
 blueprint git {
   version "0.1.0"
+  for app, platform
 
   /// Commit everything on the first generation.
   option initial_commit bool default(true)

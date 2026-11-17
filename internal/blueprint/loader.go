@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -29,12 +30,25 @@ type Blueprint struct {
 	// Source and Commit are, for a blueprint from git, the source as the
 	// app writes it and the commit used.
 	Source, Commit string
+	// Key names the blueprint's Go code built into esquadro: its hooks,
+	// template helpers and checks. It is the manifest's name, prefixed with
+	// platform/ for a built-in blueprint of the platform catalog, whose
+	// names may repeat the apps' (postgres).
+	Key string
 }
+
+// PlatformDir is the folder of Builtin that holds the blueprints made for
+// platforms only; the others are at its root.
+const PlatformDir = "platform"
 
 // Loader finds blueprints.
 type Loader struct {
-	// Builtin holds the built-in blueprints, one folder per blueprint.
+	// Builtin holds the built-in blueprints, one folder per blueprint; those
+	// only for platforms are in PlatformDir.
 	Builtin fs.FS
+	// Kind is the kind of project blueprints are loaded for: a project only
+	// uses blueprints made for its kind.
+	Kind project.Kind
 	// ProjectDir is the folder local blueprint paths are relative to.
 	ProjectDir string
 	// HasBuiltinHook reports whether esquadro implements a built-in
@@ -63,25 +77,64 @@ var Retired = map[string]string{
 
 func (l *Loader) Source(file string) []byte { return l.sources[file] }
 
-// BuiltinNames lists the built-in blueprints.
+// kind is the kind of project blueprints are loaded for, app by default.
+func (l *Loader) kind() project.Kind {
+	if l.Kind == "" {
+		return project.KindApp
+	}
+	return l.Kind
+}
+
+// BuiltinNames lists the built-in blueprints made for the loader's kind of
+// project.
 func (l *Loader) BuiltinNames() []string {
 	if l.Builtin == nil {
 		return nil
 	}
-	entries, err := fs.ReadDir(l.Builtin, ".")
-	if err != nil {
-		return nil
-	}
+	seen := map[string]bool{}
 	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			if _, err := fs.Stat(l.Builtin, path.Join(e.Name(), ManifestFile)); err == nil {
+	for _, dir := range []string{PlatformDir, "."} {
+		entries, err := fs.ReadDir(l.Builtin, dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() || seen[e.Name()] {
+				continue
+			}
+			src, err := fs.ReadFile(l.Builtin, path.Join(dir, e.Name(), ManifestFile))
+			if err != nil {
+				continue
+			}
+			if m, _ := ParseManifest(e.Name(), src); m != nil && slices.Contains(m.For, l.kind()) {
+				seen[e.Name()] = true
 				names = append(names, e.Name())
 			}
 		}
 	}
 	sort.Strings(names)
 	return names
+}
+
+// builtin finds a built-in blueprint for the loader's kind of project: in
+// PlatformDir first for a platform, then at the root. It answers its
+// folder's path.
+func (l *Loader) builtin(name string) (fs.FS, string) {
+	if l.Builtin == nil || name == PlatformDir {
+		return nil, ""
+	}
+	dirs := []string{name}
+	if l.kind() == project.KindPlatform {
+		dirs = []string{path.Join(PlatformDir, name), name}
+	}
+	for _, dir := range dirs {
+		if sub, err := fs.Sub(l.Builtin, dir); err == nil {
+			if _, err := fs.Stat(sub, ManifestFile); err == nil {
+				return sub, dir
+			}
+		}
+	}
+	return nil, ""
 }
 
 // Load loads the blueprint a project refers to. Diagnostics point at the
@@ -98,16 +151,13 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		file           string
 		dir            string
 		source, commit string
+		key            string
 	)
 	switch ref.Source {
 	case project.SourceBuiltin:
-		if l.Builtin != nil {
-			if sub, err := fs.Sub(l.Builtin, ref.Ref); err == nil {
-				if _, err := fs.Stat(sub, ManifestFile); err == nil {
-					fsys = sub
-				}
-			}
-		}
+		var at string
+		fsys, at = l.builtin(ref.Ref)
+		key = at
 		if fsys == nil {
 			if msg, ok := Retired[ref.Ref]; ok {
 				errAtRef("blueprint %s is no more: %s", ref.Ref, msg)
@@ -122,7 +172,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 			return nil, diags
 		}
 		location = "built-in"
-		file = "builtin/" + ref.Ref + "/" + ManifestFile
+		file = "builtin/" + at + "/" + ManifestFile
 	case project.SourceLocal:
 		dir = ref.Ref
 		if !filepath.IsAbs(dir) {
@@ -190,9 +240,21 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		diags.Errorf(diag.Pos{File: file, Line: 1, Col: 1}, diag.Pos{}, "built-in blueprint folder %s declares blueprint %s", ref.Ref, m.Name)
 		return nil, diags
 	}
+	if !slices.Contains(m.For, l.kind()) {
+		other := "app projects"
+		if m.For[0] == project.KindPlatform {
+			other = "platforms"
+		}
+		errAtRef("blueprint %s is made for %s, not for %s", m.Name, other, map[project.Kind]string{project.KindApp: "an app", project.KindPlatform: "a platform"}[l.kind()]).
+			Suggestion = "see the blueprints this project can use with esquadro blueprint list"
+		return nil, diags
+	}
+	if key == "" {
+		key = m.Name
+	}
 	for _, h := range m.Hooks {
 		if ref.Source == project.SourceBuiltin && l.HasBuiltinHook != nil {
-			if !l.HasBuiltinHook(m.Name, h.Path) {
+			if !l.HasBuiltinHook(key, h.Path) {
 				diags.Errorf(h.Span.Pos, h.Span.End, "hook %s is not built into this esquadro", h.Path)
 			}
 			continue
@@ -204,7 +266,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location, Dir: dir, Source: source, Commit: commit}, diags
+	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location, Dir: dir, Source: source, Commit: commit, Key: key}, diags
 }
 
 func joinNames(names []string) string {

@@ -300,8 +300,9 @@ type VersionItem struct {
 	Span
 }
 
-// DependsItem is "requires a, b" (Keyword "requires") or "optional a, b"
-// (Keyword "optional").
+// DependsItem is "requires a, b" (Keyword "requires"), "optional a, b"
+// (Keyword "optional") or "for app, platform" (Keyword "for"): the kinds
+// of project the blueprint is made for.
 type DependsItem struct {
 	Keyword Ident
 	Names   []Ident

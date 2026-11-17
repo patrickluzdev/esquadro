@@ -380,7 +380,7 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 		return string(b), nil
 	}
 	maps.Copy(funcs, envFuncs(func(name string) map[string]any { return c.set.Options[name] }))
-	maps.Copy(funcs, c.extra[self])
+	maps.Copy(funcs, c.extra[bp.Key])
 	return funcs
 }
 

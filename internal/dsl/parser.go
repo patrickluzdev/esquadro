@@ -10,7 +10,7 @@ import (
 
 var (
 	topKeywords      = []string{"package", "app", "platform", "server", "enum", "entity", "job", "report", "blueprint"}
-	manifestSettings = []string{"version", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
+	manifestSettings = []string{"version", "for", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -807,10 +807,14 @@ func (p *parser) parseManifestItem() ManifestItem {
 			return nil
 		}
 		return &VersionItem{Version: v, Pos: t.Pos, End: v.End}
-	case "requires", "optional":
+	case "requires", "optional", "for":
 		it := &DependsItem{Keyword: identOf(t)}
+		what := "blueprint name"
+		if t.Text == "for" {
+			what = "kind of project (app or platform)"
+		}
 		for {
-			n, ok := p.expectIdent("blueprint name after " + t.Text)
+			n, ok := p.expectIdent(what + " after " + t.Text)
 			if !ok {
 				return nil
 			}

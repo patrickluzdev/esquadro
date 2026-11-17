@@ -250,19 +250,32 @@ type appSource struct {
 	decl *dsl.AppDecl
 }
 
+// findApp finds the block blueprints are listed in: the platform block of
+// a platform, the app block of an app.
 func findApp(sources []project.Source) (*appSource, error) {
+	var app *appSource
 	for _, s := range sources {
 		f, _ := dsl.Parse(s.Name, s.Src)
 		if f == nil {
 			continue
 		}
 		for _, d := range f.Decls {
-			if app, ok := d.(*dsl.AppDecl); ok {
-				return &appSource{name: s.Name, src: s.Src, decl: app}, nil
+			d, ok := d.(*dsl.AppDecl)
+			if !ok {
+				continue
+			}
+			switch {
+			case d.Kind() == "platform":
+				return &appSource{name: s.Name, src: s.Src, decl: d}, nil
+			case d.Kind() == "app" && app == nil:
+				app = &appSource{name: s.Name, src: s.Src, decl: d}
 			}
 		}
 	}
-	return nil, fmt.Errorf("no file of the project has the app block")
+	if app == nil {
+		return nil, fmt.Errorf("no file of the project has the app block")
+	}
+	return app, nil
 }
 
 // insertAt is where new blueprints go: after the last one, but before git,

@@ -252,7 +252,7 @@ func (r *Runner) run(ctx context.Context, hk Hooked, in Input) (Output, error) {
 	var out Output
 	var err error
 	if hk.Blueprint.Location == "built-in" {
-		fn := r.Builtin[Key(hk.Blueprint.Manifest.Name, hk.Hook.Path)]
+		fn := r.Builtin[Key(hk.Blueprint.Key, hk.Hook.Path)]
 		if fn == nil {
 			return Output{}, fmt.Errorf("hook %s is not built into this esquadro", id)
 		}
