@@ -9,6 +9,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/blueprints/app"
 	"github.com/patrickluzdev/esquadro/blueprints/branching"
+	clientts "github.com/patrickluzdev/esquadro/blueprints/client_ts"
 	"github.com/patrickluzdev/esquadro/blueprints/env"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
@@ -39,16 +40,18 @@ func init() {
 	blueprint.Checks["security"] = security.Check
 	blueprint.Checks["store"] = store.Check
 	blueprint.Checks["rest"] = rest.Check
+	blueprint.Checks["client_ts"] = clientts.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
-	"app":      app.TemplateFuncs(),
-	"store":    store.TemplateFuncs(),
-	"rest":     rest.TemplateFuncs(),
-	"i18n":     i18n.TemplateFuncs(),
-	"jobs":     jobs.TemplateFuncs(),
-	"security": security.TemplateFuncs(),
+	"app":       app.TemplateFuncs(),
+	"store":     store.TemplateFuncs(),
+	"rest":      rest.TemplateFuncs(),
+	"client_ts": clientts.TemplateFuncs(),
+	"i18n":      i18n.TemplateFuncs(),
+	"jobs":      jobs.TemplateFuncs(),
+	"security":  security.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

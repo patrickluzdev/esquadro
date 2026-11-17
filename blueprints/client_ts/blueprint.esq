@@ -1,0 +1,21 @@
+/// A TypeScript client of the API, generated from the model into
+/// clients/ts: typed records (fields and include narrow them), the lists'
+/// filters, safe writes (If-Match, Idempotency-Key), the model's rules to
+/// check forms, errors with their code and, with security, the identity
+/// routes. It needs nothing but fetch: browsers, Node, Bun and edge
+/// runtimes. With github_actions, each tag v* publishes it as an npm
+/// package, versioned as the tag, to GitHub Packages or npmjs.
+blueprint client_ts {
+  version "0.1.0"
+  requires rest
+  optional security, github_actions
+
+  /// The package's name; @<owner>/<app>-client by default, the owner from
+  /// the module (github.com/<owner>/...) or the scope option.
+  option package string default("")
+  /// The npm scope, without @, when the module is not on GitHub.
+  option scope string default("")
+  /// Where tags publish it: github (GitHub Packages, with the workflow's
+  /// own token) or npmjs (trusted publishing, without a token).
+  option registry name default(github)
+}

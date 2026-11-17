@@ -31,7 +31,7 @@ func TemplateFuncs() template.FuncMap {
 		// policies reports whether the API asks the entities' policies:
 		// when something signs in.
 		"policies":     func(entities []*project.Entity) bool { return len(security.RealmsOf(entities)) > 0 },
-		"keyInRequest": keyInRequest,
+		"keyInRequest": KeyInRequest,
 		"whosOf":       security.WhosOf,
 		// ownerField is the Go field of the owner of e's records: its
 		// relation's key, or ID in a principal; empty without.
@@ -69,19 +69,19 @@ func TemplateFuncs() template.FuncMap {
 			o, ok := security.OwnerUsed(entities, e)
 			return ok && o.Relation != nil
 		},
-		"keyName":          keyName,
+		"keyName":          KeyName,
 		"ogenName":         ogenName,
 		"schema":           schema,
 		"changeSchema":     changeSchema,
 		"writeSchema":      writeSchema,
 		"shortable":        shortable,
-		"clearable":        clearable,
-		"includable":       includable,
+		"clearable":        Clearable,
+		"includable":       Includable,
 		"includedFrom":     includedFrom,
-		"answerFields":     answerFields,
+		"answerFields":     AnswerFields,
 		"enumName":         enumName,
-		"inRequest":        inRequest,
-		"keys":             keys,
+		"inRequest":        InRequest,
+		"keys":             Keys,
 		"needsType":        needsType,
 		"apiFieldNames":    apiFieldNames,
 		"canSampleAPI":     canSampleAPI,
@@ -111,9 +111,9 @@ func TemplateFuncs() template.FuncMap {
 // jsonName is a field's name in the API's JSON: snake_case.
 func jsonName(f *project.Field) string { return f.Snake }
 
-// keyName is the name in the API's JSON of the key of a relation, the id of
+// KeyName is the name in the API's JSON of the key of a relation, the id of
 // its record: category_id.
-func keyName(r *project.Relation) string { return r.Snake + "_id" }
+func KeyName(r *project.Relation) string { return r.Snake + "_id" }
 
 // ogenInitialisms are the names ogen writes in capitals when they are the
 // whole name or its first word ("id" is ID, but "productId" is ProductId).
@@ -188,9 +188,9 @@ func schema(f *project.Field) string {
 // checks them and refuses with invalid_fields, every field at once.
 const ruleMark = " # model rule"
 
-// portablePattern reports whether a Go pattern means the same in the
+// PortablePattern reports whether a Go pattern means the same in the
 // ECMAScript of OpenAPI and JavaScript clients.
-func portablePattern(p string) bool {
+func PortablePattern(p string) bool {
 	for _, s := range []string{"(?", `\A`, `\z`, `\p{`, `\P{`, `\Q`, "[[:", `\C`} {
 		if strings.Contains(p, s) {
 			return false
@@ -213,7 +213,7 @@ func rules(f *project.Field, indent int) []string {
 		if f.Max != nil {
 			line("maxLength: %s", f.Max.Text)
 		}
-		if f.Pattern != "" && portablePattern(f.Pattern) {
+		if f.Pattern != "" && PortablePattern(f.Pattern) {
 			line("pattern: '%s'", strings.ReplaceAll(f.Pattern, "'", "''"))
 		}
 	case project.TypeInt, project.TypeInt64:
@@ -265,7 +265,7 @@ func writeSchema(f *project.Field, changes bool) string {
 		}
 		lines = append(lines, pad+`description: 'A decimal number written as a string, e.g. "19.90"; `+strings.Join(bounds, " and ")+".'")
 	}
-	if changes && clearable(f) {
+	if changes && Clearable(f) {
 		lines = append(lines, pad+"nullable: true")
 	}
 	return "\n" + strings.Join(append(lines, rs...), "\n")
@@ -274,7 +274,7 @@ func writeSchema(f *project.Field, changes bool) string {
 // shortable is the first text field of e with a minimum length of 2 or
 // more, which "x" breaks; nil when there is none.
 func shortable(e *project.Entity) *project.Field {
-	for _, f := range inRequest(e) {
+	for _, f := range InRequest(e) {
 		if (f.Type == project.TypeString || f.Type == project.TypeText) && f.Min != nil && f.Min.Value >= 2 && f.Pattern == "" {
 			return f
 		}
@@ -282,13 +282,13 @@ func shortable(e *project.Entity) *project.Field {
 	return nil
 }
 
-// clearable reports whether a PATCH may send f as null: a field without a
+// Clearable reports whether a PATCH may send f as null: a field without a
 // default, which null empties (or, when required, is refused as such).
-func clearable(f *project.Field) bool { return f.Default == nil && f.Type != project.TypeJSON }
+func Clearable(f *project.Field) bool { return f.Default == nil && f.Type != project.TypeJSON }
 
 // changeSchema is f's schema in a PATCH body: null for a clearable one.
 func changeSchema(f *project.Field) string {
-	if !clearable(f) {
+	if !Clearable(f) {
 		return schema(f)
 	}
 	if f.Type == project.TypeEnum {
@@ -302,9 +302,9 @@ func changeSchema(f *project.Field) string {
 	return strings.TrimSuffix(s, "}") + ", nullable: true}"
 }
 
-// includable lists the relations a record's answer may include: those whose
+// Includable lists the relations a record's answer may include: those whose
 // key it holds, and the many-to-many ones it declares.
-func includable(e *project.Entity) []*project.Relation {
+func Includable(e *project.Entity) []*project.Relation {
 	var out []*project.Relation
 	for _, r := range e.Relations {
 		if r.OwnsForeignKey() || (r.Kind == project.ManyToMany && !r.Inferred) {
@@ -319,7 +319,7 @@ func includable(e *project.Entity) []*project.Relation {
 func includedFrom(m *project.Module) []*project.Entity {
 	var out []*project.Entity
 	for _, e := range m.Entities {
-		for _, r := range includable(e) {
+		for _, r := range Includable(e) {
 			if r.Target.Module != m && !slices.Contains(out, r.Target) {
 				out = append(out, r.Target)
 			}
@@ -328,21 +328,21 @@ func includedFrom(m *project.Module) []*project.Entity {
 	return out
 }
 
-// answerFields are the names of a record's answer that fields may ask for:
+// AnswerFields are the names of a record's answer that fields may ask for:
 // all but id and version, which always come.
-func answerFields(e *project.Entity) []string {
+func AnswerFields(e *project.Entity) []string {
 	var out []string
-	for _, f := range inRequest(e) {
+	for _, f := range InRequest(e) {
 		out = append(out, jsonName(f))
 	}
-	for _, r := range keys(e) {
-		out = append(out, keyName(r))
+	for _, r := range Keys(e) {
+		out = append(out, KeyName(r))
 	}
 	return append(out, "created_at", "updated_at")
 }
 
-// inRequest lists the fields a NewX carries: the declared ones.
-func inRequest(e *project.Entity) []*project.Field {
+// InRequest lists the fields a NewX carries: the declared ones.
+func InRequest(e *project.Entity) []*project.Field {
 	var out []*project.Field
 	for _, f := range e.Fields {
 		if !f.Implicit {
@@ -352,8 +352,8 @@ func inRequest(e *project.Entity) []*project.Field {
 	return out
 }
 
-// keys lists the relations whose key an entity holds.
-func keys(e *project.Entity) []*project.Relation {
+// Keys lists the relations whose key an entity holds.
+func Keys(e *project.Entity) []*project.Relation {
 	var out []*project.Relation
 	for _, r := range e.Relations {
 		if r.OwnsForeignKey() {
@@ -392,11 +392,11 @@ func apiFieldNames(m *project.Module) []FieldName {
 		}
 	}
 	for _, e := range m.Entities {
-		for _, f := range inRequest(e) {
+		for _, f := range InRequest(e) {
 			add(f.Snake, jsonName(f))
 		}
-		for _, r := range keys(e) {
-			add(r.Snake, keyName(r))
+		for _, r := range Keys(e) {
+			add(r.Snake, KeyName(r))
 		}
 	}
 	slices.SortFunc(out, func(a, b FieldName) int { return strings.Compare(a.Domain, b.Domain) })
@@ -433,7 +433,7 @@ func sampleableAPI(e *project.Entity, visiting map[*project.Entity]bool) bool {
 // which a test creates first through the API.
 func apiParents(e *project.Entity) []*project.Relation {
 	var out []*project.Relation
-	for _, r := range keys(e) {
+	for _, r := range Keys(e) {
 		if r.Required && r.Target.Module == e.Module {
 			out = append(out, r)
 		}
@@ -497,13 +497,13 @@ func apiSampleImports(entities []*project.Entity) []string {
 		if !canSampleAPI(e) {
 			continue
 		}
-		for _, r := range keys(e) {
+		for _, r := range Keys(e) {
 			if r.Required && r.Target.Module != e.Module {
 				add("uuid")
 				add("ogenuuid github.com/google/uuid")
 			}
 		}
-		for _, f := range inRequest(e) {
+		for _, f := range InRequest(e) {
 			if !f.Required {
 				continue
 			}
@@ -558,10 +558,10 @@ func accessLine(entities []*project.Entity, e *project.Entity, op string) string
 	return "Who may: " + security.AccessText(rules) + "."
 }
 
-// keyInRequest reports whether a request that creates or replaces an e must
+// KeyInRequest reports whether a request that creates or replaces an e must
 // carry r's key: a required relation, unless it is the owner's and create
 // lets the owner in, who is then the record's owner.
-func keyInRequest(entities []*project.Entity, e *project.Entity, r *project.Relation) bool {
+func KeyInRequest(entities []*project.Entity, e *project.Entity, r *project.Relation) bool {
 	if !r.Required {
 		return false
 	}

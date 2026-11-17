@@ -1,0 +1,31 @@
+{{- if and .Entities (uses "testcontainers") -}}
+package main
+
+import (
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+// TestTypeScriptClient runs the TypeScript client's tests (clients/ts/test)
+// against the API, with Node, which runs TypeScript as it is from 22.18.
+func TestTypeScriptClient(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed: the TypeScript client's tests need Node 22.18 or later")
+	}
+	if out, err := exec.Command(node, "-p", "process.features.typescript ? 1 : 0").Output(); err != nil || strings.TrimSpace(string(out)) != "1" {
+		t.Skip("this node does not run TypeScript: the TypeScript client's tests need Node 22.18 or later")
+	}
+	srv := newTestServer(t)
+	cmd := exec.Command(node, "--test", "--test-reporter=tap", "clients/ts/test/*.test.ts")
+	cmd.Dir = "../.."
+	cmd.Env = append(os.Environ(), "API_URL="+srv.URL)
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "\n# fail 0") || strings.Contains(string(out), "\n# pass 0") {
+		t.Fatalf("the TypeScript client's tests: %v\n%s", err, out)
+	}
+}
+{{end -}}

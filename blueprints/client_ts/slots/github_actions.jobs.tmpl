@@ -1,0 +1,32 @@
+{{- if .Entities}}{{$github := eq .Options.registry "github"}}
+  # The TypeScript client, published for tags v* only, versioned as the tag.
+  client:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+{{- if $github}}
+      packages: write
+{{- else}}
+      id-token: write
+{{- end}}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          registry-url: {{if $github}}https://npm.pkg.github.com{{else}}https://registry.npmjs.org{{end}}
+      - name: Publish {{packageName .App .Options}}
+        working-directory: clients/ts
+        run: |
+          npm install --no-audit --no-fund
+          npm pkg set version="${GITHUB_REF_NAME#v}"
+          npm run build
+          npm publish{{if not $github}} --provenance --access public{{end}}
+{{- if $github}}
+        env:
+          NODE_AUTH_TOKEN: ${{"{{"}} secrets.GITHUB_TOKEN {{"}}"}}
+{{- end}}
+{{- end}}

@@ -41,7 +41,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 	modes := []string{"optional", "required"}
 	for _, e := range p.Entities {
 		for _, f := range e.Fields {
-			if f.Pattern != "" && !portablePattern(f.Pattern) {
+			if f.Pattern != "" && !PortablePattern(f.Pattern) {
 				diags.Warnf(f.Pos, f.Pos, "%s.%s: the contract leaves out its pattern, which JavaScript reads differently ((?flags), \\A, \\z, \\p{...}); the API still checks it", e.Raw, f.Raw)
 			}
 		}

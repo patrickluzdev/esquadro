@@ -123,7 +123,13 @@ func TestLifecycle(t *testing.T) {
 	// A record with an owner: each customer's own reviews.
 	catalog += "\n/// What a customer thinks of a product.\nentity Review {\n  text     string required\n  customer > Customer required\n  product  > Product required\n  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
+	// The TypeScript client too: go test runs its tests against the API.
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	e.write(appEsq, strings.Replace(e.read(appEsq), "  blueprint api_docs\n", "  blueprint api_docs\n  blueprint client_ts {\n    scope \"acme\"\n  }\n", 1))
 	e.esquadro(0, "gen", dir)
+	if !strings.Contains(e.read(filepath.Join(dir, "clients", "ts", "package.json")), `"@acme/shop-client"`) {
+		t.Fatal("no TypeScript client")
+	}
 	migrations, _ := filepath.Glob(filepath.Join(dir, "migrations", "*.sql"))
 	if len(migrations) != 2 {
 		t.Fatalf("want the first migration and one for the change, got %v", migrations)

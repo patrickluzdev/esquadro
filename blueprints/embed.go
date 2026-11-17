@@ -29,5 +29,6 @@ import "embed"
 //go:embed env/blueprint.esq all:env/templates env/slots
 //go:embed security/blueprint.esq all:security/templates security/slots security/partials
 //go:embed mail/blueprint.esq all:mail/templates mail/slots all:mail/files
+//go:embed client_ts/blueprint.esq all:client_ts/templates client_ts/slots
 //go:embed git/blueprint.esq
 var FS embed.FS

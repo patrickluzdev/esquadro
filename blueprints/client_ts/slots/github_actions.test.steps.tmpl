@@ -1,0 +1,12 @@
+{{- if .Entities}}
+      # Node for the TypeScript client: its type check, and its tests, which
+      # go test runs against the API.
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - name: The TypeScript client type-checks
+        working-directory: clients/ts
+        run: |
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+{{- end}}
