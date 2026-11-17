@@ -1,0 +1,4 @@
+{{- $o := optionsOf "observability" -}}
+# Observability: where Grafana answers, and days the data is kept.
+observability_grafana_domain: {{quote $o.grafana_domain}}
+observability_retention_days: {{$o.retention_days}}

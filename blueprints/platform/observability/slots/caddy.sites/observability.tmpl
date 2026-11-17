@@ -1,0 +1,4 @@
+{{- with index (optionsOf "observability") "grafana_domain"}}
+  - domains: [{{.}}]
+    upstream: otel-lgtm:3000
+{{- end}}

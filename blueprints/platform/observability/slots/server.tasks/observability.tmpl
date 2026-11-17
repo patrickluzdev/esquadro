@@ -1,0 +1,4 @@
+  grafana:
+    desc: Open Grafana at http://localhost:3000, through SSH (Ctrl-C closes it)
+    cmds:
+      - ssh -N -L 3000:localhost:3000 {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}}

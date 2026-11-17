@@ -1,0 +1,8 @@
+## Grafana
+
+The apps send their traces, metrics and logs to Grafana on the platform's
+network; the server sends its CPU, memory, disk and network.
+{{- with index (optionsOf "observability") "grafana_domain"}} Grafana
+answers on https://{{.}}{{end}}{{if not (index (optionsOf "observability") "grafana_domain")}} `task grafana`
+opens it at http://localhost:3000, through SSH{{end}}: sign in as `admin`
+with `grafana_password` (`task secrets:edit`).

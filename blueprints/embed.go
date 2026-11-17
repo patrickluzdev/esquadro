@@ -38,4 +38,5 @@ import "embed"
 //go:embed platform/caddy/blueprint.esq all:platform/caddy/templates platform/caddy/slots
 //go:embed platform/postgres/blueprint.esq all:platform/postgres/templates platform/postgres/slots
 //go:embed platform/apps/blueprint.esq all:platform/apps/templates platform/apps/slots
+//go:embed platform/observability/blueprint.esq all:platform/observability/templates platform/observability/slots
 var FS embed.FS
