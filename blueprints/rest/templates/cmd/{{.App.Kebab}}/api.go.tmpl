@@ -15,7 +15,7 @@ import (
 {{- if policies .Entities}}
 	"{{.App.Module}}/internal/platform/security"
 {{- end}}
-{{- range .Modules}}{{if .Entities}}
+{{- range .Modules}}{{if or .Entities .Reports}}
 	"{{$.App.Module}}/internal/{{.Snake}}"
 {{- end}}{{end}}
 )
@@ -25,6 +25,8 @@ import (
 type (
 {{- range .Modules}}{{if .Entities}}
 	{{.Camel}}Operations = {{.Snake}}.HTTP
+{{- end}}{{if .Reports}}
+	{{.Camel}}Reports = {{.Snake}}.Reports
 {{- end}}{{end}}
 )
 
@@ -32,6 +34,8 @@ type (
 type api struct {
 {{- range .Modules}}{{if .Entities}}
 	{{.Camel}}Operations
+{{- end}}{{if .Reports}}
+	{{.Camel}}Reports
 {{- end}}{{end}}
 	logger *slog.Logger
 }
@@ -48,6 +52,8 @@ func newAPI(d dependencies) (http.Handler, error) {
 {{- end}}
 		}
 {{- end}}),
+{{- end}}{{if .Reports}}
+		{{.Camel}}Reports: {{.Snake}}.NewReports(d.{{.Camel}}),
 {{- end}}{{end}}
 		logger: d.logger,
 	}

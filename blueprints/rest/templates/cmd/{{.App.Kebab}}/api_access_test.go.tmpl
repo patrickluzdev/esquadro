@@ -143,4 +143,15 @@ func TestAPIAccess(t *testing.T) {
 	})
 {{- end}}{{end}}
 }
+{{- range .Reports}}{{if not (reportPublic .)}}
+
+// TestAPIReport{{.Pascal}}Access refuses the report to no one signed in.
+func TestAPIReport{{.Pascal}}Access(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	if got, _, _ := call(t, "GET", srv.URL+"/api/v1/reports/{{.Kebab}}{{reportSampleQuery .}}", "nobody"); got != refused("nobody") {
+		t.Errorf("as no one: %d, want %d", got, refused("nobody"))
+	}
+}
+{{- end}}{{end}}
 {{end -}}

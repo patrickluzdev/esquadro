@@ -93,6 +93,12 @@ blueprint security {
   option lockout_attempts int default(5)
   option lockout_minutes int default(15)
 
+  annotation report {
+    /// Who may read the report: public, a realm (whoever signed in to it)
+    /// or realm.role.
+    read list
+  }
+
   annotation entity {
     /// The entity signs in: a realm named after it.
     principal bool

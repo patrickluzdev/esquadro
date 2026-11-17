@@ -35,6 +35,12 @@ blueprint rest {
   /// How many hours an Idempotency-Key answers retries.
   option idempotency_hours int default(24)
 
+  annotation report {
+    /// The most rows the report answers; above it, too_many_records. The
+    /// unpaged_max option by default.
+    unpaged_max int
+  }
+
   annotation entity {
     /// How the entity's list pages: cursor, page, both, or [] (none).
     pagination list

@@ -20,6 +20,12 @@ func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"jsonName":            jsonName,
 		"paginationOf":        PaginationOf,
+		"reportSchema":        ReportSchema,
+		"reportIn":            ReportIn,
+		"reportOut":           ReportOut,
+		"reportRows":          ReportRows,
+		"reportPublic":        ReportPublic,
+		"reportSampleQuery":   ReportSampleQuery,
 		"ifMatchRequired":     IfMatchRequired,
 		"idempotencyRequired": IdempotencyRequired,
 		"unpagedMax":          UnpagedMax,
@@ -537,11 +543,12 @@ func linkTests(entities []*project.Entity) bool {
 	return false
 }
 
-// modulePaths lists the import paths of the modules with entities.
-func modulePaths(appModule string, modules []*project.Module) []string {
+// modulePaths lists the import paths of the modules with entities, and
+// with reports too when reports.
+func modulePaths(appModule string, modules []*project.Module, reports ...bool) []string {
 	var out []string
 	for _, m := range modules {
-		if len(m.Entities) > 0 {
+		if len(m.Entities) > 0 || (len(reports) > 0 && reports[0] && len(m.Reports) > 0) {
 			out = append(out, appModule+"/internal/"+m.Snake)
 		}
 	}

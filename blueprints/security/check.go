@@ -194,6 +194,33 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		}
 	}
 
+	for _, rep := range p.Reports {
+		end := diag.Pos{File: rep.Pos.File, Line: rep.Pos.Line, Col: rep.Pos.Col + len("report"), Offset: rep.Pos.Offset + len("report")}
+		who := names(rep.Ann["security"]["read"])
+		if who == nil {
+			if len(realms) > 0 {
+				diags.Errorf(rep.Pos, end, "report %s has no @security(read ...): say who may read its numbers", rep.Raw).
+					Suggestion = fmt.Sprintf("e.g. @security(read %s)", realms[0].Name)
+			}
+			continue
+		}
+		for _, w := range who {
+			if w == "public" {
+				continue
+			}
+			realm, role, hasRole := strings.Cut(w, ".")
+			r := byName[realm]
+			switch {
+			case w == "owner":
+				diags.Errorf(rep.Pos, end, "report %s: owner is for records; a report's SQL filters what it shows", rep.Raw)
+			case r == nil:
+				diags.Errorf(rep.Pos, end, "report %s: %s is not public nor a realm (an entity marked @security(principal))", rep.Raw, w)
+			case hasRole && !slices.Contains(r.Roles, role):
+				diags.Errorf(rep.Pos, end, "report %s: %s is not a role of %s, whose roles are %s", rep.Raw, role, realm, strings.Join(r.Roles, ", "))
+			}
+		}
+	}
+
 	options(p, set, &diags)
 	maintenance(p, set, realms, &diags)
 	needs(p, set, realms, &diags)

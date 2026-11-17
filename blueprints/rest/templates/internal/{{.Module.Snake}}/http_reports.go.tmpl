@@ -1,0 +1,62 @@
+{{- $m := .Module}}{{$pol := policies .Entities -}}
+{{- if $m.Reports -}}
+{{- $uuid := false}}{{$ogenuuid := false}}{{$decimal := false}}{{range $m.Reports}}{{range .Params}}{{if eq .Type "uuid"}}{{$uuid = true}}{{end}}{{if eq .Type "decimal"}}{{$decimal = true}}{{end}}{{end}}{{range .Columns}}{{if eq .Type "uuid"}}{{$ogenuuid = true}}{{end}}{{end}}{{end -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "errors" (and $uuid "uuid") (and $ogenuuid "ogenuuid github.com/google/uuid") (and $decimal "github.com/shopspring/decimal") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and $pol (printf "%s/internal/platform/security" .App.Module))}}
+// Reports exposes the {{$m.Snake}} module's reports as the API's operations.
+type Reports struct{ {{$m.Snake}} *{{$m.Pascal}} }
+
+// NewReports returns the API's reports on m.
+func NewReports(m *{{$m.Pascal}}) Reports { return Reports{ {{- $m.Snake}}: m} }
+{{range $r := $m.Reports}}{{$rows := reportRows $r (optionsOf "rest")}}
+func (h Reports) Report{{$r.Pascal}}(ctx context.Context{{if $r.Params}}, params apigen.Report{{$r.Pascal}}Params{{end}}) (*apigen.{{$r.Pascal}}Report, error) {
+{{- if $pol}}
+	if !security.Allows(ctx{{range (index $r.Ann "security").read}}, {{quote .}}{{end}}) {
+		return nil, security.Refusal(ctx)
+	}
+{{- end}}
+	q := {{$r.Pascal}}Query{Limit: {{$rows}}}
+{{- range $r.Params}}{{$g := ogenName .Snake}}
+{{- if eq .Type "decimal"}}
+	if {{if .Required}}v, ok := params.{{$g}}, true; ok{{else}}v, ok := params.{{$g}}.Get(); ok{{end}} {
+		d, err := decimal.NewFromString(v)
+		if err != nil {
+			return nil, edge.ErrInvalidRequest
+		}
+		q.{{.Pascal}} = {{if .Required}}d{{else}}&d{{end}}
+	}
+{{- else if .Required}}
+	q.{{.Pascal}} = {{reportIn . (printf "params.%s" $g)}}
+{{- else}}
+	if v, ok := params.{{$g}}.Get(); ok {
+		q.{{.Pascal}} = new({{reportIn . "v"}})
+	}
+{{- end}}
+{{- end}}
+	rows, err := h.{{$m.Snake}}.{{$r.Pascal}}(ctx, q)
+	if errors.Is(err, postgres.ErrTooManyRows) {
+		return nil, edge.TooManyRecords({{quote (lower $r.Label)}}, {{$rows}})
+	}
+	if err != nil {
+		return nil, err
+	}
+	answer := apigen.{{$r.Pascal}}Report{Items: make([]apigen.{{$r.Pascal}}Row, len(rows))}
+	for i, row := range rows {
+		a := &answer.Items[i]
+{{- range $r.Columns}}{{$g := ogenName .Snake}}
+{{- if .Required}}
+		a.{{$g}} = {{reportOut . (printf "row.%s" .Pascal)}}
+{{- else}}
+		if row.{{.Pascal}} != nil {
+			a.{{$g}}.SetTo({{reportOut . (printf "(*row.%s)" .Pascal)}})
+		} else {
+			a.{{$g}}.SetToNull()
+		}
+{{- end}}
+{{- end}}
+	}
+	return &answer, nil
+}
+{{end}}
+{{- end -}}

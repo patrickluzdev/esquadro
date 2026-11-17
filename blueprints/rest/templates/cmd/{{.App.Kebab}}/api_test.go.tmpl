@@ -1,7 +1,7 @@
 {{- if and .Entities (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules true)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {
@@ -9,7 +9,7 @@ func newTestDependencies(t *testing.T) dependencies {
 	pool := postgrestest.Fresh(t)
 	d := dependencies{logger: slog.New(slog.DiscardHandler), pool: pool}
 	d.config.MaxBodyKB = 64
-{{- range .Modules}}{{if .Entities}}
+{{- range .Modules}}{{if or .Entities .Reports}}
 	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{Pool: pool})
 {{- end}}{{end}}
 {{- with slot "rest.test.dependencies" .}}
@@ -538,4 +538,29 @@ func TestAPIRulesAnswerInvalidFields(t *testing.T) {
 	}
 }
 {{- end}}{{end}}
+{{- if .Reports}}
+
+// TestAPIReports asks each report through the API, on an empty database:
+// its SQL runs, and the answer is what the contract says.
+func TestAPIReports(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	for _, path := range []string{
+{{- range .Reports}}
+		"/api/v1/reports/{{.Kebab}}{{reportSampleQuery .}}",
+{{- end}}
+	} {
+		res, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body struct{ Items []json.RawMessage }
+		err = json.NewDecoder(res.Body).Decode(&body)
+		res.Body.Close()
+		if res.StatusCode != 200 || err != nil || body.Items == nil {
+			t.Errorf("%s: %d %v", path, res.StatusCode, err)
+		}
+	}
+}
+{{- end}}
 {{end -}}

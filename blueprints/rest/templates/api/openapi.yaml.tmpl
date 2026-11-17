@@ -340,6 +340,36 @@ paths:
 {{- end}}
 {{- end}}
 {{- end}}
+{{- range .Reports}}
+  /api/v1/reports/{{.Kebab}}:
+    get:
+      operationId: report{{.Pascal}}
+      summary: {{quote (printf "The %s report" .Label)}}
+      description: |
+{{- range .Doc}}
+        {{.}}
+{{- end}}
+        Up to {{reportRows . (optionsOf "rest")}} rows; past them, `too_many_records` (422).
+      tags: [{{.Module.Snake}}]
+{{- if .Params}}
+      parameters:
+{{- range .Params}}
+        - name: {{.Snake}}
+          in: query
+          required: {{.Required}}
+          schema: {{reportSchema . false}}
+{{- end}}
+{{- end}}
+      responses:
+        "200":
+          description: {{quote (printf "The %s report's rows." .Label)}}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{.Pascal}}Report"
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
 {{- with slot "rest.paths" .}}
 {{.}}
 {{- end}}
@@ -525,6 +555,26 @@ components:
           items: {type: string, format: uuid}
         next: {type: string, description: The cursor of the next page; absent on the last one.}
 {{- end}}{{end}}
+{{- end}}
+{{- range .Reports}}
+    {{.Pascal}}Report:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/{{.Pascal}}Row"
+    {{.Pascal}}Row:
+      type: object
+{{- $req := false}}{{range .Columns}}{{if .Required}}{{$req = true}}{{end}}{{end}}
+{{- if $req}}
+      required: [{{$first := true}}{{range .Columns}}{{if .Required}}{{if not $first}}, {{end}}{{$first = false}}{{.Snake}}{{end}}{{end}}]
+{{- end}}
+      properties:
+{{- range .Columns}}
+        {{.Snake}}: {{reportSchema . (not .Required)}}
+{{- end}}
 {{- end}}
 {{- with slot "rest.schemas" .}}
 {{.}}
