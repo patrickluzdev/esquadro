@@ -1,0 +1,38 @@
+/// The servers of a platform, kept as the model describes them, with
+/// Ansible: ansible/ prepares a new Debian server (task bootstrap, once, as
+/// root) and keeps every server up to date (task plan shows what would
+/// change, task apply changes it): an admin user that signs in with your SSH
+/// key and no password, no root login, the firewall, automatic security
+/// updates, and Docker with the network the platform's services share. The
+/// secrets are in secrets/, encrypted with SOPS and age: task secrets:init
+/// makes your key, task secrets:edit changes them. Your own tasks go in
+/// ansible/roles/local, which esquadro never rewrites.
+blueprint server {
+  version "0.1.0"
+  for platform
+
+  /// The user Ansible and you sign in as: it has sudo, root has no login.
+  option admin_user string default("admin")
+  /// Your SSH public key, which the admin user signs in with.
+  option ssh_key string default("~/.ssh/id_ed25519.pub")
+  /// The servers' time zone.
+  option timezone string default("UTC")
+
+  /// Roles of ansible/site.yml after base and docker, as YAML list items
+  /// indented by four spaces, e.g. "    - caddy".
+  slot "server.roles"
+  /// Variables of ansible/group_vars/all/platform.yml, as YAML at the top
+  /// level.
+  slot "server.vars"
+  /// Ports the firewall lets in besides SSH, as YAML list items indented by
+  /// two spaces, e.g. "  - 443".
+  slot "server.ports"
+  /// Secrets of secrets/platform.sops.yaml, as YAML lines "key: value" with
+  /// a comment above; the value generate makes task secrets:init write a
+  /// random one, an empty one is yours to fill.
+  slot "server.secrets"
+  /// Tasks of Taskfile.esquadro.yml, as YAML indented by two spaces.
+  slot "server.tasks"
+  /// Sections of README.md, in Markdown.
+  slot "server.readme"
+}

@@ -116,6 +116,11 @@ func runBlueprintList(args []string, stdout, stderr io.Writer) int {
 	used := func(name string) bool { return l != nil && l.set.Get(name) != nil }
 
 	loader := builtinLoader()
+	order, groups := blueprintOrder, blueprintGroups
+	if l != nil && l.project.Kind == project.KindPlatform {
+		loader.Kind = project.KindPlatform
+		order, groups = platformBlueprintOrder, platformGroups
+	}
 	mark := "  "
 	if l != nil {
 		fmt.Fprintln(stdout, "Built-in blueprints (* the app uses it):")
@@ -123,13 +128,13 @@ func runBlueprintList(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Built-in blueprints:")
 	}
 	group := ""
-	for _, name := range blueprintOrder {
+	for _, name := range order {
 		b, diags := loader.Load(&project.BlueprintRef{Ref: name, Source: project.SourceBuiltin})
 		if b == nil || diags.HasErrors() {
 			fmt.Fprintf(stderr, "esquadro blueprint list: %s: %v\n", name, diags)
 			return 1
 		}
-		if g := blueprintGroups[name]; g != group {
+		if g := groups[name]; g != group {
 			group = g
 			fmt.Fprintf(stdout, "\n  %s\n", groupTitles[g])
 		}

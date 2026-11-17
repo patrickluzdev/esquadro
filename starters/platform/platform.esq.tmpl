@@ -1,0 +1,27 @@
+/// {{.Label}}: the servers of your projects and the services they share.
+platform {{.Name}} {
+  // the servers, kept by Ansible
+  blueprint server
+{{- if .Git}}
+
+  // the repository
+  blueprint git {
+    initial_commit true
+  }
+{{- end}}
+}
+
+/// The server: write its address, a Debian 13 you sign in to as root once.
+server main {
+  host "203.0.113.10"
+}
+
+// Each app the platform runs is an app block: its image, without a tag
+// (each deploy chooses the version), and its domains.
+//
+// app shop {
+//   image   "ghcr.io/you/shop"
+//   domains ["shop.com"]
+//   worker
+//   database
+// }

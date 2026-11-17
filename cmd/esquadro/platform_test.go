@@ -1,0 +1,98 @@
+package main
+
+import (
+	"bufio"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// platformProject generates a platform from the starter, with the given
+// blueprints added and an app it runs.
+func platformProject(t *testing.T, blueprints ...string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "acme")
+	if code, _, errOut := esq(t, "new", "-starter", "platform", "-no-gen", "-no-git", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "platform.esq")
+	src, err := os.ReadFile(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(src)
+	for _, b := range blueprints {
+		s = strings.Replace(s, "  blueprint server\n", "  blueprint server\n  blueprint "+b+"\n", 1)
+	}
+	s += "\n/// The shop.\napp shop {\n  image   \"ghcr.io/acme/shop\"\n  domains [\"shop.com\", \"api.shop.com\"]\n  worker\n  database\n}\n"
+	if err := os.WriteFile(model, []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	return dir
+}
+
+func TestAPlatformDescribesItsServersAndApps(t *testing.T) {
+	dir := platformProject(t)
+	vars, err := os.ReadFile(filepath.Join(dir, "ansible", "group_vars", "all", "platform.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"platform_admin_user: admin", "  - name: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
+		if !strings.Contains(string(vars), want) {
+			t.Errorf("platform.yml lacks %q:\n%s", want, vars)
+		}
+	}
+	inv, _ := os.ReadFile(filepath.Join(dir, "ansible", "inventory.yml"))
+	if !strings.Contains(string(inv), "        main:\n          ansible_host: 203.0.113.10") {
+		t.Errorf("inventory.yml:\n%s", inv)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		t.Error("a platform has a go.mod")
+	}
+	lintPlatform(t, dir)
+}
+
+// lintPlatform checks a generated platform's playbooks as its task lint
+// does, when Ansible and ansible-lint are installed.
+func lintPlatform(t *testing.T, dir string) {
+	t.Helper()
+	for _, tool := range []string{"ansible-playbook", "ansible-lint", "ansible-galaxy"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Logf("%s is not installed: the playbooks are not linted", tool)
+			return
+		}
+	}
+	env := append(os.Environ(), "ANSIBLE_CONFIG=ansible/ansible.cfg", "ANSIBLE_COLLECTIONS_PATH="+collectionsPath(t))
+	for _, args := range [][]string{
+		{"ansible-playbook", "ansible/site.yml", "--syntax-check"},
+		{"ansible-lint", "--offline", "-q", "ansible/"},
+	} {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir, cmd.Env = dir, env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+}
+
+// collectionsPath is where the installed Ansible keeps community.docker, so
+// ansible-lint finds the collections whatever Python it runs on.
+func collectionsPath(t *testing.T) string {
+	out, err := exec.Command("ansible-galaxy", "collection", "list", "community.docker").Output()
+	if err != nil {
+		t.Skip("the community.docker collection is not installed: run task deps in a platform")
+	}
+	sc := bufio.NewScanner(strings.NewReader(string(out)))
+	for sc.Scan() {
+		if p, ok := strings.CutPrefix(sc.Text(), "# "); ok && strings.HasSuffix(p, "ansible_collections") {
+			return filepath.Dir(p)
+		}
+	}
+	t.Skip("cannot tell where the Ansible collections are")
+	return ""
+}

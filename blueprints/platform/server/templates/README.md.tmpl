@@ -1,0 +1,51 @@
+# {{.App.Label}}
+
+{{with .App.Doc}}{{join " " .}}
+
+{{end -}}
+The servers of the projects and the services they share, as code. esquadro
+generates this repository from the model in `esquadro/`: change the model,
+run `esquadro gen`, then `task plan` and `task apply`.
+
+## What you need
+
+- [Task](https://taskfile.dev), Ansible, SOPS and age on your machine.
+- A server with Debian 13, reachable by SSH as root with your key (once).
+- Your SSH key at `{{.Options.ssh_key}}`.
+
+## The first time
+
+1. `task deps` installs the Ansible collections.
+2. `task secrets:init` makes your age key at `~/.config/sops/age/keys.txt`
+   and encrypts `secrets/platform.sops.yaml` with it. **Keep a copy of the
+   key in your password manager**: without it, nobody can read the secrets.
+3. `task secrets:edit` fills in the secrets left empty.
+4. `task bootstrap` signs in as root once, creates the user
+   `{{.Options.admin_user}}` with your key, turns off root login and
+   passwords, then runs `task apply`.
+
+## Every day
+
+| Task | What it does |
+|---|---|
+| `task plan` | shows what `apply` would change, changing nothing |
+| `task apply` | brings the servers to what the platform describes |
+| `task ssh` | signs in to a server |
+| `task secrets:edit` | changes the secrets; they stay encrypted in git |
+| `task lint` | checks the playbooks |
+
+## Servers
+{{range .Servers}}
+- **{{.Raw}}** (`{{.Host}}`){{with .Doc}}: {{join " " .}}{{end}}
+{{- end}}
+
+## Your own changes
+
+Files esquadro generates are rewritten by `esquadro gen`. Yours are not:
+
+- `ansible/roles/local/`: tasks of your own, run after everything else.
+- `Taskfile.yml`: tasks of your own.
+{{- range slotParts "server.readme" .}}
+
+{{.}}
+{{- end}}

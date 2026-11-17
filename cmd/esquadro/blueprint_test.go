@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -172,5 +173,26 @@ func TestBlueprintHelp(t *testing.T) {
 	}
 	if code, _, errOut := esq(t, "blueprint", "nope"); code != 2 || !strings.Contains(errOut, "unknown command") {
 		t.Fatalf("exit %d: %s", code, errOut)
+	}
+}
+
+func TestBlueprintListShowsAPlatformItsOwn(t *testing.T) {
+	names, _ := filepath.Glob("../../blueprints/platform/*/blueprint.esq")
+	for _, n := range names {
+		name := filepath.Base(filepath.Dir(n))
+		if !slices.Contains(platformBlueprintOrder, name) || platformGroups[name] == "" {
+			t.Errorf("%s is not in platformBlueprintOrder, or has no group", name)
+		}
+	}
+	dir := filepath.Join(t.TempDir(), "acme")
+	if code, _, errOut := esq(t, "new", "-starter", "platform", "-no-gen", "-no-git", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	code, out, errOut := esq(t, "blueprint", "list", dir)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	if !strings.Contains(out, "  * server ") || !strings.Contains(out, "    git ") || strings.Contains(out, " rest ") {
+		t.Fatalf("out:\n%s", out)
 	}
 }

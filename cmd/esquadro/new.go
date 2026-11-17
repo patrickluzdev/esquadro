@@ -29,6 +29,9 @@ var blueprintGroups = map[string]string{
 	"git": "tools", "branching": "tools",
 }
 
+// platformGroups name what the blueprints of a platform are for.
+var platformGroups = map[string]string{"server": "servers", "git": "tools"}
+
 // groupTitles are the comments over each group.
 var groupTitles = map[string]string{
 	"base":  "the program, its modules and how it runs",
@@ -36,6 +39,8 @@ var groupTitles = map[string]string{
 	"api":   "the JSON API and what every request goes through",
 	"ship":  "running it in production: telemetry, the container image and the CI",
 	"tools": "the repository",
+	// A platform's.
+	"servers": "the servers, kept by Ansible, and the services they share",
 }
 
 var projectName = regexp.MustCompile(`^[a-z][a-z0-9]*([_-][a-z0-9]+)*$`)
@@ -156,6 +161,11 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 func nextSteps(dir string, files map[string]string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Next: cd %s\n", dir)
+	if _, ok := files["platform.esq"]; ok {
+		fmt.Fprintf(&b, "  write your server's address in %s/platform.esq and run esquadro gen\n", workspace.Dir)
+		b.WriteString("  task deps, task secrets:init, then task bootstrap; README.md has the rest\n")
+		return b.String()
+	}
 	if len(files) == 1 {
 		b.WriteString("  esquadro blueprint list    the blueprints you can add\n")
 		b.WriteString("  esquadro add <blueprint>   add one to esquadro/app.esq and generate\n")

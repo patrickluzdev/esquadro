@@ -13,7 +13,7 @@ import (
 
 // starterNames are the starters, in the order esquadro new lists them.
 func starterNames() []string {
-	return []string{"api", "worker", "cli"}
+	return []string{"api", "worker", "cli", "platform"}
 }
 
 // starterAbout is the line that says what a starter is for.
@@ -38,7 +38,7 @@ func starterFiles(name, project, module string, git bool) (map[string]string, er
 			return nil, err
 		}
 		switch {
-		case e.Name() == "app.esq.tmpl":
+		case e.Name() == "app.esq.tmpl" || e.Name() == "platform.esq.tmpl":
 			t, err := template.New(e.Name()).Option("missingkey=error").Parse(string(src))
 			if err != nil {
 				return nil, err
@@ -49,7 +49,7 @@ func starterFiles(name, project, module string, git bool) (map[string]string, er
 			}); err != nil {
 				return nil, err
 			}
-			files["app.esq"] = b.String()
+			files[strings.TrimSuffix(e.Name(), ".tmpl")] = b.String()
 		case strings.HasSuffix(e.Name(), ".esq"):
 			files[e.Name()] = string(src)
 		}
@@ -59,11 +59,14 @@ func starterFiles(name, project, module string, git bool) (map[string]string, er
 
 var blueprintLine = regexp.MustCompile(`(?m)^\s*blueprint ([a-z_][a-z0-9_]*)\b`)
 
-// starterBlueprints are the blueprints a starter's app uses, without git.
+// starterBlueprints are the blueprints a starter's app or platform uses,
+// without git.
 func starterBlueprints(name string) []string {
 	src, err := fs.ReadFile(starters.FS, path.Join(name, "app.esq.tmpl"))
 	if err != nil {
-		return nil
+		if src, err = fs.ReadFile(starters.FS, path.Join(name, "platform.esq.tmpl")); err != nil {
+			return nil
+		}
 	}
 	var bps []string
 	for _, m := range blueprintLine.FindAllStringSubmatch(string(src), -1) {

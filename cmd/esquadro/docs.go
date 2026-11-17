@@ -57,6 +57,10 @@ var blueprintOrder = []string{
 	"git", "branching",
 }
 
+// platformBlueprintOrder lists the blueprints of a platform, in the order a
+// platform lists them; git is the apps' too.
+var platformBlueprintOrder = []string{"server", "git"}
+
 // referencePages returns the generated pages by path, relative to the
 // site's pages folder.
 func referencePages() (map[string]string, error) {

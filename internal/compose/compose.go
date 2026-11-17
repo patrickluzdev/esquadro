@@ -103,6 +103,10 @@ type Data struct {
 	Modules  []*project.Module
 	Jobs     []*project.Job
 	Reports  []*project.Report
+	// Servers and Hosted are, in a platform, its servers and the apps it
+	// runs.
+	Servers []*project.Server
+	Hosted  []*project.Hosted
 	// Env are the project's environment variables, with their values
 	// rendered, and Environments its environments, the first one where
 	// development happens.
@@ -579,7 +583,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 
 	whole := Data{
 		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
-		Env: c.env, Environments: c.set.Environments,
+		Servers: c.p.Servers, Hosted: c.p.Hosted, Env: c.env, Environments: c.set.Environments,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
 	var datas []Data
@@ -717,7 +721,7 @@ func (c *composer) renderEnv() []*project.EnvVar {
 		if bp != nil {
 			name := display(bp, "blueprint.esq")
 			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
-				Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
+				Servers: c.p.Servers, Hosted: c.p.Hosted, Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
 			execute := func(s string) (string, bool) {
 				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)
 				if err != nil {

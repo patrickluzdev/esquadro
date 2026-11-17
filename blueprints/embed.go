@@ -7,6 +7,8 @@ import "embed"
 // FS contains the built-in blueprints: each one's manifest, templates and
 // slots, and not its Go code or test data.
 //
+// The blueprints only for platforms are in platform/.
+//
 //go:embed app/blueprint.esq all:app/templates
 //go:embed domain/blueprint.esq all:domain/templates domain/slots
 //go:embed http/blueprint.esq all:http/templates http/slots
@@ -31,4 +33,5 @@ import "embed"
 //go:embed mail/blueprint.esq all:mail/templates mail/slots all:mail/files
 //go:embed client_ts/blueprint.esq all:client_ts/templates client_ts/slots
 //go:embed git/blueprint.esq
+//go:embed platform/server/blueprint.esq all:platform/server/templates
 var FS embed.FS
