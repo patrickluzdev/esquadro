@@ -16,6 +16,7 @@ blueprint migrations
 ## Works with
 
 - **Requires** [app](../app/), [postgres](../postgres/): the app must use them too.
+- **Works with** [docker](../docker/) when the app uses them.
 
 ## Slots
 

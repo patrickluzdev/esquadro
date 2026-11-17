@@ -18,7 +18,7 @@ blueprint server
 | Option | Type | Default | |
 |---|---|---|---|
 | `admin_user` | string | `"admin"` | The user Ansible and you sign in as: it has sudo, root has no login. |
-| `ssh_key` | string | `"~/.ssh/id_ed25519.pub"` | Your SSH public key, which the admin user signs in with. |
+| `ssh_key` | string | `"~/.ssh/id_ed25519"` | Your SSH key, which Ansible and the tasks sign in with; the admin user gets its public half, the same path with .pub. |
 | `timezone` | string | `"UTC"` | The servers' time zone. |
 
 ```esquadro
