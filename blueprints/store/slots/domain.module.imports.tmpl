@@ -1,5 +1,7 @@
 {{- if .Module.Entities}}
 	"errors"
+{{- end}}
+{{- if or .Module.Entities .Module.Jobs .Module.Reports}}
 
 	"github.com/jackc/pgx/v5/pgxpool"
 {{- end}}

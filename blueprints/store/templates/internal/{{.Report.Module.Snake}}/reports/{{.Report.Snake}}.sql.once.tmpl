@@ -1,0 +1,19 @@
+{{- $r := .Report -}}
+-- The SQL of the report {{$r.Pascal}}{{with $r.Doc}}: {{join " " .}}{{end}}
+--
+-- Yours to write: esquadro wrote this file once and leaves it alone. Keep
+-- the name line; a column for each one the model declares, in any order,
+-- cast to its type (count(*)::bigint AS clicks); the parameters as
+-- sqlc.arg(name)::type when required, sqlc.narg(name)::type when not; and
+-- the LIMIT, which caps the rows the report answers.
+
+-- name: {{$r.Pascal}} :many
+SELECT
+{{- range $i, $c := $r.Columns}}{{if $i}},{{end}}
+  {{reportSample $c}}::{{reportCast $c}} AS {{$c.Snake}}
+{{- end}}
+WHERE false -- no rows until the report is written
+{{- range $r.Params}}
+  AND {{if .Required}}sqlc.arg({{.Snake}})::{{reportCast .}} IS NOT NULL{{else}}(sqlc.narg({{.Snake}})::{{reportCast .}} IS NULL OR true){{end}}
+{{- end}}
+LIMIT sqlc.arg(row_limit);

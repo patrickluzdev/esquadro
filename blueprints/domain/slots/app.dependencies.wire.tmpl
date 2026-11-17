@@ -1,4 +1,4 @@
-{{- range .Modules}}{{if or .Entities .Jobs}}
+{{- range .Modules}}{{if or .Entities .Jobs .Reports}}
 	d.{{.Camel}} = {{.Snake}}.New({{.Snake}}.Deps{
 {{- with slot "domain.deps.values" $}}
 {{.}}

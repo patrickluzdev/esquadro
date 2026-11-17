@@ -77,15 +77,27 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return postgres.Ident(o.Relation.Snake + "_id")
 		},
-		"keyField":   func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
-		"keyIn":      keyIn,
-		"keyOut":     keyOut,
-		"needs":      needs,
-		"constraint": constraint,
-		"pgIdent":    postgres.Ident,
-		"writable":   writable,
-		"refusals":   refusals,
-		"contains":   strings.Contains,
+		"keyField":      func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
+		"keyIn":         keyIn,
+		"keyOut":        keyOut,
+		"needs":         needs,
+		"constraint":    constraint,
+		"pgIdent":       postgres.Ident,
+		"writable":      writable,
+		"refusals":      refusals,
+		"contains":      strings.Contains,
+		"reportCast":    reportCast,
+		"reportImports": reportImports,
+		"reportParam":   reportParam,
+		"reportSample":  reportSample,
+		"reportRead": func(f *project.Field) string {
+			r, _ := reportReader(f)
+			return r
+		},
+		"reportConvert": func(f *project.Field, v string) string {
+			_, c := reportReader(f)
+			return fmt.Sprintf(c, v)
+		},
 		"textFields": func(e *project.Entity) []*project.Field {
 			var out []*project.Field
 			for _, f := range e.Fields {
@@ -560,6 +572,135 @@ func links(e *project.Entity) []*project.Relation {
 	for _, r := range e.Relations {
 		if r.Kind == project.ManyToMany {
 			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// reportCast is the PostgreSQL cast of a report's column or parameter of
+// f's type, which makes the Go type sqlc gives it known.
+func reportCast(f *project.Field) string {
+	switch f.Type {
+	case project.TypeInt, project.TypeInt64:
+		return "bigint"
+	case project.TypeDecimal:
+		return "numeric"
+	case project.TypeBool:
+		return "boolean"
+	case project.TypeTime:
+		return "timestamptz"
+	case project.TypeDate:
+		return "date"
+	case project.TypeUUID:
+		return "uuid"
+	}
+	return "text"
+}
+
+// reportParam is the Go expression of a report parameter, q.<Field>, as
+// sqlc's parameters take it: sqlc.arg when required, sqlc.narg when not.
+func reportParam(f *project.Field) string {
+	x := "q." + f.Pascal
+	if !f.Required {
+		switch f.Type {
+		case project.TypeInt:
+			return "postgres.Opt(" + x + ", func(n int) pgtype.Int8 { return postgres.Int8(int64(n)) })"
+		case project.TypeInt64:
+			return "postgres.Opt(" + x + ", postgres.Int8)"
+		case project.TypeDecimal:
+			return "postgres.Opt(" + x + ", postgres.Numeric)"
+		case project.TypeBool:
+			return "postgres.Opt(" + x + ", postgres.Bool)"
+		case project.TypeTime:
+			return "postgres.Opt(" + x + ", postgres.Timestamptz)"
+		case project.TypeDate:
+			return "postgres.Opt(" + x + ", postgres.Date)"
+		case project.TypeUUID:
+			return "postgres.Opt(" + x + ", postgres.UUID)"
+		case project.TypeEnum:
+			return "postgres.Opt(" + x + ", func(e " + f.Enum.Pascal + ") pgtype.Text { return postgres.Text(string(e)) })"
+		}
+		return "postgres.Opt(" + x + ", postgres.Text)"
+	}
+	switch f.Type {
+	case project.TypeInt:
+		return "int64(" + x + ")"
+	case project.TypeDecimal:
+		return "postgres.Numeric(" + x + ")"
+	case project.TypeTime:
+		return "postgres.Timestamptz(" + x + ")"
+	case project.TypeDate:
+		return "postgres.Date(" + x + ")"
+	case project.TypeUUID:
+		return "postgres.UUID(" + x + ")"
+	case project.TypeEnum:
+		return "string(" + x + ")"
+	}
+	return x
+}
+
+// reportReader is the postgres function that reads a report's column of
+// f's type from whatever sqlc made of it, and how its value becomes the
+// row's: "%s" stands for the value read.
+func reportReader(f *project.Field) (reader, convert string) {
+	switch f.Type {
+	case project.TypeInt:
+		return "postgres.IntOf", "int(%s)"
+	case project.TypeInt64:
+		return "postgres.IntOf", "%s"
+	case project.TypeDecimal:
+		return "postgres.DecimalOf", "%s"
+	case project.TypeBool:
+		return "postgres.BoolOf", "%s"
+	case project.TypeTime, project.TypeDate:
+		return "postgres.TimeOf", "%s"
+	case project.TypeUUID:
+		return "postgres.UUIDOf", "%s"
+	case project.TypeEnum:
+		return "postgres.TextOf", f.Enum.Pascal + "(%s)"
+	}
+	return "postgres.TextOf", "%s"
+}
+
+// reportSample is a SQL value of a column of f's type, for the SQL esquadro
+// writes first.
+func reportSample(f *project.Field) string {
+	switch f.Type {
+	case project.TypeInt, project.TypeInt64, project.TypeDecimal:
+		return "0"
+	case project.TypeBool:
+		return "false"
+	case project.TypeTime, project.TypeDate:
+		return "now()"
+	case project.TypeUUID:
+		return "gen_random_uuid()"
+	case project.TypeEnum:
+		return "'" + f.Enum.Values[0].Raw + "'"
+	}
+	return "''"
+}
+
+// reportImports are the imports a report's query and row types need.
+func reportImports(r *project.Report) []string {
+	var out []string
+	add := func(p string) {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	for _, f := range append(append([]*project.Field{}, r.Params...), r.Columns...) {
+		switch f.Type {
+		case project.TypeTime, project.TypeDate:
+			add("time")
+		case project.TypeUUID:
+			add("uuid")
+		case project.TypeDecimal:
+			add("github.com/shopspring/decimal")
+		}
+	}
+	for _, f := range r.Params {
+		if !f.Required && (f.Type == project.TypeInt || f.Type == project.TypeEnum) {
+			add("github.com/jackc/pgx/v5/pgtype")
 		}
 	}
 	return out

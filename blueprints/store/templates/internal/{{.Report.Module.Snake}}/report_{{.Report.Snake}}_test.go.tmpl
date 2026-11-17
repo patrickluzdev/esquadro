@@ -1,0 +1,15 @@
+{{- if uses "testcontainers" -}}
+{{- $r := .Report}}{{$m := $r.Module}}{{$p := $m.Snake -}}
+package {{$p}}_test
+
+{{importBlock "context" "testing" (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+// Test{{$r.Pascal}}Runs runs the report's SQL on an empty database: it is valid,
+// and its columns are what the model declares.
+func Test{{$r.Pascal}}Runs(t *testing.T) {
+	t.Parallel()
+	m := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+	if _, err := m.{{$r.Pascal}}(context.Background(), {{$p}}.{{$r.Pascal}}Query{}); err != nil {
+		t.Fatal(err)
+	}
+}
+{{end -}}

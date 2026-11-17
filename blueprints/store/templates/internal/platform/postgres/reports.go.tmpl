@@ -1,0 +1,113 @@
+{{- if .Reports -}}
+package postgres
+
+import (
+	"errors"
+	"fmt"
+	"reflect"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
+)
+
+// ErrTooManyRows is a report with more rows than it may answer.
+var ErrTooManyRows = errors.New("the report has more rows than it may answer")
+
+// The readers of a report's columns take what sqlc made of a column (a
+// string or a pgtype.Text, an int64 or a pgtype.Int8...) and answer its
+// value, false when it is NULL, or an error when it is not the type the
+// model declares.
+
+// TextOf reads a text column.
+func TextOf(v any) (string, bool, error) {
+	switch v := v.(type) {
+	case pgtype.Text:
+		return v.String, v.Valid, nil
+	case *string:
+		if v == nil {
+			return "", false, nil
+		}
+		return *v, true, nil
+	}
+	if r := reflect.ValueOf(v); r.Kind() == reflect.String {
+		return r.String(), true, nil
+	}
+	return "", false, notA(v, "text")
+}
+
+// IntOf reads an integer column.
+func IntOf(v any) (int64, bool, error) {
+	switch v := v.(type) {
+	case int64:
+		return v, true, nil
+	case int32:
+		return int64(v), true, nil
+	case int16:
+		return int64(v), true, nil
+	case pgtype.Int8:
+		return v.Int64, v.Valid, nil
+	case pgtype.Int4:
+		return int64(v.Int32), v.Valid, nil
+	case pgtype.Int2:
+		return int64(v.Int16), v.Valid, nil
+	}
+	return 0, false, notA(v, "integer: cast it with ::bigint")
+}
+
+// DecimalOf reads a decimal column.
+func DecimalOf(v any) (decimal.Decimal, bool, error) {
+	switch v := v.(type) {
+	case pgtype.Numeric:
+		if !v.Valid || v.NaN || v.InfinityModifier != pgtype.Finite {
+			return decimal.Decimal{}, false, nil
+		}
+		return decimal.NewFromBigInt(v.Int, v.Exp), true, nil
+	case float64:
+		return decimal.NewFromFloat(v), true, nil
+	case int64:
+		return decimal.NewFromInt(v), true, nil
+	}
+	return decimal.Decimal{}, false, notA(v, "decimal: cast it with ::numeric")
+}
+
+// BoolOf reads a boolean column.
+func BoolOf(v any) (bool, bool, error) {
+	switch v := v.(type) {
+	case bool:
+		return v, true, nil
+	case pgtype.Bool:
+		return v.Bool, v.Valid, nil
+	}
+	return false, false, notA(v, "boolean")
+}
+
+// TimeOf reads a time or date column.
+func TimeOf(v any) (time.Time, bool, error) {
+	switch v := v.(type) {
+	case time.Time:
+		return v, true, nil
+	case pgtype.Timestamptz:
+		return v.Time, v.Valid, nil
+	case pgtype.Timestamp:
+		return v.Time, v.Valid, nil
+	case pgtype.Date:
+		return v.Time, v.Valid, nil
+	}
+	return time.Time{}, false, notA(v, "time: cast it with ::timestamptz or ::date")
+}
+
+// UUIDOf reads a uuid column.
+func UUIDOf(v any) (uuid.UUID, bool, error) {
+	switch v := v.(type) {
+	case pgtype.UUID:
+		return uuid.UUID(v.Bytes), v.Valid, nil
+	case [16]byte:
+		return uuid.UUID(v), true, nil
+	}
+	return uuid.UUID{}, false, notA(v, "uuid")
+}
+
+func notA(v any, what string) error { return fmt.Errorf("%T is not %s", v, what) }
+{{end -}}

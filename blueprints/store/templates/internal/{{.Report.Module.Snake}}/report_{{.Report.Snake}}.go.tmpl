@@ -1,0 +1,64 @@
+{{- $r := .Report}}{{$m := $r.Module}}{{$rc := lower (slice $m.Camel 0 1) -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "fmt" (reportImports $r) (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// {{$r.Pascal}}Query is what the {{$r.Pascal}} report is asked for{{if $r.Params}}: its parameters, nil
+// when not set{{end}}.
+type {{$r.Pascal}}Query struct {
+{{- range $r.Params}}
+	{{.Pascal}} {{if not .Required}}*{{end}}{{goType .}}
+{{- end}}
+	// Limit is the most rows it answers; 0 is {{$r.Pascal}}Rows. Past it,
+	// postgres.ErrTooManyRows.
+	Limit int
+}
+
+// {{$r.Pascal}}Rows is the most rows the {{$r.Pascal}} report answers by default.
+const {{$r.Pascal}}Rows = 1000
+
+// {{$r.Pascal}}Row is a row of the {{$r.Pascal}} report{{if $r.Doc}}: {{join " " $r.Doc}}{{else}}.{{end}} A column the
+// model does not mark required is nil when the SQL answers NULL.
+type {{$r.Pascal}}Row struct {
+{{- range $r.Columns}}
+	{{.Pascal}} {{if not .Required}}*{{end}}{{goType .}}
+{{- end}}
+}
+
+// {{$r.Pascal}} works out the report with its SQL, reports/{{$r.Snake}}.sql.
+func ({{$rc}} *{{$m.Pascal}}) {{$r.Pascal}}(ctx context.Context, q {{$r.Pascal}}Query) ([]{{$r.Pascal}}Row, error) {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = {{$r.Pascal}}Rows
+	}
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$rc}}.Pool)).{{$r.Pascal}}(ctx, sqlgen.{{$r.Pascal}}Params{
+{{- range $r.Params}}
+		{{sqlcName .Snake}}: {{reportParam .}},
+{{- end}}
+		RowLimit: int32(limit + 1),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("report {{$r.Pascal}}: %w", err)
+	}
+	if len(rows) > limit {
+		return nil, postgres.ErrTooManyRows
+	}
+	out := make([]{{$r.Pascal}}Row, len(rows))
+	for i, row := range rows {
+{{- range $r.Columns}}
+		if v, ok, err := {{reportRead .}}(row.{{sqlcName .Snake}}); err != nil {
+			return nil, fmt.Errorf("report {{$r.Pascal}}: column {{.Snake}}: %w", err)
+{{- if .Required}}
+		} else if !ok {
+			return nil, fmt.Errorf("report {{$r.Pascal}}: column {{.Snake}} is NULL, which the model does not allow: mark it optional, or coalesce it")
+		} else {
+			out[i].{{.Pascal}} = {{reportConvert . "v"}}
+		}
+{{- else}}
+		} else if ok {
+			out[i].{{.Pascal}} = new({{reportConvert . "v"}})
+		}
+{{- end}}
+{{- end}}
+	}
+	return out, nil
+}

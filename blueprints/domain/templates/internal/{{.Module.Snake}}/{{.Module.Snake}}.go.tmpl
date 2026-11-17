@@ -1,4 +1,4 @@
-// Package {{.Module.Snake}} holds{{range $i, $e := .Module.Entities}}{{if $i}},{{end}} {{$e.Pascal}}{{end}}{{if .Module.Jobs}}{{if .Module.Entities}} and{{end}} the jobs{{range .Module.Jobs}} {{.Pascal}}{{end}}{{end}}{{if not (or .Module.Entities .Module.Jobs)}} its enums{{end}}.
+// Package {{.Module.Snake}} holds{{range $i, $e := .Module.Entities}}{{if $i}},{{end}} {{$e.Pascal}}{{end}}{{if .Module.Jobs}}{{if .Module.Entities}} and{{end}} the jobs{{range .Module.Jobs}} {{.Pascal}}{{end}}{{end}}{{if .Module.Reports}}{{if or .Module.Entities .Module.Jobs}} and{{end}} the reports{{range .Module.Reports}} {{.Pascal}}{{end}}{{end}}{{if not (or .Module.Entities .Module.Jobs .Module.Reports)}} its enums{{end}}.
 package {{.Module.Snake}}
 
 
