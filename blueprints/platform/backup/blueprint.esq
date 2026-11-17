@@ -1,0 +1,19 @@
+/// Backups of the apps' databases: every day, a pg_dump of each one goes
+/// to a bucket compatible with S3 (Cloudflare R2, with the cloudflare
+/// blueprint, which creates it), kept for keep_days. task db:backup makes
+/// one now, task db:list lists them and task db:restore puts one back,
+/// stopping the app while it does.
+blueprint backup {
+  version "0.1.0"
+  for platform
+  requires server, postgres
+
+  /// Days each backup is kept.
+  option keep_days int default(14)
+  /// When the daily backup runs, as systemd's OnCalendar, in UTC.
+  option at string default("*-*-* 03:30:00")
+  /// The bucket's S3 endpoint; with cloudflare, its account's R2.
+  option endpoint string default("")
+  /// The bucket; <platform>-backups by default, the one cloudflare creates.
+  option bucket string default("")
+}

@@ -33,6 +33,11 @@ blueprint server {
   slot "server.secrets"
   /// Tasks of Taskfile.esquadro.yml, as YAML indented by two spaces.
   slot "server.tasks"
+  /// Commands task plan runs before Ansible's, as YAML list items indented
+  /// by six spaces, e.g. "      - task: tofu:plan".
+  slot "server.plan"
+  /// Commands task apply runs before Ansible's, as task plan's.
+  slot "server.apply"
   /// Sections of README.md, in Markdown.
   slot "server.readme"
 }

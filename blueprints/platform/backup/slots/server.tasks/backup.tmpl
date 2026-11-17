@@ -1,0 +1,20 @@
+{{- $host := printf "%s@%s" (index (optionsOf "server") "admin_user") (index .Servers 0).Host}}
+  db:backup:
+    desc: Back up the apps' databases now (APP=<app> for one)
+    cmds:
+      - ssh {{$host}} sudo /opt/platform/bin/backup {{"{{"}}.APP{{"}}"}}
+
+  db:list:
+    desc: List an app's backups (APP=<app>)
+    requires:
+      vars: [APP]
+    cmds:
+      - ssh {{$host}} sudo /opt/platform/bin/restore {{"{{"}}.APP{{"}}"}}
+
+  db:restore:
+    desc: Put a backup of an app's database back, stopping the app meanwhile (APP=<app> BACKUP=<name from db:list>)
+    requires:
+      vars: [APP, BACKUP]
+    prompt: This replaces the database of {{"{{"}}.APP{{"}}"}} with {{"{{"}}.BACKUP{{"}}"}}. Continue?
+    cmds:
+      - ssh {{$host}} sudo /opt/platform/bin/restore {{"{{"}}.APP{{"}}"}} {{"{{"}}.BACKUP{{"}}"}}

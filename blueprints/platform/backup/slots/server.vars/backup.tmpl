@@ -1,0 +1,8 @@
+{{- $o := optionsOf "backup" -}}
+{{- $endpoint := $o.endpoint -}}
+{{- if and (not $endpoint) (uses "cloudflare")}}{{$endpoint = printf "https://%s.r2.cloudflarestorage.com" (index (optionsOf "cloudflare") "account_id")}}{{end}}
+# Backups: where they go, how long they stay, when they run.
+backup_endpoint: {{quote $endpoint}}
+backup_bucket: {{quote (or $o.bucket (printf "%s-backups" .App.Kebab))}}
+backup_keep_days: {{$o.keep_days}}
+backup_at: {{quote $o.at}}

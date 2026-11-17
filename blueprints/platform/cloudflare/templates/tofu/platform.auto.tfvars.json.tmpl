@@ -1,0 +1,16 @@
+{{- $o := optionsOf "cloudflare" -}}
+{{- $first := true -}}
+{
+  "account_id": {{quote $o.account_id}},
+  "server": {{quote (index .Servers 0).Host}},
+  "domains": [
+{{- range .Hosted}}{{range .Domains}}{{if not $first}},{{end}}{{$first = false}}
+    {{quote .}}
+{{- end}}{{end}}
+{{- with optionsOf "observability"}}{{with .grafana_domain}}{{if not $first}},{{end}}
+    {{quote .}}
+{{- end}}{{end}}
+  ],
+  "proxied": {{$o.proxied}},
+  "bucket": {{if uses "backup"}}{{quote (printf "%s-backups" .App.Kebab)}}{{else}}""{{end}}
+}

@@ -29,13 +29,19 @@ tasks:
       - task: apply
 
   plan:
-    desc: Show what apply would change on the servers, changing nothing
+    desc: Show what apply would change, changing nothing
     cmds:
+{{- with slot "server.plan" .}}
+{{.}}
+{{- end}}
       - ansible-playbook ansible/site.yml --check --diff
 
   apply:
-    desc: Bring the servers to what the platform describes
+    desc: Bring the servers, and what else the platform describes, to it
     cmds:
+{{- with slot "server.apply" .}}
+{{.}}
+{{- end}}
       - ansible-playbook ansible/site.yml
 
   ssh:

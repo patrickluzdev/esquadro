@@ -1,0 +1,19 @@
+  tofu:
+    desc: Run OpenTofu in tofu/ with the platform's secrets, e.g. task tofu -- state list
+    dir: tofu
+    cmds:
+      - sh ../scripts/tofu.sh {{"{{"}}.CLI_ARGS{{"}}"}}
+
+  tofu:plan:
+    desc: Show what OpenTofu would change on Cloudflare
+    dir: tofu
+    cmds:
+      - sh ../scripts/tofu.sh init -input=false -upgrade=false >/dev/null
+      - sh ../scripts/tofu.sh plan -input=false
+
+  tofu:apply:
+    desc: Bring Cloudflare to what the platform describes
+    dir: tofu
+    cmds:
+      - sh ../scripts/tofu.sh init -input=false -upgrade=false >/dev/null
+      - sh ../scripts/tofu.sh apply -input=false -auto-approve

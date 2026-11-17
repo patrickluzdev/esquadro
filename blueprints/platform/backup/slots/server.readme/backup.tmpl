@@ -1,0 +1,8 @@
+## Backups
+
+Every day ({{index (optionsOf "backup") "at"}} UTC), each app's database goes to the
+bucket as a `pg_dump`, kept for {{index (optionsOf "backup") "keep_days"}} days. Fill in
+`backup_access_key_id` and `backup_secret_access_key` with
+`task secrets:edit` first. `task db:backup` makes one now, `task db:list
+APP=<app>` lists an app's, `task db:restore APP=<app> BACKUP=<name>` puts
+one back. Try a restore once in a while: a backup never restored is a hope.

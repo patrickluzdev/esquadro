@@ -1,0 +1,21 @@
+/// The platform's Cloudflare, with OpenTofu: a DNS record for each domain
+/// of its apps (and Grafana's) pointing at the server, behind Cloudflare's
+/// proxy, with SSL in Full (strict) mode on their zones, which must already
+/// be in the account; and, with backup, the R2 bucket the backups go to.
+/// OpenTofu only changes the records it creates: one that already exists
+/// makes task plan fail, saying which. Its state is in git, encrypted with
+/// a passphrase task secrets:init generates; the API token is yours, in
+/// the secrets. Resources of your own go in tofu/local.tf, which esquadro
+/// never rewrites.
+blueprint cloudflare {
+  version "0.1.0"
+  for platform
+  requires server
+  optional apps, observability, backup
+
+  /// The Cloudflare account's id: the dashboard shows it on the account's
+  /// home page.
+  option account_id string required
+  /// Put the domains behind Cloudflare's proxy (the orange cloud).
+  option proxied bool default(true)
+}

@@ -39,4 +39,6 @@ import "embed"
 //go:embed platform/postgres/blueprint.esq all:platform/postgres/templates platform/postgres/slots
 //go:embed platform/apps/blueprint.esq all:platform/apps/templates platform/apps/slots
 //go:embed platform/observability/blueprint.esq all:platform/observability/templates platform/observability/slots
+//go:embed platform/cloudflare/blueprint.esq all:platform/cloudflare/templates platform/cloudflare/slots
+//go:embed platform/backup/blueprint.esq all:platform/backup/templates platform/backup/slots
 var FS embed.FS

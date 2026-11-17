@@ -1,0 +1,11 @@
+## Cloudflare
+
+OpenTofu, in `tofu/`, gives each domain a DNS record pointing at the server,
+behind Cloudflare's proxy, with SSL in Full (strict) mode on its zone.
+`task plan` shows what it would change, `task apply` changes it with the
+servers. The zones must already be in the account; records that exist
+already are left alone (if one is in the way, `task plan` says which:
+delete it in the dashboard, or `task tofu -- import ...` it). Before the
+first `task apply`, fill `cloudflare_token` in with `task secrets:edit`.
+The state is in `tofu/terraform.tfstate`, encrypted: commit it after each
+apply.

@@ -24,7 +24,7 @@ func platformProject(t *testing.T, blueprints ...string) string {
 	}
 	s := string(src)
 	for _, b := range blueprints {
-		if strings.Contains(s, "  blueprint "+b+"\n") {
+		if strings.Contains(s, "  blueprint "+strings.Fields(b)[0]+"\n") {
 			continue
 		}
 		s = strings.Replace(s, "  blueprint server\n", "  blueprint server\n  blueprint "+b+"\n", 1)
@@ -40,12 +40,12 @@ func platformProject(t *testing.T, blueprints ...string) string {
 }
 
 func TestAPlatformDescribesItsServersAndApps(t *testing.T) {
-	dir := platformProject(t)
+	dir := platformProject(t, "backup", "cloudflare {\n    account_id \"0123456789abcdef\"\n  }")
 	vars, err := os.ReadFile(filepath.Join(dir, "ansible", "group_vars", "all", "platform.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"platform_admin_user: admin", "caddy_certificates: acme", "platform_ports:\n  - 80\n  - 443", "  - name: shop\n    snake: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
+	for _, want := range []string{"platform_admin_user: admin", "caddy_certificates: acme", "backup_endpoint: \"https://0123456789abcdef.r2.cloudflarestorage.com\"", "platform_ports:\n  - 80\n  - 443", "  - name: shop\n    snake: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
 		if !strings.Contains(string(vars), want) {
 			t.Errorf("platform.yml lacks %q:\n%s", want, vars)
 		}
@@ -71,6 +71,15 @@ func lintPlatform(t *testing.T, dir string) {
 		}
 	}
 	env := append(os.Environ(), "ANSIBLE_CONFIG=ansible/ansible.cfg", "ANSIBLE_COLLECTIONS_PATH="+collectionsPath(t))
+	if _, err := exec.LookPath("tofu"); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "tofu")); err == nil {
+			cmd := exec.Command("tofu", "fmt", "-check", "-recursive", "tofu")
+			cmd.Dir = dir
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("tofu fmt: %v\n%s", err, out)
+			}
+		}
+	}
 	for _, args := range [][]string{
 		{"ansible-playbook", "ansible/site.yml", "--syntax-check"},
 		{"ansible-lint", "--offline", "-q", "ansible/"},
