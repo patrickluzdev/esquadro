@@ -24,6 +24,9 @@ func platformProject(t *testing.T, blueprints ...string) string {
 	}
 	s := string(src)
 	for _, b := range blueprints {
+		if strings.Contains(s, "  blueprint "+b+"\n") {
+			continue
+		}
 		s = strings.Replace(s, "  blueprint server\n", "  blueprint server\n  blueprint "+b+"\n", 1)
 	}
 	s += "\n/// The shop.\napp shop {\n  image   \"ghcr.io/acme/shop\"\n  domains [\"shop.com\", \"api.shop.com\"]\n  worker\n  database\n}\n"
@@ -42,7 +45,7 @@ func TestAPlatformDescribesItsServersAndApps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"platform_admin_user: admin", "  - name: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
+	for _, want := range []string{"platform_admin_user: admin", "caddy_certificates: acme", "platform_ports:\n  - 80\n  - 443", "  - name: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
 		if !strings.Contains(string(vars), want) {
 			t.Errorf("platform.yml lacks %q:\n%s", want, vars)
 		}

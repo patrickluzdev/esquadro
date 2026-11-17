@@ -1,0 +1,11 @@
+# Your own sites
+
+Each `*.caddy` file here is part of Caddy's configuration, in Caddyfile
+syntax, applied by `task apply`; esquadro never rewrites them. For example,
+`redirect.caddy`:
+
+```
+www.shop.com {
+	redir https://shop.com{uri} permanent
+}
+```

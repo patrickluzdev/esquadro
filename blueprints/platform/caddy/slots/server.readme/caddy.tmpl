@@ -1,0 +1,6 @@
+## Domains and HTTPS
+
+Caddy answers on ports 80 and 443 and sends each app's domains to it, with
+certificates it gets and renews by itself. Point each domain at the server
+first. Sites of your own (a redirect, a static page) go in
+`caddy/sites/*.caddy`, Caddyfile syntax, applied with `task apply`.

@@ -1,0 +1,12 @@
+{{- $o := optionsOf "caddy" -}}
+# Caddy: who Let's Encrypt writes to, which certificates, and whether the
+# domains are behind Cloudflare's proxy.
+caddy_email: {{quote $o.email}}
+caddy_certificates: {{$o.certificates}}
+caddy_cloudflare: {{$o.cloudflare}}
+# Sites besides the apps', from the platform's blueprints.
+caddy_sites:
+{{- with slot "caddy.sites" .}}
+{{.}}
+{{- else}} []
+{{- end}}

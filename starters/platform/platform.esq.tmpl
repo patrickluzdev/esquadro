@@ -2,6 +2,7 @@
 platform {{.Name}} {
   // the servers, kept by Ansible
   blueprint server
+  blueprint caddy
 {{- if .Git}}
 
   // the repository

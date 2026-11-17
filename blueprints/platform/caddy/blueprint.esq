@@ -1,0 +1,24 @@
+/// Caddy in front of the platform's apps, on ports 80 and 443: each app's
+/// domains reach its container, with HTTPS certificates Caddy gets and
+/// renews by itself. While an app is being replaced, Caddy holds its
+/// requests for up to 30 seconds instead of failing them. Behind
+/// Cloudflare's proxy it trusts only Cloudflare's addresses, and passes the
+/// visitor's own to the app in X-Forwarded-For. Sites of your own go in
+/// caddy/sites/*.caddy, which esquadro never rewrites.
+blueprint caddy {
+  version "0.1.0"
+  for platform
+  requires server
+
+  /// The email Let's Encrypt writes to about the certificates.
+  option email string default("")
+  /// acme: real certificates from Let's Encrypt; internal: Caddy's own, for
+  /// a server no one reaches from the internet (a test).
+  option certificates name default(acme)
+  /// The domains are behind Cloudflare's proxy: trust its addresses.
+  option cloudflare bool default(true)
+
+  /// Sites of other blueprints, as YAML list items indented by two spaces:
+  /// "- domains: [grafana.acme.com]" then "  upstream: grafana:3000".
+  slot "caddy.sites"
+}
