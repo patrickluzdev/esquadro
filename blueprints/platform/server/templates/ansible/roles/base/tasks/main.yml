@@ -7,6 +7,8 @@
       - ufw
       - unattended-upgrades
       - apt-listchanges
+      # What Ansible needs to manage apt repositories.
+      - python3-debian
     update_cache: true
     cache_valid_time: 3600
 
@@ -26,6 +28,12 @@
     dest: /etc/ssh/sshd_config.d/10-platform.conf
     mode: "0644"
   notify: Restart ssh
+
+- name: Make room for the journal's settings
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
 
 - name: Keep the system journal small
   ansible.builtin.copy:
