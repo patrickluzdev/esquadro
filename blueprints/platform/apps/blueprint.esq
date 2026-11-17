@@ -1,0 +1,19 @@
+/// The apps the platform runs, each from the image its CI publishes: a
+/// container of the app (and of its worker), its production variables
+/// (yours, encrypted in secrets/apps/<app>.sops.env, and the platform's:
+/// its database, where telemetry goes), and its deploys. A tag of the app
+/// deploys itself (esquadro's deploy blueprint, in the app): its CI signs
+/// in to the server with a key that can only deploy that app, which pulls
+/// the version, migrates its database, replaces the containers and, if they
+/// are not healthy, goes back to the version before. task deploy deploys
+/// or rolls back from here.
+blueprint apps {
+  version "0.1.0"
+  for platform
+  requires server
+  optional postgres, caddy
+
+  /// Variables the platform gives every app, as YAML "KEY: value" lines
+  /// indented by two spaces; Jinja sees app, the app's settings.
+  slot "apps.env"
+}

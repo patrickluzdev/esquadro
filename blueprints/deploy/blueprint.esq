@@ -1,0 +1,14 @@
+/// Deploys the app to a platform made with esquadro (esquadro new -starter
+/// platform), from its CI: each tag v* publishes the image, then signs in
+/// to the server with a key that can only deploy this app, and deploys the
+/// tag. The server pulls the image, migrates the database, replaces the
+/// containers and, when they are not healthy, goes back to the version
+/// before; the CI fails with the reason. The repository needs three
+/// secrets, which the platform's task app:key gives it: DEPLOY_SSH_KEY,
+/// DEPLOY_HOST and DEPLOY_KNOWN_HOSTS. Behind the platform's Caddy, the app
+/// trusts the visitor's address it passes.
+blueprint deploy {
+  version "0.1.0"
+  requires docker, github_actions
+  optional http
+}

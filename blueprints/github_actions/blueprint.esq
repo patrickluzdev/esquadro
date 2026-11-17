@@ -20,4 +20,7 @@ blueprint github_actions {
   /// Jobs of the CI workflow, as YAML indented by two spaces. Each job is
   /// billed by the minute, rounded up: prefer a step of the test job.
   slot "github_actions.jobs"
+  /// Steps run after the image is published, in the image job, as YAML
+  /// indented by six spaces, e.g. a deploy.
+  slot "github_actions.image.steps"
 }

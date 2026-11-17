@@ -99,3 +99,34 @@ func collectionsPath(t *testing.T) string {
 	t.Skip("cannot tell where the Ansible collections are")
 	return ""
 }
+
+func TestAnAppWithADatabaseNeedsThePlatformsPostgres(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "acme")
+	if code, _, errOut := esq(t, "new", "-starter", "platform", "-no-gen", "-no-git", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "platform.esq")
+	src, _ := os.ReadFile(model)
+	s := strings.Replace(string(src), "  blueprint postgres\n", "", 1) + "\napp shop {\n  image \"ghcr.io/acme/shop\"\n  database\n}\n"
+	if err := os.WriteFile(model, []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := esq(t, "check", dir); code == 0 || !strings.Contains(errOut, "app shop has database, and the platform has no PostgreSQL") {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+}
+
+func TestDeployAddsTheDeployToTheCI(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-blueprints", "app,env,http,docker,github_actions,deploy", "-module", "example.com/shop", "-no-git", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	ci, _ := os.ReadFile(filepath.Join(dir, ".github", "workflows", "ci.yml"))
+	if !strings.Contains(string(ci), `printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" "$GITHUB_REF_NAME"`) {
+		t.Fatalf("ci.yml:\n%s", ci)
+	}
+	dockerfile, _ := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	if !strings.Contains(string(dockerfile), "ENV SHOP_TRUST_PROXY=true") {
+		t.Fatalf("Dockerfile:\n%s", dockerfile)
+	}
+}

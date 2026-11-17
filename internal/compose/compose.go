@@ -124,6 +124,9 @@ type Data struct {
 	// Report is set in templates rendered per report, whose file name uses
 	// .Report; Module is the report's.
 	Report *project.Report
+	// Host is set in a platform's templates rendered per app it runs, whose
+	// file name uses .Host.
+	Host *project.Hosted
 	// Relation is set in templates rendered per relation: each side of
 	// every relation, with Entity and Module those of its side.
 	Relation *project.Relation
@@ -527,6 +530,7 @@ var (
 	enumRef     = regexp.MustCompile(`\.Enum\b`)
 	jobRef      = regexp.MustCompile(`\.Job\b`)
 	reportRef   = regexp.MustCompile(`\.Report\b`)
+	hostRef     = regexp.MustCompile(`\.Host\b`)
 	moduleRef   = regexp.MustCompile(`\.Module\b`)
 )
 
@@ -559,9 +563,10 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	perEnum := enumRef.MatchString(outPath)
 	perJob := jobRef.MatchString(outPath)
 	perReport := reportRef.MatchString(outPath)
+	perHost := hostRef.MatchString(outPath)
 	perModule := !perRelation && !perEntity && !perEnum && !perJob && !perReport && moduleRef.MatchString(outPath)
-	if n := btoi(perEntity || perRelation) + btoi(perEnum) + btoi(perJob) + btoi(perReport); n > 1 {
-		c.errorf(name, 0, "a template path can use only one of .Entity (or .Relation), .Enum, .Job and .Report")
+	if n := btoi(perEntity || perRelation) + btoi(perEnum) + btoi(perJob) + btoi(perReport) + btoi(perHost); n > 1 {
+		c.errorf(name, 0, "a template path can use only one of .Entity (or .Relation), .Enum, .Job, .Report and .Host")
 		return nil
 	}
 	pathTmpl, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(outPath)
@@ -618,6 +623,12 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 		for _, r := range c.p.Reports {
 			d := whole
 			d.Report, d.Module = r, r.Module
+			datas = append(datas, d)
+		}
+	case perHost:
+		for _, h := range c.p.Hosted {
+			d := whole
+			d.Host = h
 			datas = append(datas, d)
 		}
 	case perModule:

@@ -53,13 +53,13 @@ var blueprintOrder = []string{
 	"postgres", "migrations", "store", "testcontainers", "compose",
 	"rest", "api_docs", "client_ts", "security", "mail", "rate_limit", "compression", "i18n",
 	"observability",
-	"docker", "github_actions",
+	"docker", "github_actions", "deploy",
 	"git", "branching",
 }
 
 // platformBlueprintOrder lists the blueprints of a platform, in the order a
 // platform lists them; git is the apps' too.
-var platformBlueprintOrder = []string{"server", "caddy", "postgres", "git"}
+var platformBlueprintOrder = []string{"server", "caddy", "postgres", "apps", "git"}
 
 // referencePages returns the generated pages by path, relative to the
 // site's pages folder.

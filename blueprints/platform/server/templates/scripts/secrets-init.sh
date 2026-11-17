@@ -46,3 +46,13 @@ grep -E '^[a-z_][a-z0-9_]*:' secrets/platform.example.yaml | while IFS= read -r 
   fi
   sops set "$secrets" "[\"$name\"]" "\"$value\""
 done
+
+# Each app's variables, from its example, the first time.
+for example in secrets/apps/*.example.env; do
+  [ -f "$example" ] || continue
+  app=${example%.example.env}
+  if [ ! -f "$app.sops.env" ]; then
+    sops encrypt --filename-override "$app.sops.env" --input-type dotenv --output-type dotenv "$example" > "$app.sops.env"
+    echo "created $app.sops.env: fill it in with sops $app.sops.env"
+  fi
+done

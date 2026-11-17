@@ -1,0 +1,4 @@
+{{- if uses "http"}}
+# Deployed behind the platform's Caddy, which passes the visitor's address.
+ENV {{upper .App.Snake}}_TRUST_PROXY=true
+{{- end}}

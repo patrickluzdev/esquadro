@@ -1,0 +1,20 @@
+## Apps
+
+Each `app` of the model runs here from the image its CI publishes:
+
+1. `task secrets:init` creates `secrets/apps/<app>.sops.env`; fill in the
+   app's production variables with `sops secrets/apps/<app>.sops.env` (the
+   ones its `.env.example` lists as required in production). The platform
+   adds `APP_ENV`, and `DATABASE_URL` for an app with `database`.
+2. `task app:key APP=<app> REPO=<owner/repo>` makes the key the app's CI
+   deploys with: the public half goes to `deploy-keys/`, the private one
+   straight to the repository's secrets, never to disk.
+3. `task apply`, then a tag `v1.0.0` in the app: its CI publishes the image
+   and deploys it.
+
+A deploy pulls the version, migrates the database, replaces the containers
+and waits for them to be healthy; if they are not, the version before comes
+back. `task deploy APP=<app> VERSION=v1.0.0` deploys or rolls back from
+here, `task status` shows what runs, `task logs APP=<app>` follows its logs.
+Rolling back does not undo migrations: write them so the version before
+still works (add first, remove later).

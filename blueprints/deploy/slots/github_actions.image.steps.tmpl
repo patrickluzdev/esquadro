@@ -1,0 +1,14 @@
+      # Deploys the tag to the platform: the key can only deploy this app.
+      - name: Deploy
+        env:
+          DEPLOY_SSH_KEY: {{"${{"}} secrets.DEPLOY_SSH_KEY {{"}}"}}
+          DEPLOY_HOST: {{"${{"}} secrets.DEPLOY_HOST {{"}}"}}
+          DEPLOY_KNOWN_HOSTS: {{"${{"}} secrets.DEPLOY_KNOWN_HOSTS {{"}}"}}
+          # Lets the server pull this repository's image, for this deploy only.
+          REGISTRY_TOKEN: {{"${{"}} secrets.GITHUB_TOKEN {{"}}"}}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" "$GITHUB_REF_NAME"

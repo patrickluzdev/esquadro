@@ -136,12 +136,26 @@ func sortedMap(m map[string]any) string {
 func TestBuiltinBlueprintsAreValid(t *testing.T) {
 	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook}
 	names := l.BuiltinNames()
-	if strings.Join(names, " ") != "api_docs app branching client_ts compose compression docker domain env git github_actions http i18n jobs mail migrations observability postgres rate_limit rest security store testcontainers worker" {
+	if strings.Join(names, " ") != "api_docs app branching client_ts compose compression deploy docker domain env git github_actions http i18n jobs mail migrations observability postgres rate_limit rest security store testcontainers worker" {
 		t.Fatalf("built-in blueprints = %v", names)
 	}
 	for _, name := range names {
 		ref := &project.BlueprintRef{Ref: name, Source: project.SourceBuiltin}
 		b, diags := l.Load(ref)
+		if b == nil || len(diags) > 0 {
+			t.Errorf("built-in %s: %v", name, diags)
+		}
+	}
+}
+
+func TestBuiltinPlatformBlueprintsAreValid(t *testing.T) {
+	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook, Kind: project.KindPlatform}
+	names := l.BuiltinNames()
+	if strings.Join(names, " ") != "apps caddy git postgres server" {
+		t.Fatalf("built-in blueprints of a platform = %v", names)
+	}
+	for _, name := range names {
+		b, diags := l.Load(&project.BlueprintRef{Ref: name, Source: project.SourceBuiltin})
 		if b == nil || len(diags) > 0 {
 			t.Errorf("built-in %s: %v", name, diags)
 		}

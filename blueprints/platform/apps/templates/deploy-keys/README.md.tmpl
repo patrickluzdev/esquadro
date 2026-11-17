@@ -1,0 +1,6 @@
+# Deploy keys
+
+The public half of the key each app's CI deploys with, made by
+`task app:key APP=<app> REPO=<owner/repo>`: `<app>.pub`. On the server, a
+key can only deploy its own app. To revoke one, delete its file and run
+`task apply`.

@@ -84,4 +84,7 @@ jobs:
           tags: {{"${{"}} steps.meta.outputs.tags {{"}}"}}
           labels: {{"${{"}} steps.meta.outputs.labels {{"}}"}}
           build-args: VERSION={{"${{"}} steps.meta.outputs.version {{"}}"}}
+{{- with slot "github_actions.image.steps" .}}
+{{.}}
+{{- end}}
 {{- end}}

@@ -1,0 +1,26 @@
+  deploy:
+    desc: Deploy a version of an app, or roll back to one (APP=<app> VERSION=v1.2.3); signs in to ghcr.io with gh's token
+    requires:
+      vars: [APP, VERSION]
+    cmds:
+      - gh auth token | ssh {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/deploy {{"{{"}}.APP{{"}}"}} {{"{{"}}.VERSION{{"}}"}}
+
+  status:
+    desc: Each app's version and health, and the services
+    cmds:
+      - ssh {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/status
+
+  logs:
+    desc: Follow an app's logs (APP=<app>, SERVICE=worker for its worker's)
+    requires:
+      vars: [APP]
+    cmds:
+      - ssh -t {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} docker logs -f --tail 200 {{"{{"}}.APP{{"}}"}}-{{"{{"}}.SERVICE | default "app"{{"}}"}}
+    interactive: true
+
+  app:key:
+    desc: Make the key an app's CI deploys with, and give it to the app's repository (APP=<app> REPO=<owner/repo>); needs gh
+    requires:
+      vars: [APP, REPO]
+    cmds:
+      - sh scripts/deploy-key.sh {{"{{"}}.APP{{"}}"}} {{"{{"}}.REPO{{"}}"}} {{(index .Servers 0).Host}}

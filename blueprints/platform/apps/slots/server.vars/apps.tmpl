@@ -1,0 +1,6 @@
+# Variables every app gets from the platform.
+apps_env:
+  APP_ENV: production
+{{- with slot "apps.env" .}}
+{{.}}
+{{- end}}

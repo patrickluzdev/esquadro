@@ -25,12 +25,12 @@ var blueprintGroups = map[string]string{
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "client_ts": "api", "security": "api", "mail": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
-	"docker": "ship", "github_actions": "ship", "observability": "ship",
+	"docker": "ship", "github_actions": "ship", "deploy": "ship", "observability": "ship",
 	"git": "tools", "branching": "tools",
 }
 
 // platformGroups name what the blueprints of a platform are for.
-var platformGroups = map[string]string{"server": "servers", "caddy": "servers", "postgres": "servers", "git": "tools"}
+var platformGroups = map[string]string{"server": "servers", "caddy": "servers", "postgres": "servers", "apps": "servers", "git": "tools"}
 
 // groupTitles are the comments over each group.
 var groupTitles = map[string]string{
