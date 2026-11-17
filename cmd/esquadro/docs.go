@@ -86,6 +86,30 @@ func referencePages() (map[string]string, error) {
 		}
 		pages["blueprints/reference/"+name+".md"] = blueprintPage(m, i+1)
 	}
+	platform, err := fs.Glob(blueprints.FS, blueprint.PlatformDir+"/*/"+blueprint.ManifestFile)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range platform {
+		if name := path.Base(path.Dir(m)); !slices.Contains(platformBlueprintOrder, name) {
+			return nil, fmt.Errorf("blueprint %s of platforms is not in platformBlueprintOrder", name)
+		}
+	}
+	for i, name := range platformBlueprintOrder {
+		file := path.Join(blueprint.PlatformDir, name, blueprint.ManifestFile)
+		if name == "git" {
+			continue
+		}
+		src, err := fs.ReadFile(blueprints.FS, file)
+		if err != nil {
+			return nil, fmt.Errorf("blueprint %s of platforms: %w", name, err)
+		}
+		m, diags := blueprint.ParseManifest(file, src)
+		if m == nil || diags.HasErrors() {
+			return nil, fmt.Errorf("blueprint %s of platforms: invalid manifest: %v", name, diags)
+		}
+		pages["blueprints/platform/"+name+".md"] = blueprintPage(m, i+1)
+	}
 	pages["reference/cli.md"] = cliPage()
 	return pages, nil
 }

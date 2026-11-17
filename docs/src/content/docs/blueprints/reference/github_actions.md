@@ -27,3 +27,4 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 | `github_actions.branches` | Branches whose pushes run the CI, as items of a YAML list, e.g. main, develop, "release/**"; main when nobody contributes. |
 | `github_actions.test.steps` | Steps run first in the test job, as YAML indented by six spaces, e.g. a check of the pull request's branch name. |
 | `github_actions.jobs` | Jobs of the CI workflow, as YAML indented by two spaces. Each job is billed by the minute, rounded up: prefer a step of the test job. |
+| `github_actions.image.steps` | Steps run after the image is published, in the image job, as YAML indented by six spaces, e.g. a deploy. |

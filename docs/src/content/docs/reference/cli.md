@@ -260,6 +260,7 @@ listed in app.esq and an example model:
   api      A JSON API on PostgreSQL, with sign-in and roles, background jobs, its contract, docs, image and CI, and a catalog to change.
   worker   A background service on PostgreSQL: jobs on a queue, some on a schedule, worked until it is stopped, with its image and CI.
   cli      A command line tool: commands, configuration and CI, nothing else to start with.
+  platform The servers of your projects and the services they share, as code: Ansible prepares and keeps a Debian server.
 
   -blueprints string
     	comma-separated blueprints of the app, instead of a starter (default: app,env)
@@ -270,7 +271,7 @@ listed in app.esq and an example model:
   -no-git
     	leave out the git blueprint: no repository, no first commit
   -starter string
-    	start from a starter: api, worker, cli
+    	start from a starter: api, worker, cli, platform
 ```
 
 ## esquadro remove

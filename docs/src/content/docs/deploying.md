@@ -79,7 +79,8 @@ git tag v1.0.0 && git push origin v1.0.0
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` to send its traces, metrics and logs
 somewhere (see [Observability](/esquadro/observability/)).
 
-The image runs anywhere that runs containers. Blueprints for specific
-platforms (Fly.io, Kubernetes...) are planned; until then, point your
-platform at the image and give it the environment variables production
-requires, which `esquadro env list` shows.
+On your own servers, a [platform](/esquadro/production/) made by esquadro
+runs the image, and the `deploy` blueprint deploys each tag to it. The
+image also runs anywhere else that runs containers: point it at the image
+and give it the environment variables production requires, which
+`esquadro env list` shows.

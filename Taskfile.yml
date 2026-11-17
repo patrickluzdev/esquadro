@@ -35,6 +35,11 @@ tasks:
     cmds:
       - go test -tags e2e -run 'TestLifecycle|TestTutorial|TestEveryKindOfProjectRuns' -count 1 -timeout 30m -v ./cmd/esquadro
 
+  e2e:platform:
+    desc: Follow a platform from a fresh Debian 13 (a container) to an app deployed and rolled back (needs Docker, Ansible, SOPS and age; minutes)
+    cmds:
+      - go test -tags e2e -run TestPlatformRunsAnApp -count 1 -timeout 30m -v ./cmd/esquadro
+
   editor:test:
     desc: Test the VS Code extension's grammar
     dir: editors/vscode
