@@ -1,7 +1,17 @@
 {{- if .Module.Jobs -}}
 package {{.Module.Snake}}
 
-import "{{.App.Module}}/internal/platform/jobs"
+import (
+	"context"
+
+	"{{.App.Module}}/internal/platform/jobs"
+)
+
+// CancelJob cancels a job of the module enqueued with an Enqueue...At, if
+// it has not run yet.
+func (m *{{.Module.Pascal}}) CancelJob(ctx context.Context, id int64) error {
+	return m.Jobs.Cancel(ctx, id)
+}
 
 // RegisterJobs registers the work of the module's jobs, and the schedules of
 // the periodic ones.

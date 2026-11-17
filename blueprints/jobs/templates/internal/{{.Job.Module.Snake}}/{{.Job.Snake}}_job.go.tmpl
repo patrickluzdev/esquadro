@@ -9,7 +9,7 @@
 {{- range $j.Fields}}{{if and .Default (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end -}}
 package {{$m.Snake}}
 
-{{importBlock "context" (goImports $j) $re $utf8 "github.com/jackc/pgx/v5" (and (or $queue $attempts) "github.com/riverqueue/river")}}
+{{importBlock "context" "time" (goImports $j) $re $utf8 "github.com/jackc/pgx/v5" (and (or $queue $attempts) "github.com/riverqueue/river")}}
 // {{$j.Pascal}}Args are the arguments of the {{$j.Pascal}} job.
 {{- with $j.Doc}}
 //
@@ -168,4 +168,18 @@ func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}(ctx context.Context, args {{$j.Pasc
 // commits.
 func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}Tx(ctx context.Context, tx pgx.Tx, args {{$j.Pascal}}Args) error {
 	return m.Jobs.EnqueueTx(ctx, tx, args.WithDefaults())
+}
+
+// Enqueue{{$j.Pascal}}At enqueues the {{$j.Pascal}} job to run at at (right
+// away if at has passed), and answers its id, for CancelJob. Rescheduling
+// is cancelling and enqueueing again; the job should check, when it runs,
+// that what it was enqueued for still holds.
+func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}At(ctx context.Context, at time.Time, args {{$j.Pascal}}Args) (int64, error) {
+	return m.Jobs.EnqueueAt(ctx, at, args.WithDefaults())
+}
+
+// Enqueue{{$j.Pascal}}AtTx is Enqueue{{$j.Pascal}}At in tx: only if tx
+// commits.
+func (m *{{$m.Pascal}}) Enqueue{{$j.Pascal}}AtTx(ctx context.Context, tx pgx.Tx, at time.Time, args {{$j.Pascal}}Args) (int64, error) {
+	return m.Jobs.EnqueueAtTx(ctx, tx, at, args.WithDefaults())
 }

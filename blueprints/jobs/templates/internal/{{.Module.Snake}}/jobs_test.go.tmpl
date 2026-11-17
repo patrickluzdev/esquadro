@@ -95,5 +95,50 @@ func Test{{$j.Pascal}}IsWorked(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Test{{$j.Pascal}}AtATime schedules the job: not before its time, then at
+// it; and one cancelled before its time never runs.
+func Test{{$j.Pascal}}AtATime(t *testing.T) {
+	worked := make(chan {{$j.Pascal}}Args, 2)
+	m, q, _ := openJobs(t, func(r *jobs.Registry) {
+		jobs.Add(r, func(_ context.Context, args {{$j.Pascal}}Args) error {
+			worked <- args
+			return nil
+		})
+	})
+	ctx, stop := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- q.Run(ctx) }()
+
+	later, err := m.Enqueue{{$j.Pascal}}At(ctx, time.Now().Add(time.Hour), valid{{$j.Pascal}}Args())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.CancelJob(ctx, later); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Enqueue{{$j.Pascal}}At(ctx, time.Now().Add(2*time.Second), valid{{$j.Pascal}}Args()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-worked:
+		t.Fatal("worked before its time")
+	case <-time.After(time.Second):
+	}
+	select {
+	case <-worked:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the job was not worked at its time")
+	}
+	select {
+	case <-worked:
+		t.Fatal("the cancelled job was worked")
+	case <-time.After(time.Second):
+	}
+	stop()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
 {{- end}}{{end}}
 {{end -}}

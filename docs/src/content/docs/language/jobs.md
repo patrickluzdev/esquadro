@@ -45,6 +45,9 @@ For `SendWelcomeEmail` in module `accounts`:
   `EnqueueSendWelcomeEmailTx(ctx, tx, args)`, which enqueues the job in a
   transaction: only if it commits. Invalid arguments are refused with
   `*InvalidFields`, as for entities;
+- `EnqueueSendWelcomeEmailAt(ctx, at, args)` and `...AtTx`, which run the
+  job at a time (right away if it has passed) and answer its id, and
+  `accounts.CancelJob(ctx, id)`, which cancels one that has not run yet;
 - `internal/accounts/send_welcome_email_work.go`, **a file of yours**, written
   once, where the work goes:
 
@@ -56,8 +59,8 @@ func (m *Accounts) workSendWelcomeEmail(ctx context.Context, args SendWelcomeEma
 ```
 
 - with `testcontainers`, tests that enqueue each job, refuse invalid
-  arguments, see that a transaction rolled back enqueues nothing, and work a
-  job through the queue.
+  arguments, see that a transaction rolled back enqueues nothing, work a
+  job through the queue, and run one at its time but not a cancelled one.
 
 A use case enqueues a job with its module's method:
 
@@ -66,6 +69,22 @@ if err := m.EnqueueSendWelcomeEmail(ctx, accounts.SendWelcomeEmailArgs{UserID: u
 	return err
 }
 ```
+
+## At a time
+
+A job can wait for a time: "post this offer at 8 PM". Keep its id to cancel
+it; rescheduling is cancelling and enqueueing again.
+
+```go
+id, err := m.EnqueuePostOfferAt(ctx, offer.PostAt, catalog.PostOfferArgs{OfferID: offer.ID})
+// later, if the operator changes their mind
+err = m.CancelJob(ctx, id)
+```
+
+A cancellation can lose a race with the job starting, and two people can
+reschedule at once: make the work check, when it runs, that what it was
+enqueued for still holds (the offer is still approved, its time is still
+this one), so that nothing happens twice or too late.
 
 ## Running them
 
