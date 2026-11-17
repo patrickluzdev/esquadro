@@ -71,6 +71,13 @@ func lintPlatform(t *testing.T, dir string) {
 		}
 	}
 	env := append(os.Environ(), "ANSIBLE_CONFIG=ansible/ansible.cfg", "ANSIBLE_COLLECTIONS_PATH="+collectionsPath(t))
+	if _, err := exec.LookPath("task"); err == nil {
+		cmd := exec.Command("task", "--list")
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("task --list: %v\n%s", err, out)
+		}
+	}
 	if _, err := exec.LookPath("tofu"); err == nil {
 		if _, err := os.Stat(filepath.Join(dir, "tofu")); err == nil {
 			cmd := exec.Command("tofu", "fmt", "-check", "-recursive", "tofu")

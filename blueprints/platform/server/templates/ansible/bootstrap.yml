@@ -21,7 +21,7 @@
     - name: Let the admin user sign in with your key
       ansible.posix.authorized_key:
         user: "{{ platform_admin_user }}"
-        key: "{{ lookup('ansible.builtin.file', platform_ssh_key | expanduser) }}"
+        key: "{{ lookup('ansible.builtin.file', (platform_ssh_key ~ '.pub') | expanduser) }}"
 
     - name: Let the admin user use sudo without a password, which it has none of
       ansible.builtin.copy:

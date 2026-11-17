@@ -81,13 +81,13 @@ func TestPlatformRunsAnApp(t *testing.T) {
 	env := []string{
 		"SOPS_AGE_KEY_FILE=" + filepath.Join(root, "age.txt"),
 		"ANSIBLE_CONFIG=ansible/ansible.cfg",
-		"ANSIBLE_SSH_ARGS=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPersist=60s",
+		"ANSIBLE_SSH_ARGS=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o ControlMaster=auto -o ControlPersist=60s",
 		"ANSIBLE_PRIVATE_KEY_FILE=" + filepath.Join(root, "admin"),
 	}
 	if path := ansibleCollections(); path != "" {
 		env = append(env, "ANSIBLE_COLLECTIONS_PATH="+path)
 	}
-	extra := []string{"-e", "ansible_port=" + p.ssh, "-e", "platform_ssh_key=" + filepath.Join(root, "admin.pub")}
+	extra := []string{"-e", "ansible_port=" + p.ssh, "-e", "platform_ssh_key=" + filepath.Join(root, "admin")}
 	p.run(plat, env, "sh", "scripts/secrets-init.sh")
 	os.MkdirAll(filepath.Join(plat, "deploy-keys"), 0o755)
 	pub, _ := os.ReadFile(filepath.Join(root, "deploy.pub"))

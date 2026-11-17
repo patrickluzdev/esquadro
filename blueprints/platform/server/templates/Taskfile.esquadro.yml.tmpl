@@ -2,6 +2,8 @@
 version: '3'
 
 env:
+  # How the tasks sign in to the servers.
+  SSH: ssh -i {{.Options.ssh_key}} -o IdentitiesOnly=yes
   # Where your age key is: it decrypts secrets/, and it is never in git.
   SOPS_AGE_KEY_FILE: '{{"{{"}}.HOME{{"}}"}}/.config/sops/age/keys.txt'
   ANSIBLE_CONFIG: ansible/ansible.cfg
@@ -49,7 +51,14 @@ tasks:
     vars:
       SERVER: '{{"{{"}}.SERVER | default "{{(index .Servers 0).Raw}}"{{"}}"}}'
     cmds:
-      - ssh -t {{.Options.admin_user}}@$(ansible-inventory --host {{"{{"}}.SERVER{{"}}"}} | sed -n 's/.*"ansible_host": "\(.*\)".*/\1/p')
+      - |
+        case "{{"{{"}}.SERVER{{"}}"}}" in
+{{- range .Servers}}
+        {{.Raw}}) host={{.Host}} ;;
+{{- end}}
+        *) echo "there is no server {{"{{"}}.SERVER{{"}}"}}" >&2; exit 1 ;;
+        esac
+        $SSH -t {{.Options.admin_user}}@"$host"
     interactive: true
 
   lint:

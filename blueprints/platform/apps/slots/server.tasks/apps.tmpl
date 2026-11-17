@@ -3,19 +3,19 @@
     requires:
       vars: [APP, VERSION]
     cmds:
-      - gh auth token | ssh {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/deploy {{"{{"}}.APP{{"}}"}} {{"{{"}}.VERSION{{"}}"}}
+      - gh auth token | $SSH {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/deploy {{"{{"}}.APP{{"}}"}} {{"{{"}}.VERSION{{"}}"}}
 
   status:
     desc: Each app's version and health, and the services
     cmds:
-      - ssh {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/status
+      - $SSH {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} sudo /opt/platform/bin/status
 
   logs:
     desc: Follow an app's logs (APP=<app>, SERVICE=worker for its worker's)
     requires:
       vars: [APP]
     cmds:
-      - ssh -t {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} docker logs -f --tail 200 {{"{{"}}.APP{{"}}"}}-{{"{{"}}.SERVICE | default "app"{{"}}"}}
+      - $SSH -t {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} docker logs -f --tail 200 {{"{{"}}.APP{{"}}"}}-{{"{{"}}.SERVICE | default "app"{{"}}"}}
     interactive: true
 
   app:key:
