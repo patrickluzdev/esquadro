@@ -31,12 +31,12 @@ func CORS(origins []string) Middleware {
 					h.Set("Access-Control-Allow-Origin", origin)
 					h.Set("Access-Control-Allow-Credentials", "true")
 				}
-				h.Set("Access-Control-Expose-Headers", "X-Request-Id, Content-Language, RateLimit-Limit, RateLimit-Remaining, Retry-After")
+				h.Set("Access-Control-Expose-Headers", "X-Request-Id, Content-Language, ETag, Idempotent-Replayed, Location, RateLimit-Limit, RateLimit-Remaining, Retry-After")
 			}
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				if allowed {
 					h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
-					h.Set("Access-Control-Allow-Headers", "Accept, Accept-Language, Authorization, Content-Type, X-CSRF-Token, X-Request-Id")
+					h.Set("Access-Control-Allow-Headers", "Accept, Accept-Language, Authorization, Content-Type, Idempotency-Key, If-Match, X-CSRF-Token, X-Request-Id")
 					h.Set("Access-Control-Max-Age", "600")
 				}
 				w.WriteHeader(http.StatusNoContent)

@@ -2,6 +2,7 @@ package edge
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -18,6 +19,12 @@ func TestCORSAnswersAllowedOriginsOnly(t *testing.T) {
 		}
 		if allowed && rec.Header().Get("Access-Control-Allow-Credentials") != "true" {
 			t.Errorf("an allowed origin sends its cookies: %v", rec.Header())
+		}
+		// What a client sends to change safely, and reads back.
+		if allowed && (!strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "If-Match") ||
+			!strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Idempotency-Key") ||
+			!strings.Contains(rec.Header().Get("Access-Control-Expose-Headers"), "ETag")) {
+			t.Errorf("the headers of safe writes: %v", rec.Header())
 		}
 	}
 	// Any origin, but without cookies.
