@@ -33,3 +33,20 @@ func TestCompressAnswersGzipToWhoAcceptsIt(t *testing.T) {
 		t.Fatal("compressed for a client that did not ask")
 	}
 }
+
+// TestCompressLeavesAPanicToRecover writes nothing when the handler
+// panics, so that Recover can answer 500 rather than a 200 already sent.
+func TestCompressLeavesAPanicToRecover(t *testing.T) {
+	t.Parallel()
+	h := Compress(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }))
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	func() {
+		defer func() { _ = recover() }()
+		h.ServeHTTP(rec, req)
+	}()
+	if rec.Body.Len() != 0 || rec.Header().Get("Content-Encoding") != "" {
+		t.Errorf("wrote %q, %v", rec.Body.String(), rec.Header())
+	}
+}

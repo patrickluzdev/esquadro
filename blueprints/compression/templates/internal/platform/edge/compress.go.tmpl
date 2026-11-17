@@ -23,8 +23,10 @@ func Compress(next http.Handler) http.Handler {
 			return
 		}
 		cw := &compressor{ResponseWriter: w, status: http.StatusOK}
-		defer cw.close()
 		next.ServeHTTP(cw, r)
+		// Not deferred: after a panic, nothing is written, so that Recover
+		// answers the 500 itself.
+		cw.close()
 	})
 }
 
