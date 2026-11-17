@@ -16,8 +16,7 @@ tag=${version#v}
 dir=/opt/platform/apps/$app
 [ -f "$dir/image" ] || die "the platform runs no app $app"
 cd "$dir"
-image=$(sed -n 1p image)
-database=$(sed -n 2p image)
+image=$(cat image)
 previous=$(sed -n 's/^VERSION=//p' .env)
 log() { echo "$(date -u +%FT%TZ) $app $tag $*" | tee -a deploys.log; }
 
@@ -35,7 +34,8 @@ fi
 log "pulling $image:$tag"
 docker pull -q "$image:$tag" >/dev/null || die "cannot pull $image:$tag"
 
-if [ "$database" = database ]; then
+# An image that migrates its database says so (esquadro's migrations).
+if [ "$(docker image inspect -f '{{ index .Config.Labels "dev.esquadro.migrate" }}' "$image:$tag")" = true ]; then
   log "migrating"
   docker run --rm --network platform --env-file app.env "$image:$tag" migrate || { log "failed: the migration"; exit 1; }
 fi

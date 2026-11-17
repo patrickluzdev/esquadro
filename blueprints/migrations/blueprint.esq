@@ -4,6 +4,7 @@
 blueprint migrations {
   version "0.1.0"
   requires app, postgres
+  optional docker
 
   /// Imports of migrations/migrations.go.
   slot "migrations.imports"

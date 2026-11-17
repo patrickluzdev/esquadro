@@ -29,7 +29,7 @@
 
 - name: Write the image the deploy pulls, {{ app.name }}
   ansible.builtin.copy:
-    content: "{{ app.image }}\n{{ 'database' if app.database else '' }}\n"
+    content: "{{ app.image }}\n"
     dest: "{{ platform_root }}/apps/{{ app.name }}/image"
     mode: "0644"
 

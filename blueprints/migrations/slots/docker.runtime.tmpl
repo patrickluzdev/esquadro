@@ -1,0 +1,4 @@
+{{- if or .Entities (slot "migrations.after" .)}}
+# The image migrates its database: a platform's deploy runs migrate first.
+LABEL dev.esquadro.migrate="true"
+{{- end}}
