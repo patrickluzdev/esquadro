@@ -18,6 +18,7 @@ platform_ports:
 platform_apps:
 {{- range .Hosted}}
   - name: {{.Kebab}}
+    snake: {{.Snake}}
     image: {{.Image}}
     domains: [{{range $i, $d := .Domains}}{{if $i}}, {{end}}{{$d}}{{end}}]
     port: {{.Port}}

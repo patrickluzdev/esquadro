@@ -30,7 +30,7 @@ var blueprintGroups = map[string]string{
 }
 
 // platformGroups name what the blueprints of a platform are for.
-var platformGroups = map[string]string{"server": "servers", "caddy": "servers", "git": "tools"}
+var platformGroups = map[string]string{"server": "servers", "caddy": "servers", "postgres": "servers", "git": "tools"}
 
 // groupTitles are the comments over each group.
 var groupTitles = map[string]string{

@@ -1,0 +1,4 @@
+{{- $o := optionsOf "postgres" -}}
+# PostgreSQL: the version, and most connections at once.
+postgres_version: {{$o.version}}
+postgres_max_connections: {{$o.max_connections}}

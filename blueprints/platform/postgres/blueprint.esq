@@ -1,0 +1,16 @@
+/// PostgreSQL for the platform's apps: one server, with a database and a
+/// user of its own for each app that has database, which no other app can
+/// read. It publishes no port: the apps reach it on the platform's network,
+/// as postgres:5432. Its memory settings follow the server's; yours go in
+/// postgres/local.conf, which esquadro never rewrites.
+blueprint postgres {
+  version "0.1.0"
+  for platform
+  requires server
+
+  /// The major version of PostgreSQL. Changing it needs the data dumped
+  /// and restored: it does not upgrade by itself.
+  option version int default(18)
+  /// Most connections at once, for every app together.
+  option max_connections int default(100)
+}

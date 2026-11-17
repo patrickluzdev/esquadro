@@ -1,0 +1,8 @@
+## PostgreSQL
+
+Each app with `database` gets a database and a user named after it, with a
+password the server generates once and keeps in
+`/opt/platform/postgres/passwords/`. The app reads it in its
+`DATABASE_URL`. To reach the server yourself: `task ssh`, then
+`docker exec -it postgres psql -U postgres`. Settings of your own go in
+`postgres/local.conf`.
