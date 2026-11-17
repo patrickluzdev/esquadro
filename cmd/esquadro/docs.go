@@ -59,7 +59,7 @@ var blueprintOrder = []string{
 
 // platformBlueprintOrder lists the blueprints of a platform, in the order a
 // platform lists them; git is the apps' too.
-var platformBlueprintOrder = []string{"server", "caddy", "postgres", "apps", "observability", "backup", "cloudflare", "github_actions", "git"}
+var platformBlueprintOrder = []string{"server", "mail", "caddy", "postgres", "apps", "observability", "backup", "cloudflare", "github_actions", "git"}
 
 // referencePages returns the generated pages by path, relative to the
 // site's pages folder.

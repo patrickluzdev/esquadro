@@ -19,4 +19,7 @@ for app in $apps; do
   fi
 done
 rclone delete --min-age "${BACKUP_KEEP_DAYS}d" "bucket:$BACKUP_BUCKET"
+if [ "$failed" = 1 ] && [ -x /opt/platform/bin/notify ]; then
+  /opt/platform/bin/notify "A backup failed" "The backup of $(date -u +%F) failed for at least one database: see journalctl -u platform-backup on the server." || true
+fi
 exit $failed

@@ -1,0 +1,4 @@
+  mail:test:
+    desc: Send the platform's owner an email from the server, through the provider
+    cmds:
+      - $SSH {{index (optionsOf "server") "admin_user"}}@{{(index .Servers 0).Host}} "sudo /opt/platform/bin/notify 'A test email' 'This email came from the server, through the email provider of the platform.'"

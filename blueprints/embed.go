@@ -42,4 +42,5 @@ import "embed"
 //go:embed platform/cloudflare/blueprint.esq all:platform/cloudflare/templates platform/cloudflare/slots
 //go:embed platform/backup/blueprint.esq all:platform/backup/templates platform/backup/slots
 //go:embed platform/github_actions/blueprint.esq all:platform/github_actions/templates
+//go:embed platform/mail/blueprint.esq all:platform/mail/templates platform/mail/slots
 var FS embed.FS

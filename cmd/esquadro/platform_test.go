@@ -40,12 +40,12 @@ func platformProject(t *testing.T, blueprints ...string) string {
 }
 
 func TestAPlatformDescribesItsServersAndApps(t *testing.T) {
-	dir := platformProject(t, "backup", "cloudflare {\n    account_id \"0123456789abcdef\"\n  }")
+	dir := platformProject(t, "backup", "cloudflare {\n    account_id \"0123456789abcdef\"\n  }", "mail {\n    owner \"ops@acme.com\"\n    from  \"Acme <no-reply@acme.com>\"\n  }")
 	vars, err := os.ReadFile(filepath.Join(dir, "ansible", "group_vars", "all", "platform.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"platform_admin_user: admin", "caddy_certificates: acme", "backup_endpoint: \"https://0123456789abcdef.r2.cloudflarestorage.com\"", "platform_ports:\n  - 80\n  - 443", "  - name: shop\n    snake: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
+	for _, want := range []string{"platform_admin_user: admin", "caddy_certificates: acme", "caddy_email: \"ops@acme.com\"", "MAIL_URL: \"{{ mail_url }}\"", "backup_endpoint: \"https://0123456789abcdef.r2.cloudflarestorage.com\"", "platform_ports:\n  - 80\n  - 443", "  - name: shop\n    snake: shop\n    image: ghcr.io/acme/shop\n    domains: [shop.com, api.shop.com]\n    port: 8080\n    worker: true\n    database: true"} {
 		if !strings.Contains(string(vars), want) {
 			t.Errorf("platform.yml lacks %q:\n%s", want, vars)
 		}

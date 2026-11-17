@@ -1,0 +1,22 @@
+/// The platform's email: who owns it and where emails come from, and the
+/// provider that sends them (Resend, or any SMTP server). Grafana sends its
+/// password resets and alerts through it, to the owner; the backup tells
+/// the owner when it fails; Let's Encrypt writes to the owner; and each app
+/// gets MAIL_URL from it, unless the app's own secrets set one. task
+/// mail:test sends the owner an email from the server.
+blueprint mail {
+  version "0.1.0"
+  for platform
+  requires server
+  optional apps
+
+  /// Who owns the platform: the email alerts, password resets and Let's
+  /// Encrypt write to.
+  option owner string required
+  /// Who the platform's emails come from, e.g. Platform <no-reply@acme.com>,
+  /// on a domain the provider sends for.
+  option from string required
+  /// resend: Resend, with its API key in the secrets (mail_api_key); smtp:
+  /// any SMTP server, with its URL in the secrets (mail_smtp_url).
+  option provider name default(resend)
+}

@@ -8,6 +8,12 @@ platform {{.Name}} {
   blueprint observability
   blueprint github_actions
 
+  // the platform's email: its owner gets the alerts and password resets
+  // blueprint mail {
+  //   owner "you@acme.com"
+  //   from  "Platform <no-reply@acme.com>"
+  // }
+
   // with the domains on Cloudflare: their DNS and SSL, and the daily
   // backups of the databases in its R2
   // blueprint cloudflare {

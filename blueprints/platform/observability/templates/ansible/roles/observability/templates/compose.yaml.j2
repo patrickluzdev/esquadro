@@ -12,6 +12,16 @@ services:
 {% if observability_grafana_domain %}
       GF_SERVER_ROOT_URL: https://{{ observability_grafana_domain }}
 {% endif %}
+{% if mail_owner is defined %}
+      # Password resets and alerts, through the platform's email.
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: "{{ mail_smtp_host }}:{{ mail_smtp_port }}"
+      GF_SMTP_USER: "{{ mail_smtp_user }}"
+      GF_SMTP_FROM_ADDRESS: "{{ mail_from_address }}"
+      GF_SMTP_FROM_NAME: "{{ mail_from_name or 'Grafana' }}"
+      GF_SMTP_STARTTLS_POLICY: "{{ 'NoStartTLS' if (mail_smtp_port | int) == 465 else 'MandatoryStartTLS' }}"
+      GF_SECURITY_ADMIN_EMAIL: "{{ mail_owner }}"
+{% endif %}
       PROMETHEUS_EXTRA_ARGS: --storage.tsdb.retention.time={{ observability_retention_days }}d
       LOKI_EXTRA_ARGS: >-
         -compactor.retention-enabled=true -store.retention={{ observability_retention_days * 24 }}h
@@ -22,6 +32,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - data:/data
+      - ./alerting/platform.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/platform.yaml:ro
     networks: [platform]
   hostmetrics:
     image: grafana/otel-lgtm:{{ observability_version }}

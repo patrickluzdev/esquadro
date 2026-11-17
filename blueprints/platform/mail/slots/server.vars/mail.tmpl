@@ -1,0 +1,5 @@
+{{- $o := optionsOf "mail" -}}
+# Email: the platform's owner, who its emails come from, and its provider.
+mail_owner: {{quote $o.owner}}
+mail_from: {{quote $o.from}}
+mail_provider: {{$o.provider}}

@@ -1,0 +1,7 @@
+## Email
+
+Emails go to {{index (optionsOf "mail") "owner"}}, the platform's owner, through
+{{if eq (index (optionsOf "mail") "provider") "resend"}}Resend (fill `mail_api_key` in with `task secrets:edit`){{else}}the SMTP server of `mail_smtp_url` (`task secrets:edit`){{end}}:
+Grafana's password resets and alerts, a backup that failed, Let's Encrypt.
+Each app gets `MAIL_URL` too, unless its own secrets set one.
+`task mail:test` sends one now.

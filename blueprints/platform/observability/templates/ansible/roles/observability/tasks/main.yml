@@ -5,12 +5,30 @@
     state: directory
     mode: "0750"
 
-- name: Keep Grafana's password where only root reads it
+- name: Keep Grafana's passwords where only root reads them
   ansible.builtin.copy:
-    content: "GF_SECURITY_ADMIN_PASSWORD={{ grafana_password }}\n"
+    content: |
+      GF_SECURITY_ADMIN_PASSWORD={{ grafana_password }}
+      {% if mail_owner is defined %}
+      GF_SMTP_PASSWORD={{ mail_smtp_password }}
+      {% endif %}
     dest: "{{ platform_root }}/observability/.env"
     mode: "0600"
   no_log: true
+  register: observability_env
+
+- name: Create the folder of Grafana's alerts
+  ansible.builtin.file:
+    path: "{{ platform_root }}/observability/alerting"
+    state: directory
+    mode: "0755"
+
+- name: Write Grafana's alerts, to the platform's owner
+  ansible.builtin.template:
+    src: alerts.yaml.j2
+    dest: "{{ platform_root }}/observability/alerting/platform.yaml"
+    mode: "0644"
+  register: observability_alerts
 
 - name: Write the collector of the server's metrics
   ansible.builtin.copy:
@@ -29,4 +47,21 @@
   community.docker.docker_compose_v2:
     project_src: "{{ platform_root }}/observability"
     state: present
-    recreate: "{{ 'always' if observability_collector is changed else 'auto' }}"
+    recreate: >-
+      {{ 'always' if (observability_collector is changed or observability_env is changed or observability_alerts is changed)
+         else 'auto' }}
+    wait: true
+    wait_timeout: 180
+
+- name: Give Grafana's admin the owner's email, for password resets
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3000/api/user
+    method: PUT
+    url_username: admin
+    url_password: "{{ grafana_password }}"
+    force_basic_auth: true
+    body_format: json
+    body: {login: admin, name: admin, email: "{{ mail_owner }}"}
+  when: mail_owner is defined
+  no_log: true
+  changed_when: false

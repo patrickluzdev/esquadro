@@ -1,0 +1,9 @@
+{{- if eq (index (optionsOf "mail") "provider") "resend"}}
+# The Resend API key the platform's emails are sent with (Sending access,
+# for the from address's domain).
+mail_api_key:
+{{- else}}
+# The SMTP server the platform's emails are sent with:
+# smtp://user:password@host:port (TLS on 465, STARTTLS otherwise).
+mail_smtp_url:
+{{- end}}
