@@ -41,4 +41,5 @@ import "embed"
 //go:embed platform/observability/blueprint.esq all:platform/observability/templates platform/observability/slots
 //go:embed platform/cloudflare/blueprint.esq all:platform/cloudflare/templates platform/cloudflare/slots
 //go:embed platform/backup/blueprint.esq all:platform/backup/templates platform/backup/slots
+//go:embed platform/github_actions/blueprint.esq all:platform/github_actions/templates
 var FS embed.FS

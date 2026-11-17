@@ -1,0 +1,12 @@
+/// The platform's CI on GitHub Actions: checks that the generated files are
+/// what the model generates (esquadro gen -check), the playbooks
+/// (ansible-lint) and, with cloudflare, the OpenTofu code (tofu validate).
+/// It never touches the servers: you apply from your machine. It runs as
+/// little as it can, to save Actions minutes: pushes to main and pull
+/// requests ready for review, older runs cancelled.
+blueprint github_actions {
+  version "0.1.0"
+  for platform
+  requires server
+  optional cloudflare
+}

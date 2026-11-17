@@ -151,7 +151,7 @@ func TestBuiltinBlueprintsAreValid(t *testing.T) {
 func TestBuiltinPlatformBlueprintsAreValid(t *testing.T) {
 	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook, Kind: project.KindPlatform}
 	names := l.BuiltinNames()
-	if strings.Join(names, " ") != "apps backup caddy cloudflare git observability postgres server" {
+	if strings.Join(names, " ") != "apps backup caddy cloudflare git github_actions observability postgres server" {
 		t.Fatalf("built-in blueprints of a platform = %v", names)
 	}
 	for _, name := range names {

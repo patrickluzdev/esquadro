@@ -6,6 +6,14 @@ platform {{.Name}} {
   blueprint postgres
   blueprint apps
   blueprint observability
+  blueprint github_actions
+
+  // with the domains on Cloudflare: their DNS and SSL, and the daily
+  // backups of the databases in its R2
+  // blueprint cloudflare {
+  //   account_id "your account's id"
+  // }
+  // blueprint backup
 {{- if .Git}}
 
   // the repository
