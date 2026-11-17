@@ -3,7 +3,7 @@
 //
 // Grammar (informal; newlines end fields, settings and options):
 //
-//	File       = { AppDecl | EnumDecl | EntityDecl | JobDecl } .
+//	File       = { AppDecl | EnumDecl | EntityDecl | JobDecl | ReportDecl } .
 //	AppDecl    = "app" Ident "{" { AppItem } "}" .
 //	AppItem    = "module" String
 //	           | "blueprint" ( Ident | String ) [ "{" { Option } "}" ]
@@ -11,6 +11,7 @@
 //	EnumDecl   = "enum" Ident "{" { Ident [ "," ] } "}" .
 //	EntityDecl = "entity" Ident [ "(" Option { "," Option } ")" ] "{" { Member } "}" .
 //	JobDecl    = "job" Ident [ "{" { Member } "}" ] .
+//	ReportDecl = "report" Ident "{" { Member } "}" .
 //	Member     = Field | Relation | Annotation .
 //	Field      = Ident Ident { Modifier | Annotation } .
 //	Relation   = Ident ( ">" | "-" | "<>" | "<" ) Ident [ "." Ident ] [ "(" Ident ")" ] { Modifier | Annotation } .

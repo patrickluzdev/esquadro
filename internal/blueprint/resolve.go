@@ -266,6 +266,12 @@ func (r *resolver) annotations() {
 			f.Ann = r.annotate(f.Annotations, TargetField, nil)
 		}
 	}
+	for _, rep := range r.p.Reports {
+		rep.Ann = r.annotate(rep.Annotations, TargetReport, nil)
+		for _, f := range append(append([]*project.Field{}, rep.Columns...), rep.Params...) {
+			f.Ann = r.annotate(f.Annotations, TargetField, nil)
+		}
+	}
 }
 
 func (r *resolver) annotate(anns []*dsl.Annotation, t Target, e *project.Entity) project.Ann {

@@ -169,6 +169,14 @@ type JobDecl struct {
 	Bare bool
 }
 
+// ReportDecl is a "report" block: numbers worked out by SQL of the
+// project's own, whose fields are its columns and, marked param, its
+// parameters. It is written as an entity, without options; relations are
+// parsed, to report them clearly, but are not valid.
+type ReportDecl struct {
+	EntityDecl
+}
+
 // Member is a member of an entity: *Field, *Relation or *Annotation.
 type Member interface {
 	memberNode()

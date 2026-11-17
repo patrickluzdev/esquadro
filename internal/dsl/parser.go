@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	topKeywords      = []string{"package", "app", "enum", "entity", "job", "blueprint"}
+	topKeywords      = []string{"package", "app", "enum", "entity", "job", "report", "blueprint"}
 	appSettings      = []string{"module", "blueprint"}
 	manifestSettings = []string{"version", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
 )
@@ -41,6 +41,8 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 				d = p.parseEntity()
 			case "job":
 				d = p.parseJob()
+			case "report":
+				d = p.parseReport()
 			case "blueprint":
 				d = p.parseBlueprint()
 			case "package":
@@ -50,7 +52,7 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 		if d == nil {
 			// A failed app/enum/entity has already reported and resynced.
 			if t.Kind != Name || !isTopKeyword(t.Text) {
-				e := p.errorf(t, "expected package, app, enum, entity, job or blueprint, found %s", t.describe())
+				e := p.errorf(t, "expected package, app, enum, entity, job, report or blueprint, found %s", t.describe())
 				if t.Kind == Name {
 					e.Suggestion = didYouMean(t.Text, topKeywords)
 				}
@@ -534,6 +536,28 @@ func (p *parser) parseJob() Decl {
 	end := p.parseBlock(open, "job "+name.Name, func() bool { return p.parseMember(&job.EntityDecl) })
 	job.Span = Span{Pos: start.Pos, End: end}
 	return job
+}
+
+func (p *parser) parseReport() Decl {
+	doc := p.takeDoc()
+	start := p.advance() // "report"
+	name, ok := p.expectIdent("report name")
+	if !ok {
+		p.syncTop()
+		return nil
+	}
+	r := &ReportDecl{}
+	r.Doc, r.Name = doc, name
+	if t := p.tok(); t.Kind != LBrace {
+		p.errorf(t, `expected "{" after report %s, found %s`, name.Name, t.describe()).
+			Suggestion = "list its columns and parameters in a block: report " + name.Name + " { ... }"
+		p.syncTop()
+		return nil
+	}
+	open := p.advance()
+	end := p.parseBlock(open, "report "+name.Name, func() bool { return p.parseMember(&r.EntityDecl) })
+	r.Span = Span{Pos: start.Pos, End: end}
+	return r
 }
 
 func (p *parser) parseEntityOptions(ent *EntityDecl) bool {

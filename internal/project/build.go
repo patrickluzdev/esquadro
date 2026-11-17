@@ -78,6 +78,7 @@ type builder struct {
 	modules  map[string]*Module
 	moduleOf map[dsl.Decl]*Module
 	jobs     map[string]*Job
+	reports  map[string]*Report
 }
 
 func (b *builder) errorf(s dsl.Span, format string, args ...any) *diag.Diagnostic {
@@ -145,6 +146,8 @@ func (b *builder) build() {
 			b.declare(d.Name, d)
 		case *dsl.JobDecl:
 			b.declare(d.Name, d)
+		case *dsl.ReportDecl:
+			b.declare(d.Name, d)
 		case *dsl.BlueprintDecl:
 			b.errorf(d.Name.Span, "blueprint manifests cannot be part of a project").
 				Suggestion = "put this block in blueprint.esq inside the blueprint's own folder"
@@ -188,6 +191,11 @@ func (b *builder) build() {
 	for _, d := range b.allDecls() {
 		if d, ok := d.(*dsl.JobDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
 			b.buildJob(d)
+		}
+	}
+	for _, d := range b.allDecls() {
+		if d, ok := d.(*dsl.ReportDecl); ok && b.decls[d.Name.Name] == dsl.Decl(d) {
+			b.buildReport(d)
 		}
 	}
 	// Pass 2: declared relations.
@@ -363,6 +371,69 @@ func (b *builder) buildJob(d *dsl.JobDecl) {
 	}
 	b.jobs[d.Name.Name] = j
 	b.p.Jobs = append(b.p.Jobs, j)
+}
+
+// buildReport builds a report: its fields are the columns of its rows,
+// those marked param the parameters a request passes; no relations, as a
+// row holds values, and nothing unique or with a default.
+func (b *builder) buildReport(d *dsl.ReportDecl) {
+	r := &Report{Names: b.names(d.Name), Module: b.moduleOf[d], Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
+	if r.Module != nil {
+		r.Module.Reports = append(r.Module.Reports, r)
+	}
+	for _, rel := range d.Relations {
+		b.errorf(rel.Name.Span, "a report's columns cannot be relations: its rows hold values").
+			Suggestion = fmt.Sprintf("select the id instead: %s_id uuid", strings.TrimSuffix(b.names(rel.Name).Snake, "_id"))
+	}
+	seen := map[string]*Field{}
+	for _, f := range d.Fields {
+		param := false
+		mods := make([]*dsl.Modifier, 0, len(f.Modifiers))
+		for _, m := range f.Modifiers {
+			switch m.Name.Name {
+			case "param":
+				if b.noArgs(m) {
+					param = true
+				}
+				continue
+			case "unique", "default":
+				b.errorf(m.Name.Span, "%s is for entities: a report's columns and parameters are values its SQL works with", m.Name.Name).
+					Suggestion = "remove it"
+				continue
+			}
+			mods = append(mods, m)
+		}
+		field := *f
+		field.Modifiers = mods
+		fld := b.buildField(r.Module, &field, false)
+		if fld == nil {
+			continue
+		}
+		if prev, ok := seen[fld.Snake]; ok {
+			b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "%s is already a column or parameter of %s, at line %d", fld.Raw, r.Raw, prev.Pos.Line)
+			continue
+		}
+		seen[fld.Snake] = fld
+		if fld.Type == TypeJSON {
+			b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "a report's columns and parameters are plain values: json is not one").
+				Suggestion = "select the values the report shows, each in a column"
+			continue
+		}
+		if param {
+			r.Params = append(r.Params, fld)
+		} else {
+			r.Columns = append(r.Columns, fld)
+		}
+	}
+	if len(r.Columns) == 0 {
+		b.errorf(d.Name.Span, "report %s has no columns: what does each row hold?", r.Raw).
+			Suggestion = "declare its columns as fields, e.g. clicks int required"
+	}
+	if b.reports == nil {
+		b.reports = map[string]*Report{}
+	}
+	b.reports[d.Name.Name] = r
+	b.p.Reports = append(b.p.Reports, r)
 }
 
 func implicitField(name string, t Type, d *Default) *Field {
@@ -1020,6 +1091,10 @@ func (b *builder) checkTypeNameClashes() {
 			if j := b.jobs[d.Name.Name]; j != nil {
 				check(j.Names, j.Pos, d.Name.Span)
 			}
+		case *dsl.ReportDecl:
+			if r := b.reports[d.Name.Name]; r != nil {
+				check(r.Names, r.Pos, d.Name.Span)
+			}
 		}
 	}
 }
@@ -1136,7 +1211,7 @@ func (b *builder) buildModules() {
 			switch d := d.(type) {
 			case *dsl.PackageDecl:
 				mod = b.module(d)
-			case *dsl.EntityDecl, *dsl.EnumDecl, *dsl.JobDecl:
+			case *dsl.EntityDecl, *dsl.EnumDecl, *dsl.JobDecl, *dsl.ReportDecl:
 				if mod != nil {
 					b.moduleOf[d] = mod
 					continue

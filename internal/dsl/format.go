@@ -40,6 +40,8 @@ func Format(f *File) []byte {
 			p.entity(&out, "entity", d)
 		case *JobDecl:
 			p.entity(&out, "job", &d.EntityDecl)
+		case *ReportDecl:
+			p.entity(&out, "report", &d.EntityDecl)
 		case *BlueprintDecl:
 			p.blueprint(&out, d)
 		case *PackageDecl:
@@ -75,6 +77,8 @@ func firstLine(d Decl) int {
 	case *EntityDecl:
 		doc = d.Doc
 	case *JobDecl:
+		doc = d.Doc
+	case *ReportDecl:
 		doc = d.Doc
 	case *BlueprintDecl:
 		doc = d.Doc
@@ -482,8 +486,8 @@ func (p *printer) enum(out *strings.Builder, d *EnumDecl) {
 	out.WriteString("\n")
 }
 
-// entity writes an entity, or a job (keyword "job"), which is written
-// without a block when it has nothing in it.
+// entity writes an entity, a report, or a job (keyword "job"), which is
+// written without a block when it has nothing in it.
 func (p *printer) entity(out *strings.Builder, keyword string, d *EntityDecl) {
 	p.docs(out, d.Doc)
 	header := keyword + " " + d.Name.Name

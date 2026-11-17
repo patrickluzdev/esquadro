@@ -10,6 +10,7 @@ type Description struct {
 	Enums    []EnumDescription   `json:"enums"`
 	Entities []EntityDescription `json:"entities"`
 	Jobs     []JobDescription    `json:"jobs,omitempty"`
+	Reports  []ReportDescription `json:"reports,omitempty"`
 }
 
 // JobDescription describes a job: its arguments are fields.
@@ -18,6 +19,16 @@ type JobDescription struct {
 	Module string             `json:"module"`
 	Fields []FieldDescription `json:"fields"`
 	Ann    Ann                `json:"ann,omitempty"`
+}
+
+// ReportDescription describes a report: the columns of its rows and the
+// parameters it takes.
+type ReportDescription struct {
+	Names
+	Module  string             `json:"module"`
+	Columns []FieldDescription `json:"columns"`
+	Params  []FieldDescription `json:"params"`
+	Ann     Ann                `json:"ann,omitempty"`
 }
 
 // AppDescription describes the app block.
@@ -144,6 +155,16 @@ func (p *Project) Describe() Description {
 			jd.Fields = append(jd.Fields, describeField(f))
 		}
 		d.Jobs = append(d.Jobs, jd)
+	}
+	for _, r := range p.Reports {
+		rd := ReportDescription{Names: r.Names, Module: moduleName(r.Module), Ann: r.Ann, Columns: []FieldDescription{}, Params: []FieldDescription{}}
+		for _, f := range r.Columns {
+			rd.Columns = append(rd.Columns, describeField(f))
+		}
+		for _, f := range r.Params {
+			rd.Params = append(rd.Params, describeField(f))
+		}
+		d.Reports = append(d.Reports, rd)
 	}
 	return d
 }

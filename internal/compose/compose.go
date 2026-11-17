@@ -102,6 +102,7 @@ type Data struct {
 	Enums    []*project.Enum
 	Modules  []*project.Module
 	Jobs     []*project.Job
+	Reports  []*project.Report
 	// Env are the project's environment variables, with their values
 	// rendered, and Environments its environments, the first one where
 	// development happens.
@@ -116,6 +117,9 @@ type Data struct {
 	// Job is set in templates rendered per job, whose file name uses .Job;
 	// Module is the job's.
 	Job *project.Job
+	// Report is set in templates rendered per report, whose file name uses
+	// .Report; Module is the report's.
+	Report *project.Report
 	// Relation is set in templates rendered per relation: each side of
 	// every relation, with Entity and Module those of its side.
 	Relation *project.Relation
@@ -518,6 +522,7 @@ var (
 	entityRef   = regexp.MustCompile(`\.Entity\b`)
 	enumRef     = regexp.MustCompile(`\.Enum\b`)
 	jobRef      = regexp.MustCompile(`\.Job\b`)
+	reportRef   = regexp.MustCompile(`\.Report\b`)
 	moduleRef   = regexp.MustCompile(`\.Module\b`)
 )
 
@@ -549,9 +554,10 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	perEntity := !perRelation && entityRef.MatchString(outPath)
 	perEnum := enumRef.MatchString(outPath)
 	perJob := jobRef.MatchString(outPath)
-	perModule := !perRelation && !perEntity && !perEnum && !perJob && moduleRef.MatchString(outPath)
-	if n := btoi(perEntity || perRelation) + btoi(perEnum) + btoi(perJob); n > 1 {
-		c.errorf(name, 0, "a template path can use only one of .Entity (or .Relation), .Enum and .Job")
+	perReport := reportRef.MatchString(outPath)
+	perModule := !perRelation && !perEntity && !perEnum && !perJob && !perReport && moduleRef.MatchString(outPath)
+	if n := btoi(perEntity || perRelation) + btoi(perEnum) + btoi(perJob) + btoi(perReport); n > 1 {
+		c.errorf(name, 0, "a template path can use only one of .Entity (or .Relation), .Enum, .Job and .Report")
 		return nil
 	}
 	pathTmpl, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(outPath)
@@ -572,7 +578,7 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 	}
 
 	whole := Data{
-		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
+		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
 		Env: c.env, Environments: c.set.Environments,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
 	}
@@ -602,6 +608,12 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 		for _, j := range c.p.Jobs {
 			d := whole
 			d.Job, d.Module = j, j.Module
+			datas = append(datas, d)
+		}
+	case perReport:
+		for _, r := range c.p.Reports {
+			d := whole
+			d.Report, d.Module = r, r.Module
 			datas = append(datas, d)
 		}
 	case perModule:
@@ -704,7 +716,7 @@ func (c *composer) renderEnv() []*project.EnvVar {
 		bp := c.set.Get(v.Blueprint)
 		if bp != nil {
 			name := display(bp, "blueprint.esq")
-			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs,
+			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
 				Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
 			execute := func(s string) (string, bool) {
 				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)

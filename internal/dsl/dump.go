@@ -107,13 +107,15 @@ func Dump(f *File) string {
 					w(1, "hook %s %s%s", it.Event.Name, dumpValue(it.Path), writes)
 				}
 			}
-		case *EntityDecl, *JobDecl:
+		case *EntityDecl, *JobDecl, *ReportDecl:
 			keyword, ent := "entity", (*EntityDecl)(nil)
 			switch d := d.(type) {
 			case *EntityDecl:
 				ent = d
 			case *JobDecl:
 				keyword, ent = "job", &d.EntityDecl
+			case *ReportDecl:
+				keyword, ent = "report", &d.EntityDecl
 			}
 			w(0, "%s %s @%s", keyword, ent.Name.Name, pos(ent.Span))
 			docs(1, ent.Doc)

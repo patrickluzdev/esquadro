@@ -19,6 +19,7 @@ type Project struct {
 	Enums    []*Enum
 	Entities []*Entity
 	Jobs     []*Job
+	Reports  []*Report
 }
 
 // Module is a part of the domain: the entities and enums of the files that
@@ -28,6 +29,7 @@ type Module struct {
 	Entities []*Entity
 	Enums    []*Enum
 	Jobs     []*Job
+	Reports  []*Report
 	Pos      diag.Pos
 }
 
@@ -156,6 +158,19 @@ type Job struct {
 	Module      *Module
 	Doc         []string
 	Fields      []*Field
+	Annotations []*dsl.Annotation
+	Ann         Ann
+	Pos         diag.Pos
+}
+
+// Report is numbers the project's own SQL works out: the columns of its
+// rows and the parameters a request passes it, each with a model type.
+type Report struct {
+	Names
+	Module      *Module
+	Doc         []string
+	Columns     []*Field
+	Params      []*Field
 	Annotations []*dsl.Annotation
 	Ann         Ann
 	Pos         diag.Pos

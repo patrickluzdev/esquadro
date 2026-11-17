@@ -2,7 +2,7 @@
 
 Support for [Esquadro](https://github.com/patrickluzdev/esquadro)'s `.esq` files:
 
-- **Syntax highlighting** of models (`app`, `package`, `enum`, `entity`, `job`)
+- **Syntax highlighting** of models (`app`, `package`, `enum`, `entity`, `job`, `report`)
   and blueprint manifests (`blueprint.esq`).
 - **Errors while you type**, before saving: the ones `esquadro check` reports,
   across the whole project (an entity misspelled in another file, an option a

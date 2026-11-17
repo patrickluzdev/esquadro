@@ -91,7 +91,7 @@
           }
         },
         {
-          "match": "\\b(app|entity|enum|job)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(app|entity|enum|job|report)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "storage.type.esquadro"
@@ -165,7 +165,7 @@
           "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
         },
         {
-          "match": "^\\s*(?!(?:app|package|entity|enum|job|module|blueprint|env|version|requires|optional|option|annotation|slot|go_require|hook)\\b)([a-z_][A-Za-z0-9_]*)(?=\\s)",
+          "match": "^\\s*(?!(?:app|package|entity|enum|job|report|module|blueprint|env|version|requires|optional|option|annotation|slot|go_require|hook)\\b)([a-z_][A-Za-z0-9_]*)(?=\\s)",
           "captures": {
             "1": {
               "name": "variable.other.property.esquadro"
