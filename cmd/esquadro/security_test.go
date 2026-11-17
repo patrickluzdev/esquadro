@@ -177,9 +177,9 @@ func TestSecurityWithoutPrincipals(t *testing.T) {
 	if code, out, errOut := esq(t, "gen", dir); code != 0 {
 		t.Fatalf("gen: %s%s", out, errOut)
 	}
-	routes := read(t, filepath.Join(dir, "cmd", "shop", "routes.go"))
+	routes := read(t, filepath.Join(dir, "cmd", "shop", "routes_gen.go"))
 	if !strings.Contains(routes, "edge.CORS(d.config.CORSOrigins)") || !strings.Contains(routes, "edge.Secure(d.config.HSTS)") || strings.Contains(routes, "Authenticate") {
-		t.Fatalf("routes.go:\n%s", routes)
+		t.Fatalf("routes_gen.go:\n%s", routes)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "internal", "platform", "security")); err == nil {
 		t.Fatal("a security package without principals")

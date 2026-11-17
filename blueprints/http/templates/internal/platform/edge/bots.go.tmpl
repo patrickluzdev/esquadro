@@ -1,0 +1,34 @@
+package edge
+
+import (
+	"net/http"
+	"strings"
+)
+
+// Bots are parts of the User-Agent of clients that are no person: link
+// previews (WhatsApp, Telegram, social networks, chats), search engines and
+// tools. Add your own with Bots = append(Bots, "...").
+var Bots = []string{
+	"whatsapp", "telegrambot", "facebookexternalhit", "facebot", "twitterbot",
+	"slackbot", "discordbot", "linkedinbot", "skypeuripreview", "pinterest",
+	"googlebot", "bingbot", "yandex", "baiduspider", "duckduckbot", "applebot",
+	"petalbot", "semrushbot", "ahrefsbot", "gptbot", "claudebot", "ccbot",
+	"bot/", "crawler", "spider", "preview", "curl/", "wget/", "python-requests",
+	"go-http-client", "headlesschrome",
+}
+
+// IsBot reports whether r comes from a link preview, a search engine or a
+// tool rather than a person, by its User-Agent; one without a User-Agent
+// is a bot too. Count clicks and visits only when it is not.
+func IsBot(r *http.Request) bool {
+	ua := strings.ToLower(r.UserAgent())
+	if ua == "" {
+		return true
+	}
+	for _, b := range Bots {
+		if strings.Contains(ua, b) {
+			return true
+		}
+	}
+	return false
+}

@@ -26,8 +26,13 @@ blueprint http {
   /// "*" is any, but never with cookies. None by default: only the app's
   /// own pages. <APP>_CORS_ORIGINS, comma separated, overrides it.
   option cors_origins list default([])
+  /// Routes of the app's own (a redirect, a page, a webhook), in
+  /// cmd/<app>/routes.go, written once with an example and yours after:
+  /// false leaves the file out. Deleting it works too; the app builds
+  /// without it, and esquadro gen does not bring it back.
+  option own_routes bool default(true)
 
-  /// Imports of cmd/<app>/routes.go.
+  /// Imports of cmd/<app>/routes_gen.go.
   slot "http.routes.imports"
   /// Routes, registered on mux; d is the dependencies, and an error is
   /// returned as nil, err.

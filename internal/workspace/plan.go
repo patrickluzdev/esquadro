@@ -80,6 +80,7 @@ const (
 	reasonForeign    = "exists, but esquadro did not generate it"
 	reasonEditedGone = "edited since esquadro generated it, and is no longer generated"
 	reasonYours      = "yours: generated once, never updated"
+	reasonNowYours   = "generated before, yours from now on"
 	reasonDeleted    = "yours, and you deleted it: esquadro does not bring it back"
 	reasonHookEdited = "edited since hook %s wrote it"
 )
@@ -99,7 +100,15 @@ func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error)
 		if l, ok := lock.Files[f.Path]; ok {
 			a.locked = &l
 		}
+		// A file esquadro generated that becomes the user's (a .once
+		// template at its path): replaced if untouched, so the user gets the
+		// new starting point instead of the old generated code.
+		wasGenerated := f.Once && old != nil && a.locked != nil && !a.locked.Once
 		switch {
+		case wasGenerated && Hash(old) == a.locked.Hash:
+			a.Change, a.Reason = Update, reasonNowYours
+		case wasGenerated:
+			a.Change, a.Reason = Conflict, reasonEdited
 		case f.Once && old != nil:
 			a.Change, a.Reason = Keep, reasonYours
 		case f.Once && a.locked != nil:

@@ -244,6 +244,40 @@ func TestOnceFileTheUserAlreadyHadIsKept(t *testing.T) {
 	}
 }
 
+func TestAGeneratedFileThatBecomesTheUsersIsReplacedWhenUntouched(t *testing.T) {
+	p := newProject(t)
+	if _, err := p.gen(false, file("routes.go", "generated")); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := p.gen(false, once("routes.go", "yours"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "update routes.go")
+	if got, _ := p.read("routes.go"); got != "yours" {
+		t.Fatalf("routes.go = %q", got)
+	}
+	// From now on it is the user's.
+	p.write("routes.go", "mine")
+	if plan, err = p.gen(false, once("routes.go", "yours, again")); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "keep routes.go")
+
+	// Edited while generated: a conflict, not overwritten.
+	q := newProject(t)
+	if _, err := q.gen(false, file("routes.go", "generated")); err != nil {
+		t.Fatal(err)
+	}
+	q.write("routes.go", "edited")
+	if _, err := q.gen(false, once("routes.go", "yours")); err == nil {
+		t.Fatal("an edited generated file was replaced")
+	}
+	if got, _ := q.read("routes.go"); got != "edited" {
+		t.Fatalf("routes.go = %q", got)
+	}
+}
+
 func TestUpdateKeepsFileMode(t *testing.T) {
 	p := newProject(t)
 	if _, err := p.gen(false, file("run.sh", "v1")); err != nil {

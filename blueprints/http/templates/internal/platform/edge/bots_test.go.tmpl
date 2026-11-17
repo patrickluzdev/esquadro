@@ -1,0 +1,51 @@
+package edge
+
+import (
+	"net/http/httptest"
+	"testing"
+)
+
+func TestIsBotKnowsLinkPreviewsAndPeople(t *testing.T) {
+	t.Parallel()
+	for ua, bot := range map[string]bool{
+		"WhatsApp/2.23.20.0 A": true,
+		"TelegramBot (like TwitterBot)": true,
+		"facebookexternalhit/1.1": true,
+		"Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)": true,
+		"curl/8.5.0": true,
+		"": true,
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1": false,
+		"Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36": false,
+	} {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.Header.Set("User-Agent", ua)
+		if got := IsBot(r); got != bot {
+			t.Errorf("IsBot(%q) = %v, want %v", ua, got, bot)
+		}
+	}
+}
+
+func TestVisitorIsTheSamePersonAllDayWithoutSayingWho(t *testing.T) {
+	t.Parallel()
+	req := func(addr, ua string) *httptestRequest { return &httptestRequest{addr, ua} }
+	a, b, c := req("203.0.113.1:1", "phone"), req("203.0.113.1:2", "phone"), req("203.0.113.2:1", "phone")
+	secret := []byte("secret")
+	if a.visitor(secret) != b.visitor(secret) {
+		t.Error("the same person, another port: another visitor")
+	}
+	if a.visitor(secret) == c.visitor(secret) || a.visitor(secret) == a.visitor([]byte("other")) {
+		t.Error("another person, or another secret: the same visitor")
+	}
+	if len(a.visitor(secret)) != 32 {
+		t.Errorf("visitor %q", a.visitor(secret))
+	}
+}
+
+type httptestRequest struct{ addr, ua string }
+
+func (h *httptestRequest) visitor(secret []byte) string {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = h.addr
+	r.Header.Set("User-Agent", h.ua)
+	return Visitor(r, secret, false)
+}

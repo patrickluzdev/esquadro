@@ -53,7 +53,7 @@ func TestAddWritesTheBlueprintsWithWhatTheyRequire(t *testing.T) {
 		t.Fatalf("out: %s", out)
 	}
 	want := "  // mine: keep this\n  blueprint app\n  blueprint env\n" +
-		"  blueprint http {\n    // port 8080\n    // trust_proxy false\n    // cors_origins []\n  }\n" +
+		"  blueprint http {\n    // port 8080\n    // trust_proxy false\n    // cors_origins []\n    // own_routes true\n  }\n" +
 		"  blueprint rate_limit {\n    // per_minute 120\n  }\n\n" +
 		"  // Add more with esquadro add <blueprint>; see them with esquadro blueprint list.\n}\n"
 	if got := read(t, appEsq); !strings.HasSuffix(got, want) {

@@ -24,6 +24,7 @@ blueprint http
 | `port` | int | `8080` | Port the server listens on; PORT overrides it. |
 | `trust_proxy` | bool | `false` | Take the client's address from X-Forwarded-For, for the log and the rate limit; only behind a proxy that sets it. &lt;APP>_TRUST_PROXY overrides it. |
 | `cors_origins` | list | `[]` | The origins browsers may call the app from (https://app.example.com); "*" is any, but never with cookies. None by default: only the app's own pages. &lt;APP>_CORS_ORIGINS, comma separated, overrides it. |
+| `own_routes` | bool | `true` | Routes of the app's own (a redirect, a page, a webhook), in cmd/&lt;app>/routes.go, written once with an example and yours after: false leaves the file out. Deleting it works too; the app builds without it, and esquadro gen does not bring it back. |
 
 ```esquadro
 blueprint http {
@@ -47,7 +48,7 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 
 | Slot | |
 |---|---|
-| `http.routes.imports` | Imports of cmd/&lt;app>/routes.go. |
+| `http.routes.imports` | Imports of cmd/&lt;app>/routes_gen.go. |
 | `http.routes` | Routes, registered on mux; d is the dependencies, and an error is returned as nil, err. |
 | `http.middleware.context` | Middleware that sets the request's context before anything answers, one per line ending with a comma, e.g. edge.Localize,. |
 | `http.middleware` | Middleware every request goes through, inside the access log and the panic recovery, one per line ending with a comma. |

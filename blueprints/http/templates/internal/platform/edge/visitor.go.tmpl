@@ -1,0 +1,24 @@
+package edge
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"time"
+)
+
+// Visitor is an id of the person behind r for today, to count unique
+// visitors without knowing who they are: an HMAC, with secret, of their
+// address, User-Agent and today's date (UTC). It is the same all day and
+// changes the next, so no one is followed from one day to another, and
+// nothing that identifies a person is kept. trustProxy is as ClientOf's.
+func Visitor(r *http.Request, secret []byte, trustProxy bool) string {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(time.Now().UTC().Format(time.DateOnly)))
+	mac.Write([]byte{0})
+	mac.Write([]byte(ClientOf(r, trustProxy)))
+	mac.Write([]byte{0})
+	mac.Write([]byte(r.UserAgent()))
+	return hex.EncodeToString(mac.Sum(nil)[:16])
+}

@@ -1,0 +1,29 @@
+{{- if .Options.own_routes -}}
+package main
+
+import "net/http"
+
+// ownRoutes are routes of your own, besides the ones the model generates:
+// a redirect, a page, a webhook. They go through every middleware the
+// others do, and are registered before anything else answers not_found.
+//
+// This file is yours: esquadro wrote it once and leaves it alone. Delete it
+// when the app has no routes of its own; esquadro gen will not write it
+// again, and the app builds without it.
+//
+// A pattern with a host wins over one without, on that host: the routes of
+// a short domain, say, beside the API. Take the host from a variable of the
+// app's env block, e.g.
+//
+//	mux.HandleFunc("GET "+d.config.ShortDomain+"/{code}", d.links.Redirect)
+//	mux.HandleFunc("POST /hooks/telegram", d.posting.TelegramUpdate)
+func (d dependencies) ownRoutes(mux *http.ServeMux) error {
+	// An example: asks search engines not to crawl the app. Change it, or
+	// remove it.
+	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+	})
+	return nil
+}
+{{- end}}
