@@ -30,12 +30,17 @@ func ({{$rc}} *{{$m.Pascal}}) {{$r.Pascal}}(ctx context.Context, q {{$r.Pascal}}
 	if limit <= 0 {
 		limit = {{$r.Pascal}}Rows
 	}
+{{- if $r.Params}}
 	rows, err := sqlgen.New(postgres.Querier(ctx, {{$rc}}.Pool)).{{$r.Pascal}}(ctx, sqlgen.{{$r.Pascal}}Params{
 {{- range $r.Params}}
 		{{sqlcName .Snake}}: {{reportParam .}},
 {{- end}}
 		RowLimit: int32(limit + 1),
 	})
+{{- else}}
+	// With the row limit its only parameter, sqlc takes it as it is.
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$rc}}.Pool)).{{$r.Pascal}}(ctx, int32(limit+1))
+{{- end}}
 	if err != nil {
 		return nil, fmt.Errorf("report {{$r.Pascal}}: %w", err)
 	}

@@ -121,6 +121,8 @@ func TestLifecycle(t *testing.T) {
 	}
 	catalog += "\n/// Who makes a product.\nentity Brand {\n  name string required\n}\n"
 	// A record with an owner: each customer's own reviews.
+	// A report, whose SQL esquadro writes first and the test then writes.
+	catalog += "\n/// Products per brand.\nreport ProductsByBrand {\n  brand    string required\n  products int    required\n  @security(read user)\n}\n"
 	catalog += "\n/// What a customer thinks of a product.\nentity Review {\n  text     string required\n  customer > Customer required\n  product  > Product required\n  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	// The TypeScript client too: go test runs its tests against the API.
@@ -129,6 +131,20 @@ func TestLifecycle(t *testing.T) {
 	e.esquadro(0, "gen", dir)
 	if !strings.Contains(e.read(filepath.Join(dir, "clients", "ts", "package.json")), `"@acme/shop-client"`) {
 		t.Fatal("no TypeScript client")
+	}
+	reportSQL := filepath.Join(dir, "internal", "catalog", "reports", "products_by_brand.sql")
+	if !strings.Contains(e.read(reportSQL), "-- name: ProductsByBrand :many") {
+		t.Fatal("esquadro did not write the report's first SQL")
+	}
+	e.write(reportSQL, `-- name: ProductsByBrand :many
+SELECT b.name::text AS brand, count(p.id)::bigint AS products
+FROM brands b LEFT JOIN products p ON p.brand_id = b.id
+GROUP BY b.name ORDER BY b.name
+LIMIT sqlc.arg(row_limit);
+`)
+	e.esquadro(0, "gen", dir)
+	if !strings.Contains(e.read(reportSQL), "LEFT JOIN") {
+		t.Fatal("gen wrote over the report's SQL")
 	}
 	migrations, _ := filepath.Glob(filepath.Join(dir, "migrations", "*.sql"))
 	if len(migrations) != 2 {
@@ -181,6 +197,7 @@ func TestLifecycle(t *testing.T) {
 
 	e.ownerScenario(added["id"].(string))
 	e.safeWrites(added, category["id"].(string), brand["id"].(string))
+	e.report()
 
 	// 6. Its own tests pass on the new model.
 	e.run(nil, "go", "test", "./...")
@@ -309,6 +326,24 @@ func (e *lifecycle) ownerScenario(product string) {
 	owner, _ := e.request("GET", query, "", map[string]string{"Authorization": e.auth}, 200).body["customer"].(map[string]any)
 	if owner["id"] != carlaID || owner["name"] != "Someone" || owner["created_at"] != nil {
 		e.t.Fatalf("the review's customer, as an admin: %v", owner)
+	}
+}
+
+// report reads the report through the running service: whoever signed in
+// as a user sees the numbers; no one signed in, not.
+func (e *lifecycle) report() {
+	e.t.Helper()
+	e.request("GET", "/api/v1/reports/products-by-brand", "", nil, 401)
+	rows := e.request("GET", "/api/v1/reports/products-by-brand", "", map[string]string{"Authorization": e.auth}, 200).body["items"].([]any)
+	found := false
+	for _, r := range rows {
+		row := r.(map[string]any)
+		if row["brand"] == "Ace" && row["products"] == float64(1) {
+			found = true
+		}
+	}
+	if !found {
+		e.t.Fatalf("the report: %v", rows)
 	}
 }
 
