@@ -27,7 +27,8 @@ trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 if [ ! -t 0 ]; then
   token=$(cat)
   if [ -n "$token" ]; then
-    printf '%s' "$token" | docker login "${image%%/*}" -u token --password-stdin >/dev/null
+    printf '%s' "$token" | docker login "${image%%/*}" -u token --password-stdin >/dev/null 2>&1 ||
+      die "cannot sign in to ${image%%/*} with the token given"
   fi
 fi
 
