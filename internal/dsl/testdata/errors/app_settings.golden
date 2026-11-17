@@ -1,9 +1,3 @@
-app_settings.esq:2:3: error: unknown app setting "modul"
-  |
-2 |   modul "github.com/example/shop"
-  |   ^^^^^
-  = help: did you mean "module"?
-
 app_settings.esq:3:10: error: expected module path as a string, found name "github"
   |
 3 |   module github.com/example/shop
@@ -25,4 +19,4 @@ app_settings.esq:8:13: error: expected a value after option pool_max (string, nu
 8 |     pool_max
   |             ^
 
-5 errors
+4 errors

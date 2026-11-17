@@ -325,7 +325,7 @@ func hasLaterCell(cells []string, j int) bool {
 
 func (p *printer) app(out *strings.Builder, d *AppDecl) {
 	p.docs(out, d.Doc)
-	header := "app " + d.Name.Name + " {"
+	header := d.Kind() + " " + d.Name.Name + " {"
 	first := d.End.Offset
 	if len(d.Items) > 0 {
 		first = d.Items[0].SourceSpan().Pos.Offset
@@ -348,6 +348,12 @@ func (p *printer) app(out *strings.Builder, d *AppDecl) {
 			l.text = annotationString(it)
 		case *EnvBlock:
 			l.text = p.envBlock(it)
+		case *Setting:
+			if it.Value == nil {
+				l.text = it.Key.Name
+			} else {
+				l.cells, l.kind = []string{it.Key.Name, valueString(*it.Value)}, optionRow
+			}
 		}
 		l.trail = p.trailing(sp.End.Offset)
 		b.lines = append(b.lines, l)

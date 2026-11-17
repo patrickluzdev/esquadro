@@ -4,10 +4,11 @@
 // Grammar (informal; newlines end fields, settings and options):
 //
 //	File       = { AppDecl | EnumDecl | EntityDecl | JobDecl | ReportDecl } .
-//	AppDecl    = "app" Ident "{" { AppItem } "}" .
+//	AppDecl    = ( "app" | "platform" | "server" ) Ident "{" { AppItem } "}" .
 //	AppItem    = "module" String
 //	           | "blueprint" ( Ident | String ) [ "{" { Option } "}" ]
-//	           | Annotation .
+//	           | EnvBlock | Annotation
+//	           | Ident [ Value ] .
 //	EnumDecl   = "enum" Ident "{" { Ident [ "," ] } "}" .
 //	EntityDecl = "entity" Ident [ "(" Option { "," Option } ")" ] "{" { Member } "}" .
 //	JobDecl    = "job" Ident [ "{" { Member } "}" ] .

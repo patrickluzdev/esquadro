@@ -1,0 +1,19 @@
+/// The servers.
+platform acme {
+  blueprint server
+  blueprint postgres {
+    version 18
+  }
+}
+
+server main {
+  host "203.0.113.10" // the VPS
+}
+
+app shop {
+  image   "ghcr.io/acme/shop"
+  domains ["shop.com", "api.shop.com"]
+  worker
+  database
+  port    8080
+}

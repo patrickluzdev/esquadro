@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	topKeywords      = []string{"package", "app", "enum", "entity", "job", "report", "blueprint"}
-	appSettings      = []string{"module", "blueprint"}
+	topKeywords      = []string{"package", "app", "platform", "server", "enum", "entity", "job", "report", "blueprint"}
 	manifestSettings = []string{"version", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
 )
 
@@ -33,7 +32,7 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 		var d Decl
 		if t.Kind == Name {
 			switch t.Text {
-			case "app":
+			case "app", "platform", "server":
 				d = p.parseApp()
 			case "enum":
 				d = p.parseEnum()
@@ -52,7 +51,7 @@ func Parse(filename string, src []byte) (*File, diag.List) {
 		if d == nil {
 			// A failed app/enum/entity has already reported and resynced.
 			if t.Kind != Name || !isTopKeyword(t.Text) {
-				e := p.errorf(t, "expected package, app, enum, entity, job, report or blueprint, found %s", t.describe())
+				e := p.errorf(t, "expected package, app, platform, server, enum, entity, job, report or blueprint, found %s", t.describe())
 				if t.Kind == Name {
 					e.Suggestion = didYouMean(t.Text, topKeywords)
 				}
@@ -288,19 +287,23 @@ func (p *parser) parseBlock(open Token, what string, member func() bool) diag.Po
 
 func (p *parser) parseApp() Decl {
 	doc := p.takeDoc()
-	start := p.advance() // "app"
-	name, ok := p.expectIdent("app name")
+	start := p.advance() // "app", "platform" or "server"
+	kw := start.Text
+	name, ok := p.expectIdent(kw + " name")
 	if !ok {
 		p.syncTop()
 		return nil
 	}
-	open, ok := p.expect(LBrace, "after app name")
+	open, ok := p.expect(LBrace, "after "+kw+" name")
 	if !ok {
 		p.syncTop()
 		return nil
 	}
-	app := &AppDecl{Doc: doc, Name: name}
-	end := p.parseBlock(open, "app "+name.Name, func() bool { return p.parseAppItem(app) })
+	app := &AppDecl{Keyword: kw, Doc: doc, Name: name}
+	if kw == "app" {
+		app.Keyword = ""
+	}
+	end := p.parseBlock(open, kw+" "+name.Name, func() bool { return p.parseAppItem(app) })
 	app.Span = Span{Pos: start.Pos, End: end}
 	return app
 }
@@ -326,7 +329,7 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 		return true
 	}
 	if t.Kind != Name {
-		p.errorf(t, "expected an app setting (module, blueprint or env), found %s", t.describe())
+		p.errorf(t, "expected a setting of %s %s (a name, then a value or nothing), found %s", app.Kind(), app.Name.Name, t.describe())
 		return false
 	}
 	switch t.Text {
@@ -368,8 +371,21 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 		app.Blueprints = append(app.Blueprints, ref)
 		app.Items = append(app.Items, ref)
 	default:
-		p.errorf(t, "unknown app setting %q", t.Text).Suggestion = didYouMean(t.Text, appSettings)
-		return false
+		// Any other "key value" or "key": the project checks which settings
+		// the block takes.
+		key := p.advance()
+		s := &Setting{Key: Ident{Name: key.Text, Span: Span{Pos: key.Pos, End: key.End}}, Pos: key.Pos, End: key.End}
+		switch p.tok().Kind {
+		case Newline, RBrace, EOF:
+		default:
+			v, ok := p.parseValue("after " + key.Text)
+			if !ok {
+				return false
+			}
+			s.Value, s.End = &v, v.End
+		}
+		app.Settings = append(app.Settings, s)
+		app.Items = append(app.Items, s)
 	}
 	return true
 }

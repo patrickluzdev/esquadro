@@ -24,7 +24,7 @@ func Dump(f *File) string {
 	for _, d := range f.Decls {
 		switch d := d.(type) {
 		case *AppDecl:
-			w(0, "app %s @%s", d.Name.Name, pos(d.Span))
+			w(0, "%s %s @%s", d.Kind(), d.Name.Name, pos(d.Span))
 			docs(1, d.Doc)
 			if d.Module != nil {
 				w(1, "module %s", dumpValue(*d.Module))
@@ -33,6 +33,13 @@ func Dump(f *File) string {
 				w(1, "blueprint %s @%s", dumpValue(bp.Ref), pos(bp.Span))
 				for _, o := range bp.Options {
 					w(2, "option %s %s", o.Key.Name, dumpValue(o.Value))
+				}
+			}
+			for _, s := range d.Settings {
+				if s.Value == nil {
+					w(1, "setting %s @%s", s.Key.Name, pos(s.Span))
+				} else {
+					w(1, "setting %s %s @%s", s.Key.Name, dumpValue(*s.Value), pos(s.Span))
 				}
 			}
 			for _, a := range d.Annotations {

@@ -75,22 +75,47 @@ type AnnotationArg struct {
 	Span
 }
 
-// AppDecl is the "app" block.
+// AppDecl is an "app", "platform" or "server" block. An app project has
+// one app block; a platform project has one platform block, its servers,
+// and an app block for each app it runs, made of settings.
 type AppDecl struct {
-	Doc  []string
-	Name Ident
+	// Keyword is "app", "platform" or "server"; empty means "app".
+	Keyword string
+	Doc     []string
+	Name    Ident
 	// Module is nil when not set. When set more than once, the parser keeps
 	// the first and reports the rest.
 	Module      *Value
 	Blueprints  []*BlueprintRef
 	Annotations []*Annotation
-	// Items keeps module, blueprints and annotations in source order.
+	// Settings are the other "key value" or "key" lines, such as the image
+	// of an app a platform runs; which ones a block takes is checked when
+	// the project is built.
+	Settings []*Setting
+	// Items keeps module, blueprints, settings and annotations in source
+	// order.
 	Items []AppItem
 	Span
 }
 
+// Kind is the block's keyword: "app", "platform" or "server".
+func (d *AppDecl) Kind() string {
+	if d.Keyword == "" {
+		return "app"
+	}
+	return d.Keyword
+}
+
+// Setting is a "key value" line of a block, or a bare "key", a flag.
+type Setting struct {
+	Key Ident
+	// Value is nil for a flag.
+	Value *Value
+	Span
+}
+
 // AppItem is an item of the app block: *ModuleItem, *BlueprintRef,
-// *EnvBlock or *Annotation.
+// *EnvBlock, *Setting or *Annotation.
 type AppItem interface {
 	appItemNode()
 	SourceSpan() Span
@@ -246,6 +271,7 @@ func (*ModuleItem) appItemNode()   {}
 func (*BlueprintRef) appItemNode() {}
 func (*Annotation) appItemNode()   {}
 func (*EnvBlock) appItemNode()     {}
+func (*Setting) appItemNode()      {}
 
 func (*Field) memberNode()      {}
 func (*Relation) memberNode()   {}

@@ -13,8 +13,14 @@ import (
 
 // Project is the resolved model of the .esq files of a project.
 type Project struct {
-	Files    []string
+	Files []string
+	// Kind is app or platform. In a platform, App is the platform block and
+	// Servers and Hosted say where and what it runs; an app's declarations
+	// are empty.
+	Kind     Kind
 	App      *App
+	Servers  []*Server
+	Hosted   []*Hosted
 	Modules  []*Module
 	Enums    []*Enum
 	Entities []*Entity

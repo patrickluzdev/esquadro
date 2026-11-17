@@ -1,0 +1,14 @@
+platform acme @2:1-5:2
+  doc "The servers."
+  blueprint server @3:1-3:17
+  blueprint postgres @4:3-4:36
+    option version num:18
+server main @7:1-9:2
+  setting host "203.0.113.10" @8:6-8:25
+app shop @11:1-17:2
+  setting image "ghcr.io/acme/shop" @12:3-12:28
+  setting domains ["shop.com", "api.shop.com"] @13:3-13:38
+  setting worker @14:3-14:9
+  setting database @15:5-15:13
+  setting port num:8080 @16:3-16:12
+comment "// the VPS" @8:28-8:38

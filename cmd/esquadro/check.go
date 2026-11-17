@@ -43,6 +43,14 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	p := l.project
+	if p.Kind == project.KindPlatform {
+		fmt.Fprintf(stdout, "ok: platform %s (%s, %s, %s, %s)\n", p.App.Raw,
+			count(len(l.sources), "file", "files"),
+			count(len(p.Servers), "server", "servers"),
+			count(len(p.Hosted), "app", "apps"),
+			count(len(p.App.Blueprints), "blueprint", "blueprints"))
+		return 0
+	}
 	fmt.Fprintf(stdout, "ok: app %s (%s, %s, %s, %s)\n", p.App.Raw,
 		count(len(l.sources), "file", "files"),
 		count(len(p.Entities), "entity", "entities"),

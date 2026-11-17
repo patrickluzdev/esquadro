@@ -135,11 +135,31 @@ func asciiOnly(s string) string {
 }
 
 func (b *builder) build() {
-	var apps []*dsl.AppDecl
+	var apps, platforms, servers []*dsl.AppDecl
+	for _, d := range b.allDecls() {
+		if d, ok := d.(*dsl.AppDecl); ok {
+			switch d.Kind() {
+			case "platform":
+				platforms = append(platforms, d)
+			case "server":
+				servers = append(servers, d)
+			default:
+				apps = append(apps, d)
+			}
+		}
+	}
+	if len(platforms) > 0 {
+		b.buildPlatform(platforms, servers, apps)
+		return
+	}
+	b.p.Kind = KindApp
+	for _, s := range servers {
+		b.errorf(s.Name.Span, "server %s belongs to a platform project", s.Name.Name).
+			Suggestion = "servers are declared in a project made with esquadro new -starter platform"
+	}
 	for _, d := range b.allDecls() {
 		switch d := d.(type) {
 		case *dsl.AppDecl:
-			apps = append(apps, d)
 		case *dsl.EnumDecl:
 			b.declare(d.Name, d)
 		case *dsl.EntityDecl:
@@ -231,10 +251,18 @@ func (b *builder) declare(name dsl.Ident, d dsl.Decl) {
 
 func (b *builder) buildApp(d *dsl.AppDecl) *App {
 	app := &App{Names: b.names(d.Name), Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
-	if d.Module == nil {
+	if d.Kind() == "app" {
+		for _, s := range d.Settings {
+			b.errorf(s.Key.Span, "unknown app setting %q", s.Key.Name).Suggestion = didYouMean(s.Key.Name, appSettings)
+		}
+	}
+	switch {
+	case d.Kind() == "platform":
+		// A platform has no Go module.
+	case d.Module == nil:
 		b.errorf(d.Name.Span, "app %s has no module", d.Name.Name).
 			Suggestion = `add the Go module path, e.g. module "github.com/you/` + app.Kebab + `"`
-	} else {
+	default:
 		app.Module = d.Module.Text
 		if app.Module == "" || strings.ContainsAny(app.Module, " \t\\") || strings.HasPrefix(app.Module, "/") || strings.HasSuffix(app.Module, "/") {
 			b.errorf(d.Module.Span, "%q is not a valid Go module path", app.Module).
@@ -291,7 +319,7 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 		app.Blueprints = append(app.Blueprints, ref)
 	}
 	if len(d.Blueprints) == 0 {
-		b.diags.Warnf(d.Name.Pos, d.Name.End, "app %s uses no blueprints, so nothing will be generated", d.Name.Name).
+		b.diags.Warnf(d.Name.Pos, d.Name.End, d.Kind()+" %s uses no blueprints, so nothing will be generated", d.Name.Name).
 			Suggestion = "add one, e.g. blueprint app; see them with esquadro blueprint list"
 	}
 	return app
