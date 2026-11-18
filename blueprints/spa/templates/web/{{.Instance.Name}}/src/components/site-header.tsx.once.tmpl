@@ -2,7 +2,7 @@
 // search (Cmd+K) and where the page is; at the right the account. Yours to
 // change.
 import { Link } from "@tanstack/react-router"
-import { Fragment } from "react"
+import { Fragment, useEffect } from "react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,11 +14,17 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { UserMenu } from "@/components/user-menu"
+import { appName, panel } from "../esquadro/config.ts"
 import { useCrumbs } from "../esquadro/kit/crumbs.ts"
 import { CommandPalette, PaletteButton } from "../esquadro/kit/palette.tsx"
 
 export function SiteHeader() {
   const crumbs = useCrumbs()
+  // The tab says where the page is, and which panel: Produtos · Fe Admin.
+  const here = crumbs.length > 1 ? crumbs[crumbs.length - 1].label : ""
+  useEffect(() => {
+    document.title = [here, `${appName} ${panel}`].filter(Boolean).join(" · ")
+  }, [here])
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center bg-card shadow-sm transition-[width,height] ease-linear">
       <div className="flex w-full items-center gap-2 px-4">

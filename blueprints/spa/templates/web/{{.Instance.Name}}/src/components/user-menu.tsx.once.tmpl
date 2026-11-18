@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { signOut, useSession } from "../esquadro/kit/auth.tsx"
+import { panel } from "../esquadro/config.ts"
 import { t } from "../esquadro/kit/i18n.ts"
 
 export function UserMenu() {
@@ -45,7 +46,7 @@ export function UserMenu() {
           </Avatar>
           <div className="grid min-w-0 flex-1 leading-tight">
             <span className="truncate font-bold text-foreground">{name}</span>
-            <span className="truncate text-xs text-muted-foreground">{roles}</span>
+            <span className="truncate text-xs text-muted-foreground">{[roles, t("panel", { name: panel })].filter(Boolean).join(" · ")}</span>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
