@@ -106,13 +106,35 @@ func TestRegenerationUpdatesOnlyUntouchedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expect(t, plan, "keep README.md\nupdate a.go\nunchanged b.go")
+	expect(t, plan, "update README.md\nupdate a.go\nunchanged b.go")
 	if got, _ := p.read("a.go"); got != "A2" {
 		t.Fatalf("a.go = %q", got)
 	}
-	if got, _ := p.read("README.md"); got != "v1" {
-		t.Fatalf("a .once file must never be updated, got %q", got)
+	if got, _ := p.read("README.md"); got != "v2" {
+		t.Fatalf("a .once file the user never touched follows its template, got %q", got)
 	}
+}
+
+func TestOnceFileTheUserChangedIsKept(t *testing.T) {
+	p := newProject(t)
+	if _, err := p.gen(false, once("README.md", "v1")); err != nil {
+		t.Fatal(err)
+	}
+	p.write("README.md", "mine")
+	plan, err := p.gen(false, once("README.md", "v2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "keep README.md")
+	if got, _ := p.read("README.md"); got != "mine" {
+		t.Fatalf("a .once file the user changed is theirs, got %q", got)
+	}
+	// Changed back to what esquadro wrote, it follows the template again.
+	p.write("README.md", "v1")
+	if plan, err = p.gen(false, once("README.md", "v3")); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "update README.md")
 }
 
 func TestEditedFileIsAConflictAndNothingIsWritten(t *testing.T) {

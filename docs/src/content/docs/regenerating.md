@@ -11,7 +11,8 @@ is on disk:
 |---|---|
 | you did not touch | updates it, or deletes it when the model no longer needs it |
 | you edited | stops before writing anything, and lists it |
-| marked `.once` (README, Taskfile.yml, translations.go...) | wrote it once; it is yours |
+| marked `.once` (README, Taskfile.yml, translations.go...), as it wrote it | updates it: you never changed it, so it follows its template |
+| marked `.once`, and you changed it | leaves it: it is yours |
 | a file of yours, not generated | never looks at it |
 
 ```sh
