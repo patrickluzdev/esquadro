@@ -102,6 +102,8 @@ entity Product {
   - A date in the filters (`created_at`, which every resource can filter
     by, or a date field marked `@store(filter)`) is a period: today, the last
     7 or 30 days, this month, or a range picked in the calendar.
+  - Views saves the list's search, filters and sorting under a name, to
+    come back to (kept in the browser).
   - Export saves what the search and filters find as a CSV file (the
     records selected, from the selection's bar): the columns shown, as people
     read them, with `;` and a byte-order mark where the language's

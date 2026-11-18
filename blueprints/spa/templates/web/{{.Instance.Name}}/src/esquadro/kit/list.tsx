@@ -50,6 +50,7 @@ import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
 import { copy } from "./copy.tsx"
 import { DateRangeFilter } from "./daterange.tsx"
+import { ViewsMenu } from "./views.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
 import { ask } from "./confirm.tsx"
@@ -470,7 +471,12 @@ export function ResourceList({
             <X /> {t("clearFilters")}
           </Button>
         )}
-        <Button variant="outline" className="ml-auto" onClick={exportAll} disabled={!page || page.items.length === 0}>
+        {!embedded && (
+          <div className="ml-auto">
+            <ViewsMenu meta={meta} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} />
+          </div>
+        )}
+        <Button variant="outline" className={embedded ? "ml-auto" : undefined} onClick={exportAll} disabled={!page || page.items.length === 0}>
           <Download /> {t("export")}
         </Button>
         {hideable.length > 1 && (
