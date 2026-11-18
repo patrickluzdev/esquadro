@@ -49,8 +49,12 @@ func ({{$rc}} *{{$m.Pascal}}) {{$r.Pascal}}(ctx context.Context, q {{$r.Pascal}}
 	}
 	out := make([]{{$r.Pascal}}Row, len(rows))
 	for i, row := range rows {
+{{- $one := eq (len $r.Columns) 1}}
+{{- if $one}}
+		// With one column, sqlc answers each row as its value.
+{{- end}}
 {{- range $r.Columns}}
-		if v, ok, err := {{reportRead .}}(row.{{sqlcName .Snake}}); err != nil {
+		if v, ok, err := {{reportRead .}}({{if $one}}row{{else}}row.{{sqlcName .Snake}}{{end}}); err != nil {
 			return nil, fmt.Errorf("report {{$r.Pascal}}: column {{.Snake}}: %w", err)
 {{- if .Required}}
 		} else if !ok {

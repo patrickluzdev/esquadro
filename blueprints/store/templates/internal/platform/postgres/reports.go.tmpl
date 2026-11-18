@@ -31,8 +31,20 @@ func TextOf(v any) (string, bool, error) {
 		}
 		return *v, true, nil
 	}
-	if r := reflect.ValueOf(v); r.Kind() == reflect.String {
+	r := reflect.ValueOf(v)
+	if r.Kind() == reflect.String {
+		// An enum of the database, as sqlc names it.
 		return r.String(), true, nil
+	}
+	// A nullable enum, as sqlc makes it: its value and Valid.
+	if r.Kind() == reflect.Struct && r.NumField() == 2 {
+		if valid := r.FieldByName("Valid"); valid.IsValid() && valid.Kind() == reflect.Bool {
+			for i := range r.NumField() {
+				if f := r.Field(i); f.Kind() == reflect.String {
+					return f.String(), valid.Bool(), nil
+				}
+			}
+		}
 	}
 	return "", false, notA(v, "text")
 }
@@ -109,5 +121,7 @@ func UUIDOf(v any) (uuid.UUID, bool, error) {
 	return uuid.UUID{}, false, notA(v, "uuid")
 }
 
-func notA(v any, what string) error { return fmt.Errorf("%T is not %s", v, what) }
+func notA(v any, what string) error {
+	return fmt.Errorf("%T is not %s: cast the column to its type in the report's SQL (::text, ::bigint, ::numeric, ::timestamptz)", v, what)
+}
 {{end -}}

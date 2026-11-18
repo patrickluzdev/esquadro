@@ -123,6 +123,8 @@ func TestLifecycle(t *testing.T) {
 	// A record with an owner: each customer's own reviews.
 	// A report, whose SQL esquadro writes first and the test then writes.
 	catalog += "\n/// Products per brand.\nreport ProductsByBrand {\n  brand    string required\n  products int    required\n  @security(read [user, service.reader])\n}\n"
+	// A report of one column, whose rows sqlc answers as values.
+	catalog += "\n/// Products in all.\nreport ProductsInAll {\n  products int required\n  @security(read user)\n}\n"
 	catalog += "\n/// What a customer thinks of a product.\nentity Review {\n  text     string required\n  customer > Customer required\n  product  > Product required\n  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	// The TypeScript client too: go test runs its tests against the API.
@@ -143,6 +145,9 @@ SELECT b.name::text AS brand, count(p.id)::bigint AS products
 FROM brands b LEFT JOIN products p ON p.brand_id = b.id
 GROUP BY b.name ORDER BY b.name
 LIMIT sqlc.arg(row_limit);
+`)
+	e.write(filepath.Join(dir, "internal", "catalog", "reports", "products_in_all.sql"), `-- name: ProductsInAll :many
+SELECT count(*)::bigint AS products FROM products LIMIT sqlc.arg(row_limit);
 `)
 	e.esquadro(0, "gen", dir)
 	if !strings.Contains(e.read(reportSQL), "LEFT JOIN") {
@@ -347,6 +352,10 @@ func (e *lifecycle) report() {
 	}
 	if !found {
 		e.t.Fatalf("the report: %v", rows)
+	}
+	all := e.request("GET", "/api/v1/reports/products-in-all", "", map[string]string{"Authorization": e.auth}, 200).body["items"].([]any)
+	if len(all) != 1 || all[0].(map[string]any)["products"].(float64) < 1 {
+		e.t.Fatalf("the report of one column: %v", all)
 	}
 }
 

@@ -28,6 +28,8 @@ report ProductsByCategory {
 
 - Each field is a **column** of the rows, with a model type; one not marked
   `required` may be `null` (an average of nothing).
+- A column can be one of the model's enums (`status Status`): its values are
+  then the enum's, and a frontend shows their labels.
 - A field marked **`param`** is a **parameter**, passed in the query;
   `required` makes it compulsory.
 - [`@security(read ...)`](/esquadro/security/) says who may read it:
