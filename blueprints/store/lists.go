@@ -181,7 +181,7 @@ func ListWhere(entities []*project.Entity, e *project.Entity, opts map[string]an
 		conds = append(conds, "(sqlc.narg(owner_id)::uuid IS NULL OR "+col+" = sqlc.narg(owner_id)::uuid)")
 	}
 	if len(SearchFields(e)) > 0 {
-		conds = append(conds, "(sqlc.narg(q)::text IS NULL OR "+searchColumn+" @@ websearch_to_tsquery("+langOf(lang)+", sqlc.narg(q)::text))")
+		conds = append(conds, "(sqlc.narg(q)::text IS NULL OR "+searchColumn+" @@ websearch_to_tsquery("+langOf(lang)+", sqlc.narg(q)::text) OR "+searchColumn+" @@ "+prefixQuery(lang)+")")
 	}
 	for _, f := range ListFilters(e) {
 		switch f.Kind {
@@ -200,7 +200,17 @@ func ListWhere(entities []*project.Entity, e *project.Entity, opts map[string]an
 
 // Rank is the relevance of a record to the search, for its order.
 func Rank(lang string) string {
-	return "ts_rank(" + searchColumn + ", websearch_to_tsquery(" + langOf(lang) + ", sqlc.narg(q)::text))::real"
+	return "ts_rank(" + searchColumn + ", websearch_to_tsquery(" + langOf(lang) + ", sqlc.narg(q)::text) || " + prefixQuery(lang) + ")::real"
+}
+
+// prefixQuery is the search as words being typed: each word the start of
+// one in the record ("tecl" finds "teclado"), all of them in it, and none
+// of those after a minus ("-fio"). Each word is quoted, so that what is
+// typed is never tsquery syntax.
+func prefixQuery(lang string) string {
+	return "coalesce(to_tsquery(" + langOf(lang) + ", (SELECT string_agg(CASE WHEN neg THEN '!' ELSE '' END || quote_literal(word) || ':*', ' & ') " +
+		"FROM (SELECT left(w, 1) = '-' AS neg, regexp_replace(w, '^-|[\"()&|!:*<>]', '', 'g') AS word " +
+		"FROM regexp_split_to_table(trim(sqlc.narg(q)::text), '\\s+') AS w) AS words WHERE word <> '')), ''::tsquery)"
 }
 
 const searchColumn = "search_vector"

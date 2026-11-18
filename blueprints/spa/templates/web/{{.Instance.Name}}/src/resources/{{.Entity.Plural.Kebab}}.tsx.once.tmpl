@@ -18,7 +18,8 @@ const f = meta.fields
 export default resource(meta, {
   table: {
     columns: [{{$n := 0}}{{range $f := inRequest .Entity}}{{if lt $n 4}}{{if $n}}, {{end}}f.{{$f.Snake}}{{$n = add1 $n}}{{end}}{{end}}],
-    filters: [{{$m := 0}}{{range $f := inRequest .Entity}}{{if or (eq (spaKind $f) "enum") (eq (spaKind $f) "bool")}}{{if $m}}, {{end}}f.{{$f.Snake}}{{$m = add1 $m}}{{end}}{{end}}],
+    // The filters the API has (a field marked @store(filter)).
+    filters: [{{$m := 0}}{{range $f := inRequest .Entity}}{{if and (or (eq (spaKind $f) "enum") (eq (spaKind $f) "bool")) (filterable $.Entity $f.Snake)}}{{if $m}}, {{end}}f.{{$f.Snake}}{{$m = add1 $m}}{{end}}{{end}}{{range $r := keys .Entity}}{{if filterable $.Entity (keyName $r)}}{{if $m}}, {{end}}f.{{keyName $r}}{{$m = add1 $m}}{{end}}{{end}}],
   },
   form: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}],
   show: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}, f.created_at, f.updated_at],

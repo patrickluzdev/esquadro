@@ -3,6 +3,7 @@
 export { resource, column } from "./resource.ts"
 export type { Action, Column, ColumnOptions, Resource, ResourceDef } from "./resource.ts"
 export { EditableCell } from "./cell.tsx"
+export { SearchBox, Highlight } from "./search.tsx"
 export type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 export { ResourceList, listSearch } from "./list.tsx"
 export type { ListSearch } from "./list.tsx"

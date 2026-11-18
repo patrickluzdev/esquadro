@@ -80,6 +80,11 @@ entity Product {
   version it read (`If-Match`: a change someone made meanwhile is not
   overwritten), creates once however often it is sent (`Idempotency-Key`),
   and asks before leaving with unsaved changes.
+- The search searches as people type (after a pause), finds words by
+  their start ("tecl" finds "Teclado"), keeps `"exact phrases"` and
+  `-excluded` words, clears with its button or Esc, and is reached with `/`;
+  the words found are marked in the list. Only the filters the API has (a
+  field marked `@store(filter)`) are shown.
 - The list is a data table (TanStack Table, in shadcn/ui's way):
   - checkboxes select records, and a bar acts on all of them: Delete, and
     your actions marked `bulk`, each record in turn, telling how many went

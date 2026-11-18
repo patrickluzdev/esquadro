@@ -26,7 +26,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Search,
+  SearchX,
   Trash2,
   X,
 } from "lucide-react"
@@ -42,8 +42,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -52,8 +51,10 @@ import { EditableCell } from "./cell.tsx"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
-import type { Rec } from "./meta.ts"
+import { resources } from "../resources.gen.ts"
+import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
+import { SearchBox, SearchContext } from "./search.tsx"
 import { columnField, columnOptions } from "./resource.ts"
 import type { Action, Resource } from "./resource.ts"
 import { FieldValue } from "./show.tsx"
@@ -82,6 +83,36 @@ export function listSearch(search: Record<string, unknown>): ListSearch {
     else if (typeof v === "string" || typeof v === "number") out[k] = v
   }
   return out
+}
+
+/** A filter of the list: an enum's values, yes or no, or the related records. */
+function ListFilter({ field, value, onChange }: { field: FieldMeta; value?: string; onChange: (v?: string) => void }) {
+  const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
+  const related = useQuery({
+    queryKey: [target?.name ?? field.target, "options"],
+    queryFn: () => target.api(api as never).list({ per_page: 100, limit: 100 }),
+    enabled: field.kind === "relation" && target !== undefined,
+  })
+  const options: [string, string][] =
+    field.kind === "relation"
+      ? (related.data?.items ?? []).map((r: Rec) => [r.id, capitalize(String(r[field.display ?? "id"] ?? r.id))])
+      : (field.values ?? ["true", "false"]).map((v) => [v, capitalize(field.kind === "bool" ? format(field, v === "true") : format(field, v))])
+  return (
+    <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? undefined : v)}>
+      <SelectTrigger className="w-auto min-w-40">
+        <span className="text-muted-foreground">{field.label}:</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper">
+        <SelectItem value={ALL}>{capitalize(t("all"))}</SelectItem>
+        {options.map(([v, label]) => (
+          <SelectItem key={v} value={v}>
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 /** Runs an action on each record, in turn; how many went through and failed. */
@@ -119,8 +150,13 @@ export function ResourceList({ resource, description }: { resource: Resource; de
     queryFn: () => meta.api(api as never).list(query),
     placeholderData: keepPreviousData,
   })
-  const set = (changes: Partial<ListSearch>) =>
-    navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never })
+  // A change of the list's state goes to the URL; typing replaces the entry
+  // instead of filling the history.
+  const set = (changes: Partial<ListSearch>, replace = false) =>
+    navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never, replace })
+  const filtering = Boolean(search.q) || (resource.table.filters ?? []).some((f) => search[f.name] !== undefined)
+  const clearAll = () =>
+    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries((resource.table.filters ?? []).map((f) => [f.name, undefined])) })
 
   const page = list.data
   const items = useMemo(() => page?.items ?? [], [page])
@@ -314,38 +350,26 @@ export function ResourceList({ resource, description }: { resource: Resource; de
       />
       <div className="flex flex-wrap items-center gap-2">
         {searchable && (
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder={t("search")}
-              defaultValue={search.q ?? ""}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") set({ q: e.currentTarget.value || undefined, page: undefined, cursor: undefined })
-              }}
-            />
-          </div>
+          <SearchBox
+            value={search.q ?? ""}
+            busy={list.isFetching}
+            placeholder={t("searchIn", { name: meta.label.toLocaleLowerCase() })}
+            onSearch={(q) => set({ q: q || undefined, page: undefined, cursor: undefined }, true)}
+          />
         )}
         {filters.map((f) => (
-          <Select
+          <ListFilter
             key={f.name}
-            value={String(search[f.name] ?? ALL)}
-            onValueChange={(v) => set({ [f.name]: v === ALL ? undefined : v, page: undefined, cursor: undefined })}
-          >
-            <SelectTrigger className="w-auto min-w-40">
-              <span className="text-muted-foreground">{f.label}:</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectItem value={ALL}>{capitalize(t("all"))}</SelectItem>
-              {(f.values ?? ["true", "false"]).map((v) => (
-                <SelectItem key={v} value={v}>
-                  {capitalize(f.kind === "bool" ? format(f, v === "true") : format(f, v))}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            field={f}
+            value={search[f.name] === undefined ? undefined : String(search[f.name])}
+            onChange={(v) => set({ [f.name]: v, page: undefined, cursor: undefined })}
+          />
         ))}
+        {filtering && (
+          <Button variant="ghost" onClick={clearAll}>
+            <X /> {t("clearFilters")}
+          </Button>
+        )}
         {hideable.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -406,6 +430,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
         </div>
       )}
       <div className="overflow-hidden rounded-lg border">
+        <SearchContext value={search.q ?? ""}>
         <Table>
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((group) => (
@@ -445,15 +470,21 @@ export function ResourceList({ resource, description }: { resource: Resource; de
             ))}
           </TableBody>
         </Table>
+        </SearchContext>
         {page?.items.length === 0 && (
           <Empty className="border-t">
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Inbox />
-              </EmptyMedia>
-              <EmptyTitle>{t("empty")}</EmptyTitle>
-              <EmptyDescription>{t("emptyHint")}</EmptyDescription>
+              <EmptyMedia variant="icon">{filtering ? <SearchX /> : <Inbox />}</EmptyMedia>
+              <EmptyTitle>{search.q ? t("noResults", { q: search.q }) : filtering ? t("noMatches") : t("empty")}</EmptyTitle>
+              <EmptyDescription>{filtering ? t("noResultsHint") : t("emptyHint")}</EmptyDescription>
             </EmptyHeader>
+            {filtering && (
+              <EmptyContent>
+                <Button variant="outline" onClick={clearAll}>
+                  {search.q ? t("clearSearch") : t("clearFilters")}
+                </Button>
+              </EmptyContent>
+            )}
           </Empty>
         )}
       </div>

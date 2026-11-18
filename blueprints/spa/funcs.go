@@ -25,6 +25,7 @@ func TemplateFuncs() template.FuncMap {
 		"realms":     security.RealmsOf,
 		"displayOf":  DisplayOf,
 		"lucide":     Lucide,
+		"filterable": Filterable,
 		"add1":       func(n int) int { return n + 1 },
 		"enumValues": func(e *project.Enum) []string {
 			out := make([]string, len(e.Values))
@@ -69,6 +70,18 @@ func Humanize(name string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// Filterable reports whether the API filters the entity's list by the
+// value of a field or a relation's key (param, e.g. status or category_id):
+// the filters a list shows are those.
+func Filterable(e *project.Entity, param string) bool {
+	for _, f := range rest.APIFilters(e) {
+		if f.Param == param && (f.Kind == "eq" || f.Kind == "in") {
+			return true
+		}
+	}
+	return false
 }
 
 // Lucide is the component of a Lucide icon's name: shopping-cart is

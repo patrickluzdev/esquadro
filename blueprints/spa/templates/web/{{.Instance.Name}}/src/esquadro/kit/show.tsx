@@ -15,6 +15,7 @@ import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
+import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
 
@@ -31,6 +32,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
     return <RelationValue field={field} id={String(value)} />
   }
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">—</span>
+  if (field.kind === "text" || field.kind === "textarea") return <Highlight text={format(field, value)} />
   return <>{format(field, value)}</>
 }
 

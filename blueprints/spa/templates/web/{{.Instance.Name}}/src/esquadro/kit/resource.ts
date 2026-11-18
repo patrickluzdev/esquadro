@@ -55,7 +55,13 @@ export interface Resource extends ResourceDef {
 
 /** A resource: the model's meta, and what you decide it shows. */
 export function resource(meta: ResourceMeta, def: ResourceDef): Resource {
-  return { meta, ...def }
+  // A filter the API does not have would show a list it did not filter.
+  const filters = def.table.filters?.filter((f) => {
+    const ok = meta.filters.some((p) => p.param === f.name && (p.kind === "eq" || p.kind === "in"))
+    if (!ok) console.warn(`${meta.name}: the API does not filter by ${f.name}: mark it @store(filter) in the model`)
+    return ok
+  })
+  return { meta, ...def, table: { ...def.table, filters } }
 }
 
 /** A column with options: its label, your own cell, edited in the list. */
