@@ -1,0 +1,3 @@
+{{- if and (uses "jobs") (index (optionsOf "notifications") "retention_days")}}
+	"{{.App.Module}}/internal/platform/notifications"
+{{- end}}

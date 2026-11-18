@@ -9,7 +9,7 @@ import { {{if $m2m}}links, {{end}}records, Transport } from "./runtime.ts"
 {{- if $hasFiles}}
 import { uploads } from "./uploads.ts"
 {{- end}}
-import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, ReadOptions, RequestOptions } from "./runtime.ts"
+import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, {{if uses "notifications"}}NoticePage, {{end}}ReadOptions, RequestOptions } from "./runtime.ts"
 import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
 {{- if .Reports}}
 import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
@@ -71,6 +71,24 @@ export function createClient(options: ClientOptions) {
     audit: {
       list: (query: { entity?: string; record_id?: string; actor_id?: string; action?: string; since?: string; until?: string; page?: number; per_page?: number } = {}, o: ReadOptions = {}) =>
         t.request<AuditPage>("GET", "/audit", { query, signal: o.signal }),
+    },
+{{- end}}
+{{- if uses "notifications"}}
+    /** The notices of who signs in. */
+    notifications: {
+      list: (query: { unread?: boolean; page?: number; per_page?: number } = {}, o: ReadOptions = {}) =>
+        t.request<NoticePage>("GET", "/notifications", { query, signal: o.signal }),
+      /** How many are unread, and how often a frontend asks (seconds). */
+      count: (o: ReadOptions = {}) => t.request<{ unread: number; poll_seconds: number }>("GET", "/notifications/count", { signal: o.signal }),
+      read: async (id: string) => {
+        await t.request("POST", `/notifications/${encodeURIComponent(id)}/read`)
+      },
+      readAll: async () => {
+        await t.request("POST", "/notifications/read")
+      },
+      remove: async (id: string) => {
+        await t.request("DELETE", `/notifications/${encodeURIComponent(id)}`)
+      },
     },
 {{- end}}
 {{- if .Reports}}

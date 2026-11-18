@@ -61,6 +61,9 @@ blueprint spa {
   /// The buttons to sign in with the realm's providers (Google, GitHub) on
   /// the sign-in page, and the accounts connected in the settings.
   option social_login bool default(true)
+  /// The bell of the notices in the header, and their page, with the
+  /// notifications blueprint.
+  option notifications bool default(true)
 
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.

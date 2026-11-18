@@ -1,8 +1,8 @@
 {{- $e := .Entity}}{{$ws := writable $e}}{{$rs := refusals $e -}}
 package {{$e.Module.Snake}}
 
-{{- $audited := audited $e (optionsOf "audit")}}
-{{importBlock "context" "errors" (and (needs $e "json") "encoding/json") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module) (and $audited (printf "%s/internal/platform/audit" .App.Module))}}
+{{- $audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}
+{{importBlock "context" "errors" (and (needs $e "json") "encoding/json") (and $rule "fmt") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module) (and $audited (printf "%s/internal/platform/audit" .App.Module)) (and $rule (printf "%s/internal/platform/notifications" .App.Module))}}
 // {{$e.Camel}}Gone is why a change of the {{lower $e.Label}} id changed nothing: it
 // does not exist (Err{{$e.Pascal}}NotFound), or its version is no longer the one
 // asked for (Err{{$e.Pascal}}Changed).
@@ -174,6 +174,52 @@ func {{$e.Camel}}Links(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, n New{
 			return err
 		}
 	}
+{{- end}}
+	return nil
+}
+{{- end}}
+{{- with $rule}}{{$owner := noticeOwner $.Entities $e}}
+
+// {{$e.Camel}}Noticed sends the notices the model's rule of {{$e.Plural.Snake}} says for a
+// change (create, update, delete), in the transaction of db.
+func {{$e.Camel}}Noticed(ctx context.Context, db sqlgen.DBTX, action string, before, after *{{$e.Pascal}}) error {
+{{- if .When}}
+	// An update notifies only about {{join ", " .When}}.
+	if action == "update" && before != nil && after != nil && {{range $i, $w := .When}}{{if $i}} && {{end}}fmt.Sprint(before.{{(index (fieldsByName $e) $w).Pascal}}) == fmt.Sprint(after.{{(index (fieldsByName $e) $w).Pascal}}){{end}} {
+		return nil
+	}
+{{- end}}
+	x := after
+	if x == nil {
+		x = before
+	}
+	values := map[string]string{
+{{- range $e.Fields}}{{if not .Implicit}}
+{{- if eq (printf "%v" .Type) "money"}}
+		{{quote .Snake}}: x.{{.Pascal}}.Number() + " " + x.{{.Pascal}}.CurrencyCode(),
+{{- else}}
+		{{quote .Snake}}: fmt.Sprint(x.{{.Pascal}}),
+{{- end}}
+{{- end}}{{end}}
+	}
+	link := "/{{$e.Plural.Kebab}}/" + x.ID.String()
+	if action == "delete" {
+		link = "/{{$e.Plural.Kebab}}"
+	}
+	n := notifications.Notice{
+		Title: notifications.Fill({{quote .Title}}, values), Text: notifications.Fill({{quote .Text}}, values),
+		Link: link, Entity: {{quote $e.Plural.Snake}}, RecordID: x.ID,
+	}
+{{- range .Recipients}}
+{{- if .Owner}}
+	if err := notifications.ToPerson(ctx, db, {{quote $owner.Realm}}, {{if $owner.Relation}}x.{{$owner.Relation.Pascal}}ID{{else}}x.ID{{end}}, n); err != nil {
+		return err
+	}
+{{- else}}
+	if err := notifications.Send(ctx, db, {{quote (printf "%s%s" .Realm (or (and .Role (printf ".%s" .Role)) ""))}}, n); err != nil {
+		return err
+	}
+{{- end}}
 {{- end}}
 	return nil
 }

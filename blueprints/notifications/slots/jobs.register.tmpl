@@ -1,0 +1,3 @@
+{{- if index (optionsOf "notifications") "retention_days"}}
+	notifications.RegisterJobs(registry, d.pool)
+{{- end}}

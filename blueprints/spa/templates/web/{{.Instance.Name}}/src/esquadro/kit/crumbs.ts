@@ -49,6 +49,7 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   const parts = partsOf(pathname)
   const out: Crumb[] = [{ label: t("home"), to: "/" }]
   if (parts.length === 0) return out
+  if (parts[0] === "notifications") return [...out, { label: t("notifications"), to: "/notifications" }]
   if (parts[0] === "audit") return [...out, { label: t("administration") }, { label: t("audit"), to: "/audit" }]
   if (parts[0] === "service-keys") return [...out, { label: t("administration") }, { label: t("serviceKeys"), to: "/service-keys" }]
   // A realm's accounts are called by its name.

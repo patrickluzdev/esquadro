@@ -1,0 +1,34 @@
+/// Notices to the people who sign in: a new order for the admins, a task's
+/// status changed for its owner. Sent from your code
+/// (notifications.Send), or by the model's rules on the records of an entity
+/// (@notifications(on create, to user.admin, title "...")), written in the
+/// transaction of the change. Each person lists, counts and reads their
+/// own; frontends show them under a bell.
+blueprint notifications {
+  version "0.1.0"
+  requires app, domain, postgres, migrations, store, security, http
+  optional jobs, rest, client_ts, spa, testcontainers
+
+  /// Seconds between a frontend's checks for new notices; 0 checks only
+  /// when a page opens and when its window comes back to the front.
+  option poll_seconds int default(30)
+  /// Days a notice read is kept, then deleted by a daily job and <app>
+  /// notifications purge; 0 keeps them.
+  option retention_days int default(90)
+  /// How many notices a frontend's bell shows.
+  option page_size int default(10)
+
+  annotation entity {
+    /// When to notify: create, update (with when, only when one of those
+    /// fields changed), delete.
+    on list
+    /// The fields an update notifies about; any, without them.
+    when fields
+    /// Whom: a realm's people (user), its role's (user.admin), or the
+    /// record's owner (owner). Who made the change is never notified.
+    to list
+    /// The notice's title and text; {field} is the record's field.
+    title string
+    text string
+  }
+}

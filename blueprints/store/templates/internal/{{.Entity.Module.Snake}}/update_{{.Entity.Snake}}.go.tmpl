@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$links := idLinks $e}}{{$tx := or $files $audited $links -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "update"}}{{end}}{{$links := idLinks $e}}{{$tx := or $files $audited $links $notice -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -50,6 +50,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 {{- end}}
 {{- if $audited}}
 		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "update", id, &stored, &updated); err != nil {
+			return err
+		}
+{{- end}}
+{{- if $notice}}
+		if err := {{$e.Camel}}Noticed(ctx, postgres.Querier(ctx, {{$r}}.Pool), "update", &stored, &updated); err != nil {
 			return err
 		}
 {{- end}}

@@ -1,0 +1,45 @@
+
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"time"
+
+	"{{.App.Module}}/internal/platform/notifications"
+)
+
+const notificationsUsage = `usage: {{.App.Kebab}} notifications purge [--days N]
+
+Deletes the notices read for more than --days days ({{.Options.retention_days}} by default).`
+
+// notificationsCommand runs {{.App.Kebab}} notifications.
+func notificationsCommand(ctx context.Context, args []string) error {
+	if len(args) == 0 || args[0] != "purge" {
+		fmt.Fprintln(os.Stderr, notificationsUsage)
+		return fmt.Errorf("notifications: purge is the only command")
+	}
+	flags := flag.NewFlagSet("notifications purge", flag.ContinueOnError)
+	flags.Usage = func() { fmt.Fprintln(os.Stderr, notificationsUsage) }
+	days := flags.Int("days", notifications.RetentionDays, "")
+	if err := flags.Parse(args[1:]); err != nil {
+		return err
+	}
+	if *days <= 0 {
+		return fmt.Errorf("notifications: --days is at least 1")
+	}
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	n, err := notifications.Purge(ctx, d.pool, time.Now().AddDate(0, 0, -*days))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%d notices deleted\n", n)
+	return nil
+}
+

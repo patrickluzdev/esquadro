@@ -1,0 +1,11 @@
+{{- if and (uses "notifications") .Options.notifications -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { t } from "../../esquadro/kit/i18n.ts"
+import { NotificationsPage } from "../../esquadro/kit/notifications.tsx"
+
+// Every notice of who signs in. Yours, like the other pages.
+export const Route = createFileRoute("/_app/notifications")({
+  staticData: { title: t("notifications") },
+  component: NotificationsPage,
+})
+{{- end}}

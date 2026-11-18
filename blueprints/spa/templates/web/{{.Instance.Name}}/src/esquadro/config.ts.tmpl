@@ -18,6 +18,9 @@ export const providers: readonly string[] = [{{range $realms}}{{if eq .Name $rea
 /** The buttons of the providers on the sign-in page, and the accounts connected. */
 export const socialLogin: boolean = {{.Options.social_login}}
 
+/** The bell of the notices: how often it asks (seconds), how many it shows; null without it. */
+export const notifications: { poll: number; size: number } | null = {{if and (uses "notifications") .Options.notifications}}{ poll: {{index (optionsOf "notifications") "poll_seconds"}}, size: {{index (optionsOf "notifications") "page_size"}} }{{else}}null{{end}}
+
 /** The roles let in; any role of the realm when empty. */
 export const roles: readonly string[] = [{{range $i, $r := .Options.roles}}{{if $i}}, {{end}}"{{$r}}"{{end}}]
 

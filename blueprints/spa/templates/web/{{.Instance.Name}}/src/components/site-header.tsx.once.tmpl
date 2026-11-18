@@ -14,7 +14,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { UserMenu } from "@/components/user-menu"
-import { appName, panel } from "../esquadro/config.ts"
+import { appName, notifications, panel } from "../esquadro/config.ts"
+import { NotificationBell } from "../esquadro/kit/notifications.tsx"
 import { useCrumbs } from "../esquadro/kit/crumbs.ts"
 import { CommandPalette, PaletteButton } from "../esquadro/kit/palette.tsx"
 
@@ -55,6 +56,7 @@ export function SiteHeader() {
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto flex items-center gap-1">
+          {notifications && <NotificationBell />}
           <UserMenu />
         </div>
         <CommandPalette />

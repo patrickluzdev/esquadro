@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints/audit"
+	"github.com/patrickluzdev/esquadro/blueprints/notifications"
 	"github.com/patrickluzdev/esquadro/blueprints/postgres"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -127,8 +128,17 @@ func TemplateFuncs() template.FuncMap {
 		"audited":         audit.Audited,
 		"auditSecret":     audit.Secret,
 		"auditIgnored":    audit.Ignored,
-		"links":           links,
-		"manyToMany":      func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
+		"noticeRule":      notifications.RuleOf,
+		"noticeOwner":     notifications.OwnerFor,
+		"fieldsByName": func(e *project.Entity) map[string]*project.Field {
+			out := map[string]*project.Field{}
+			for _, f := range e.Fields {
+				out[f.Snake], out[f.Raw] = f, f
+			}
+			return out
+		},
+		"links":      links,
+		"manyToMany": func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}
 }
 

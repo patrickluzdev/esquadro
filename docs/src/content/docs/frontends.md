@@ -206,6 +206,10 @@ entity Product {
 }
 ```
 
+With the [notifications](/esquadro/notifications/) blueprint, the header has
+a bell with how many notices are unread, the last ones in a popover (a
+click leads to the record and marks it read) and a page with all of them.
+
 With the [audit](/esquadro/audit/) blueprint, an audited record's page has a
 History tab, and Administration an Audit page with every change.
 

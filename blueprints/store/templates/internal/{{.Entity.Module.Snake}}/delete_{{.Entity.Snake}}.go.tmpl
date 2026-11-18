@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "delete"}}{{end}}{{$tx := or $files $audited $notice -}}
 package {{$m.Snake}}
 {{if softDeleted $e}}
 {{importBlock "context" "time" "uuid" (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -43,6 +43,11 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		}
 {{- if $audited}}
 		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "delete", id, &stored, nil); err != nil {
+			return err
+		}
+{{- end}}
+{{- if $notice}}
+		if err := {{$e.Camel}}Noticed(ctx, postgres.Querier(ctx, {{$r}}.Pool), "delete", &stored, nil); err != nil {
 			return err
 		}
 {{- end}}

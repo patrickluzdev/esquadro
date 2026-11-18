@@ -16,6 +16,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
 	"github.com/patrickluzdev/esquadro/blueprints/jobs"
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
+	"github.com/patrickluzdev/esquadro/blueprints/notifications"
 	"github.com/patrickluzdev/esquadro/blueprints/platform/apps"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
@@ -54,22 +55,24 @@ func init() {
 	blueprint.Checks["spa"] = spa.Check
 	blueprint.Checks["seed"] = seed.Check
 	blueprint.Checks["audit"] = audit.Check
+	blueprint.Checks["notifications"] = notifications.Check
 	blueprint.Checks["storage"] = storage.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
-	"app":       app.TemplateFuncs(),
-	"store":     store.TemplateFuncs(),
-	"rest":      rest.TemplateFuncs(),
-	"client_ts": clientts.TemplateFuncs(),
-	"i18n":      i18n.TemplateFuncs(),
-	"jobs":      jobs.TemplateFuncs(),
-	"security":  security.TemplateFuncs(),
-	"spa":       spa.TemplateFuncs(),
-	"seed":      seed.TemplateFuncs(),
-	"audit":     audit.TemplateFuncs(),
-	"storage":   storage.TemplateFuncs(),
+	"app":           app.TemplateFuncs(),
+	"store":         store.TemplateFuncs(),
+	"rest":          rest.TemplateFuncs(),
+	"client_ts":     clientts.TemplateFuncs(),
+	"i18n":          i18n.TemplateFuncs(),
+	"jobs":          jobs.TemplateFuncs(),
+	"security":      security.TemplateFuncs(),
+	"spa":           spa.TemplateFuncs(),
+	"seed":          seed.TemplateFuncs(),
+	"audit":         audit.TemplateFuncs(),
+	"notifications": notifications.TemplateFuncs(),
+	"storage":       storage.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

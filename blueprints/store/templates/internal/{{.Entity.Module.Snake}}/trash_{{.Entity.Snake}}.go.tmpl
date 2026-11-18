@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$own := ownerColumn .Entities $e -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "delete"}}{{end}}{{$own := ownerColumn .Entities $e -}}
 {{- if softDeleted $e -}}
 package {{$m.Snake}}
 
@@ -32,6 +32,17 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	}
 {{- end}}
 {{- end}}
+{{- if $notice}}
+	// What the notices say about it, read before it goes.
+	live, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Err{{$e.Pascal}}NotFound
+	}
+	if err != nil {
+		return err
+	}
+	stored := {{$e.Camel}}Of(live)
+{{- end}}
 	trashed, err := q.Trash{{$e.Pascal}}(ctx, sqlgen.Trash{{$e.Pascal}}Params{DeletedAt: postgres.Timestamptz(at), ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 	if err != nil {
 		return err
@@ -39,6 +50,11 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	if trashed == 0 {
 		return {{$e.Camel}}Gone(ctx, db, id)
 	}
+{{- if $notice}}
+	if err := {{$e.Camel}}Noticed(ctx, db, "delete", &stored, nil); err != nil {
+		return err
+	}
+{{- end}}
 {{- if $audited}}
 	return {{$e.Camel}}Recorded(ctx, db, "delete", id, nil, nil)
 {{- else}}

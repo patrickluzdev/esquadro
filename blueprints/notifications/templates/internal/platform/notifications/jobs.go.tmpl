@@ -1,0 +1,24 @@
+{{- if and (uses "jobs") .Options.retention_days -}}
+package notifications
+
+import (
+	"context"
+	"time"
+
+	"{{.App.Module}}/internal/platform/jobs"
+)
+
+// purgeArgs deletes, every day, the notices read RetentionDays ago.
+type purgeArgs struct{}
+
+func (purgeArgs) Kind() string { return "notifications_purge" }
+
+// RegisterJobs registers the daily purge of the notices read long ago.
+func RegisterJobs(r *jobs.Registry, db Execer) {
+	jobs.Add(r, func(ctx context.Context, _ purgeArgs) error {
+		_, err := Purge(ctx, db, time.Now().AddDate(0, 0, -RetentionDays))
+		return err
+	})
+	jobs.Every(r, "45 3 * * *", purgeArgs{})
+}
+{{end -}}

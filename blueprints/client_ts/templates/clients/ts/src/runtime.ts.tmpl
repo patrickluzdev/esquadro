@@ -184,6 +184,29 @@ export interface AuditPage {
   total_pages: number
 }
 
+/** A notice to the person who signs in. */
+export interface Notice {
+  id: string
+  title: string
+  text: string
+  /** A path of the frontend it leads to: /orders/<id>. */
+  link: string
+  entity: string
+  record_id: string | null
+  created_at: string
+  read_at: string | null
+}
+
+/** A page of notices, the newest first, with how many are unread in all. */
+export interface NoticePage {
+  items: Notice[]
+  page: number
+  per_page: number
+  total: number
+  total_pages: number
+  unread: number
+}
+
 /** The trash of an entity's records. */
 export interface Trash<T> {
   /** A page of it, the last deleted first, each with deleted_at. */
