@@ -78,8 +78,13 @@ function accountsOf(realm: AccountRealm): Accounts {
 
 /** Whether the session administers the realm's accounts: one of its admins' rules. */
 export function administers(session: { realm: string; roles: string[] } | null, realm: AccountRealm): boolean {
+  return allowedBy(session, realm.admins)
+}
+
+/** Whether the session is one of the realm.role rules: user.admin. */
+export function allowedBy(session: { realm: string; roles: string[] } | null, rules: readonly string[]): boolean {
   if (!session) return false
-  return realm.admins.some((rule) => {
+  return rules.some((rule) => {
     const [name, role] = rule.split(".")
     return name === session.realm && (!role || session.roles.includes(role))
   })
@@ -96,7 +101,7 @@ const statusLabel = (s: Status) => t(`account_${s}`)
 const roleLabel = (r: string) => capitalize(r.replaceAll("_", " "))
 
 /** When an account was last seen, as people say it: 3 hours ago, never. */
-function seen(at: string | null): string {
+export function seen(at: string | null): string {
   if (!at) return t("never")
   const seconds = (new Date(at).getTime() - Date.now()) / 1000
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" })

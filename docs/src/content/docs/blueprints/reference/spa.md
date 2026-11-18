@@ -33,6 +33,7 @@ blueprint spa
 | `primary_dark` | string | `""` | The primary color of the dark theme; by default the primary, or a light gray when the primary is too dark to stand out there. |
 | `radius` | string | `"0.75rem"` | How round the corners are, as CSS: 0.75rem, 0.5rem, 0. |
 | `idle_minutes` | int | `0` | Minutes without use after which the frontend signs out (a warning comes a minute before); 0, never. |
+| `service_keys` | bool | `true` | A Service keys page under Administration, for those who administer them, when the security blueprint declares services. |
 
 ```esquadro
 blueprint spa {

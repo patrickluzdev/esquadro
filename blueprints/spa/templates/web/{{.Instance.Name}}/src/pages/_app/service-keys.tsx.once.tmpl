@@ -1,0 +1,24 @@
+{{- if and (index (optionsOf "security") "services") .Options.service_keys -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { ShieldX } from "lucide-react"
+import { serviceKeyAdmins } from "../../esquadro/accounts.gen.ts"
+import { allowedBy } from "../../esquadro/kit/accounts-admin.tsx"
+import { useSession } from "../../esquadro/kit/auth.tsx"
+import { t } from "../../esquadro/kit/i18n.ts"
+import { ServiceKeysAdmin } from "../../esquadro/kit/service-keys.tsx"
+import { StateView } from "../../esquadro/kit/states.tsx"
+
+// The service keys, for those who administer them. Yours, like the other
+// pages.
+export const Route = createFileRoute("/_app/service-keys")({
+  component: ServiceKeysPage,
+})
+
+function ServiceKeysPage() {
+  const session = useSession()
+  if (!allowedBy(session, serviceKeyAdmins ?? [])) {
+    return <StateView framed tone="warning" icon={<ShieldX />} title={t("forbidden")} description={t("forbiddenPage")} />
+  }
+  return <ServiceKeysAdmin />
+}
+{{- end}}

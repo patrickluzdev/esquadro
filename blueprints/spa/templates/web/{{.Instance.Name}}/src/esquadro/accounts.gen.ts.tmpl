@@ -36,3 +36,8 @@ export const accountRealms: AccountRealm[] = [
   },
 {{- end}}{{end}}
 ]
+{{- $sec := optionsOf "security"}}{{$admins := strs (index $sec "service_admins")}}
+{{- if and (not $admins) $realms}}{{$admins = realmAdmins .Entities (index $realms 0).Entity}}{{end}}
+
+/** Who administers the service keys (realm.role rules); null without a page of them. */
+export const serviceKeyAdmins: string[] | null = {{if and (index $sec "services") .Options.service_keys $admins}}[{{range $i, $w := $admins}}{{if $i}}, {{end}}"{{$w}}"{{end}}]{{else}}null{{end}}

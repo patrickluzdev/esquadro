@@ -167,6 +167,16 @@ an email confirmed, no access) share one frame, `src/components/auth-frame.tsx`:
 the brand, or how it ended (`tone`: success, error, info, forbidden), a
 title, a hint and a way back to signing in. A link that expired says so.
 
+When the security blueprint declares `services`, Administration has a
+Service keys page too, for those who administer them (the `service_admins`
+option): the service roles in cards, with what each may do as the rules
+say; the keys, with their roles, status (active, expired, revoked), when
+they expire and when they were last used; New key, which shows the key
+once, to copy; and Revoke. The lifetimes it offers are the security
+blueprint's `service_key_choices`, within `service_key_max_days`. The spa's
+`service_keys false` leaves the page out; it is
+`src/pages/_app/service-keys.tsx`, yours.
+
 The lists of entities with a trash (`@store(soft_delete)`) have a Trash
 button; deleting there can be undone, and the trash restores or deletes for
 good: see [The trash](/esquadro/trash/).

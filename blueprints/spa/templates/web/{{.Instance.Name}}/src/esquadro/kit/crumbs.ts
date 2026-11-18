@@ -49,6 +49,7 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   const parts = partsOf(pathname)
   const out: Crumb[] = [{ label: t("home"), to: "/" }]
   if (parts.length === 0) return out
+  if (parts[0] === "service-keys") return [...out, { label: t("administration") }, { label: t("serviceKeys"), to: "/service-keys" }]
   // A realm's accounts are called by its name.
   if (parts[0] === "accounts") {
     const r = accountRealms.find((x) => x.slug === parts[1])

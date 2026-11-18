@@ -49,6 +49,9 @@ blueprint spa {
   /// Minutes without use after which the frontend signs out (a warning
   /// comes a minute before); 0, never.
   option idle_minutes int default(0)
+  /// A Service keys page under Administration, for those who administer
+  /// them, when the security blueprint declares services.
+  option service_keys bool default(true)
 
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.
