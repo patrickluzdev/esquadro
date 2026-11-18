@@ -357,7 +357,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
               type="button"
               variant="destructive-outline"
               onClick={async () => {
-                if (!(await ask(t("confirmDelete"), { destructive: true }))) return
+                if (!(await ask(t("confirmDelete"), { destructive: true, description: t("cantUndo"), confirm: t("delete") }))) return
                 try {
                   await meta.api(api as never).delete(record.id, { ifMatch: record })
                   dirty.current = false

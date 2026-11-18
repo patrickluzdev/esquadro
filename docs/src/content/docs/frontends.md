@@ -321,12 +321,21 @@ and dark); the components are shadcn/ui's, in `src/components/ui`, and the
 layout's (sidebar, header, account menu) in `src/components`: all yours to
 change. `npx shadcn add <component>` adds more.
 
+The account menu, at the right of the header (`src/components/user-menu.tsx`),
+links to each section of the account page, by its key (`?section=devices`),
+and holds the theme and signing out: add a link there with each section you
+add to the page.
+
 ### Pages of your own
 
 A file in `src/pages/_app/` is a page behind the sign-in. The kit's parts
 are yours to use there: `PageHeader`, `Dashboard`, the charts, and
 `Settings`, sections in a menu at the left, the one chosen kept in the URL,
-which the account page is made of:
+which the account page is made of. `ask` asks before what cannot be undone
+(`await ask("Archive it?", { destructive: true, description: "…", confirm: "Archive" })`),
+and `toast` tells what happened (`toast("Archived")`, `toast(text, "error")`).
+
+The account page is made of:
 
 ```tsx
 <Settings

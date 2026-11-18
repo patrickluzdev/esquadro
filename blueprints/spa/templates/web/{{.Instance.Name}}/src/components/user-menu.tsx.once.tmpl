@@ -3,7 +3,8 @@
 // profile page, settings.
 import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { LogOut, Monitor, Moon, Sun, UserCog } from "lucide-react"
+import { KeyRound, LogOut, Mail, Monitor, MonitorSmartphone, Moon, Palette, Sun } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -16,11 +17,24 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { signOut, useSession } from "../esquadro/kit/auth.tsx"
 import { panel } from "../esquadro/config.ts"
+import { signOut, useSession } from "../esquadro/kit/auth.tsx"
 import { t } from "../esquadro/kit/i18n.ts"
+
+/**
+ * The menu's links: each section of the account page, by its key
+ * (?section=). Add yours (a profile, notifications) here and to the page.
+ */
+const links: { label: string; icon: LucideIcon; section: string }[] = [
+  { label: t("password"), icon: KeyRound, section: "password" },
+  { label: t("devices"), icon: MonitorSmartphone, section: "devices" },
+  { label: t("email"), icon: Mail, section: "email" },
+]
 
 export function UserMenu() {
   const session = useSession()
@@ -39,41 +53,49 @@ export function UserMenu() {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-60 p-2">
-        <DropdownMenuLabel className="flex items-center gap-3 px-2 py-2 font-normal">
+      <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl p-2">
+        <DropdownMenuLabel className="flex items-center gap-3 px-2 py-2.5 font-normal">
           <Avatar className="size-10">
             <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="grid min-w-0 flex-1 leading-tight">
-            <span className="truncate font-bold text-foreground">{name}</span>
+            <span className="truncate text-sm font-bold text-foreground">{name}</span>
             <span className="truncate text-xs text-muted-foreground">{[roles, t("panel", { name: panel })].filter(Boolean).join(" · ")}</span>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="gap-3 py-2 font-semibold">
-          <Link to="/account">
-            <UserCog />
-            {t("account")}
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("theme")}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
-            <DropdownMenuRadioItem value="light" className="gap-3 font-semibold">
-              <Sun /> {t("light")}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="dark" className="gap-3 font-semibold">
-              <Moon /> {t("dark")}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="system" className="gap-3 font-semibold">
-              <Monitor /> {t("system")}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
+          {links.map((l) => (
+            <DropdownMenuItem key={l.section} asChild className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground">
+              <Link to="/account" search={ { section: l.section } as never }>
+                <l.icon />
+                {l.label}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground">
+              <Palette className="size-4 text-muted-foreground" />
+              {t("theme")}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="rounded-xl p-1.5">
+              <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+                <DropdownMenuRadioItem value="light" className="gap-3 font-semibold">
+                  <Sun /> {t("light")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark" className="gap-3 font-semibold">
+                  <Moon /> {t("dark")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system" className="gap-3 font-semibold">
+                  <Monitor /> {t("system")}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="gap-3 py-2 font-semibold"
+          className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground"
           onClick={async () => {
             await signOut(queryClient)
             navigate({ to: "/login", search: { redirect: undefined } })

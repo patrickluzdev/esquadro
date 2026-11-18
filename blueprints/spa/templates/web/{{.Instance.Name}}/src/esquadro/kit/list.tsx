@@ -411,7 +411,7 @@ export function ResourceList({
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={async () => {
-                          if (!(await ask(t("confirmDelete"), { destructive: true }))) return
+                          if (!(await ask(t("confirmDelete"), { destructive: true, description: t("cantUndo"), confirm: t("delete") }))) return
                           try {
                             await remove(r)
                             toast(t("deleted"))
@@ -449,7 +449,7 @@ export function ResourceList({
 
   const selected = items.filter((r) => (rowSelection as Record<string, boolean>)[r.id])
   const runBulk = async (label: string, records: Rec[], run: (r: Rec) => Promise<unknown> | unknown, question?: string, destructive?: boolean) => {
-    if (question && !(await ask(question, { destructive }))) return
+    if (question && !(await ask(question, { destructive, description: destructive ? t("cantUndo") : undefined }))) return
     const { done, failed, error } = await each(records, run)
     if (failed === 0) toast(t("bulkDone", { done, label }))
     else toast(t("bulkFailed", { done, failed, error: describe(error) }), "error")

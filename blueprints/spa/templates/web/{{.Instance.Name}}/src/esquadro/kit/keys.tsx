@@ -18,11 +18,17 @@ export function typing(e: KeyboardEvent): boolean {
 }
 
 /** Calls the handler of each key pressed, unless someone is typing. */
+/** Whether a dialog, a menu or a popover is open over the page. */
+function layerOpen(): boolean {
+  return document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"][data-state="open"]') !== null
+}
+
 export function useKeys(keys: Record<string, (e: KeyboardEvent) => void>, enabled = true) {
   useEffect(() => {
     if (!enabled) return
     const onKey = (e: KeyboardEvent) => {
-      if (typing(e)) return
+      // A dialog or a menu open takes its keys (Esc closes it, not the page).
+      if (typing(e) || e.defaultPrevented || layerOpen()) return
       const run = keys[e.key]
       if (run) {
         e.preventDefault()

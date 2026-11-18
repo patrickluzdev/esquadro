@@ -168,7 +168,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
         <Button
           variant="destructive-outline"
           disabled={remove.isPending}
-          onClick={async () => (await ask(t("confirmDelete"), { destructive: true })) && remove.mutate(r)}
+          onClick={async () => (await ask(t("confirmDelete"), { destructive: true, description: t("cantUndo"), confirm: t("delete") })) && remove.mutate(r)}
         >
           <Trash2 /> {t("delete")}
         </Button>
@@ -208,6 +208,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
                   className="flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-1 pb-3 font-semibold text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent"
                 >
                   {rel.label ?? rel.resource.meta.label}
+                  <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -221,4 +222,19 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
       )}
     </div>
   )
+}
+
+/**
+ * How many related records a tab lists: the total the API answers by page
+ * (none by cursor, which counts nothing).
+ */
+function RelationCount({ resource, param, value }: { resource: Resource; param: string; value: string }) {
+  const total = useQuery({
+    queryKey: [resource.meta.name, "count", param, value],
+    queryFn: () => resource.meta.api(api as never).list({ [param]: value, per_page: 1, limit: 1 }),
+    select: (page: { total?: number }) => page.total,
+    staleTime: 30_000,
+  })
+  if (typeof total.data !== "number") return null
+  return <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">{total.data}</span>
 }

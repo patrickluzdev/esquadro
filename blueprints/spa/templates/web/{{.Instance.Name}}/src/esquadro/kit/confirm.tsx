@@ -11,17 +11,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { CircleHelp, Trash2 } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { t } from "./i18n.ts"
 
-type Question = { text: string; destructive: boolean; answer: (yes: boolean) => void }
+type Question = { text: string; destructive: boolean; description?: string; confirm?: string; answer: (yes: boolean) => void }
 let show: ((q: Question) => void) | undefined
 
-/** Asks a yes or no question; true on yes. */
-export function ask(text: string, options: { destructive?: boolean } = {}): Promise<boolean> {
+/**
+ * Asks a yes or no question; true on yes. A destructive one (delete) is in
+ * red; description says more, confirm names the button (Yes by default).
+ */
+export function ask(text: string, options: { destructive?: boolean; description?: string; confirm?: string } = {}): Promise<boolean> {
   return new Promise((answer) => {
     if (!show) return answer(false)
-    show({ text, destructive: options.destructive ?? false, answer })
+    show({ text, destructive: options.destructive ?? false, description: options.description, confirm: options.confirm, answer })
   })
 }
 
@@ -44,18 +49,30 @@ export function Confirmer() {
   }
   return (
     <AlertDialog open={open} onOpenChange={(o) => !o && answer(false)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{question?.text}</AlertDialogTitle>
-          <AlertDialogDescription className="sr-only">{question?.text}</AlertDialogDescription>
-        </AlertDialogHeader>
+      <AlertDialogContent className="gap-5 sm:max-w-md">
+        <div className="flex gap-4">
+          <div
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-full",
+              question?.destructive ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+            )}
+          >
+            {question?.destructive ? <Trash2 className="size-5" /> : <CircleHelp className="size-5" />}
+          </div>
+          <AlertDialogHeader className="gap-1.5 text-left">
+            <AlertDialogTitle className="text-lg font-bold">{question?.text}</AlertDialogTitle>
+            <AlertDialogDescription className={cn(!question?.description && "sr-only")}>
+              {question?.description ?? question?.text}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => answer(false)}>{t("cancel")}</AlertDialogCancel>
           <AlertDialogAction
             className={question?.destructive ? buttonVariants({ variant: "destructive" }) : undefined}
             onClick={() => answer(true)}
           >
-            {t("yes")}
+            {question?.confirm ?? t("yes")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
