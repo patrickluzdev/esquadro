@@ -1,0 +1,27 @@
+import { createFileRoute, notFound } from "@tanstack/react-router"
+import { accountRealms } from "../../../esquadro/accounts.gen.ts"
+import { AccountsAdmin, administers } from "../../../esquadro/kit/accounts-admin.tsx"
+import { useSession } from "../../../esquadro/kit/auth.tsx"
+import { StateView } from "../../../esquadro/kit/states.tsx"
+import { t } from "../../../esquadro/kit/i18n.ts"
+import { ShieldX } from "lucide-react"
+
+// The accounts of a realm this frontend administers (/accounts/users): for
+// those its entity lets write it. Yours, like the other pages.
+export const Route = createFileRoute("/_app/accounts/$slug")({
+  loader: ({ params }) => {
+    const realm = accountRealms.find((r) => r.slug === params.slug)
+    if (!realm) throw notFound()
+    return realm
+  },
+  component: AccountsPage,
+})
+
+function AccountsPage() {
+  const realm = Route.useLoaderData()
+  const session = useSession()
+  if (!administers(session, realm)) {
+    return <StateView framed tone="warning" icon={<ShieldX />} title={t("forbidden")} description={t("forbiddenPage")} />
+  }
+  return <AccountsAdmin realm={realm} />
+}

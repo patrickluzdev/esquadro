@@ -29,6 +29,7 @@ func TemplateFuncs() template.FuncMap {
 		"paginationOf": rest.PaginationOf,
 		"clearable":    rest.Clearable,
 		"realms":       security.RealmsOf,
+		"realmAdmins":  security.Admins,
 		"tsType":       tsType,
 		"reportSample": func(f *project.Field) string {
 			switch f.Type {

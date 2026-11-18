@@ -2,6 +2,7 @@
 // header's breadcrumb: Home, a resource, one of its records (by its name),
 // editing it.
 import { isApiError } from "@api"
+import { accountRealms } from "../accounts.gen.ts"
 import { dashboards } from "../dashboard.gen.ts"
 import { useQuery } from "@tanstack/react-query"
 import { useMatches, useRouterState } from "@tanstack/react-router"
@@ -48,6 +49,13 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   const parts = partsOf(pathname)
   const out: Crumb[] = [{ label: t("home"), to: "/" }]
   if (parts.length === 0) return out
+  // A realm's accounts are called by its name.
+  if (parts[0] === "accounts") {
+    const r = accountRealms.find((x) => x.slug === parts[1])
+    out.push({ label: t("administration") })
+    if (parts[1]) out.push({ label: r?.label ?? capitalize(parts[1]), to: `/accounts/${parts[1]}` })
+    return out
+  }
   // A dashboard is called by the name the model gives it.
   if (parts[0] === "dashboards") {
     const d = dashboards.find((x) => x.slug === parts[1])

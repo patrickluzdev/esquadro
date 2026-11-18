@@ -167,6 +167,18 @@ an email confirmed, no access) share one frame, `src/components/auth-frame.tsx`:
 the brand, or how it ended (`tone`: success, error, info, forbidden), a
 title, a hint and a way back to signing in. A link that expired says so.
 
+The realms a frontend administers (whose entity lets its own realm
+write it, `@security(write user.admin)`) each have a page under
+Administration in the menu, for those who may: the realm's roles in cards,
+with their permissions (as the model declares them); the accounts, with
+their roles, status (active, invited, email not confirmed, disabled) and
+when they were last seen, searched and filtered in the URL; Invite, which
+emails a link to choose the password (opening the reset page greeted,
+`?invite=1`); and, on each, Change roles, Send the invitation again, Sign
+out everywhere, Disable and Delete, never on one's own account. Its page
+is `src/pages/_app/accounts/$slug.tsx`, yours; the entity's
+`@<frontend>(label, singular)` names it.
+
 The settings page (`/settings`, from the account's menu) changes the
 password, lists the devices signed in and signs out of one or of all the
 others, changes the email with a link to the new one, and picks the theme. What changes an account needs a recent

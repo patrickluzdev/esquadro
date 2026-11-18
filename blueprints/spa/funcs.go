@@ -28,6 +28,7 @@ func TemplateFuncs() template.FuncMap {
 		"pagination":  rest.PaginationOf,
 		"inRequest":   rest.InRequest,
 		"realms":      security.RealmsOf,
+		"realmAdmins": security.Admins,
 		"displayOf":   DisplayOf,
 		"titleOf":     TitleOf,
 		"lucide":      Lucide,

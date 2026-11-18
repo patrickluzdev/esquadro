@@ -18,6 +18,7 @@ import {
 import { isGroup } from "@/menu.ts"
 import type { Menu, MenuItem } from "@/menu.ts"
 import { base } from "../esquadro/config.ts"
+import { useSession } from "../esquadro/kit/auth.tsx"
 
 /** Whether the page shown is the entry's, or under it. */
 function useActive() {
@@ -29,6 +30,7 @@ function useActive() {
 
 export function NavMain({ items, label }: { items: Menu["main"]; label?: string }) {
   const active = useActive()
+  const session = useSession()
   const { isMobile, setOpenMobile, state, setOpen } = useSidebar()
   const close = () => isMobile && setOpenMobile(false)
   // A group is open while one of its pages is shown, unless you close it;
@@ -46,7 +48,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
     <SidebarGroup className="px-4">
       {label && <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</SidebarGroupLabel>}
       <SidebarMenu>
-        {items.map((item) =>
+        {items.filter((item) => !item.show || item.show(session)).map((item) =>
           isGroup(item) ? (
             <Collapsible
               key={item.label}
@@ -74,7 +76,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub className="ml-5 border-l-0 px-0 py-1">
-                    {item.items.map((sub) => (
+                    {item.items.filter((sub) => !sub.show || sub.show(session)).map((sub) => (
                       <SidebarMenuSubItem key={sub.to}>
                         <SidebarMenuSubButton
                           asChild

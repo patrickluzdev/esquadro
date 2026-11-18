@@ -29,6 +29,73 @@ export interface Device {
   user_agent: string
 }
 
+/** An account of a realm, as those who administer it see it. */
+export interface Account {
+  id: string
+  email: string
+  /** What it is called: its record's name. */
+  name: string
+  /** Its record's fields. */
+  fields: Record<string, unknown>
+  roles: string[]
+  status: "active" | "invited" | "unverified" | "disabled"
+  last_seen_at: string | null
+  created_at: string
+}
+
+/** A page of accounts. */
+export interface AccountPage {
+  items: Account[]
+  page: number
+  per_page: number
+  total: number
+  total_pages: number
+}
+
+/** A role of a realm, as the model declares it. */
+export interface RoleInfo {
+  name: string
+  permissions: string[]
+  /** How many accounts have it. */
+  accounts: number
+  /** Whether it administers the realm's accounts. */
+  administers: boolean
+}
+
+/** What the accounts of a realm are asked for. */
+export interface AccountQuery {
+  q?: string
+  role?: string
+  status?: Account["status"]
+  page?: number
+  per_page?: number
+}
+
+// accounts are the routes that administer a realm's accounts.
+function accounts(t: Transport, path: string) {
+  const one = (id: string) => `${path}/accounts/${encodeURIComponent(id)}`
+  return {
+    list: (query: AccountQuery = {}) => t.request<AccountPage>("GET", `${path}/accounts`, { query: query as Record<string, string | number | undefined> }),
+    /** Makes an account without a password and emails it a link to choose one. */
+    invite: (invitation: { email: string; roles?: string[]; fields?: Record<string, unknown>; redirect?: string }) =>
+      t.request<Account>("POST", `${path}/accounts`, { body: invitation }),
+    reinvite: async (id: string, redirect?: string) => {
+      await t.request("POST", `${one(id)}/invite`, { body: { redirect } })
+    },
+    setRoles: (id: string, roles: string[]) => t.request<Account>("PUT", `${one(id)}/roles`, { body: { roles } }),
+    disable: (id: string) => t.request<Account>("POST", `${one(id)}/disable`),
+    enable: (id: string) => t.request<Account>("POST", `${one(id)}/enable`),
+    endSessions: async (id: string) => {
+      await t.request("DELETE", `${one(id)}/sessions`)
+    },
+    remove: async (id: string) => {
+      await t.request("DELETE", one(id))
+    },
+    /** The realm's roles, their permissions and how many accounts have each. */
+    roles: () => t.request<RoleInfo[]>("GET", `${path}/roles`),
+  }
+}
+
 /** An email and a password. */
 export interface Credentials {
   email: string
@@ -112,9 +179,14 @@ export function {{$r.Entity.Camel}}Identity(t: Transport, cookie: boolean) {
     forgotPassword: async (request: { email: string; redirect?: string }) => {
       await t.request("POST", `${path}/password/forgot`, { body: request })
     },
-    resetPassword: async (reset: { token: string; password: string }) => {
+    /** Sets the password with a reset link's (or an invitation's) token. */
+    resetPassword: async (reset: { token: string; new_password: string }) => {
       await t.request("POST", `${path}/password/reset`, { body: reset })
     },
+{{- end}}
+{{- if realmAdmins $.Entities $r.Entity}}
+    /** Its accounts, for those who administer them. */
+    accounts: accounts(t, path),
 {{- end}}
 {{- $social := false}}{{range $r.Providers}}{{if ne . "password"}}{{$social = true}}{{end}}{{end}}
 {{- if $social}}
