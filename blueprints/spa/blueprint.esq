@@ -34,6 +34,10 @@ blueprint spa {
   /// to its icons), inset (sidebar-08, the page in an inset card) or
   /// dashboard (dashboard-01, it slides away, wider).
   option sidebar name default(icon)
+  /// Where a list's filters are, unless its resource says (filterLayout):
+  /// drawer (a panel at the right, applied at once), dialog, or bar (beside
+  /// the search, applied as chosen).
+  option filters name default(drawer)
   /// Minutes without use after which the frontend signs out (a warning
   /// comes a minute before); 0, never.
   option idle_minutes int default(0)

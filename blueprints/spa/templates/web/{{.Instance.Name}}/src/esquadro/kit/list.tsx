@@ -3,7 +3,7 @@
 // sorting, search and pages, all in the URL, so that it can be shared and
 // Back works; records selected to act on several at once; cells changed in
 // place; each record's actions in its menu.
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   columnVisibilityFeature,
   createColumnHelper,
@@ -24,7 +24,6 @@ import {
   Copy,
   Download,
   Hash,
-  ListFilter as ListFilterIcon,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -52,8 +51,8 @@ import { api } from "../api.ts"
 import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
 import { copy } from "./copy.tsx"
-import { DateRangeFilter } from "./daterange.tsx"
-import { MoneyRangeFilter } from "./moneyrange.tsx"
+import { filterLayout } from "../config.ts"
+import { ActiveFilters, BarFilter, cleared, ColumnFilter, FilterPanel, FilterTabs, isActive } from "./filters.tsx"
 import { ViewsMenu } from "./views.tsx"
 import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
@@ -73,7 +72,6 @@ import type { Action, Resource } from "./resource.ts"
 import { FieldValue } from "./show.tsx"
 import { toast } from "./toast.tsx"
 
-const ALL = "__all"
 const PER_PAGE = 10
 const PAGE_SIZES = [10, 25, 50, 100]
 /** Exporting: records asked for at a time, and at most. */
@@ -100,46 +98,6 @@ export function listSearch(search: Record<string, unknown>): ListSearch {
     else if (typeof v === "string" || typeof v === "number") out[k] = v
   }
   return out
-}
-
-/** A filter by a date: a period, in two params (created_at_min, _max). */
-function isDate(f: FieldMeta): boolean {
-  return f.kind === "date" || f.kind === "datetime"
-}
-
-/** The URL's keys of a filter: a range's two (price_min, price_max). */
-function filterKeys(f: FieldMeta): string[] {
-  return isDate(f) || f.kind === "money" ? [`${f.name}_min`, `${f.name}_max`] : [f.name]
-}
-
-/** A filter of the list: an enum's values, yes or no, or the related records. */
-function ListFilter({ field, value, onChange }: { field: FieldMeta; value?: string; onChange: (v?: string) => void }) {
-  const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
-  const related = useQuery({
-    queryKey: [target?.name ?? field.target, "options"],
-    queryFn: () => target.api(api as never).list({ per_page: 100, limit: 100 }),
-    enabled: field.kind === "relation" && target !== undefined,
-  })
-  const options: [string, string][] =
-    field.kind === "relation"
-      ? (related.data?.items ?? []).map((r: Rec) => [r.id, capitalize(String(r[field.display ?? "id"] ?? r.id))])
-      : (field.values ?? ["true", "false"]).map((v) => [v, capitalize(field.kind === "bool" ? format(field, v === "true") : format(field, v))])
-  return (
-    <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? undefined : v)}>
-      <SelectTrigger className="w-auto min-w-40">
-        <span className="text-muted-foreground">{field.label}:</span>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent position="popper">
-        <SelectItem value={ALL}>{capitalize(t("all"))}</SelectItem>
-        {options.map(([v, label]) => (
-          <SelectItem key={v} value={v}>
-            {label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
 }
 
 type Density = "comfortable" | "compact"
@@ -210,6 +168,7 @@ export function ResourceList({
 }) {
   const { meta } = resource
   const embedded = scope !== undefined
+  const tabsField = resource.table.tabs?.name === scope?.param ? undefined : resource.table.tabs
   const urlSearch = useSearch({ strict: false }) as ListSearch
   const [localSearch, setLocalSearch] = useState<ListSearch>({})
   const search = embedded ? localSearch : urlSearch
@@ -230,6 +189,22 @@ export function ResourceList({
     queryFn: () => meta.api(api as never).list(query),
     placeholderData: keepPreviousData,
   })
+  // How many records each tab keeps, with the rest of the search: a page
+  // of one, for its total (none by cursor).
+  const tabValues: (string | undefined)[] = tabsField ? [undefined, ...(tabsField.values ?? ["true", "false"])] : []
+  const counts = useQueries({
+    queries: tabValues.map((v) => {
+      const q: Record<string, unknown> = { ...query, page: 1, per_page: 1 }
+      if (tabsField) q[tabsField.name] = v
+      return {
+        queryKey: [meta.name, "count", q],
+        queryFn: () => meta.api(api as never).list(q) as Promise<{ total?: number }>,
+        enabled: paged,
+        staleTime: 30_000,
+        placeholderData: keepPreviousData,
+      }
+    }),
+  })
   // A change of the list's state goes to the URL; typing replaces the entry
   // instead of filling the history.
   const set = (changes: Partial<ListSearch>, replace = false) =>
@@ -237,14 +212,15 @@ export function ResourceList({
       ? setLocalSearch((s) => Object.fromEntries(Object.entries({ ...s, ...changes }).filter(([, v]) => v !== undefined)))
       : navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never, replace })
   // A scoped list's own key is not a filter, nor a column.
-  const filters = (resource.table.filters ?? []).filter((f) => f.name !== scope?.param)
+  // The tabs' field is filtered by its tabs, not twice.
+  const filters = (resource.table.filters ?? []).filter((f) => f.name !== scope?.param && f.name !== tabsField?.name)
   const tableColumns = resource.table.columns.filter((c) => columnField(c).name !== scope?.param)
   // The search counts only where the list has one.
   const filtering =
     (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) ||
-    filters.some((f) => filterKeys(f).some((k) => search[k] !== undefined))
+    [...filters, ...(tabsField ? [tabsField] : [])].some((f) => isActive(f, search as never))
   const clearAll = () =>
-    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries(filters.flatMap(filterKeys).map((k) => [k, undefined])) })
+    set({ q: undefined, page: undefined, cursor: undefined, ...cleared(tabsField ? [...filters, tabsField] : filters) })
 
   // A refresh that fails keeps the last page loaded, under an alert, as
   // TanStack Query drops it when the new query errs.
@@ -314,9 +290,8 @@ export function ResourceList({
           id: f.name,
           meta: { label },
           header: () => {
-            if (!meta.sorts.includes(f.name)) return label
             const Icon = search.sort === f.name ? ArrowUp : search.sort === `-${f.name}` ? ArrowDown : ArrowUpDown
-            return (
+            const title = meta.sorts.includes(f.name) ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -326,6 +301,17 @@ export function ResourceList({
                 {label}
                 <Icon className="text-muted-foreground" />
               </Button>
+            ) : (
+              label
+            )
+            // A funnel by the column's name, when the list filters by it.
+            const filter = resource.table.columnFilters ? filters.find((x) => x.name === f.name) : undefined
+            if (!filter) return title
+            return (
+              <span className="inline-flex items-center gap-1">
+                {title}
+                <ColumnFilter field={filter} values={search as Record<string, string | undefined>} onChange={(c) => set({ ...c, page: undefined, cursor: undefined })} />
+              </span>
             )
           },
           cell: ({ row }) => {
@@ -434,7 +420,7 @@ export function ResourceList({
       }),
     )
     return helper.columns(out)
-  }, [resource, selectable, search.sort, meta, actions, scope?.param, canCreate, titleColumn])
+  }, [resource, selectable, search, meta, actions, scope?.param, canCreate, titleColumn])
 
   const table = useTable({
     features,
@@ -518,7 +504,10 @@ export function ResourceList({
   )
 
   const [density, setDensity] = useDensity()
-  const [showFilters, setShowFilters] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const layout = resource.table.filterLayout ?? filterLayout
+  const values = search as Record<string, string | undefined>
+  const setFilters = (changes: Record<string, string | undefined>) => set({ ...changes, page: undefined, cursor: undefined })
 
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
   const current = search.page ?? 1
@@ -536,7 +525,6 @@ export function ResourceList({
       <Download /> {t("export")}
     </Button>
   )
-  const activeFilters = filters.filter((f) => filterKeys(f).some((k) => search[k] !== undefined)).length
   return (
     <div className={cn("flex flex-col gap-4", !embedded && "rounded-xl border border-border bg-card p-5")}>
       {embedded ? (
@@ -572,10 +560,15 @@ export function ResourceList({
             />
           </div>
         )}
-        {filters.length > 0 && (
-          <Button variant="outline" className={cn((showFilters || activeFilters > 0) && "border-primary text-primary")} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
-            <ListFilterIcon /> {t("filters")}
-            {activeFilters > 0 && <span className="rounded-md bg-primary px-1.5 text-xs text-primary-foreground">{activeFilters}</span>}
+        {filters.length > 0 &&
+          (layout === "bar" ? (
+            filters.map((f) => <BarFilter key={f.name} field={f} values={values} onChange={setFilters} />)
+          ) : (
+            <FilterPanel filters={filters} values={values} onApply={setFilters} layout={layout} open={filtersOpen} onOpenChange={setFiltersOpen} />
+          ))}
+        {layout === "bar" && filters.some((f) => isActive(f, values)) && (
+          <Button variant="ghost" onClick={() => setFilters(cleared(filters))}>
+            <X /> {t("clearFilters")}
           </Button>
         )}
         {!embedded && <ViewsMenu meta={meta} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} />}
@@ -612,40 +605,14 @@ export function ResourceList({
           </DropdownMenu>
         )}
       </div>
-      {(showFilters || activeFilters > 0) && filters.length > 0 && (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 animate-in fade-in-0 slide-in-from-top-1">
-        {filters.map((f) =>
-          f.kind === "money" ? (
-            <MoneyRangeFilter
-              key={f.name}
-              field={f}
-              min={search[`${f.name}_min`] as string | undefined}
-              max={search[`${f.name}_max`] as string | undefined}
-              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
-            />
-          ) : isDate(f) ? (
-            <DateRangeFilter
-              key={f.name}
-              field={f}
-              min={search[`${f.name}_min`] as string | undefined}
-              max={search[`${f.name}_max`] as string | undefined}
-              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
-            />
-          ) : (
-          <ListFilter
-            key={f.name}
-            field={f}
-            value={search[f.name] === undefined ? undefined : String(search[f.name])}
-            onChange={(v) => set({ [f.name]: v, page: undefined, cursor: undefined })}
-          />
-          ),
-        )}
-        {filtering && (
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearAll}>
-            <X /> {t("clearFilters")}
-          </Button>
-        )}
-      </div>
+      {layout !== "bar" && <ActiveFilters filters={filters} values={values} onChange={setFilters} onOpen={() => setFiltersOpen(true)} />}
+      {tabsField && (
+        <FilterTabs
+          field={tabsField}
+          value={values[tabsField.name]}
+          onChange={(v) => setFilters({ [tabsField.name]: v })}
+          count={paged ? (v) => counts[tabValues.indexOf(v)]?.data?.total : undefined}
+        />
       )}
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 text-sm animate-in fade-in-0 slide-in-from-top-1">

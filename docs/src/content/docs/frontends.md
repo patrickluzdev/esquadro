@@ -182,6 +182,15 @@ entity Product {
   - each record has a menu: View, Edit, your actions, Delete;
   - Columns shows and hides columns (`hidden` starts one hidden), and sets
     the rows' density, comfortable or compact (kept in the browser).
+  - The filters are in a drawer at the right (or a dialog, or a bar beside
+    the search: `filterLayout`), changed in a draft and applied at once;
+    those set show as chips under the search, each with an X, and Clear
+    all. An enum's values are checked, several at once, each with its dot;
+    yes or no is three buttons; a related record is searched by its name;
+    money is a range, from and up to, with the currency's symbol.
+  - Tabs above the list (`tabs: f.status`) filter by an enum's value, or
+    yes or no, each with how many records it keeps; a funnel in a column's
+    header (`columnFilters: true`) filters by that column.
   - A date in the filters (`created_at`, which every resource can filter
     by, or a date field marked `@store(filter)`) is a period: today, the last
     7 or 30 days, this month, or a range picked in the calendar.
@@ -262,7 +271,7 @@ changed where it belongs: the model (`.esq`), the resource
 Each annotation is named after the frontend: `@admin(...)` for
 `blueprint spa admin`. The [blueprint's reference](/esquadro/blueprints/reference/spa/)
 lists them, and its options (the domain, the realm and roles, the language,
-the sidebar, the idle time).
+the sidebar, where the lists' filters are, the idle time).
 
 ### A resource
 
@@ -271,6 +280,9 @@ export default resource(meta, {
   table: {
     columns: [f.name, column(f.price, { editable: true }), column(f.status, { label: "State", hidden: true })],
     filters: [f.status, f.price, f.created_at],
+    filterLayout: "drawer",
+    tabs: f.status,
+    columnFilters: true,
     search: true,
     sort: "-created_at",
     select: true,
@@ -297,6 +309,9 @@ export default resource(meta, {
 |---|---|---|
 | `table.columns` | The list's columns: a field, or `column(field, {label, cell, editable, hidden})` | the first fields but images |
 | `table.filters` | The filters shown: only those the API has | the enums, booleans and money the API filters by, its relations, and `created_at` |
+| `table.filterLayout` | Where the filters are: `drawer`, `dialog` or `bar` | the spa's `filters` option, `drawer` |
+| `table.tabs` | Tabs above the list by an enum or a yes or no field, with each value's count | none |
+| `table.columnFilters` | A funnel in the header of each column the list filters by | off |
 | `table.search`, `table.sort`, `table.select` | The search box, the first order, the checkboxes | as the API allows, `-created_at`, on |
 | `form` | The fields of the form | every field |
 | `sections` | The form's cards: `{title, description, fields, side}`; `side` puts one in the narrower column at the right | details at the left; media and filing at the right |

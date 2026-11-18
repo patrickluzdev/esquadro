@@ -22,6 +22,15 @@ export default resource(meta, {
     columns: [{{$n := 0}}{{range $f := inRequest .Entity}}{{if and (lt $n 4) (ne (spaKind $f) "image")}}{{if $n}}, {{end}}f.{{$f.Snake}}{{$n = add1 $n}}{{end}}{{end}}],
     // The filters the API has (a field marked @store(filter)).
     filters: [{{$m := 0}}{{range $f := inRequest .Entity}}{{if or (and (or (eq (spaKind $f) "enum") (eq (spaKind $f) "bool")) (filterable $.Entity $f.Snake)) (and (eq (spaKind $f) "money") (rangeFilterable $.Entity $f.Snake))}}{{if $m}}, {{end}}f.{{$f.Snake}}{{$m = add1 $m}}{{end}}{{end}}{{range $r := keys .Entity}}{{if filterable $.Entity (keyName $r)}}{{if $m}}, {{end}}f.{{keyName $r}}{{$m = add1 $m}}{{end}}{{end}}{{if $m}}, {{end}}f.created_at],
+    // Where the filters are: a drawer (by default), a dialog or a bar.
+    // filterLayout: "bar",
+{{- $t := "" }}{{range $f := inRequest .Entity}}{{if and (not $t) (eq (spaKind $f) "enum") (filterable $.Entity $f.Snake)}}{{$t = $f.Snake}}{{end}}{{end}}
+{{- if $t}}
+    // Tabs above the list, each value with how many records it keeps.
+    // tabs: f.{{$t}},
+{{- end}}
+    // A funnel in the header of each column the list filters by.
+    // columnFilters: true,
   },
   form: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}],
   show: [{{$s := 0}}{{range $f := inRequest .Entity}}{{if ne (spaKind $f) "image"}}{{if $s}}, {{end}}f.{{$f.Snake}}{{$s = add1 $s}}{{end}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}, f.created_at, f.updated_at],

@@ -52,23 +52,37 @@ function parse(value?: string): Date | undefined {
 
 const day = (d: Date) => new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short" }).format(d)
 
+/** What a period reads: "Last 7 days", "02 Nov – 10 Nov", "since 02 Nov", or All. */
+export function periodSummary(min?: string, max?: string): string {
+  const from = parse(min)
+  const to = parse(max)
+  const preset = !to && from ? presets().find((p) => startOfDay(from).getTime() === p.from.getTime()) : undefined
+  return preset ? preset.label : from ? (to ? `${day(from)} – ${day(to)}` : `${t("since")} ${day(from)}`) : t("all")
+}
+
+/**
+ * The period's button and its popover. Bare, it fills its place and leaves
+ * the field's name to a label above it (in a drawer, a dialog).
+ */
 export function DateRangeFilter({
   field,
   min,
   max,
   onChange,
+  bare = false,
 }: {
   field: FieldMeta
   min?: string
   max?: string
   onChange: (min?: string, max?: string) => void
+  bare?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const from = parse(min)
   const to = parse(max)
   const [range, setRange] = useState<DateRange | undefined>({ from, to })
   const preset = !to && from ? presets().find((p) => startOfDay(from).getTime() === p.from.getTime()) : undefined
-  const summary = preset ? preset.label : from ? (to ? `${day(from)} – ${day(to)}` : `${t("since")} ${day(from)}`) : t("all")
+  const summary = periodSummary(min, max)
   const apply = (f?: Date, e?: Date) => {
     onChange(f && param(field, startOfDay(f)), e && param(field, field.kind === "date" ? startOfDay(e) : endOfDay(e)))
     setOpen(false)
@@ -83,10 +97,10 @@ export function DateRangeFilter({
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn("justify-start font-normal", !from && "text-muted-foreground")}>
+        <Button variant="outline" id={bare ? `filter-${field.name}` : undefined} className={cn("justify-start font-normal", bare && "h-11 w-full rounded-lg border-transparent bg-input px-3 font-semibold shadow-none hover:bg-input/80 dark:bg-input dark:hover:bg-input/80", !from && "text-muted-foreground")}>
           <CalendarIcon />
-          <span className="text-muted-foreground">{field.label}:</span>
-          <span className="text-foreground">{summary}</span>
+          {!bare && <span className="text-muted-foreground">{field.label}:</span>}
+          <span className={cn("text-foreground", bare && !from && "text-muted-foreground")}>{summary}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="flex w-auto flex-col gap-2 p-2 sm:flex-row" align="start">

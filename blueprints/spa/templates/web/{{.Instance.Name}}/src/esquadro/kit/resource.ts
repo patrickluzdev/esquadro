@@ -54,6 +54,15 @@ export interface ResourceDef {
     sort?: string
     /** Checkboxes to act on several records at once; on by default. */
     select?: boolean
+    /**
+     * Where the filters are: a drawer (the project's default, the spa's
+     * filters option), a dialog, or a bar beside the search.
+     */
+    filterLayout?: "drawer" | "dialog" | "bar"
+    /** Tabs above the list by an enum or a yes or no field, each with its count. */
+    tabs?: FieldMeta
+    /** A funnel in the header of each column the list filters by. */
+    columnFilters?: boolean
   }
   form: FieldMeta[]
   /** The form in cards: a title, and the fields of each (of those in form). */

@@ -67,6 +67,9 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if sidebar, _ := opts["sidebar"].(string); sidebar != "icon" && sidebar != "inset" && sidebar != "dashboard" {
 			diags.Errorf(at("sidebar"), at("sidebar"), "sidebar %s is not icon, inset or dashboard", sidebar)
 		}
+		if filters, _ := opts["filters"].(string); filters != "drawer" && filters != "dialog" && filters != "bar" {
+			diags.Errorf(at("filters"), at("filters"), "filters %s is not drawer, dialog or bar", filters)
+		}
 		if locale, _ := opts["locale"].(string); locale != "en" {
 			diags = append(diags, unlabeled(p, name)...)
 		}

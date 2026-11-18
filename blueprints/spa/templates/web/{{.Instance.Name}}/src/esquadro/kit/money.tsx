@@ -143,6 +143,7 @@ export function MoneyInput({
   onBlur?: () => void
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   "aria-label"?: string
+  placeholder?: string
 }) {
   const m = isMoney(value) ? value : null
   const code = currencyOf(m)

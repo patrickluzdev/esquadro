@@ -28,3 +28,6 @@ export const panel: string = "{{humanize .Instance.Name}}"
 
 /** The app's currency (ISO 4217): money's when an amount has none. */
 export const currency: string = "{{.App.Currency}}"
+
+/** Where a list's filters are, unless its resource says (the spa's filters option). */
+export const filterLayout: "drawer" | "dialog" | "bar" = "{{.Options.filters}}"
