@@ -29,7 +29,7 @@ function useActive() {
 
 export function NavMain({ items, label }: { items: Menu["main"]; label?: string }) {
   const active = useActive()
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpenMobile, state, setOpen } = useSidebar()
   const close = () => isMobile && setOpenMobile(false)
   // A group is open while one of its pages is shown, unless you close it;
   // going to one of its pages opens it again.
@@ -57,7 +57,16 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.label} isActive={item.items.some((i) => active(i.to))} className="h-12 gap-3 rounded-lg px-3 font-semibold group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:[&>span]:hidden text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
+                  <SidebarMenuButton
+                    // Collapsed to its icons, a group opens the sidebar,
+                    // the group open in it.
+                    onClick={(e) => {
+                      if (state !== "collapsed" || isMobile) return
+                      e.preventDefault()
+                      setOpen(true)
+                      setOpened((all) => ({ ...all, [item.label]: true }))
+                    }}
+                    tooltip={item.label} isActive={item.items.some((i) => active(i.to))} className="h-12 gap-3 rounded-lg px-3 font-semibold group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:[&>span]:hidden text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
                     {item.icon && <item.icon />}
                     <span>{item.label}</span>
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
