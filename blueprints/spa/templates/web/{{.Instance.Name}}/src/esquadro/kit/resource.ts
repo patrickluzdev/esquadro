@@ -59,6 +59,8 @@ export interface ResourceDef {
   /** The form in cards: a title, and the fields of each (of those in form). */
   sections?: { title: string; description?: string; fields: FieldMeta[]; side?: boolean }[]
   show?: FieldMeta[]
+  /** The fields beside the picture on a record's page: the first short ones (not the title) by default. */
+  summary?: FieldMeta[]
   actions?: Action[]
   /** The field a record is called by (in titles and pickers). */
   title?: FieldMeta

@@ -117,6 +117,17 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
   const fields = resource.show ?? resource.form
   const relations = resource.relations?.() ?? []
+  // Beside the picture, a few short fields; every field in the Details tab,
+  // in the form's sections when it has them.
+  const long: FieldMeta["kind"][] = ["textarea", "json", "image", "file"]
+  const summary = resource.summary ?? fields.filter((f) => f !== resource.title && !long.includes(f.kind)).slice(0, 4)
+  const groups: { title?: string; fields: FieldMeta[] }[] = []
+  for (const sec of resource.sections ?? []) {
+    const own = sec.fields.filter((f) => fields.includes(f))
+    if (own.length) groups.push({ title: sec.title, fields: own })
+  }
+  const rest = fields.filter((f) => !groups.some((g) => g.fields.includes(f)))
+  if (rest.length) groups.push({ title: groups.length ? t("other") : undefined, fields: rest })
   const value = (f: FieldMeta) => (
     <div key={f.name} className="group/value flex flex-col gap-1">
       <dt className="text-sm font-medium text-muted-foreground">{f.label}</dt>
@@ -176,8 +187,8 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
     </div>
   )
   return (
-    <div className={cn("grid items-start gap-6", relations.length > 0 && "lg:grid-cols-[340px_minmax(0,1fr)]")}>
-      <Card className={cn("relative", relations.length === 0 && "max-w-3xl")}>
+    <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <Card className="relative">
         {can.includes("update") && (
           <Button asChild variant="ghost" size="icon-sm" className="absolute top-4 right-4 text-muted-foreground" aria-label={t("edit")}>
             <Link to={`/${meta.name}/${r.id}/edit` as never}>
@@ -193,33 +204,38 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
               <p className="text-sm text-muted-foreground">{capitalize(meta.singular)}</p>
             </div>
           </div>
-          <dl className={cn("grid gap-5", relations.length === 0 && "sm:grid-cols-2")}>{fields.map(value)}</dl>
+          {summary.length > 0 && <dl className="grid gap-5">{summary.map(value)}</dl>}
           {buttons}
         </CardContent>
       </Card>
-      {relations.length > 0 && (
-        <Card className="py-0">
-          <Tabs defaultValue={`${relations[0].resource.meta.name}-${relations[0].param}`} className="gap-0">
-            <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b border-border bg-transparent px-5 pt-3 pb-0">
-              {relations.map((rel) => (
-                <TabsTrigger
-                  key={`${rel.resource.meta.name}-${rel.param}`}
-                  value={`${rel.resource.meta.name}-${rel.param}`}
-                  className="flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-1 pb-3 font-semibold text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent"
-                >
-                  {rel.label ?? rel.resource.meta.label}
-                  <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
-                </TabsTrigger>
-              ))}
-            </TabsList>
+      <Card className="py-0">
+        <Tabs defaultValue={"details"} className="gap-0">
+          <TabsList variant="line" className="px-6 pt-4">
+            <TabsTrigger value="details">
+              {t("details")}
+            </TabsTrigger>
             {relations.map((rel) => (
-              <TabsContent key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`} className="p-5">
-                <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
-              </TabsContent>
+              <TabsTrigger key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`}>
+                {rel.label ?? rel.resource.meta.label}
+                <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
+              </TabsTrigger>
             ))}
-          </Tabs>
-        </Card>
-      )}
+          </TabsList>
+          <TabsContent value="details" className="flex flex-col gap-8 p-6">
+            {groups.map((g, i) => (
+              <section key={g.title ?? i} className="flex flex-col gap-5">
+                {g.title && <h2 className="text-base font-bold text-foreground">{g.title}</h2>}
+                <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">{g.fields.map(value)}</dl>
+              </section>
+            ))}
+          </TabsContent>
+          {relations.map((rel) => (
+            <TabsContent key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`} className="p-5">
+              <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
+            </TabsContent>
+          ))}
+        </Tabs>
+      </Card>
     </div>
   )
 }
@@ -236,5 +252,5 @@ function RelationCount({ resource, param, value }: { resource: Resource; param: 
     staleTime: 30_000,
   })
   if (typeof total.data !== "number") return null
-  return <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">{total.data}</span>
+  return <span className="rounded-full bg-muted px-2 py-0.5 text-xs leading-none font-semibold text-muted-foreground tabular-nums in-data-[state=active]:bg-primary/10 in-data-[state=active]:text-primary">{total.data}</span>
 }

@@ -295,7 +295,8 @@ export default resource(meta, {
 | `table.search`, `table.sort`, `table.select` | The search box, the first order, the checkboxes | as the API allows, `-created_at`, on |
 | `form` | The fields of the form | every field |
 | `sections` | The form's cards: `{title, description, fields, side}`; `side` puts one in the narrower column at the right | details at the left; media and filing at the right |
-| `show` | The fields of a record's page | every field but images, and when it was created and changed |
+| `show` | The fields of a record's page, in its Details tab (in the form's sections, when it has them) | every field but images, and when it was created and changed |
+| `summary` | The fields beside the picture, atop the buttons | the first four short ones but the title |
 | `title` | What a record is called, in titles, the breadcrumb and pickers | the first field |
 | `subtitle` | A second line under each name in the list: a field or a function | the first relation |
 | `image` | A record's picture, in lists and atop its page | its first image field, else its initials |
