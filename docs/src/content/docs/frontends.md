@@ -331,8 +331,10 @@ add to the page.
 A file in `src/pages/_app/` is a page behind the sign-in. The kit's parts
 are yours to use there: `PageHeader`, `Dashboard`, the charts, and
 `Settings`, sections in a menu at the left, the one chosen kept in the URL,
-which the account page is made of. `ask` asks before what cannot be undone
-(`await ask("Archive it?", { destructive: true, description: "…", confirm: "Archive" })`),
+which the account page is made of. `ask` asks before acting, with an icon
+of its `kind` (`info`, `success`, `warning`, `danger`; `destructive` is a
+danger), a `description` and the button's name
+(`await ask("Archive it?", { kind: "warning", description: "…", confirm: "Archive" })`),
 and `toast` tells what happened (`toast("Archived")`, `toast(text, "error")`).
 
 The account page is made of:
