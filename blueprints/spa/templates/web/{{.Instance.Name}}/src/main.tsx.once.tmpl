@@ -1,6 +1,7 @@
 // The start of the {{.Instance.Name}} frontend: yours to change.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRouter, RouterProvider } from "@tanstack/react-router"
+import { ThemeProvider } from "next-themes"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { isApiError } from "@api"
@@ -8,15 +9,6 @@ import { base } from "./esquadro/config.ts"
 import { sessionQuery } from "./esquadro/kit/auth.tsx"
 import { routeTree } from "./esquadro/routeTree.gen.ts"
 import "./theme.css"
-
-// The theme the person chose, or the system's.
-try {
-  const theme = localStorage.getItem("theme")
-  const dark = theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
-  document.documentElement.classList.toggle("dark", dark)
-} catch {
-  // Storage may be refused: the system's theme it is.
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,8 +45,11 @@ declare module "@tanstack/react-router" {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    {/* The theme: light, dark or the system's, kept in this browser. */}
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

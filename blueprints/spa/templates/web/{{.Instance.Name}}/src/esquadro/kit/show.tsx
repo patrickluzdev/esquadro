@@ -2,16 +2,19 @@
 // value is shown (yours too, from src/fields.ts).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
+import { Pencil, Trash2 } from "lucide-react"
 import { fields as yours } from "@/fields.ts"
-import { Badge } from "@/components/ui/badge.tsx"
-import { Button } from "@/components/ui/button.tsx"
-import { Card } from "@/components/ui/card.tsx"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "../api.ts"
+import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { format, t } from "./i18n.ts"
-import { resources } from "../resources.gen.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
+import { PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
 
@@ -20,16 +23,17 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
   const value = record[field.name]
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.show) return <>{own.show(value, record)}</>
-  if (field.kind === "enum" && value) return <Badge>{String(value)}</Badge>
+  if (field.kind === "enum" && value) return <Badge variant="secondary">{String(value)}</Badge>
+  if (field.kind === "bool") return <Badge variant={value ? "default" : "outline"}>{format(field, value)}</Badge>
   if (field.kind === "relation" && value) {
     const related = record[field.name.replace(/_id$/, "")] as Rec | undefined
     if (related && field.display) return <>{String(related[field.display] ?? related.id)}</>
     return <RelationValue field={field} id={String(value)} />
   }
+  if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">—</span>
   return <>{format(field, value)}</>
 }
 
-/** A record of the resource; none without an id (a create). */
 /** A related record, by the field it is shown by: fetched once, then cached. */
 function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
@@ -39,18 +43,21 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
     enabled: target !== undefined,
     staleTime: 60_000,
   })
+  if (related.isPending && target) return <Skeleton className="inline-block h-4 w-24 align-middle" />
   const shown = related.data?.[field.display ?? "id"]
   if (shown === undefined || shown === null) return <span className="text-muted-foreground">{id.slice(0, 8)}</span>
-  if (target) {
-    return (
-      <Link to={`/${target.name}/${id}` as never} className="underline" onClick={(e) => e.stopPropagation()}>
-        {String(shown)}
-      </Link>
-    )
-  }
-  return <>{String(shown)}</>
+  return (
+    <Link
+      to={`/${target.name}/${id}` as never}
+      className="font-medium underline-offset-4 hover:underline"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {String(shown)}
+    </Link>
+  )
 }
 
+/** A record of the resource; none without an id (a create). */
 export function useRecord(resource: Resource, id: string | undefined) {
   return useQuery({
     queryKey: [resource.meta.name, "get", id],
@@ -73,59 +80,77 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
     },
     onError: (e) => toast(describe(e), "error"),
   })
-  if (record.isPending) return <div className="h-32 animate-pulse rounded-lg bg-muted" />
-  if (record.isError) return <p className="text-destructive">{describe(record.error)}</p>
+  if (record.isPending) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    )
+  }
+  if (record.isError) return <p className="text-sm text-destructive">{describe(record.error)}</p>
   const r = record.data
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-xl font-semibold">{title}</h1>
-        {resource.actions?.filter((a) => !a.when || a.when(r)).map((a) => (
-          <Button
-            key={a.label}
-            variant="outline"
-            onClick={async () => {
-              if (a.confirm && !(await ask(a.confirm))) return
-              try {
-                await a.run(r)
-                toast(t("done"))
-                queryClient.invalidateQueries({ queryKey: [meta.name] })
-              } catch (e) {
-                toast(describe(e), "error")
-              }
-            }}
-          >
-            {a.label}
-          </Button>
-        ))}
-        {can.includes("update") && (
-          <Button variant="outline" asLink>
-            <Link to={`/${meta.name}/${r.id}/edit` as never}>{t("edit")}</Link>
-          </Button>
-        )}
-        {can.includes("delete") && (
-          <Button
-            variant="destructive"
-            disabled={remove.isPending}
-            onClick={async () => (await ask(t("confirmDelete"))) && remove.mutate(r)}
-          >
-            {t("delete")}
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={title}
+        description={meta.singular}
+        actions={
+          <>
+            {resource.actions
+              ?.filter((a) => !a.when || a.when(r))
+              .map((a) => (
+                <Button
+                  key={a.label}
+                  variant="outline"
+                  onClick={async () => {
+                    if (a.confirm && !(await ask(a.confirm))) return
+                    try {
+                      await a.run(r)
+                      toast(t("done"))
+                      queryClient.invalidateQueries({ queryKey: [meta.name] })
+                    } catch (e) {
+                      toast(describe(e), "error")
+                    }
+                  }}
+                >
+                  {a.label}
+                </Button>
+              ))}
+            {can.includes("update") && (
+              <Button variant="outline" asChild>
+                <Link to={`/${meta.name}/${r.id}/edit` as never}>
+                  <Pencil /> {t("edit")}
+                </Link>
+              </Button>
+            )}
+            {can.includes("delete") && (
+              <Button
+                variant="destructive"
+                disabled={remove.isPending}
+                onClick={async () => (await ask(t("confirmDelete"), { destructive: true })) && remove.mutate(r)}
+              >
+                <Trash2 /> {t("delete")}
+              </Button>
+            )}
+          </>
+        }
+      />
       <Card>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          {(resource.show ?? resource.form).map((f) => (
-            <div key={f.name}>
-              <dt className="text-sm text-muted-foreground">{f.label}</dt>
-              <dd>
-                <FieldValue field={f} record={r} />
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <CardContent>
+          <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            {(resource.show ?? resource.form).map((f) => (
+              <div key={f.name} className="space-y-1">
+                <dt className="text-sm text-muted-foreground">{f.label}</dt>
+                <dd className="text-sm font-medium">
+                  <FieldValue field={f} record={r} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </CardContent>
       </Card>
     </div>
   )
