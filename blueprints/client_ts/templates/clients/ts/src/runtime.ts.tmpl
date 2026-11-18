@@ -84,6 +84,12 @@ export class Transport {
   readonly #options: ClientOptions
   /** The CSRF token sent with changes, in cookie mode. */
   csrf: string | undefined
+  /**
+   * Fetches the session's CSRF token, in cookie mode: a change refused for
+   * the lack of it (a session open in this browser, never read by this
+   * page) is sent once more after it.
+   */
+  refreshCsrf: (() => Promise<void>) | undefined
 
   constructor(options: ClientOptions) {
     this.#options = options
@@ -97,6 +103,17 @@ export class Transport {
 
   /** Sends a request and answers its JSON body, or throws an ApiError. */
   async request<T>(method: string, path: string, init: RequestOptions = {}): Promise<T> {
+    try {
+      return await this.#send<T>(method, path, init)
+    } catch (e) {
+      // Refused before anything was done: safe to send again.
+      if (!(e instanceof ApiError && e.code === "csrf" && method !== "GET" && this.refreshCsrf)) throw e
+      await this.refreshCsrf().catch(() => undefined)
+      return this.#send<T>(method, path, init)
+    }
+  }
+
+  async #send<T>(method: string, path: string, init: RequestOptions): Promise<T> {
     const o = this.#options
     const url = new URL(path, o.baseUrl)
     for (const [key, value] of Object.entries(init.query ?? {})) {

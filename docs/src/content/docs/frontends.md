@@ -130,6 +130,11 @@ With `idle_minutes`, the frontend signs out after that long without use
 (in any of its tabs), warning a minute before, and comes back to the page
 after signing in again.
 
+The pages before signing in (signing in, a forgotten password, a new one,
+an email confirmed, no access) share one frame, `src/components/auth-frame.tsx`:
+the brand, or how it ended (`tone`: success, error, info, forbidden), a
+title, a hint and a way back to signing in. A link that expired says so.
+
 The settings page (`/settings`, from the account's menu) changes the
 password, lists the devices signed in and signs out of one or of all the
 others, changes the email with a link to the new one, and picks the theme. What changes an account needs a recent

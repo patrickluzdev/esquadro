@@ -140,4 +140,9 @@
   h3 {
     @apply font-bold tracking-tight;
   }
+  /* The panel shows a password with its own button: not the browser's too. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
 }

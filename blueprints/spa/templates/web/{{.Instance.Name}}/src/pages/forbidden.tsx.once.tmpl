@@ -1,36 +1,29 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { ShieldX } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { AuthFrame } from "@/components/auth-frame"
 import { signOut } from "../esquadro/kit/auth.tsx"
 import { t } from "../esquadro/kit/i18n.ts"
 
+// Signed in, with no role this panel lets in: out, to sign in with another
+// account.
 export const Route = createFileRoute("/forbidden")({ component: Forbidden })
 
 function Forbidden() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   return (
-    <Empty className="min-h-svh">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ShieldX />
-        </EmptyMedia>
-        <EmptyTitle>{t("forbidden")}</EmptyTitle>
-        <EmptyDescription>{t("forbiddenPage")}</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button
-          variant="outline"
-          onClick={async () => {
-            await signOut(queryClient)
-            navigate({ to: "/login", search: { redirect: undefined } })
-          }}
-        >
-          {t("signOut")}
-        </Button>
-      </EmptyContent>
-    </Empty>
+    <AuthFrame tone="forbidden" title={t("noAccess")} hint={t("forbiddenPage")}>
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={async () => {
+          await signOut(queryClient)
+          navigate({ to: "/login", search: { redirect: undefined } })
+        }}
+      >
+        {t("signInAnother")}
+      </Button>
+    </AuthFrame>
   )
 }

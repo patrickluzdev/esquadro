@@ -12,6 +12,7 @@ export function describe(e: unknown): string {
     if (e.code === "precondition_failed") return t("conflict")
     if (e.code === "reauthentication_required") return t("reauthenticate")
     if (e.code === "invalid_fields") return t("fixFields")
+    if (e.code === "invalid_link") return t("invalidLink")
     if (e.status === 400) return t("badRequest")
     if (e.status === 401) return t("sessionEnded")
     if (e.status === 403) return t("forbidden")

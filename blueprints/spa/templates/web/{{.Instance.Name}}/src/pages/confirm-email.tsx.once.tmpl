@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
-import { MailCheck, MailX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { AuthFrame } from "@/components/auth-frame"
 import { account } from "../esquadro/kit/account.tsx"
 import { describe } from "../esquadro/kit/errors.ts"
 import { t } from "../esquadro/kit/i18n.ts"
-import { StateView } from "../esquadro/kit/states.tsx"
 
 // The page the email change's link opens, with its ?token.
 export const Route = createFileRoute("/confirm-email")({
@@ -19,23 +18,20 @@ function Confirm() {
   const confirm = useQuery({ queryKey: ["confirm-email", token], queryFn: () => account().confirmEmail(token).then(() => true), retry: false })
   if (confirm.isPending) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
+      <div className="flex min-h-svh items-center justify-center bg-card">
         <Spinner className="size-6" />
       </div>
     )
   }
   return (
-    <StateView
-      className="min-h-svh"
-      tone={confirm.isError ? "error" : "default"}
-      icon={confirm.isError ? <MailX /> : <MailCheck />}
+    <AuthFrame
+      tone={confirm.isError ? "error" : "success"}
       title={confirm.isError ? t("emailNotConfirmed") : t("emailConfirmed")}
-      description={confirm.isError ? describe(confirm.error) : undefined}
-      action={
-        <Button asChild variant="outline">
-          <Link to="/">{t("home")}</Link>
-        </Button>
-      }
-    />
+      hint={confirm.isError ? describe(confirm.error) : t("emailConfirmedHint")}
+    >
+      <Button asChild size="lg" className="w-full">
+        <Link to="/">{t("goHome")}</Link>
+      </Button>
+    </AuthFrame>
   )
 }

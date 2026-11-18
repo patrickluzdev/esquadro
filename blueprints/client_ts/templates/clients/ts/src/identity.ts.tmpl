@@ -44,6 +44,11 @@ function realm(t: Transport, path: string, cookie: boolean) {
     if (cookie && s.csrf_token) t.csrf = s.csrf_token
     return s
   }
+  if (cookie) {
+    t.refreshCsrf ??= async () => {
+      keep(await t.request<Session>("GET", `${path}/session`))
+    }
+  }
   return {
     /** Signs in, as a cookie or, with a token client, answering session_token. */
     signIn: async (c: Credentials) => keep(await t.request<Session>("POST", `${path}/sign-in`, { body: { ...c, cookie } })),
