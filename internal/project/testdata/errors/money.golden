@@ -50,4 +50,16 @@ money.esq:14:17: error: pattern is not allowed on money fields
    |                 ^^^^^^^
    = help: pattern applies to string and text
 
-9 errors
+money.esq:18:18: error: money needs the app's currency
+   |
+18 |   total          money
+   |                  ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:19:3: error: field total_currency clashes with the currency column total_currency of money field total
+   |
+19 |   total_currency string
+   |   ^^^^^^^^^^^^^^
+   = help: remove it: the money field already stores its currency
+
+11 errors

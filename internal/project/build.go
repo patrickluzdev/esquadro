@@ -1192,6 +1192,19 @@ func (b *builder) checkMemberClashes(e *Entity) {
 		}
 		seen[f.Snake] = member{"field", f.Raw, f.Pos}
 	}
+	// A money field also stores its currency, in <field>_currency.
+	for _, f := range e.Fields {
+		if f.Type != TypeMoney {
+			continue
+		}
+		col := f.Snake + "_currency"
+		if prev, ok := seen[col]; ok {
+			b.diags.Errorf(prev.pos, nameEnd(prev.pos, prev.raw), "field %s clashes with the currency column %s of money field %s", prev.raw, col, f.Raw).
+				Suggestion = "remove it: the money field already stores its currency"
+			continue
+		}
+		seen[col] = member{"currency of", f.Raw, f.Pos}
+	}
 	for _, r := range e.Relations {
 		if r.Inferred {
 			continue

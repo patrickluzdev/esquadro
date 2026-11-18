@@ -46,8 +46,10 @@ var rangeTypes = map[project.Type][3]string{
 	project.TypeInt:     {"integer", "int", "postgres.Int4"},
 	project.TypeInt64:   {"bigint", "int64", "postgres.Int8"},
 	project.TypeDecimal: {"numeric", "decimal.Decimal", "postgres.Numeric"},
-	project.TypeDate:    {"date", "time.Time", "postgres.Date"},
-	project.TypeTime:    {"timestamptz", "time.Time", "postgres.Timestamptz"},
+	// A money field's range is on its amount, whatever the currency.
+	project.TypeMoney: {"numeric", "decimal.Decimal", "postgres.Numeric"},
+	project.TypeDate:  {"date", "time.Time", "postgres.Date"},
+	project.TypeTime:  {"timestamptz", "time.Time", "postgres.Timestamptz"},
 }
 
 // ListFilters are the filters of e's lists: by creation, always, then the
@@ -104,6 +106,8 @@ func ListSorts(e *project.Entity, opts map[string]any) []ListSort {
 			s.Cast, s.Value = "bigint", "strconv.FormatInt("+x+", 10)"
 		case project.TypeDecimal:
 			s.Cast, s.Value = "numeric", x+".String()"
+		case project.TypeMoney:
+			s.Cast, s.Value = "numeric", x+".Number()"
 		case project.TypeDate:
 			s.Cast, s.Value = "date", x+".Format(time.DateOnly)"
 		case project.TypeTime:

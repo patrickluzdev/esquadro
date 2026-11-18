@@ -1,9 +1,18 @@
 // Package {{.Module.Snake}} holds{{range $i, $e := .Module.Entities}}{{if $i}},{{end}} {{$e.Pascal}}{{end}}{{if .Module.Jobs}}{{if .Module.Entities}} and{{end}} the jobs{{range .Module.Jobs}} {{.Pascal}}{{end}}{{end}}{{if .Module.Reports}}{{if or .Module.Entities .Module.Jobs}} and{{end}} the reports{{range .Module.Reports}} {{.Pascal}}{{end}}{{end}}{{if not (or .Module.Entities .Module.Jobs .Module.Reports)}} its enums{{end}}.
 package {{.Module.Snake}}
+{{- $money := false}}{{range .Module.Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- range .Module.Jobs}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 
 
 import (
+{{- if $money}}
+	"strings"
+{{- end}}
 	"uuid"
+{{- if $money}}
+
+	"github.com/bojanz/currency"
+{{- end}}
 {{- with slot "domain.module.imports" .}}
 {{.}}
 {{- end}}
@@ -16,9 +25,9 @@ var (
 {{- end}}
 
 // FieldError is a field the module refuses, with a code that says why:
-// required, too_short, too_long, too_small, too_large, pattern,
-// invalid_value, not_found (a related record that does not exist) or taken
-// (a unique value already used).
+// required, too_short, too_long, too_small, too_large, too_precise (an
+// amount with more than four places), pattern, invalid_value, not_found (a
+// related record that does not exist) or taken (a unique value already used).
 type FieldError struct{ Field, Code string }
 
 // InvalidFields is a value the module refuses, field by field.
@@ -46,3 +55,32 @@ func New(deps Deps) *{{.Module.Pascal}} {
 	}
 	return &{{.Module.Pascal}}{Deps: deps}
 }
+{{- if $money}}
+
+// moneyFits reports whether an amount fits where it is stored: four places
+// at most.
+func moneyFits(a currency.Amount) bool {
+	_, places, ok := strings.Cut(a.Number(), ".")
+	return !ok || len(strings.TrimRight(places, "0")) <= 4
+}
+
+// mustMoney is an amount known to be valid: a default, a test's value.
+func mustMoney(n, code string) currency.Amount {
+	a, err := currency.NewAmount(n, code)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
+
+// moneyCmp compares an amount with a bound, taken in the amount's currency:
+// -1, 0 or 1.
+func moneyCmp(a currency.Amount, bound string) int {
+	b, err := currency.NewAmount(bound, a.CurrencyCode())
+	if err != nil {
+		return 0
+	}
+	c, _ := a.Cmp(b)
+	return c
+}
+{{- end}}

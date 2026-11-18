@@ -70,6 +70,8 @@ type column struct {
 	// generated is the expression of a column PostgreSQL computes and
 	// stores (GENERATED ALWAYS AS ... STORED), or "".
 	generated string
+	// check is the column's CHECK expression, or "".
+	check string
 }
 
 type foreignKey struct {
@@ -92,11 +94,13 @@ var sqlTypes = map[project.Type]string{
 	project.TypeInt:     "integer",
 	project.TypeInt64:   "bigint",
 	project.TypeDecimal: "numeric",
-	project.TypeBool:    "boolean",
-	project.TypeTime:    "timestamptz",
-	project.TypeDate:    "date",
-	project.TypeUUID:    "uuid",
-	project.TypeJSON:    "jsonb",
+	// Four places: prices finer than a cent.
+	project.TypeMoney: "numeric(19,4)",
+	project.TypeBool:  "boolean",
+	project.TypeTime:  "timestamptz",
+	project.TypeDate:  "date",
+	project.TypeUUID:  "uuid",
+	project.TypeJSON:  "jsonb",
 }
 
 // annotation returns a postgres annotation value of a node, or "".
@@ -105,6 +109,19 @@ func annotation(a project.Ann, key string) string {
 		return v
 	}
 	return ""
+}
+
+// currencyColumn is the currency of a money column: <column>_currency, an
+// ISO 4217 code, the app's by default.
+func currencyColumn(d project.Description, amount column) column {
+	name := amount.name + "_currency"
+	c := column{name: name, sqlType: "char(3)", notNull: amount.notNull, check: postgres.Ident(name) + " ~ '^[A-Z]{3}$'"}
+	// Required, it takes the app's currency in the rows already there;
+	// optional, it is empty with its amount.
+	if amount.notNull && d.App.Currency != "" {
+		c.def = "'" + d.App.Currency + "'"
+	}
+	return c
 }
 
 // tableName is the entity's table: @postgres(table ...) or its plural.
@@ -259,6 +276,9 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 		}
 		t.columns = append(t.columns, c)
 		columns[f.Raw] = c.name
+		if f.Type == project.TypeMoney {
+			t.columns = append(t.columns, currencyColumn(l.d, c))
+		}
 	}
 	for _, r := range e.Relations {
 		if !r.OwnsKey {
@@ -438,7 +458,7 @@ func defaultSQL(f project.FieldDescription) string {
 		return "now()"
 	}
 	switch f.Type {
-	case project.TypeInt, project.TypeInt64, project.TypeDecimal, project.TypeBool:
+	case project.TypeInt, project.TypeInt64, project.TypeDecimal, project.TypeMoney, project.TypeBool:
 		return def.Text
 	case project.TypeJSON:
 		return quoteLiteral(def.Text) + "::jsonb"

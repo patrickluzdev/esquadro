@@ -1,7 +1,8 @@
-{{- $decimal := false}}{{range .Entities}}{{if needs . "decimal"}}{{$decimal = true}}{{end}}{{end -}}
+{{- $decimal := false}}{{range .Entities}}{{if or (needs . "decimal") (needs . "money")}}{{$decimal = true}}{{end}}{{end -}}
+{{- $money := false}}{{range .Entities}}{{if needs . "money"}}{{$money = true}}{{end}}{{end -}}
 package postgres
 
-{{importBlock "errors" "time" "uuid" "github.com/jackc/pgx/v5/pgconn" "github.com/jackc/pgx/v5/pgtype" (and $decimal "github.com/shopspring/decimal")}}
+{{importBlock "errors" "time" "uuid" (and $money "strings") "github.com/jackc/pgx/v5/pgconn" "github.com/jackc/pgx/v5/pgtype" (and $decimal "github.com/shopspring/decimal") (and $money "github.com/bojanz/currency")}}
 // In optional columns, the empty value of a Go type stands for NULL: an
 // empty string, a zero time. Numbers and booleans are always stored, since
 // their zero is a value.
@@ -87,3 +88,40 @@ func Violation(err error) (constraint, kind string, ok bool) {
 	}
 	return "", "", false
 }
+{{- if $money}}
+
+// MoneyAmount is the number of a, as its amount column takes it: NULL when
+// a has no currency (an empty money field).
+func MoneyAmount(a currency.Amount) pgtype.Numeric {
+	if a.CurrencyCode() == "" {
+		return pgtype.Numeric{}
+	}
+	var n pgtype.Numeric
+	if err := n.Scan(a.Number()); err != nil {
+		return pgtype.Numeric{}
+	}
+	return n
+}
+
+// Money is the amount its two columns hold, exactly: the zero Amount (no
+// currency) when they are NULL.
+func Money(n pgtype.Numeric, code string) currency.Amount {
+	v, err := n.Value()
+	if err != nil {
+		return currency.Amount{}
+	}
+	s, ok := v.(string)
+	if !ok || code == "" {
+		return currency.Amount{}
+	}
+	// numeric(19,4) answers 19.9000: the places it pads are not the amount's.
+	if strings.Contains(s, ".") {
+		s = strings.TrimRight(strings.TrimRight(s, "0"), ".")
+	}
+	a, err := currency.NewAmount(s, code)
+	if err != nil {
+		return currency.Amount{}
+	}
+	return a
+}
+{{- end}}

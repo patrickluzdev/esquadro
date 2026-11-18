@@ -201,8 +201,17 @@ func alterTable(s *steps, from, to table) {
 			continue
 		}
 		if prev.sqlType != c.sqlType {
-			s.todo("change %s.%s from %s to %s: write the conversion by hand", q, c.name, prev.sqlType, c.sqlType)
-			continue
+			if note, ok := convertible(prev.sqlType, c.sqlType); ok {
+				stmt := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s;", q, postgres.Ident(c.name), c.sqlType)
+				if note != "" {
+					stmt = "-- " + note + "\n" + stmt
+				}
+				s.alterColumns = append(s.alterColumns, stmt)
+				s.labels = append(s.labels, "change_"+to.name+"_"+c.name)
+			} else {
+				s.todo("change %s.%s from %s to %s: write the conversion by hand", q, c.name, prev.sqlType, c.sqlType)
+				continue
+			}
 		}
 		if prev.notNull != c.notNull {
 			verb := "DROP"
@@ -299,6 +308,19 @@ func idents(names []string) string {
 	return strings.Join(out, ", ")
 }
 
+// convertible reports whether PostgreSQL converts a column from one type to
+// another by itself (a decimal becoming money, and back), with a note for
+// what the conversion may change.
+func convertible(from, to string) (string, bool) {
+	switch {
+	case from == "numeric" && to == "numeric(19,4)":
+		return "Rounds amounts to four places, and fails on amounts of more than 15 digits before the point.", true
+	case from == "numeric(19,4)" && to == "numeric":
+		return "", true
+	}
+	return "", false
+}
+
 func columnSQL(c column) string {
 	s := postgres.Ident(c.name) + " " + c.sqlType
 	if c.generated != "" {
@@ -309,6 +331,9 @@ func columnSQL(c column) string {
 	}
 	if c.def != "" {
 		s += " DEFAULT " + c.def
+	}
+	if c.check != "" {
+		s += " CHECK (" + c.check + ")"
 	}
 	return s
 }

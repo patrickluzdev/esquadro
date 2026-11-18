@@ -205,6 +205,8 @@ func sqlcIn(f *project.Field, expr string) string {
 		return expr
 	case project.TypeDecimal:
 		return "postgres.Numeric(" + expr + ")"
+	case project.TypeMoney:
+		return "postgres.MoneyAmount(" + expr + ")"
 	case project.TypeBool:
 		if null {
 			return "postgres.Bool(" + expr + ")"
@@ -252,6 +254,13 @@ func sqlcOut(f *project.Field, expr string) string {
 		return expr
 	case project.TypeDecimal:
 		return "postgres.Decimal(" + expr + ")"
+	case project.TypeMoney:
+		// expr is the amount's column (row.Price); its currency is beside it.
+		code := expr + "Currency"
+		if null {
+			code += ".String"
+		}
+		return "postgres.Money(" + expr + ", " + code + ")"
 	case project.TypeBool:
 		if null {
 			return expr + ".Bool"
@@ -286,6 +295,8 @@ func needs(e *project.Entity, what string) bool {
 			return true
 		case what == "decimal" && f.Type == project.TypeDecimal:
 			return true
+		case what == "money" && f.Type == project.TypeMoney:
+			return true
 		}
 	}
 	return false
@@ -305,11 +316,21 @@ type Writable struct {
 	Column, Param, GoParam string
 	Field                  *project.Field
 	Relation               *project.Relation
+	// Currency marks the currency column of a money field, written after
+	// its amount's.
+	Currency bool
 }
 
 // In converts the domain value of the column, read from the struct named
 // v (a NewX), to sqlc's parameter.
 func (w Writable) In(v string) string {
+	if w.Currency {
+		code := v + "." + w.Field.Pascal + ".CurrencyCode()"
+		if nullable(w.Field) {
+			return "postgres.Text(" + code + ")"
+		}
+		return code
+	}
 	if w.Field != nil {
 		return sqlcIn(w.Field, v+"."+w.Field.Pascal)
 	}
@@ -326,6 +347,10 @@ func writable(e *project.Entity) []Writable {
 		}
 		c := pgColumn(f)
 		out = append(out, Writable{Column: postgres.Ident(c), Param: c, GoParam: names(c).Pascal, Field: f})
+		if f.Type == project.TypeMoney {
+			cc := c + "_currency"
+			out = append(out, Writable{Column: postgres.Ident(cc), Param: cc, GoParam: names(cc).Pascal, Field: f, Currency: true})
+		}
 	}
 	for _, r := range e.Relations {
 		if r.OwnsForeignKey() {
@@ -439,6 +464,14 @@ func sample(f *project.Field, pkg, i string) string {
 			n = f.Max.Text
 		}
 		return `decimal.RequireFromString("` + n + `")`
+	case project.TypeMoney:
+		n := "1"
+		if f.Min != nil {
+			n = f.Min.Text
+		} else if f.Max != nil && f.Max.Value < 1 {
+			n = f.Max.Text
+		}
+		return `func() currency.Amount { a, _ := currency.NewAmount("` + n + `", "USD"); return a }()`
 	case project.TypeBool:
 		return "true"
 	case project.TypeTime, project.TypeDate:
@@ -493,6 +526,8 @@ func SampleImports(fields []*project.Field) []string {
 			add("strings")
 		case strings.HasPrefix(s, "decimal."):
 			add("github.com/shopspring/decimal")
+		case strings.HasPrefix(s, "func() currency."):
+			add("github.com/bojanz/currency")
 		case strings.HasPrefix(s, "time."):
 			add("time")
 		case strings.HasPrefix(s, "json."):

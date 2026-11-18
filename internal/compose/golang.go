@@ -19,6 +19,7 @@ var goTypes = map[project.Type]string{
 	project.TypeInt:     "int",
 	project.TypeInt64:   "int64",
 	project.TypeDecimal: "decimal.Decimal",
+	project.TypeMoney:   "currency.Amount",
 	project.TypeBool:    "bool",
 	project.TypeTime:    "time.Time",
 	project.TypeDate:    "time.Time",
@@ -29,6 +30,7 @@ var goTypes = map[project.Type]string{
 // goImportOf is the import each Go type needs.
 var goImportOf = map[project.Type]string{
 	project.TypeDecimal: "github.com/shopspring/decimal",
+	project.TypeMoney:   "github.com/bojanz/currency",
 	project.TypeTime:    "time",
 	project.TypeDate:    "time",
 	project.TypeJSON:    "encoding/json",

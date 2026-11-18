@@ -13,3 +13,8 @@ entity Product {
   fee     money default(1.5)
   tax     money pattern("x")
 }
+
+entity Order {
+  total          money
+  total_currency string
+}

@@ -16,4 +16,5 @@ blueprint domain {
   slot "domain.deps.values"
 
   go_require "github.com/shopspring/decimal" "v1.4.0"
+  go_require "github.com/bojanz/currency" "v1.5.1"
 }

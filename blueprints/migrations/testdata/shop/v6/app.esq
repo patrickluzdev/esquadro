@@ -1,0 +1,11 @@
+app shop {
+  module "github.com/example/shop"
+  currency BRL
+  blueprint app
+  blueprint domain
+  blueprint postgres
+  blueprint migrations
+  blueprint store {
+    search_language portuguese
+  }
+}

@@ -75,7 +75,7 @@ func (c {{$e.Pascal}}Changes) Empty() bool {
 	return {{$first := true}}{{range $e.Fields}}{{if not .Implicit}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{if $first}}true{{end}}
 }
 {{- $defaults := false}}
-{{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end}}
+{{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date") (eq .Type "money"))}}{{$defaults = true}}{{end}}{{end}}
 {{- if $defaults}}
 
 // WithDefaults fills the fields left empty with the defaults declared for
@@ -101,6 +101,10 @@ func (n New{{$e.Pascal}}) WithDefaults() New{{$e.Pascal}} {
 {{- else if and (or (eq .Type "time") (eq .Type "date")) (eq .Default.Text "now")}}
 	if {{$x}}.IsZero() {
 		{{$x}} = time.Now()
+	}
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() == "" {
+		{{$x}} = mustMoney({{quote .Default.Text}}, {{quote $.App.Currency}})
 	}
 {{- end}}
 {{- end}}{{end}}
@@ -136,6 +140,10 @@ func (n New{{$e.Pascal}}) Validate() error {
 	}
 {{- else if eq .Type "json"}}
 	if len({{$x}}) == 0 {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() == "" {
 		refuse({{quote .Snake}}, "required")
 	}
 {{- end}}
@@ -178,6 +186,22 @@ func (n New{{$e.Pascal}}) Validate() error {
 		refuse({{quote .Snake}}, "too_large")
 	}
 {{- end}}
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() != "" {
+		if !moneyFits({{$x}}) {
+			refuse({{quote .Snake}}, "too_precise")
+		}
+{{- if .Min}}
+		if moneyCmp({{$x}}, {{quote .Min.Text}}) < 0 {
+			refuse({{quote .Snake}}, "too_small")
+		}
+{{- end}}
+{{- if .Max}}
+		if moneyCmp({{$x}}, {{quote .Max.Text}}) > 0 {
+			refuse({{quote .Snake}}, "too_large")
+		}
+{{- end}}
+	}
 {{- else if eq .Type "enum"}}
 	if {{$x}} != "" && !{{$x}}.Valid() {
 		refuse({{quote .Snake}}, "invalid_value")
