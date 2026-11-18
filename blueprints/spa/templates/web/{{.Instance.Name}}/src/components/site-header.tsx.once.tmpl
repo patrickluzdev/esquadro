@@ -1,6 +1,6 @@
-{{- $mode := or .Options.sidebar "icon" -}}
-// The top of the signed-in pages (shadcn/ui's block {{if eq $mode "dashboard"}}dashboard-01{{else if eq $mode "inset"}}sidebar-08{{else}}sidebar-07{{end}}): the sidebar's
-// button, and where the page is. Yours to change.
+// The top of the signed-in pages: at the left the sidebar's button, the
+// search (Cmd+K) and where the page is; at the right the account. Yours to
+// change.
 import { Link } from "@tanstack/react-router"
 import { Fragment } from "react"
 import {
@@ -13,16 +13,19 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { UserMenu } from "@/components/user-menu"
 import { useCrumbs } from "../esquadro/kit/crumbs.ts"
 import { CommandPalette, PaletteButton } from "../esquadro/kit/palette.tsx"
 
 export function SiteHeader() {
   const crumbs = useCrumbs()
   return (
-    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/95 backdrop-blur-sm transition-[width,height] ease-linear">
-      <div className="flex w-full items-center gap-2 px-4 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center bg-card shadow-sm transition-[width,height] ease-linear">
+      <div className="flex w-full items-center gap-2 px-4">
+        <SidebarTrigger className="size-10 rounded-full text-muted-foreground hover:text-foreground [&_svg]:size-5!" />
+        {/* Cmd+K: pages, records and commands. */}
+        <PaletteButton />
+        <Separator orientation="vertical" className="mx-2 hidden data-[orientation=vertical]:h-5 md:block" />
         <Breadcrumb>
           <BreadcrumbList>
             {crumbs.map((c, i) => (
@@ -45,9 +48,8 @@ export function SiteHeader() {
             ))}
           </BreadcrumbList>
         </Breadcrumb>
-        {/* Cmd+K: pages, records and commands. */}
-        <div className="ml-auto">
-          <PaletteButton />
+        <div className="ml-auto flex items-center gap-1">
+          <UserMenu />
         </div>
         <CommandPalette />
       </div>

@@ -18,6 +18,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import { Spinner } from "@/components/ui/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { isGroup, menu } from "@/menu.ts"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
@@ -38,21 +39,25 @@ const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator
 /** The key that opens the palette, as this computer writes it. */
 export const paletteKey = mac ? "⌘K" : "Ctrl K"
 
-/** A button that opens the palette, for the header. */
+/** A button that opens the palette, for the header: its icon, the key on hover. */
 export function PaletteButton() {
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-8 w-full justify-start gap-2 text-muted-foreground sm:w-56"
-      onClick={openPalette}
-    >
-      <Search />
-      <span className="flex-1 text-left">{t("searchEverything")}</span>
-      <kbd className="pointer-events-none hidden h-5 items-center rounded border bg-muted px-1.5 font-mono text-[10px] sm:inline-flex">
-        {paletteKey}
-      </kbd>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-10 rounded-full text-muted-foreground hover:text-foreground [&_svg]:size-5!"
+          onClick={openPalette}
+          aria-label={t("searchEverything")}
+        >
+          <Search />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {t("searchEverything")} <kbd className="ml-1 font-mono">{paletteKey}</kbd>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -112,8 +117,17 @@ export function CommandPalette() {
   const pages = menu.main.flatMap((e) => (isGroup(e) ? e.items.map((i) => ({ ...i, group: e.label })) : [{ ...e, group: "" }]))
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} title={t("commandPalette")} description={t("paletteSearch")}>
-      <CommandInput placeholder={t("paletteSearch")} value={text} onValueChange={setText} />
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={t("commandPalette")}
+      description={t("paletteSearch")}
+      showCloseButton={false}
+      className="top-12 translate-y-0 rounded-2xl sm:max-w-lg [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-sm [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-foreground [&_[cmdk-input-wrapper]]:h-14 [&_[cmdk-item]]:gap-3 [&_[cmdk-item]]:rounded-lg [&_[cmdk-item]]:py-2 [&_[cmdk-item]]:font-semibold [&_[cmdk-item]>svg:first-child]:box-content [&_[cmdk-item]>svg:first-child]:size-4! [&_[cmdk-item]>svg:first-child]:rounded-md [&_[cmdk-item]>svg:first-child]:border [&_[cmdk-item]>svg:first-child]:border-border [&_[cmdk-item]>svg:first-child]:p-1.5 [&_[cmdk-list]]:max-h-[min(60vh,420px)] [&_[cmdk-list]]:pb-2"
+    >
+      <CommandInput placeholder={t("paletteSearch")} value={text} onValueChange={setText}>
+        <kbd className="pointer-events-none rounded-md border border-border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">Esc</kbd>
+      </CommandInput>
       <CommandList>
         <CommandEmpty>{searching ? <Spinner className="mx-auto" /> : t("noResults", { q: text })}</CommandEmpty>
         {searchable.map((r, i) => {

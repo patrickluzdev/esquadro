@@ -6,11 +6,9 @@ import { Link } from "@tanstack/react-router"
 import type { ComponentProps } from "react"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -46,9 +44,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         <NavMain items={menu.main} label={t("menu")} />
         <NavSecondary items={menu.secondary} className="mt-auto" />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser />
-      </SidebarFooter>
 {{- if eq $mode "icon"}}
       <SidebarRail />
 {{- end}}

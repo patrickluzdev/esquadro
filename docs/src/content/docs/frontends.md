@@ -69,11 +69,12 @@ blocks, chosen by `sidebar`:
 | `dashboard` | dashboard-01 | It slides away, wider, beside an inset page |
 
 Its files are yours (`src/components/app-sidebar.tsx`, `nav-main.tsx`,
-`nav-user.tsx`, `site-header.tsx`, `src/pages/_app.tsx`), written once: to
+`user-menu.tsx`, `site-header.tsx`, `src/pages/_app.tsx`), written once: to
 change the layout later, change them, or take another block from
-ui.shadcn.com/blocks. The header shows where the page is (a breadcrumb), and
-the account's menu has the theme (light, dark or the system's) and signing
-out.
+ui.shadcn.com/blocks. The header has, at the left, the sidebar's button, the
+search (it opens the command palette, as Cmd+K does) and where the page is (a
+breadcrumb); at the right, the account's avatar, whose menu has the account's
+page, the theme (light, dark or the system's) and signing out.
 
 In a list, `j` and `k` (or the arrows) move between records, `Enter` opens
 one, `e` edits it and `x` selects it; on a record, `e` edits and `Esc` goes
