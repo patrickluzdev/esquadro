@@ -2,7 +2,7 @@
   "name": "esquadro",
   "displayName": "Esquadro",
   "description": "Syntax highlighting, live errors and formatting for Esquadro's .esq files, and a panel for what esquadro gen would change and the conflicts it leaves.",
-  "version": "0.2.0",
+  "version": "0.8.0",
   "publisher": "patrickluzdev",
   "license": "Apache-2.0",
   "repository": {

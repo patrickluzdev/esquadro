@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -23,7 +24,7 @@ func TestCanaryUpgrades(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tag := strings.TrimSpace(gitOut(t, repo, "describe", "--tags", "--abbrev=0", "--match", "v*"))
+	tag := lastRelease(t, repo)
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +105,20 @@ func TestCanaryUpgrades(t *testing.T) {
 	e.run(nil, "go", "vet", "./...")
 	e.run(nil, "go", "test", "./...")
 	e.esquadro(0, "gen", "-check", dir)
+}
+
+// lastRelease is the newest release tag before this commit: not one on it,
+// as when CI runs for the release being made.
+func lastRelease(t *testing.T, repo string) string {
+	t.Helper()
+	here := strings.Fields(gitOut(t, repo, "tag", "--points-at", "HEAD", "--list", "v*"))
+	for _, tag := range strings.Fields(gitOut(t, repo, "tag", "--merged", "HEAD", "--list", "v*", "--sort=-v:refname")) {
+		if !slices.Contains(here, tag) && !strings.Contains(tag, "-") {
+			return tag
+		}
+	}
+	t.Fatal("no release before this commit")
+	return ""
 }
 
 func gitOut(t *testing.T, dir string, args ...string) string {
