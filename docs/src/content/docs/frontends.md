@@ -15,6 +15,7 @@ app shop {
     domain "admin.shop.com"      // or, without one, under /admin
     roles  [admin, staff]        // who of the realm may use it
     locale pt_br                 // en or pt_br
+    sidebar icon                 // icon, inset or dashboard
   }
 }
 ```
@@ -24,6 +25,26 @@ sign-in with the session cookie, a responsive layout with a light and a dark
 theme, and the app's binary serves its build. `task web:install` installs its
 packages, `task dev` runs the API and the frontend together, `task web:build`
 builds it.
+
+## The layout
+
+The frontend is built with [shadcn/ui](https://ui.shadcn.com): its
+components are copied into `src/components/ui`, yours to change, and
+`npx shadcn add <component>` adds more. The sidebar is one of shadcn/ui's
+blocks, chosen by `sidebar`:
+
+| `sidebar` | Block | What it is like |
+|---|---|---|
+| `icon` (default) | sidebar-07 | It collapses to its icons; groups open and close |
+| `inset` | sidebar-08 | The page is an inset card beside it |
+| `dashboard` | dashboard-01 | It slides away, wider, beside an inset page |
+
+Its files are yours (`src/components/app-sidebar.tsx`, `nav-main.tsx`,
+`nav-user.tsx`, `site-header.tsx`, `src/pages/_app.tsx`), written once: to
+change the layout later, change them, or take another block from
+ui.shadcn.com/blocks. The header shows where the page is (a breadcrumb), and
+the account's menu has the theme (light, dark or the system's) and signing
+out.
 
 ## Sign-in
 
@@ -42,10 +63,12 @@ list, form and page.
 entity Product {
   name  string  required @admin(label "Name")
   price decimal required @admin(label "Price")
-  @admin(resource, label "Products", singular "Product", icon package)
+  @admin(resource, label "Products", singular "Product", icon package, group "Catalog")
 }
 ```
 
+- `group` puts the resource in a section of the menu, with the other
+  resources of the same group.
 - The list pages, filters, sorts and searches through the API, with all of it
   in the URL: a list can be shared, and Back works.
 - The form has a field for each kind of field (text, numbers, money, dates,

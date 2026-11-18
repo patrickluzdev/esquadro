@@ -1,0 +1,95 @@
+// The account, at the bottom of the sidebar (shadcn/ui's block sidebar-07):
+// the theme and signing out. Yours to change: a profile page, settings.
+import { useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar"
+import { signOut, useSession } from "../esquadro/kit/auth.tsx"
+import { t } from "../esquadro/kit/i18n.ts"
+
+export function NavUser() {
+  const session = useSession()
+  const { theme, setTheme } = useTheme()
+  const { isMobile } = useSidebar()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const name = t("account")
+  const roles = session?.roles.join(", ") ?? ""
+  const avatar = (
+    <Avatar className="h-8 w-8 rounded-lg">
+      <AvatarFallback className="rounded-lg">{(roles || name).slice(0, 2).toUpperCase()}</AvatarFallback>
+    </Avatar>
+  )
+  const who = (
+    <div className="grid flex-1 text-left text-sm leading-tight">
+      <span className="truncate font-medium">{name}</span>
+      <span className="truncate text-xs">{roles}</span>
+    </div>
+  )
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+              {avatar}
+              {who}
+              <ChevronsUpDown className="ml-auto size-4" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            side={isMobile ? "bottom" : "right"}
+            align="end"
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                {avatar}
+                {who}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("theme")}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+                <DropdownMenuRadioItem value="light">
+                  <Sun /> {t("light")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark">
+                  <Moon /> {t("dark")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system">
+                  <Monitor /> {t("system")}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={async () => {
+                await signOut(queryClient)
+                navigate({ to: "/login", search: { redirect: undefined } })
+              }}
+            >
+              <LogOut />
+              {t("signOut")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}

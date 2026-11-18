@@ -1,0 +1,28 @@
+// The smaller entries at the bottom of the sidebar (shadcn/ui's block
+// sidebar-08). Yours to change.
+import { Link } from "@tanstack/react-router"
+import type { ComponentPropsWithoutRef } from "react"
+import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+import type { MenuItem } from "@/menu.ts"
+
+export function NavSecondary({ items, ...props }: { items: MenuItem[] } & ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  if (items.length === 0) return null
+  return (
+    <SidebarGroup {...props}>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.to}>
+              <SidebarMenuButton asChild size="sm">
+                <Link to={item.to as never}>
+                  {item.icon && <item.icon />}
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}

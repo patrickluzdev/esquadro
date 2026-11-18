@@ -27,6 +27,7 @@ blueprint spa
 | `roles` | list | `[]` | The roles of the realm let in; any role when empty. |
 | `locale` | name | `"en"` | en or pt_br: the language of its own words (src/messages.ts) and of dates, numbers and money. |
 | `serve` | name | `"app"` | app: the app's binary serves it, built in. (image, a container of its own, is planned.) |
+| `sidebar` | name | `"icon"` | The sidebar, from shadcn/ui's blocks: icon (sidebar-07, it collapses to its icons), inset (sidebar-08, the page in an inset card) or dashboard (dashboard-01, it slides away, wider). |
 
 ```esquadro
 blueprint spa {
@@ -42,6 +43,7 @@ blueprint spa {
 | entity | `label` | string | What people call it, in the frontend's language: Offers. |
 | entity | `singular` | string | What one of it is called, in titles: "Product". |
 | entity | `menu` | string | Its entry in the menu; the label by default. |
+| entity | `group` | string | The section of the menu it is in, with the other resources of the same group: "Catalog". |
 | entity | `icon` | name | The icon of its menu entry, a Lucide name: tag, users, shopping_cart. |
 | field | `label` | string | What people call the field, in the frontend's language: Price. |
 

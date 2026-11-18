@@ -1,0 +1,80 @@
+// The main entries of the sidebar (shadcn/ui's blocks sidebar-07 and
+// sidebar-08): pages, and groups that open and close. Yours to change.
+import { Link, useRouterState } from "@tanstack/react-router"
+import { ChevronRight } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  useSidebar,
+} from "@/components/ui/sidebar"
+import { isGroup } from "@/menu.ts"
+import type { Menu, MenuItem } from "@/menu.ts"
+import { base } from "../esquadro/config.ts"
+
+/** Whether the page shown is the entry's, or under it. */
+function useActive() {
+  const path = useRouterState({ select: (s) => s.location.pathname })
+  const root = base.replace(/\/$/, "")
+  const rel = root && path.startsWith(root) ? path.slice(root.length) || "/" : path
+  return (to: string) => (to === "/" ? rel === "/" : rel === to || rel.startsWith(to + "/"))
+}
+
+export function NavMain({ items, label }: { items: Menu["main"]; label?: string }) {
+  const active = useActive()
+  const { isMobile, setOpenMobile } = useSidebar()
+  const close = () => isMobile && setOpenMobile(false)
+  const link = (item: MenuItem) => (
+    <Link to={item.to as never} onClick={close}>
+      {item.icon && <item.icon />}
+      <span>{item.label}</span>
+    </Link>
+  )
+  return (
+    <SidebarGroup>
+      {label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
+      <SidebarMenu>
+        {items.map((item) =>
+          isGroup(item) ? (
+            <Collapsible key={item.label} asChild defaultOpen={item.items.some((i) => active(i.to))} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip={item.label}>
+                    {item.icon && <item.icon />}
+                    <span>{item.label}</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {item.items.map((sub) => (
+                      <SidebarMenuSubItem key={sub.to}>
+                        <SidebarMenuSubButton asChild isActive={active(sub.to)}>
+                          <Link to={sub.to as never} onClick={close}>
+                            <span>{sub.label}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          ) : (
+            <SidebarMenuItem key={item.to}>
+              <SidebarMenuButton asChild tooltip={item.label} isActive={active(item.to)}>
+                {link(item)}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ),
+        )}
+      </SidebarMenu>
+    </SidebarGroup>
+  )
+}

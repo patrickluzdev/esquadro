@@ -30,6 +30,10 @@ blueprint spa {
   /// app: the app's binary serves it, built in. (image, a container of its
   /// own, is planned.)
   option serve name default(app)
+  /// The sidebar, from shadcn/ui's blocks: icon (sidebar-07, it collapses
+  /// to its icons), inset (sidebar-08, the page in an inset card) or
+  /// dashboard (dashboard-01, it slides away, wider).
+  option sidebar name default(icon)
 
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.
@@ -40,6 +44,9 @@ blueprint spa {
     singular string
     /// Its entry in the menu; the label by default.
     menu string
+    /// The section of the menu it is in, with the other resources of the
+    /// same group: "Catalog".
+    group string
     /// The icon of its menu entry, a Lucide name: tag, users, shopping_cart.
     icon name
   }

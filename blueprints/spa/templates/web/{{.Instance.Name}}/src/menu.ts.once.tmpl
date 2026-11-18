@@ -1,5 +1,5 @@
 // The menu of the {{.Instance.Name}} frontend: yours to change. Add your own
-// pages, reorder, or leave resources out.
+// pages, reorder, group (a group opens and closes), or leave resources out.
 import * as icons from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { t } from "./esquadro/kit/i18n.ts"
@@ -11,9 +11,45 @@ export interface MenuItem {
   icon?: LucideIcon
 }
 
-export const menu: MenuItem[] = [
-  { to: "/", label: t("home"), icon: icons.Home },
-{{- range .Entities}}{{$a := ann .}}{{if index $a "resource"}}
-  { to: "/{{.Plural.Kebab}}", label: resources.{{.Plural.Camel}}.menu, icon: icons.{{index $a "icon" | lucide}} },
+export interface MenuGroup {
+  label: string
+  icon?: LucideIcon
+  items: MenuItem[]
+}
+
+export interface Menu {
+  /** The main entries: pages, and groups of them. */
+  main: (MenuItem | MenuGroup)[]
+  /** Smaller entries at the bottom of the sidebar: help, settings. */
+  secondary: MenuItem[]
+}
+
+export const menu: Menu = {
+  main: [
+    { to: "/", label: t("home"), icon: icons.House },
+{{- range $i, $e := .Entities}}{{$a := ann $e}}{{if index $a "resource"}}
+{{- $g := printf "%v" (index $a "group")}}
+{{- if eq $g "<nil>"}}
+    { to: "/{{$e.Plural.Kebab}}", label: resources.{{$e.Plural.Camel}}.menu, icon: icons.{{index $a "icon" | lucide}} },
+{{- else}}
+{{- $first := true}}{{range $j, $o := $.Entities}}{{if lt $j $i}}{{$oa := ann $o}}{{if and (index $oa "resource") (eq (printf "%v" (index $oa "group")) $g)}}{{$first = false}}{{end}}{{end}}{{end}}
+{{- if $first}}
+    {
+      label: {{printf "%q" $g}},
+      icon: icons.{{index $a "icon" | lucide}},
+      items: [
+{{- range $o := $.Entities}}{{$oa := ann $o}}{{if and (index $oa "resource") (eq (printf "%v" (index $oa "group")) $g)}}
+        { to: "/{{$o.Plural.Kebab}}", label: resources.{{$o.Plural.Camel}}.menu, icon: icons.{{index $oa "icon" | lucide}} },
 {{- end}}{{end}}
-]
+      ],
+    },
+{{- end}}
+{{- end}}
+{{- end}}{{end}}
+  ],
+  secondary: [],
+}
+
+export function isGroup(entry: MenuItem | MenuGroup): entry is MenuGroup {
+  return "items" in entry
+}

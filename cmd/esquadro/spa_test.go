@@ -44,6 +44,9 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 		"src/resources/products.tsx":        "export default resource(meta, {",
 		"src/pages/_app/products/index.tsx": `createFileRoute("/_app/products/")`,
 		"src/menu.ts":                       "icons.Package",
+		"src/components/app-sidebar.tsx":    `collapsible="icon"`,
+		"src/components/ui/select.tsx":      "SelectPrimitive",
+		"components.json":                   `"style": "new-york"`,
 		"embed.go":                          "package admin",
 	} {
 		if got := read(t, filepath.Join(web, path)); !strings.Contains(got, want) {
@@ -78,6 +81,7 @@ func TestSPAChecksItsInstances(t *testing.T) {
 	}{
 		"role":      {func(s string) string { return strings.Replace(s, "roles [admin, staff]", "roles [boss]", 1) }, "boss is not a role of user"},
 		"serve":     {func(s string) string { return strings.Replace(s, "locale pt_br", "serve image", 1) }, "serve image is not one esquadro generates yet"},
+		"sidebar":   {func(s string) string { return strings.Replace(s, "locale pt_br", "sidebar floating", 1) }, "sidebar floating is not icon, inset or dashboard"},
 		"name":      {func(s string) string { return strings.Replace(s, "blueprint spa admin", "blueprint spa Admin", 1) }, "Admin cannot name a frontend"},
 		"workspace": {func(s string) string { return strings.Replace(s, "  blueprint workspace\n", "", 1) }, "requires workspace"},
 		"no name":   {func(s string) string { return strings.Replace(s, "blueprint spa admin", "blueprint spa", 1) }, "is used by named instances"},

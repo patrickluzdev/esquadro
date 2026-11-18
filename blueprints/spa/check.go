@@ -62,6 +62,9 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if locale, _ := opts["locale"].(string); locale != "en" && locale != "pt_br" {
 			diags.Errorf(at("locale"), at("locale"), "locale %s is not en or pt_br: add the language to src/messages.ts, and choose en here", locale)
 		}
+		if sidebar, _ := opts["sidebar"].(string); sidebar != "icon" && sidebar != "inset" && sidebar != "dashboard" {
+			diags.Errorf(at("sidebar"), at("sidebar"), "sidebar %s is not icon, inset or dashboard", sidebar)
+		}
 		if set.Get("workspace") == nil {
 			diags.Errorf(ref.Pos, ref.Pos, "spa %s lives in the workspace: add blueprint workspace", name)
 		}

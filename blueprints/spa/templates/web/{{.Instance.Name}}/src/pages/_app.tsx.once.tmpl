@@ -1,10 +1,47 @@
-import { createFileRoute } from "@tanstack/react-router"
+{{- $mode := or .Options.sidebar "icon" -}}
+import { createFileRoute, Outlet } from "@tanstack/react-router"
+import type { CSSProperties } from "react"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SiteHeader } from "@/components/site-header"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { requireSession } from "../esquadro/kit/auth.tsx"
-import { AppLayout } from "../esquadro/kit/layout.tsx"
 
 // The signed-in pages: every file under _app/ needs a session (and a role
-// let in), and is framed by the layout.
+// let in), and is framed by the sidebar (src/components/app-sidebar.tsx).
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
-  component: () => <AppLayout brand="{{.App.Label}}" />,
+  component: Layout,
 })
+
+function Layout() {
+  return (
+{{- if eq $mode "dashboard"}}
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="@container/main flex flex-1 flex-col gap-6 p-4 lg:p-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+{{- else}}
+    <SidebarProvider style={ {} as CSSProperties }>
+      <AppSidebar />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-0 md:px-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+{{- end}}
+  )
+}

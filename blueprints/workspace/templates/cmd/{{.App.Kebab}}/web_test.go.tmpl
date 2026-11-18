@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestFrontends checks each frontend as task web:build would: its types,
+// TestFrontends checks each frontend as task web:build would: its build (which generates its routes), its types
 // its tests and its build, once its packages are installed (task
 // web:install); without them, it is skipped.
 func TestFrontends(t *testing.T) {
@@ -21,7 +21,7 @@ func TestFrontends(t *testing.T) {
 	}
 	for _, name := range []string{ {{- range $i, $s := .}}{{if $i}}, {{end}}"{{$s.Name}}"{{end -}} } {
 		t.Run(name, func(t *testing.T) {
-			for _, script := range []string{"check", "test", "build"} {
+			for _, script := range []string{"build", "check", "test"} {
 				cmd := exec.Command(npm, "run", script)
 				cmd.Dir = filepath.Join("..", "..", "web", name)
 				if out, err := cmd.CombinedOutput(); err != nil {
