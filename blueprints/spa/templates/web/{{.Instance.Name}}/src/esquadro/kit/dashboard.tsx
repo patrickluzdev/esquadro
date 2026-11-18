@@ -3,10 +3,10 @@
 // time parameters, laid out in a grid by their widths. Each widget is
 // exported, for pages of your own.
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import * as icons from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { AlertTriangle, RotateCw, TrendingDown, TrendingUp } from "lucide-react"
-import { useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import {
   Area,
@@ -86,6 +86,9 @@ export interface Widget {
 
 const DAY = 86_400_000
 
+/** The period a dashboard opens with. */
+const DEFAULT_PERIOD = "30d"
+
 /** A period: its start (none: all time). */
 interface Period {
   key: string
@@ -150,8 +153,16 @@ export function Dashboard({
   title?: string
   description?: string
 }) {
-  const [period, setPeriod] = useState("30d")
-  const [picked, setPicked] = useState<string>()
+  // The period and the number drawn are in the URL (?period=7d&kpi=orders):
+  // a dashboard's link opens it as it was; the defaults stay out of it.
+  const search = useSearch({ strict: false }) as { period?: string; kpi?: string }
+  const navigate = useNavigate()
+  const period = periods().some((p) => p.key === search.period) ? (search.period as string) : DEFAULT_PERIOD
+  const picked = search.kpi
+  const setSearch = (changes: { period?: string; kpi?: string }) =>
+    navigate({ to: ".", search: (prev: Record<string, unknown>) => ({ ...prev, ...changes }) as never, replace: true })
+  const setPeriod = (p: string) => setSearch({ period: p === DEFAULT_PERIOD ? undefined : p })
+  const setPicked = (name: string) => setSearch({ kpi: name })
   const mine = widgets.filter((w) => w.dashboard === dashboard)
   const since = periods().find((p) => p.key === period)?.since
   const timed = mine.some((w) => w.since)

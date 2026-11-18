@@ -91,7 +91,8 @@ The reports marked as widgets make dashboards: the first page's, and one
 page for each `dashboard` the reports name, in a Dashboards group of the
 menu (`/dashboards/sales`). Each has a period at the right of its title
 (today, the last 7, 30 or 90 days, this month, all time) that fills the
-reports' time parameters.
+reports' time parameters. The period and the number drawn are in the URL
+(`?period=7d&kpi=orders-per-day`): a dashboard's link opens it as it was.
 
 ```esquadro
 report RevenuePerDay {
