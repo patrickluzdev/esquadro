@@ -21,10 +21,10 @@ export function BarsChart<T extends Record<string, unknown>>({ rows, x, y }: { r
       <ResponsiveContainer>
         <BarChart data={rows}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={x} />
+          <XAxis dataKey={x as never} />
           <YAxis />
           <Tooltip />
-          <Bar dataKey={y} fill="var(--color-primary)" />
+          <Bar dataKey={y as never} fill="var(--color-primary)" />
         </BarChart>
       </ResponsiveContainer>
     </div>

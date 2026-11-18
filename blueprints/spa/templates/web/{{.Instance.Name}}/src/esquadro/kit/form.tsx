@@ -4,13 +4,14 @@
 // (Idempotency-Key), and a warning before leaving with changes unsaved.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useBlocker, useNavigate } from "@tanstack/react-router"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { fields as yours } from "@/fields.ts"
 import { Button } from "@/components/ui/button.tsx"
 import { Card } from "@/components/ui/card.tsx"
 import { Input } from "@/components/ui/input.tsx"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
+import { ask } from "./confirm.tsx"
 import { describe, fieldErrors } from "./errors.ts"
 import { t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
@@ -19,6 +20,13 @@ import { useRecord } from "./show.tsx"
 import { toast } from "./toast.tsx"
 
 type Values = Record<string, unknown>
+
+/** Fields required and left empty, found before sending. */
+class MissingFields extends Error {
+  constructor(readonly fields: Record<string, string>) {
+    super("missing fields")
+  }
+}
 
 /** The input of a field, by its kind. */
 export function FieldInput({ field, value, onChange }: { field: FieldMeta; value: unknown; onChange: (v: unknown) => void }) {
@@ -116,26 +124,49 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const fields = resource.form.filter((f) => !f.readOnly)
   const [values, setValues] = useState<Values>(() => initial(fields, record))
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [dirty, setDirty] = useState(false)
+  // A ref, not state: the blocker reads it as it is when leaving, also
+  // right after saving.
+  const dirty = useRef(false)
+  const setDirty = (d: boolean) => {
+    dirty.current = d
+  }
   // One key for this form: sending it again (a double click, a retry)
   // creates the record once.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  useBlocker({ shouldBlockFn: () => dirty && !window.confirm(t("unsaved")), enableBeforeUnload: () => dirty })
+  useBlocker({
+    shouldBlockFn: async () => dirty.current && !(await ask(t("unsaved"))),
+    enableBeforeUnload: () => dirty.current,
+  })
 
   const save = useMutation({
-    mutationFn: () =>
-      record
-        ? meta.api(api as never).update(record.id, values, { ifMatch: record })
-        : meta.api(api as never).create(values, { idempotencyKey }),
+    mutationFn: async () => {
+      // What is required and empty is refused here, on its field, before
+      // the API is asked.
+      const missing: Record<string, string> = {}
+      for (const f of fields) {
+        const v = values[f.name]
+        if (f.required && f.kind !== "bool" && (v === null || v === undefined || v === "")) missing[f.name] = "required"
+      }
+      if (Object.keys(missing).length > 0) throw new MissingFields(missing)
+      // What is empty is left out: the API's default on a create, and empty
+      // on a change (which replaces the record).
+      const filled = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null && v !== undefined && v !== ""))
+      if (record) return meta.api(api as never).update(record.id, filled, { ifMatch: record })
+      return meta.api(api as never).create(filled, { idempotencyKey })
+    },
     onSuccess: (saved: Rec) => {
       setDirty(false)
       toast(t("saved"))
       queryClient.invalidateQueries({ queryKey: [meta.name] })
-      setTimeout(() => navigate({ to: `/${meta.name}/${saved.id}` as never }))
+      navigate({ to: `/${meta.name}/${saved.id}` as never })
     },
     onError: (e) => {
+      if (e instanceof MissingFields) {
+        setErrors(e.fields)
+        return
+      }
       setErrors(fieldErrors(e))
       toast(describe(e), "error")
     },
@@ -165,7 +196,11 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                 setValues((all) => ({ ...all, [f.name]: v }))
               }}
             />
-            {errors[f.name] && <span className="text-sm text-destructive">{t("invalid", { code: errors[f.name] })}</span>}
+            {errors[f.name] && (
+              <span className="text-sm text-destructive">
+                {errors[f.name] === "required" ? t("required") : t("invalid", { code: errors[f.name] })}
+              </span>
+            )}
           </label>
         ))}
       </Card>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button.tsx"
 import { cn } from "@/components/ui/cn.ts"
 import { signOut, useSession } from "./auth.tsx"
 import { t } from "./i18n.ts"
+import { Confirmer } from "./confirm.tsx"
 import { Toaster } from "./toast.tsx"
 
 /** The theme: light, dark or the system's, kept in this browser. */
@@ -74,7 +75,7 @@ export function AppLayout({ brand, children }: { brand: string; children?: React
                 variant="outline"
                 onClick={async () => {
                   await signOut(queryClient)
-                  navigate({ to: "/login" })
+                  navigate({ to: "/login", search: { redirect: undefined } })
                 }}
               >
                 {t("signOut")}
@@ -85,6 +86,7 @@ export function AppLayout({ brand, children }: { brand: string; children?: React
         <main className="flex-1 p-4 md:p-6">{children ?? <Outlet />}</main>
       </div>
       <Toaster />
+      <Confirmer />
     </div>
   )
 }

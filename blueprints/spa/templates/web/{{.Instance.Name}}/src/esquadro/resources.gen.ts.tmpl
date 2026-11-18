@@ -11,7 +11,7 @@ export const resources = {
   {{$e.Plural.Camel}}: defineMeta({
     name: "{{$e.Plural.Kebab}}",
     label: {{printf "%q" (or (index $a "label") (humanize $e.Plural.Snake))}},
-    singular: {{printf "%q" (humanize $e.Snake)}},
+    singular: {{printf "%q" (or (index $a "singular") (humanize $e.Snake))}},
     menu: {{printf "%q" (or (index $a "menu") (index $a "label") (humanize $e.Plural.Snake))}},
     icon: {{printf "%q" (or (index $a "icon") "circle")}},
     api: (api: Api) => api.{{$e.Plural.Camel}} as unknown as import("./kit/meta.ts").RecordsApi,

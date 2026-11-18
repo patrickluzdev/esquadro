@@ -40,6 +40,7 @@ blueprint spa {
 |---|---|---|---|
 | entity | `resource` | bool | The entity is a resource of the frontend: its list, form and page. |
 | entity | `label` | string | What people call it, in the frontend's language: Offers. |
+| entity | `singular` | string | What one of it is called, in titles: "Product". |
 | entity | `menu` | string | Its entry in the menu; the label by default. |
 | entity | `icon` | name | The icon of its menu entry, a Lucide name: tag, users, shopping_cart. |
 | field | `label` | string | What people call the field, in the frontend's language: Price. |

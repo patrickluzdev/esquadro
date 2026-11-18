@@ -42,7 +42,7 @@ list, form and page.
 entity Product {
   name  string  required @admin(label "Name")
   price decimal required @admin(label "Price")
-  @admin(resource, label "Products", icon package)
+  @admin(resource, label "Products", singular "Product", icon package)
 }
 ```
 

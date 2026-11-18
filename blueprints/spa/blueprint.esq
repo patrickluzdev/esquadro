@@ -36,6 +36,8 @@ blueprint spa {
     resource bool
     /// What people call it, in the frontend's language: Offers.
     label string
+    /// What one of it is called, in titles: "Product".
+    singular string
     /// Its entry in the menu; the label by default.
     menu string
     /// The icon of its menu entry, a Lucide name: tag, users, shopping_cart.
