@@ -31,6 +31,7 @@ func TemplateFuncs() template.FuncMap {
 		"lucide":     Lucide,
 		"filterable": Filterable,
 		"fileMeta":   FileMeta,
+		"enumColor":  EnumColor,
 		"rangeFilterable": func(e *project.Entity, name string) bool {
 			for _, f := range rest.APIFilters(e) {
 				if f.Param == name+"_min" {
@@ -191,4 +192,36 @@ func FileMeta(e *project.Entity, f *project.Field, opts map[string]any) string {
 	}
 	return fmt.Sprintf(", upload: { entity: %s, field: %s }, accept: [%s], maxSize: %d",
 		strconv.Quote(e.Plural.Snake), strconv.Quote(f.Snake), strings.Join(accept, ", "), r.Max)
+}
+
+// colorWords guess a value's color from the words of its name.
+var colorWords = []struct {
+	color string
+	words []string
+}{
+	{"red", []string{"CANCEL", "FAIL", "ERROR", "REJECT", "BLOCK", "BAN", "DENI", "EXPIRE", "OVERDUE", "LOST", "DELETED", "REFUND"}},
+	{"amber", []string{"PENDING", "DRAFT", "WAIT", "REVIEW", "HOLD", "PAUS", "PROCESS", "PARTIAL", "TRIAL", "SCHEDUL", "LOW"}},
+	{"green", []string{"ACTIVE", "ENABLE", "PAID", "DONE", "COMPLETE", "APPROV", "PUBLISH", "SUCCESS", "OPEN", "ONLINE", "VERIFIED", "AVAILABLE", "DELIVERED", "WON", "IN_STOCK"}},
+	{"blue", []string{"NEW", "SENT", "SHIPPED", "PROGRESS", "RUNNING", "CONFIRM"}},
+}
+
+// EnumColor is the color of an enum value's dot: its own (@<spa>(color
+// ...)), or a guess from its name; gray when none fits.
+func EnumColor(v *project.EnumValue, ann map[string]any) string {
+	if c, ok := ann["color"].(string); ok && c != "" {
+		return c
+	}
+	name := strings.ToUpper(v.Raw)
+	// INACTIVE, DISABLED, UNPAID: a negation is not the word it negates.
+	if strings.HasPrefix(name, "IN") && strings.Contains(name, "ACTIVE") || strings.HasPrefix(name, "DIS") || strings.HasPrefix(name, "UN") || strings.HasPrefix(name, "NOT_") {
+		return "gray"
+	}
+	for _, c := range colorWords {
+		for _, w := range c.words {
+			if strings.Contains(name, w) {
+				return c.color
+			}
+		}
+	}
+	return "gray"
 }

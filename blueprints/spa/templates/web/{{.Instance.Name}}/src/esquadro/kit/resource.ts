@@ -57,11 +57,16 @@ export interface ResourceDef {
   }
   form: FieldMeta[]
   /** The form in cards: a title, and the fields of each (of those in form). */
-  sections?: { title: string; description?: string; fields: FieldMeta[] }[]
+  sections?: { title: string; description?: string; fields: FieldMeta[]; side?: boolean }[]
   show?: FieldMeta[]
   actions?: Action[]
   /** The field a record is called by (in titles and pickers). */
   title?: FieldMeta
+  /**
+   * A second line under a record's name in lists: a field (its category) or
+   * what a function makes of the record.
+   */
+  subtitle?: FieldMeta | ((record: Rec) => string)
   /**
    * A record's picture, as a URL: beside its name in lists and on its page.
    * Without one, or when it has none, the first letters of its name.

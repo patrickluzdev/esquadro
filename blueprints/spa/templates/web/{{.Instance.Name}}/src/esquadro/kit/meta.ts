@@ -15,6 +15,8 @@ export interface FieldMeta {
   /** An enum's values, and what people call each. */
   values?: readonly string[]
   labels?: Readonly<Record<string, string>>
+  /** The color of each value's dot: green, amber, red, blue, violet, sky, orange, gray. */
+  colors?: Readonly<Record<string, string>>
   /** A relation's resource, and the field its records are shown by. */
   target?: string
   display?: string

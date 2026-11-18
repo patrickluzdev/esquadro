@@ -15,6 +15,7 @@ import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { CopyButton } from "./copy.tsx"
 import { FileValue } from "./files.tsx"
+import { StatusValue } from "./status.tsx"
 import { imageOf, Picture } from "./picture.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
@@ -33,7 +34,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.show) return <>{own.show(value, record)}</>
   if (field.kind === "file" || field.kind === "image") return <FileValue field={field} value={value} />
-  if (field.kind === "enum" && value) return <Badge variant="secondary">{format(field, value)}</Badge>
+  if (field.kind === "enum" && value) return <StatusValue field={field} value={value} />
   if (field.kind === "bool") return <Badge variant={value ? "default" : "outline"}>{format(field, value)}</Badge>
   if (field.kind === "relation" && value) {
     const related = record[field.name.replace(/_id$/, "")] as Rec | undefined
@@ -118,7 +119,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const relations = resource.relations?.() ?? []
   const value = (f: FieldMeta) => (
     <div key={f.name} className="group/value flex flex-col gap-1">
-      <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{f.label}</dt>
+      <dt className="text-sm font-medium text-muted-foreground">{f.label}</dt>
       <dd className="flex min-h-6 items-center gap-1 text-sm font-semibold text-foreground">
         <FieldValue field={f} record={r} />
         {r[f.name] !== null && r[f.name] !== undefined && r[f.name] !== "" && (
@@ -176,7 +177,14 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   )
   return (
     <div className={cn("grid items-start gap-6", relations.length > 0 && "lg:grid-cols-[340px_minmax(0,1fr)]")}>
-      <Card className={cn(relations.length === 0 && "max-w-3xl")}>
+      <Card className={cn("relative", relations.length === 0 && "max-w-3xl")}>
+        {can.includes("update") && (
+          <Button asChild variant="ghost" size="icon-sm" className="absolute top-4 right-4 text-muted-foreground" aria-label={t("edit")}>
+            <Link to={`/${meta.name}/${r.id}/edit` as never}>
+              <Pencil />
+            </Link>
+          </Button>
+        )}
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-3 pt-2 text-center">
             <Picture src={imageOf(resource, r)} name={title} size="lg" />

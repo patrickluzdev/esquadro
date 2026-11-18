@@ -81,5 +81,10 @@ blueprint spa {
     /// What people call a value of an enum, in the frontend's language:
     /// Active.
     label string
+    /// The color of its dot: green, amber, red, blue, violet, sky, orange
+    /// or gray. Without one, a guess from its name: ACTIVE, PAID and DONE
+    /// are green, PENDING and DRAFT amber, CANCELED and FAILED red; others
+    /// gray.
+    color name
   }
 }

@@ -49,5 +49,6 @@ blueprint spa {
 | field | `label` | string | What people call the field, in the frontend's language: Price. |
 | relation | `label` | string | What people call the relation, in the frontend's language: Category. |
 | value | `label` | string | What people call a value of an enum, in the frontend's language: Active. |
+| value | `color` | name | The color of its dot: green, amber, red, blue, violet, sky, orange or gray. Without one, a guess from its name: ACTIVE, PAID and DONE are green, PENDING and DRAFT amber, CANCELED and FAILED red; others gray. |
 
 An annotation is written `@spa(key value)` on the element.

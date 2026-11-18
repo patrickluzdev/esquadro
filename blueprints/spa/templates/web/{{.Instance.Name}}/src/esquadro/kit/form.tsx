@@ -23,6 +23,7 @@ import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { FileInput, isStoredFile } from "./files.tsx"
 import { MoneyInput } from "./money.tsx"
+import { StatusDot } from "./status.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
@@ -60,7 +61,10 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
         <Choice id={id} field={field} value={str} onChange={onChange} invalid={invalid}>
           {field.values?.map((v) => (
             <SelectItem key={v} value={v}>
-              {format(field, v)}
+              <span className="flex items-center gap-2">
+                <StatusDot field={field} value={v} />
+                {format(field, v)}
+              </span>
             </SelectItem>
           ))}
         </Choice>
@@ -167,6 +171,25 @@ function initial(fields: FieldMeta[], record?: Rec, given: Record<string, unknow
   return out
 }
 
+/** A card of the form. */
+type FormSection = { title: string; description?: string; fields: FieldMeta[]; side?: boolean }
+
+/**
+ * The form's cards when the resource names none: the details (texts,
+ * numbers, dates) at the left; at the right, the media (images and files)
+ * and how the record is filed (choices, related records, yes or no).
+ */
+export function defaultSections(form: FieldMeta[]): FormSection[] {
+  const media = form.filter((f) => f.kind === "image" || f.kind === "file")
+  const filed = form.filter((f) => f.kind === "enum" || f.kind === "relation" || f.kind === "bool")
+  const details = form.filter((f) => !media.includes(f) && !filed.includes(f))
+  const out: FormSection[] = [{ title: t("details"), fields: details.length > 0 ? details : form }]
+  if (details.length === 0) return out
+  if (media.length > 0) out.push({ title: t("media"), fields: media, side: true })
+  if (filed.length > 0) out.push({ title: t("organization"), fields: filed, side: true })
+  return out
+}
+
 /** The form to create a record, or to change one (with its id). */
 export function ResourceForm({ resource, id }: { resource: Resource; id?: string }) {
   const record = useRecord(resource, id)
@@ -179,7 +202,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const { meta } = resource
   const fields = resource.form.filter((f) => !f.readOnly)
   // The form's cards: the resource's sections, or one with every field.
-  const sections = resource.sections ?? [{ title: t("details"), fields: resource.form }]
+  const sections = resource.sections ?? defaultSections(resource.form)
   // A new record starts with what the URL gives (?category_id=), or with a
   // copy of another (Duplicate).
   const given = useSearch({ strict: false }) as Record<string, unknown>
@@ -253,63 +276,73 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
       }}
     >
       <PageHeader title={record ? t("editing", { name: meta.singular }) : t("creating", { name: meta.singular })} />
-      <div className="flex max-w-[1080px] flex-col gap-4">
-        {sections.map((section) => (
-          <Card key={section.title}>
-            <CardHeader className="gap-1">
-              <CardTitle>{section.title}</CardTitle>
-              {section.description && <CardDescription>{section.description}</CardDescription>}
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="gap-7">
-                {section.fields
-                  .filter((f) => !f.readOnly)
-                  .map((f) => {
-                    const error = errors[f.name]
-                    const input = (
-                      <FieldInput
-                        field={f}
-                        value={values[f.name]}
-                        invalid={error !== undefined}
-                        onChange={(v) => {
-                          dirty.current = true
-                          setErrors(({ [f.name]: _, ...rest }) => rest)
-                          setValues((all) => ({ ...all, [f.name]: v }))
-                        }}
-                      />
-                    )
-                    const label = (
-                      <FieldLabel htmlFor={`field-${f.name}`} className="font-semibold text-muted-foreground">
-                        {f.label}
-                        {f.required && f.kind !== "bool" && <span className="text-destructive">*</span>}
-                      </FieldLabel>
-                    )
-                    return (
-                      <Field
-                        key={f.name}
-                        orientation={f.kind === "bool" ? "horizontal" : "vertical"}
-                        data-invalid={error !== undefined || undefined}
-                      >
-                        {f.kind === "bool" ? (
-                          <>
-                            {input}
-                            {label}
-                          </>
-                        ) : (
-                          <>
-                            {label}
-                            {input}
-                          </>
-                        )}
-                        {error && <FieldError>{fieldMessage(f, error)}</FieldError>}
-                      </Field>
-                    )
-                  })}
-              </FieldGroup>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {(() => {
+        const card = (section: FormSection) => (
+              <Card key={section.title}>
+                <CardHeader className="gap-1">
+                  <CardTitle>{section.title}</CardTitle>
+                  {section.description && <CardDescription>{section.description}</CardDescription>}
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup className="gap-7">
+                    {section.fields
+                      .filter((f) => !f.readOnly)
+                      .map((f) => {
+                        const error = errors[f.name]
+                        const input = (
+                          <FieldInput
+                            field={f}
+                            value={values[f.name]}
+                            invalid={error !== undefined}
+                            onChange={(v) => {
+                              dirty.current = true
+                              setErrors(({ [f.name]: _, ...rest }) => rest)
+                              setValues((all) => ({ ...all, [f.name]: v }))
+                            }}
+                          />
+                        )
+                        const label = (
+                          <FieldLabel htmlFor={`field-${f.name}`} className="font-semibold text-muted-foreground">
+                            {f.label}
+                            {f.required && f.kind !== "bool" && <span className="text-destructive">*</span>}
+                          </FieldLabel>
+                        )
+                        return (
+                          <Field
+                            key={f.name}
+                            orientation={f.kind === "bool" ? "horizontal" : "vertical"}
+                            data-invalid={error !== undefined || undefined}
+                          >
+                            {f.kind === "bool" ? (
+                              <>
+                                {input}
+                                {label}
+                              </>
+                            ) : (
+                              <>
+                                {label}
+                                {input}
+                              </>
+                            )}
+                            {error && <FieldError>{fieldMessage(f, error)}</FieldError>}
+                          </Field>
+                        )
+                      })}
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+        )
+        // The main cards at the left; those of the side (an image, how a
+        // record is filed) in a narrower column at the right.
+        const main = sections.filter((s) => !s.side)
+        const side = sections.filter((s) => s.side)
+        return (
+          <div className={cn("grid items-start gap-4", side.length > 0 && main.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_380px]" : "max-w-[1080px]")}>
+            <div className="flex min-w-0 flex-col gap-4">{(main.length > 0 ? main : side).map(card)}</div>
+            {side.length > 0 && main.length > 0 && <div className="flex min-w-0 flex-col gap-4">{side.map(card)}</div>}
+          </div>
+        )
+      })()}
       {/* The form's actions, fixed at the foot of the screen. */}
       <PageFoot>
         {/* Editing goes back to the record; creating has only its actions. */}

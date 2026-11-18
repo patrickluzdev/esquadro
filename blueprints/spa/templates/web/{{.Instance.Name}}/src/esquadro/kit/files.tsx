@@ -129,11 +129,14 @@ export function FileInput({
   }
 
   if (file) {
+    // Side by side where there is room; one under the other in a narrow
+    // card.
     return (
-      <div className="flex items-center gap-4 rounded-xl border border-border p-3">
+      <div className="@container rounded-xl border border-border p-3">
+        <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:gap-4">
         {hidden}
         {image ? (
-          <img src={file.url} alt="" className="size-20 shrink-0 rounded-lg border border-border object-cover" />
+          <img src={file.url} alt="" className="aspect-square w-full max-w-48 shrink-0 rounded-lg border border-border object-cover @md:size-20" />
         ) : (
           <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <FileIcon className="size-5" />
@@ -151,6 +154,7 @@ export function FileInput({
           <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onChange(null)}>
             <Trash2 /> {t("removeFile")}
           </Button>
+        </div>
         </div>
       </div>
     )

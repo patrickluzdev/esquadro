@@ -16,6 +16,7 @@ import type { FieldMeta, Page, Rec, ResourceMeta } from "./meta.ts"
 import { isMoney, MoneyInput } from "./money.tsx"
 import type { Money } from "./money.tsx"
 import { FieldValue } from "./show.tsx"
+import { StatusDot } from "./status.tsx"
 import { toast } from "./toast.tsx"
 
 const NONE = "__none"
@@ -79,7 +80,10 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
             {!field.required && <SelectItem value={NONE}>{capitalize(t("none"))}</SelectItem>}
             {field.values?.map((v) => (
               <SelectItem key={v} value={v}>
-                {format(field, v)}
+                <span className="flex items-center gap-2">
+                  <StatusDot field={field} value={v} />
+                  {format(field, v)}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

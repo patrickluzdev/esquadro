@@ -336,10 +336,19 @@ export function ResourceList({
             )
             if (f.name !== titleColumn) return value
             // The column a record is called by carries its picture.
+            // And, under the name, the resource's subtitle.
+            const sub = resource.subtitle
             return (
               <div className="flex items-center gap-3">
                 <Picture src={imageOf(resource, row.original)} name={String(row.original[f.name] ?? "")} />
-                {value}
+                <div className="flex min-w-0 flex-col">
+                  {value}
+                  {sub && (
+                    <span className="truncate text-xs font-medium text-muted-foreground">
+                      {typeof sub === "function" ? sub(row.original) : <FieldValue field={sub} record={row.original} />}
+                    </span>
+                  )}
+                </div>
               </div>
             )
           },

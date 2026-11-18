@@ -28,6 +28,10 @@ export default resource(meta, {
 {{- with inRequest .Entity}}
   title: f.{{(index . 0).Snake}},
 {{- end}}
+{{- with keys .Entity}}
+  // A second line under each name in the list: change it, or remove it.
+  subtitle: f.{{keyName (index . 0)}},
+{{- end}}
 {{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}
 {{- if $rel}}
   // The related records on a record's page.

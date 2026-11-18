@@ -226,6 +226,20 @@ export default resource(meta, {
 
 A field the model gains is in `meta.fields` at once; add it where you want it.
 
+What else a resource may say, each with a default that works without it:
+
+- `subtitle`: a second line under each name in the list, a field
+  (`f.category_id`, the default when the entity has a relation) or a
+  function of the record.
+- `sections`: the form's cards, each a title and its fields; one with
+  `side: true` goes in a narrower column at the right. Without them, the
+  details are at the left, and the media (images and files) and how the
+  record is filed (choices, related records) at the right.
+- An enum's value shows as a dot of its color and its label. The color is
+  the value's `@<frontend>(color green)` (green, amber, red, blue, violet,
+  sky, orange or gray), or a guess from its name: ACTIVE, PAID and DONE are
+  green, PENDING and DRAFT amber, CANCELED and FAILED red; others gray.
+
 A `money` field is shown with its currency (`R$ 1.234,56`), exactly: its
 amount is text, never a float. Its input writes it as the language does,
 with the currency's symbol and places; a list filters it by a range (from,
