@@ -339,6 +339,23 @@ export const fields: Record<string, FieldRenderer> = {
 
 ### The look
 
+The primary color and how round the corners are come from the spa's
+options, in the model:
+
+```esquadro
+blueprint spa admin {
+  primary      "#3d3d3d"
+  primary_dark "#e5e5e5"
+  radius       "0.5rem"
+}
+```
+
+The text on the primary is white, or near black where white would not
+read; in the dark theme the primary is `primary_dark`, by default the
+primary itself, or a light gray when it is too dark to stand out there.
+They are written to `src/esquadro/theme.gen.css`, regenerated with the
+model, which `src/theme.css` imports first: a token set there wins.
+
 The colors, the radius and the font are tokens in `src/theme.css` (light
 and dark); the components are shadcn/ui's, in `src/components/ui`, and the
 layout's (sidebar, header, account menu) in `src/components`: all yours to

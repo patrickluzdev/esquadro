@@ -17,21 +17,23 @@ import (
 // TemplateFuncs are the template helpers of the spa blueprint.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"spaKind":    Kind,
-		"humanize":   Humanize,
-		"keys":       rest.Keys,
-		"keyName":    rest.KeyName,
-		"apiFilters": rest.APIFilters,
-		"sortsOf":    rest.SortsOf,
-		"pagination": rest.PaginationOf,
-		"inRequest":  rest.InRequest,
-		"realms":     security.RealmsOf,
-		"displayOf":  DisplayOf,
-		"titleOf":    TitleOf,
-		"lucide":     Lucide,
-		"filterable": Filterable,
-		"fileMeta":   FileMeta,
-		"enumColor":  EnumColor,
+		"spaKind":     Kind,
+		"humanize":    Humanize,
+		"keys":        rest.Keys,
+		"keyName":     rest.KeyName,
+		"apiFilters":  rest.APIFilters,
+		"sortsOf":     rest.SortsOf,
+		"pagination":  rest.PaginationOf,
+		"inRequest":   rest.InRequest,
+		"realms":      security.RealmsOf,
+		"displayOf":   DisplayOf,
+		"titleOf":     TitleOf,
+		"lucide":      Lucide,
+		"filterable":  Filterable,
+		"fileMeta":    FileMeta,
+		"enumColor":   EnumColor,
+		"onColor":     OnColor,
+		"darkPrimary": DarkPrimary,
 		"rangeFilterable": func(e *project.Entity, name string) bool {
 			for _, f := range rest.APIFilters(e) {
 				if f.Param == name+"_min" {

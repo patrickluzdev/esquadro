@@ -67,6 +67,11 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if sidebar, _ := opts["sidebar"].(string); sidebar != "icon" && sidebar != "inset" && sidebar != "dashboard" {
 			diags.Errorf(at("sidebar"), at("sidebar"), "sidebar %s is not icon, inset or dashboard", sidebar)
 		}
+		for _, o := range []string{"primary", "primary_dark"} {
+			if v, _ := opts[o].(string); ColorError(o, v) != "" {
+				diags.Errorf(at(o), at(o), "%s", ColorError(o, v))
+			}
+		}
 		if filters, _ := opts["filters"].(string); filters != "drawer" && filters != "dialog" && filters != "bar" {
 			diags.Errorf(at("filters"), at("filters"), "filters %s is not drawer, dialog or bar", filters)
 		}

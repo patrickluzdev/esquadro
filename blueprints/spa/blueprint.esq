@@ -38,6 +38,14 @@ blueprint spa {
   /// drawer (a panel at the right, applied at once), dialog, or bar (beside
   /// the search, applied as chosen).
   option filters name default(drawer)
+  /// The primary color (buttons, links, what is chosen), as #rrggbb; the
+  /// text on it is white or black, whichever reads.
+  option primary string default("#2a85ff")
+  /// The primary color of the dark theme; by default the primary, or a
+  /// light gray when the primary is too dark to stand out there.
+  option primary_dark string default("")
+  /// How round the corners are, as CSS: 0.75rem, 0.5rem, 0.
+  option radius string default("0.75rem")
   /// Minutes without use after which the frontend signs out (a warning
   /// comes a minute before); 0, never.
   option idle_minutes int default(0)

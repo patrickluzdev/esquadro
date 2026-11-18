@@ -29,6 +29,9 @@ blueprint spa
 | `serve` | name | `"app"` | app: the app's binary serves it, built in. (image, a container of its own, is planned.) |
 | `sidebar` | name | `"icon"` | The sidebar, from shadcn/ui's blocks: icon (sidebar-07, it collapses to its icons), inset (sidebar-08, the page in an inset card) or dashboard (dashboard-01, it slides away, wider). |
 | `filters` | name | `"drawer"` | Where a list's filters are, unless its resource says (filterLayout): drawer (a panel at the right, applied at once), dialog, or bar (beside the search, applied as chosen). |
+| `primary` | string | `"#2a85ff"` | The primary color (buttons, links, what is chosen), as #rrggbb; the text on it is white or black, whichever reads. |
+| `primary_dark` | string | `""` | The primary color of the dark theme; by default the primary, or a light gray when the primary is too dark to stand out there. |
+| `radius` | string | `"0.75rem"` | How round the corners are, as CSS: 0.75rem, 0.5rem, 0. |
 | `idle_minutes` | int | `0` | Minutes without use after which the frontend signs out (a warning comes a minute before); 0, never. |
 
 ```esquadro
