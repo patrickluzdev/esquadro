@@ -51,7 +51,16 @@ export async function requireSession(queryClient: QueryClient, href: string): Pr
 }
 
 export async function signIn(queryClient: QueryClient, email: string, password: string): Promise<void> {
-  const session = await identity().signIn({ email, password })
+  let session: Session
+  try {
+    session = await identity().signIn({ email, password })
+  } catch (e) {
+    // A session already open in this browser (its cookie) makes the API ask
+    // for its CSRF token: reading the session brings it, then once more.
+    if (!(isApiError(e) && e.code === "csrf")) throw e
+    await identity().session().catch(() => null)
+    session = await identity().signIn({ email, password })
+  }
   queryClient.setQueryData(sessionQuery.queryKey, session)
   announceSession("signed-in")
 }
