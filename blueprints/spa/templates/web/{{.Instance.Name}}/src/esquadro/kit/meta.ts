@@ -63,6 +63,16 @@ export interface RecordsApi {
   update(id: string, record: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
   patch(id: string, changes: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
   delete(id: string, options?: { ifMatch?: number | { version: number } }): Promise<void>
+  /** Where delete puts records, when their entity has a trash. */
+  trash?: TrashApi
+}
+
+/** The trash of a resource whose entity has one. */
+export interface TrashApi {
+  list(query?: { page?: number; per_page?: number }): Promise<Page>
+  restore(id: string): Promise<Rec>
+  purge(id: string): Promise<void>
+  empty(): Promise<{ purged: number }>
 }
 
 /** A resource as the model says it: generated in resources.gen.ts. */
@@ -79,6 +89,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   filters: readonly FilterMeta[]
   sorts: readonly string[]
   pagination: readonly string[]
+  /** Deleting puts records in the trash, where they stay days days (0: until emptied). */
+  trash?: { days: number }
 }
 
 export function defineMeta<const F extends Record<string, FieldMeta>, A>(

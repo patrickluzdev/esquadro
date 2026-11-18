@@ -74,6 +74,16 @@ In your code, the module has `DeleteProduct` (to the trash),
 `RestoreProduct`, `ReadDeletedProduct`, `ListDeletedProducts`,
 `PurgeProduct` and `PurgeDeletedProducts`.
 
+## In the frontends
+
+A [spa](/esquadro/frontends/) list of an entity with a trash gets a
+**Trash** button, with how many records it holds. Deleting asks less (the
+record can come back), and its notice has **Undo**. The trash
+(`/products?trash=1`) lists what went there, with when, to **Restore** or
+**Delete for good** one by one, or **Empty trash**; it says why a record
+cannot come back (what it points at is in the trash too, or its unique value
+was taken).
+
 ## Purging
 
 What has been in the trash for 30 days is deleted for good (the `store`

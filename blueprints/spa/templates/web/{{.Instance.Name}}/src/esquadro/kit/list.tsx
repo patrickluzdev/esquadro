@@ -63,6 +63,7 @@ import { capitalize, format, t } from "./i18n.ts"
 import { resources } from "../resources.gen.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
+import { confirmRemove, removed, TrashList, useTrashCount } from "./trash.tsx"
 import { SearchBox, SearchContext } from "./search.tsx"
 import { EmptyState, ErrorState, LoadingBar, NoResultsState, RefreshError, TableSkeleton } from "./states.tsx"
 import { cn } from "@/lib/utils"
@@ -157,7 +158,14 @@ async function each(records: Rec[], run: (r: Rec) => Promise<unknown> | unknown)
  * the records related to one (a category's products), on that record's
  * page, with its state in the page.
  */
-export function ResourceList({
+export function ResourceList(props: { resource: Resource; description?: string; scope?: { param: string; value: string; label?: string } }) {
+  const search = useSearch({ strict: false }) as ListSearch
+  // A resource with a trash shows it at ?trash=1.
+  if (props.resource.meta.trash && !props.scope && search.trash) return <TrashList resource={props.resource} />
+  return <RecordsList {...props} />
+}
+
+function RecordsList({
   resource,
   description,
   scope,
@@ -243,6 +251,7 @@ export function ResourceList({
   useEffect(() => setRowSelection({}), [JSON.stringify(search)])
 
   const remove = (r: Rec) => meta.api(api as never).delete(r.id, { ifMatch: r })
+  const trashCount = useTrashCount(meta, !embedded)
   const runOne = async (a: Action, r: Rec) => {
     if (a.confirm && !(await ask(a.confirm, { destructive: a.destructive }))) return
     try {
@@ -397,10 +406,10 @@ export function ResourceList({
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={async () => {
-                          if (!(await ask(t("confirmDelete"), { destructive: true, description: t("cantUndo"), confirm: t("delete") }))) return
+                          if (!(await confirmRemove(meta))) return
                           try {
                             await remove(r)
-                            toast(t("deleted"))
+                            removed(meta, r, queryClient)
                           } catch (e) {
                             toast(describe(e), "error")
                           }
@@ -544,6 +553,12 @@ export function ResourceList({
           description={description}
           actions={
             <>
+              {meta.trash && (
+                <Button variant="outline" onClick={() => navigate({ to: ".", search: { trash: 1 } as never })}>
+                  <Trash2 /> {t("trash")}
+                  {Boolean(trashCount) && <span className="rounded-full bg-muted px-1.5 text-xs font-semibold tabular-nums">{trashCount}</span>}
+                </Button>
+              )}
               {exportButton}
               {create}
             </>
@@ -654,7 +669,13 @@ export function ResourceList({
                 variant="destructive-outline"
                 onClick={() => {
                   const records = selected.filter((r) => (r.can ?? []).includes("delete"))
-                  runBulk(t("delete"), records, remove, t("confirmDeleteMany", { count: records.length }), true)
+                  runBulk(
+                    meta.trash ? t("moveToTrash") : t("delete"),
+                    records,
+                    remove,
+                    meta.trash ? t("trashManyQ", { count: records.length }) : t("confirmDeleteMany", { count: records.length }),
+                    !meta.trash,
+                  )
                 }}
               >
                 <Trash2 /> {t("delete")}

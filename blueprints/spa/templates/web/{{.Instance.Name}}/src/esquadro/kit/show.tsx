@@ -27,6 +27,7 @@ import { useKeys } from "./keys.tsx"
 import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
+import { confirmRemove, removed } from "./trash.tsx"
 
 /** A field's value: your own renderer for its name or kind, or the kit's. */
 export function FieldValue({ field, record }: { field: FieldMeta; record: Rec }) {
@@ -103,8 +104,8 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const queryClient = useQueryClient()
   const remove = useMutation({
     mutationFn: (r: Rec) => meta.api(api as never).delete(r.id, { ifMatch: r }),
-    onSuccess: () => {
-      toast(t("deleted"))
+    onSuccess: (_, r) => {
+      removed(meta, r, queryClient)
       queryClient.invalidateQueries({ queryKey: [meta.name] })
       navigate({ to: `/${meta.name}` as never })
     },
@@ -179,7 +180,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
         <Button
           variant="destructive-outline"
           disabled={remove.isPending}
-          onClick={async () => (await ask(t("confirmDelete"), { destructive: true, description: t("cantUndo"), confirm: t("delete") })) && remove.mutate(r)}
+          onClick={async () => (await confirmRemove(meta)) && remove.mutate(r)}
         >
           <Trash2 /> {t("delete")}
         </Button>

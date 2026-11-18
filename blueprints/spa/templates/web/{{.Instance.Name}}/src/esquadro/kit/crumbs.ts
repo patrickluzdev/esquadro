@@ -45,7 +45,7 @@ function metaOf(name: string | undefined): ResourceMeta | undefined {
  * The breadcrumb of a path. A record is called by its name (record, once
  * its page has read it), or by its id until then; Not found, when missing.
  */
-export function crumbsOf(pathname: string, title?: string, record?: Rec, missing = false): Crumb[] {
+export function crumbsOf(pathname: string, title?: string, record?: Rec, missing = false, trash = false): Crumb[] {
   const parts = partsOf(pathname)
   const out: Crumb[] = [{ label: t("home"), to: "/" }]
   if (parts.length === 0) return out
@@ -66,7 +66,8 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   const meta = metaOf(parts[0])
   const page = pages().find((p) => p.to === `/${parts[0]}`)
   out.push({ label: meta?.label ?? page?.label ?? (parts.length === 1 && title ? title : parts[0]), to: `/${parts[0]}` })
-  if (parts[1] === "new") out.push({ label: t("new") })
+  if (parts.length === 1 && trash && meta?.trash) out.push({ label: t("trash") })
+  else if (parts[1] === "new") out.push({ label: t("new") })
   else if (parts[1]) {
     const name = meta && record ? String(record[meta.title] ?? "").trim() : ""
     // A record that is not there is not called by its id.
@@ -79,6 +80,7 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
 /** The breadcrumb of the page shown. */
 export function useCrumbs(): Crumb[] {
   const pathname: string = useRouterState({ select: (s) => s.location.pathname })
+  const trash = useRouterState({ select: (s) => Boolean((s.location.search as { trash?: unknown }).trash) })
   const title = useMatches({ select: (ms) => ms.map((m) => m.staticData?.title).filter(Boolean).pop() })
   const parts = partsOf(pathname)
   const meta = metaOf(parts[0])
@@ -87,5 +89,5 @@ export function useCrumbs(): Crumb[] {
   // never asks for it itself.
   const record = useQuery<Rec>({ queryKey: [meta?.name, "get", id], enabled: false })
   const missing = isApiError(record.error) && record.error.status === 404
-  return crumbsOf(pathname, title, id ? record.data : undefined, missing)
+  return crumbsOf(pathname, title, id ? record.data : undefined, missing, trash)
 }

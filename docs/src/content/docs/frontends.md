@@ -167,6 +167,10 @@ an email confirmed, no access) share one frame, `src/components/auth-frame.tsx`:
 the brand, or how it ended (`tone`: success, error, info, forbidden), a
 title, a hint and a way back to signing in. A link that expired says so.
 
+The lists of entities with a trash (`@store(soft_delete)`) have a Trash
+button; deleting there can be undone, and the trash restores or deletes for
+good: see [The trash](/esquadro/trash/).
+
 The realms a frontend administers (whose entity lets its own realm
 write it, `@security(write user.admin)`) each have a page under
 Administration in the menu, for those who may: the realm's roles in cards,

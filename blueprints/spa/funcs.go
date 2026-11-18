@@ -13,6 +13,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/storage"
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -28,6 +29,7 @@ func TemplateFuncs() template.FuncMap {
 		"pagination":  rest.PaginationOf,
 		"inRequest":   rest.InRequest,
 		"realms":      security.RealmsOf,
+		"softDeleted": store.SoftDeleted,
 		"realmAdmins": security.Admins,
 		"displayOf":   DisplayOf,
 		"titleOf":     TitleOf,

@@ -30,6 +30,9 @@ export const resources = {
     filters: [{{range $i, $f := apiFilters $e}}{{if $i}}, {{end}}{ param: "{{$f.Param}}", kind: "{{$f.Kind}}" }{{end}}],
     sorts: [{{range $i, $s := sortsOf $e (optionsOf "postgres")}}{{if $i}}, {{end}}"{{$s}}"{{end}}],
     pagination: [{{range $i, $p := pagination $e (optionsOf "rest")}}{{if $i}}, {{end}}"{{$p}}"{{end}}],
+{{- if softDeleted $e}}
+    trash: { days: {{or (index (optionsOf "store") "purge_days") 0}} },
+{{- end}}
   }),
 {{- end}}{{end}}
 }

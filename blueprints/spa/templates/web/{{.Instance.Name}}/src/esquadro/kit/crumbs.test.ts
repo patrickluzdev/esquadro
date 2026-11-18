@@ -20,6 +20,12 @@ describe("crumbsOf", () => {
     expect(crumbsOf(path, undefined, { id: "123", version: 1, [m.title]: "Webcam HD" })[2]?.label).toBe("Webcam HD")
   })
 
+  const trashed = Object.values(resources as unknown as Record<string, ResourceMeta>).find((r) => r.trash)
+  it.runIf(trashed !== undefined)("names the trash of a list", () => {
+    const m = trashed as ResourceMeta
+    expect(crumbsOf(`/${m.name}`, undefined, undefined, false, true).map((c) => c.to ?? "")).toEqual(["/", `/${m.name}`, ""])
+  })
+
   it("calls a missing record Not found, not by its id", () => {
     expect(crumbsOf("/things/123", undefined, undefined, true)[2]?.label).not.toBe("123")
   })
