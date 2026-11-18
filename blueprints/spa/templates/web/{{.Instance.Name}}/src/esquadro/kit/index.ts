@@ -5,6 +5,7 @@ export type { Action, Column, ColumnOptions, Relation, Resource, ResourceDef } f
 export { EditableCell } from "./cell.tsx"
 export { SearchBox, Highlight } from "./search.tsx"
 export { CommandPalette, PaletteButton, openPalette } from "./palette.tsx"
+export { toCsv, download } from "./export.ts"
 export { StateView, EmptyState, NoResultsState, ErrorState, RefreshError, LoadingBar, TableSkeleton, FormSkeleton, DetailSkeleton } from "./states.tsx"
 export type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 export { ResourceList, listSearch } from "./list.tsx"

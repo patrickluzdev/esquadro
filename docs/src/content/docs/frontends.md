@@ -99,6 +99,10 @@ entity Product {
     alone (`PATCH`) on the version shown (`If-Match`);
   - each record has a menu: View, Edit, your actions, Delete;
   - Columns shows and hides columns (`hidden` starts one hidden).
+  - Export saves what the search and filters find as a CSV file (the
+    records selected, from the selection's bar): the columns shown, as people
+    read them, with `;` and a byte-order mark where the language's
+    spreadsheets expect them.
 - A record's page lists the records of other resources that point at it
   (a category's products), each with the list's search, filters and actions;
   its New starts with the record (`?category_id=`). They are the resource's

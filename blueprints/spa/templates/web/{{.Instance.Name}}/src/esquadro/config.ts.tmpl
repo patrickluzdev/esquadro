@@ -17,4 +17,4 @@ export const realmKey = "{{$key}}" as const
 export const roles: readonly string[] = [{{range $i, $r := .Options.roles}}{{if $i}}, {{end}}"{{$r}}"{{end}}]
 
 /** The language of the frontend's own words, dates, numbers and money. */
-export const locale = "{{if eq .Options.locale "pt_br"}}pt-BR{{else}}en{{end}}"
+export const locale: string = "{{if eq .Options.locale "pt_br"}}pt-BR{{else}}en{{end}}"

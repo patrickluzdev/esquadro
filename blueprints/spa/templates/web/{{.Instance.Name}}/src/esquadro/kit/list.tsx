@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns3,
+  Download,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -43,7 +44,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { api } from "../api.ts"
+import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
+import { download, fileName, toCsv } from "./export.ts"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -60,6 +63,9 @@ import { toast } from "./toast.tsx"
 
 const ALL = "__all"
 const PER_PAGE = 25
+/** Exporting: records asked for at a time, and at most. */
+const EXPORT_PAGE = 100
+const EXPORT_MAX = 10_000
 
 const features = tableFeatures({ columnVisibilityFeature, rowSelectionFeature })
 const helper = createColumnHelper<typeof features, Rec>()
@@ -348,6 +354,41 @@ export function ResourceList({
     queryClient.invalidateQueries({ queryKey: [meta.name] })
   }
 
+  // The columns shown, as the file's columns.
+  const shown = () =>
+    table
+      .getVisibleLeafColumns()
+      .map((c) => tableColumns.find((tc) => columnField(tc).name === c.id))
+      .filter((c) => c !== undefined)
+      .map((c) => ({ field: columnField(c), label: columnOptions(c).label ?? columnField(c).label }))
+  // Everything the list's search and filters find, page by page.
+  const exportAll = async () => {
+    const id = sonner.loading(t("exporting", { count: 0 }))
+    try {
+      const records: Rec[] = []
+      const base: Record<string, unknown> = { ...query }
+      delete base.page
+      delete base.cursor
+      let pageNo = 1
+      let cursor: string | undefined
+      for (;;) {
+        const p = await meta.api(api as never).list(
+          paged ? { ...base, page: pageNo, per_page: EXPORT_PAGE } : { ...base, limit: EXPORT_PAGE, cursor },
+        )
+        records.push(...p.items)
+        sonner.loading(t("exporting", { count: records.length }), { id })
+        if (records.length >= EXPORT_MAX) break
+        if (paged ? pageNo >= (p.total_pages ?? 1) : !p.next) break
+        pageNo++
+        cursor = p.next
+      }
+      download(fileName(meta.name), toCsv(shown(), records.slice(0, EXPORT_MAX)))
+      sonner.success(t("exported", { count: Math.min(records.length, EXPORT_MAX) }), { id })
+    } catch (e) {
+      sonner.error(describe(e), { id })
+    }
+  }
+
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
   const current = search.page ?? 1
   const create = page?.can.includes("create") && (
@@ -392,10 +433,13 @@ export function ResourceList({
             <X /> {t("clearFilters")}
           </Button>
         )}
+        <Button variant="outline" className="ml-auto" onClick={exportAll} disabled={!page || page.items.length === 0}>
+          <Download /> {t("export")}
+        </Button>
         {hideable.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
+              <Button variant="outline">
                 <Columns3 /> {t("columns")}
               </Button>
             </DropdownMenuTrigger>
@@ -422,6 +466,9 @@ export function ResourceList({
             <X /> {t("clearSelection")}
           </Button>
           <div className="ml-auto flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => download(fileName(meta.name), toCsv(shown(), selected))}>
+              <Download /> {t("export")}
+            </Button>
             {bulkActions.map((a) => {
               const records = selected.filter((r) => !a.when || a.when(r))
               return (
