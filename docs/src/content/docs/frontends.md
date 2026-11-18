@@ -133,7 +133,8 @@ entity Product {
     alone (`PATCH`) on the version shown (`If-Match`), showing the new value
     at once and going back to the old one if the API refuses it;
   - each record has a menu: View, Edit, your actions, Delete;
-  - Columns shows and hides columns (`hidden` starts one hidden).
+  - Columns shows and hides columns (`hidden` starts one hidden), and sets
+    the rows' density, comfortable or compact (kept in the browser).
   - A date in the filters (`created_at`, which every resource can filter
     by, or a date field marked `@store(filter)`) is a period: today, the last
     7 or 30 days, this month, or a range picked in the calendar.

@@ -40,6 +40,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -134,6 +136,31 @@ function ListFilter({ field, value, onChange }: { field: FieldMeta; value?: stri
       </SelectContent>
     </Select>
   )
+}
+
+type Density = "comfortable" | "compact"
+const densityKey = "esquadro:density"
+
+/** How tight the lists' rows are: a preference of this browser. */
+function useDensity(): [Density, (d: Density) => void] {
+  const [density, set] = useState<Density>(() => {
+    try {
+      return localStorage.getItem(densityKey) === "compact" ? "compact" : "comfortable"
+    } catch {
+      return "comfortable"
+    }
+  })
+  return [
+    density,
+    (d: Density) => {
+      set(d)
+      try {
+        localStorage.setItem(densityKey, d)
+      } catch {
+        // Storage refused: the choice lasts the visit.
+      }
+    },
+  ]
 }
 
 /** Runs an action on each record, in turn; how many went through and failed. */
@@ -447,6 +474,8 @@ export function ResourceList({
     !embedded && rowsShown.length > 0,
   )
 
+  const [density, setDensity] = useDensity()
+
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
   const current = search.page ?? 1
   const create = page?.can.includes("create") && (
@@ -509,7 +538,7 @@ export function ResourceList({
         <Button variant="outline" className={embedded ? "ml-auto" : undefined} onClick={exportAll} disabled={!page || page.items.length === 0}>
           <Download /> {t("export")}
         </Button>
-        {hideable.length > 1 && (
+        {(hideable.length > 1 || !embedded) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -528,6 +557,16 @@ export function ResourceList({
                   {(c.columnDef.meta as { label?: string } | undefined)?.label ?? c.id}
                 </DropdownMenuCheckboxItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("density")}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={density} onValueChange={(v) => setDensity(v as Density)}>
+                <DropdownMenuRadioItem value="comfortable" onSelect={(e) => e.preventDefault()}>
+                  {t("comfortable")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="compact" onSelect={(e) => e.preventDefault()}>
+                  {t("compact")}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -575,7 +614,13 @@ export function ResourceList({
       <div className="relative overflow-hidden rounded-lg border">
         <LoadingBar active={list.isFetching && !list.isPending} />
         <SearchContext value={search.q ?? ""}>
-        <Table className={cn("transition-opacity", list.isFetching && !list.isPending && "opacity-60")}>
+        <Table
+          className={cn(
+            "transition-opacity",
+            list.isFetching && !list.isPending && "opacity-60",
+            density === "compact" && "[&_td]:py-1 [&_th]:h-8",
+          )}
+        >
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
