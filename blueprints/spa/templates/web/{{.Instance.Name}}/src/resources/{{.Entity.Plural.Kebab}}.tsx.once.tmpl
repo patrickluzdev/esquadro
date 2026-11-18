@@ -1,8 +1,7 @@
 {{- $a := ann .Entity}}{{if index $a "resource" -}}
 // The {{.Entity.Plural.Kebab}} resource: what its list, form and page show. Yours to
-// change, as a Filament resource is: columns, form fields, filters,
-// actions. A field the model gains is in resources.{{.Entity.Plural.Camel}}.fields;
-// add it here when you want it.
+// change: columns, form fields, filters, actions. A field the model gains
+// is in resources.{{.Entity.Plural.Camel}}.fields; add it here when you want it.
 //
 // A column changed in the list itself:  column(f.status, { editable: true })
 // An action on a record (in its menu and on its page), and on the records
