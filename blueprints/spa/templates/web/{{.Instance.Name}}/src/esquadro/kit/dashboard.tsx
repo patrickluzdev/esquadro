@@ -6,11 +6,12 @@ import * as icons from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { AlertTriangle, RotateCw } from "lucide-react"
 import { useState } from "react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Line, LineChart as Lines, XAxis, YAxis } from "recharts"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import type { ChartConfig } from "@/components/ui/chart"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,7 @@ import { widgets as declared } from "../dashboard.gen.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta } from "./meta.ts"
+import { PageHeader } from "./page.tsx"
 
 type Row = Record<string, unknown>
 
@@ -50,38 +52,58 @@ function periods(): { key: string; label: string; since?: Date }[] {
   ]
 }
 
-/** The dashboard of the widgets: yours to place on a page (the first one). */
-export function Dashboard({ widgets = declared }: { widgets?: Widget[] }) {
+/**
+ * The dashboard of the widgets: yours to place on a page (the first one),
+ * under a title of yours, with the period at its right.
+ */
+export function Dashboard({
+  widgets = declared,
+  title,
+  description,
+}: {
+  widgets?: Widget[]
+  title?: string
+  description?: string
+}) {
   const [period, setPeriod] = useState("30d")
-  if (widgets.length === 0) return null
   const since = periods().find((p) => p.key === period)?.since
   const timed = widgets.some((w) => w.since)
   const stats = widgets.filter((w) => w.kind === "stat")
   const others = widgets.filter((w) => w.kind !== "stat")
+  const picker = timed && (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-semibold text-muted-foreground">{t("period")}:</span>
+      <Select value={period} onValueChange={setPeriod}>
+        <SelectTrigger className="h-10 w-44 bg-card shadow-xs" aria-label={t("period")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="end">
+          {periods().map((p) => (
+            <SelectItem key={p.key} value={p.key}>
+              {p.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
   return (
     <div className="flex flex-col gap-4">
-      {timed && (
-        <div className="flex flex-wrap gap-1 self-end rounded-xl bg-card p-1" role="group" aria-label={t("period")}>
-          {periods().map((p) => (
-            <Button
-              key={p.key}
-              size="sm"
-              variant={period === p.key ? "secondary" : "ghost"}
-              className={cn(period === p.key && "bg-background shadow-xs")}
-              aria-pressed={period === p.key}
-              onClick={() => setPeriod(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {(title || picker) && <PageHeader title={title ?? ""} description={description} actions={picker || undefined} />}
       {stats.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((w, i) => (
-            <WidgetCard key={w.name} widget={w} since={since} tone={i} />
-          ))}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("overview")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* The numbers, side by side in a tray, as many as fit. */}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 rounded-2xl bg-muted p-3">
+              {stats.map((w, i) => (
+                <StatTile key={w.name} widget={w} since={since} tone={i} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
       {others.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -96,10 +118,10 @@ export function Dashboard({ widgets = declared }: { widgets?: Widget[] }) {
 
 /** The colors of the numbers' icons, in turn. */
 const TONES = [
-  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
-  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
-  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
-  "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+  "bg-sky-200 text-neutral-900 dark:bg-sky-500/25 dark:text-sky-200",
+  "bg-emerald-200 text-neutral-900 dark:bg-emerald-500/25 dark:text-emerald-200",
+  "bg-violet-200 text-neutral-900 dark:bg-violet-500/25 dark:text-violet-200",
+  "bg-orange-200 text-neutral-900 dark:bg-orange-500/25 dark:text-orange-200",
 ]
 
 function iconOf(name?: string): LucideIcon {
@@ -111,61 +133,69 @@ function iconOf(name?: string): LucideIcon {
   return ((icons as unknown as Record<string, LucideIcon>)[key] ?? icons.ChartColumn) as LucideIcon
 }
 
-function WidgetCard({ widget: w, since, tone = 0 }: { widget: Widget; since?: Date; tone?: number }) {
+function useRows(w: Widget, since?: Date) {
   const params: Record<string, unknown> = {}
   if (w.since && since) params[w.since] = since.toISOString()
-  const rows = useQuery({
+  return useQuery({
     queryKey: ["reports", w.name, params],
     queryFn: () => w.fetch(api as never, params),
   })
+}
+
+/** A number: its name, its icon in a colored circle, the number. */
+function StatTile({ widget: w, since, tone }: { widget: Widget; since?: Date; tone: number }) {
+  const rows = useRows(w, since)
+  const yCol = w.columns.find((c) => c.name === w.y)
+  const Icon = iconOf(w.icon)
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-2xl bg-card p-4 shadow-xs">
+      <div className="min-w-0">
+        <p className="mb-4 truncate text-sm font-semibold text-muted-foreground">{w.label}</p>
+        <div className="text-3xl font-bold tracking-tight text-foreground tabular-nums">
+          {rows.isPending ? (
+            <Skeleton className="h-9 w-24" />
+          ) : rows.isError ? (
+            <button type="button" className="text-base text-destructive underline-offset-4 hover:underline" title={describe(rows.error)} onClick={() => rows.refetch()}>
+              {t("retry")}
+            </button>
+          ) : (
+            format(yCol ?? ({ kind: "decimal" } as FieldMeta), total(rows.data, w.y))
+          )}
+        </div>
+      </div>
+      <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
+        <Icon className="size-5" />
+      </div>
+    </div>
+  )
+}
+
+/** A chart or a table, in a card of its own. */
+function WidgetCard({ widget: w, since }: { widget: Widget; since?: Date }) {
+  const rows = useRows(w, since)
   const column = (name?: string) => w.columns.find((c) => c.name === name)
   const yCol = column(w.y)
   return (
-    <Card className={cn(w.kind === "stat" && "@container/card gap-2")}>
-      <CardHeader className={cn(w.kind === "stat" && "relative")}>
-        {w.kind === "stat" ? (
-          <>
-            <CardDescription className="pr-14 font-semibold">{w.label}</CardDescription>
-            <div className={cn("absolute top-0 right-5 flex size-11 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
-              {(() => {
-                const Icon = iconOf(w.icon)
-                return <Icon className="size-5" />
-              })()}
-            </div>
-          </>
-        ) : (
-          <CardTitle>{w.label}</CardTitle>
-        )}
-        {w.kind === "stat" && (
-          <CardTitle className="mt-3 text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
-            {rows.isPending ? (
-              <Skeleton className="h-8 w-24" />
-            ) : rows.isError ? (
-              "—"
-            ) : (
-              format(yCol ?? ({ kind: "decimal" } as FieldMeta), total(rows.data, w.y))
-            )}
-          </CardTitle>
-        )}
+    <Card>
+      <CardHeader>
+        <CardTitle>{w.label}</CardTitle>
       </CardHeader>
-      {(w.kind !== "stat" || rows.isError) && (
-        <CardContent>
-          {rows.isPending && <Skeleton className={w.kind === "table" ? "h-40 w-full" : "h-56 w-full"} />}
-          {rows.isError && (
-            <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-destructive" role="alert">
-              <AlertTriangle className="size-5" />
-              <span>{describe(rows.error)}</span>
-              <Button variant="outline" size="sm" onClick={() => rows.refetch()}>
-                <RotateCw /> {t("retry")}
-              </Button>
-            </div>
-          )}
-          {rows.data && rows.data.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">{t("noData")}</p>}
-          {rows.data && rows.data.length > 0 && w.kind === "bar" && <BarsChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
-          {rows.data && rows.data.length > 0 && w.kind === "line" && <LineChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
-          {rows.data && rows.data.length > 0 && w.kind === "table" && <ReportTable rows={rows.data} columns={w.columns} />}
-        </CardContent>
-      )}
+      <CardContent>
+        {rows.isPending && <Skeleton className={w.kind === "table" ? "h-40 w-full" : "h-64 w-full"} />}
+        {rows.isError && (
+          <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-destructive" role="alert">
+            <AlertTriangle className="size-5" />
+            <span>{describe(rows.error)}</span>
+            <Button variant="outline" size="sm" onClick={() => rows.refetch()}>
+              <RotateCw /> {t("retry")}
+            </Button>
+          </div>
+        )}
+        {rows.data && rows.data.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">{t("noData")}</p>}
+        {rows.data && rows.data.length > 0 && w.kind === "bar" && <BarsChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
+        {rows.data && rows.data.length > 0 && w.kind === "line" && <LineChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
+        {rows.data && rows.data.length > 0 && w.kind === "table" && <ReportTable rows={rows.data} columns={w.columns} />}
+      </CardContent>
     </Card>
   )
 }
@@ -189,28 +219,30 @@ function chartRows(rows: Row[], x: string, y: string) {
 export function BarsChart({ rows, x, y, label }: { rows: Row[]; x: string; y: string; label?: string }) {
   const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
-    <ChartContainer config={config} className="aspect-auto h-56 w-full">
-      <BarChart data={chartRows(rows, x, y)} accessibilityLayer>
+    <ChartContainer config={config} className="aspect-auto h-64 w-full">
+      <BarChart data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: -12 } }>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={8} />
-        <ChartTooltip content={<ChartTooltipContent />} />
-        <Bar dataKey={y} fill={`var(--color-${y})`} radius={4} />
+        <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={48} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+        <Bar dataKey={y} fill={`var(--color-${y})`} radius={[8, 8, 0, 0]} maxBarSize={48} />
       </BarChart>
     </ChartContainer>
   )
 }
 
-/** A line (an area) over a report's rows, in their order: days, months. */
+/** A smooth line over a report's rows, in their order: days, months. */
 export function LineChart({ rows, x, y, label }: { rows: Row[]; x: string; y: string; label?: string }) {
-  const config = { [y]: { label: label ?? y, color: "var(--chart-2)" } } satisfies ChartConfig
+  const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
-    <ChartContainer config={config} className="aspect-auto h-56 w-full">
-      <AreaChart data={chartRows(rows, x, y)} accessibilityLayer>
+    <ChartContainer config={config} className="aspect-auto h-64 w-full">
+      <Lines data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: -12, right: 8 } }>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={8} />
+        <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={48} />
         <ChartTooltip content={<ChartTooltipContent />} />
-        <Area dataKey={y} type="monotone" fill={`var(--color-${y})`} fillOpacity={0.25} stroke={`var(--color-${y})`} />
-      </AreaChart>
+        <Line dataKey={y} type="monotone" stroke={`var(--color-${y})`} strokeWidth={3} dot={false} activeDot={ { r: 5 } } />
+      </Lines>
     </ChartContainer>
   )
 }
@@ -218,9 +250,9 @@ export function LineChart({ rows, x, y, label }: { rows: Row[]; x: string; y: st
 /** A report's rows as a table, each column as people read it. */
 export function ReportTable({ rows, columns }: { rows: Row[]; columns: FieldMeta[] }) {
   return (
-    <div className="max-h-72 overflow-auto rounded-md border">
+    <div className="max-h-72 overflow-auto">
       <Table>
-        <TableHeader className="bg-muted/50">
+        <TableHeader>
           <TableRow>
             {columns.map((c) => (
               <TableHead key={c.name}>{c.label}</TableHead>

@@ -89,7 +89,9 @@ keyboard.
 
 The first page shows the reports marked as widgets: a number, bars, a line
 or a table, for a period (today, the last 7 or 30 days, all time) that
-fills the report's time parameter.
+fills the report's time parameter, chosen at the right of its title. The
+numbers sit side by side in an overview, each with its icon (`icon`) in a
+colored circle; the charts and tables, each in a card, below them.
 
 ```esquadro
 report ProductsByCategory {
