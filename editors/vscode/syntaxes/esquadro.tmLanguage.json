@@ -128,7 +128,7 @@
     },
     "types": {
       "name": "support.type.esquadro",
-      "match": "\\b(string|text|int|int64|decimal|money|bool|time|date|uuid|json)\\b"
+      "match": "\\b(string|text|int|int64|decimal|money|file|image|bool|time|date|uuid|json)\\b"
     },
     "modifiers": {
       "name": "storage.modifier.esquadro",

@@ -25,7 +25,7 @@ jobs.esq:16:10: error: unknown type "Missing"
    |
 16 |   status Missing
    |          ^^^^^^^
-   = help: built-in types are string, text, int, int64, decimal, money, bool, time, date, uuid and json
+   = help: built-in types are string, text, int, int64, decimal, money, file, image, bool, time, date, uuid and json
 
 jobs.esq:19:5: error: User is already declared at line 7
    |

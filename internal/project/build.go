@@ -231,6 +231,28 @@ func (b *builder) build() {
 	for _, e := range b.p.Entities {
 		b.checkMemberClashes(e)
 	}
+	b.checkFilesHaveStorage()
+}
+
+// checkFilesHaveStorage reports the file and image fields of an app
+// without the storage blueprint, which keeps them.
+func (b *builder) checkFilesHaveStorage() {
+	if b.p.App == nil {
+		return
+	}
+	for _, r := range b.p.App.Blueprints {
+		if r.Ref == "storage" {
+			return
+		}
+	}
+	for _, e := range b.p.Entities {
+		for _, f := range e.Fields {
+			if f.IsFile() {
+				b.diags.Errorf(f.Pos, nameEnd(f.Pos, f.Raw), "%s.%s is %s %s, which needs the storage blueprint", e.Raw, f.Raw, article(f.typeName()), f.typeName()).
+					Suggestion = "add it to the app block: blueprint storage"
+			}
+		}
+	}
 }
 
 // declare registers an entity or enum name, reporting duplicates and names
@@ -399,6 +421,11 @@ func (b *builder) buildJob(d *dsl.JobDecl) {
 			}
 		}
 		if fld := b.buildField(j.Module, f, false); fld != nil {
+			if fld.IsFile() {
+				b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "a job's argument cannot be %s %s: the queue holds values", article(fld.typeName()), fld.typeName()).
+					Suggestion = fmt.Sprintf("pass the id of the record that has it, e.g. %s_record_id uuid", fld.Snake)
+				continue
+			}
 			j.Fields = append(j.Fields, fld)
 		}
 	}
@@ -461,6 +488,11 @@ func (b *builder) buildReport(d *dsl.ReportDecl) {
 		if fld.Type == TypeJSON {
 			b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "a report's columns and parameters are plain values: json is not one").
 				Suggestion = "select the values the report shows, each in a column"
+			continue
+		}
+		if fld.IsFile() {
+			b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "a report's columns and parameters are plain values: %s is not one", fld.typeName()).
+				Suggestion = "select the file's id as a uuid, or its name as a string"
 			continue
 		}
 		if param && fld.Type == TypeMoney {
@@ -583,7 +615,7 @@ func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 		if s := didYouMean(typ, cands); s != "" {
 			e.Suggestion = s
 		} else {
-			e.Suggestion = "built-in types are string, text, int, int64, decimal, money, bool, time, date, uuid and json"
+			e.Suggestion = "built-in types are string, text, int, int64, decimal, money, file, image, bool, time, date, uuid and json"
 		}
 		return nil
 	}
@@ -610,6 +642,11 @@ func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 			if f.Type == TypeMoney {
 				b.errorf(m.Name.Span, "unique is not allowed on money fields").
 					Suggestion = "an amount is rarely an identity; make another field unique"
+				continue
+			}
+			if f.IsFile() {
+				b.errorf(m.Name.Span, "unique is not allowed on %s fields", f.typeName()).
+					Suggestion = "each upload is its own file already"
 				continue
 			}
 			if b.noArgs(m) {
@@ -775,6 +812,11 @@ func (b *builder) setPattern(f *Field, m *dsl.Modifier) {
 var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 func (b *builder) setDefault(f *Field, m *dsl.Modifier) {
+	if f.IsFile() {
+		b.errorf(m.Name.Span, "default is not allowed on %s fields", f.typeName()).
+			Suggestion = "a file comes from an upload; leave the field empty instead"
+		return
+	}
 	v, ok := b.oneArg(m, "default(0)")
 	if !ok {
 		return

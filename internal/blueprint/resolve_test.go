@@ -136,7 +136,7 @@ func sortedMap(m map[string]any) string {
 func TestBuiltinBlueprintsAreValid(t *testing.T) {
 	l := &Loader{Builtin: blueprints.FS, HasBuiltinHook: anyHook, Browsing: true}
 	names := l.BuiltinNames()
-	if strings.Join(names, " ") != "api_docs app branching client_ts compose compression deploy docker domain env git github_actions http i18n jobs mail migrations observability postgres rate_limit rest security spa store testcontainers worker workspace" {
+	if strings.Join(names, " ") != "api_docs app branching client_ts compose compression deploy docker domain env git github_actions http i18n jobs mail migrations observability postgres rate_limit rest security spa storage store testcontainers worker workspace" {
 		t.Fatalf("built-in blueprints = %v", names)
 	}
 	for _, name := range names {

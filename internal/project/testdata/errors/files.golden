@@ -1,0 +1,55 @@
+files.esq:9:3: error: Product.photo is an image, which needs the storage blueprint
+  |
+9 |   photo  image required unique
+  |   ^^^^^
+  = help: add it to the app block: blueprint storage
+
+files.esq:9:25: error: unique is not allowed on image fields
+  |
+9 |   photo  image required unique
+  |                         ^^^^^^
+  = help: each upload is its own file already
+
+files.esq:10:3: error: Product.manual is a file, which needs the storage blueprint
+   |
+10 |   manual file default("x") min(1) pattern("x")
+   |   ^^^^^^
+   = help: add it to the app block: blueprint storage
+
+files.esq:10:15: error: default is not allowed on file fields
+   |
+10 |   manual file default("x") min(1) pattern("x")
+   |               ^^^^^^^
+   = help: a file comes from an upload; leave the field empty instead
+
+files.esq:10:28: error: min is not allowed on file fields
+   |
+10 |   manual file default("x") min(1) pattern("x")
+   |                            ^^^
+   = help: min and max apply to string, text, int, int64, decimal and money
+
+files.esq:10:35: error: pattern is not allowed on file fields
+   |
+10 |   manual file default("x") min(1) pattern("x")
+   |                                   ^^^^^^^
+   = help: pattern applies to string and text
+
+files.esq:14:3: error: a job's argument cannot be an image: the queue holds values
+   |
+14 |   photo image required
+   |   ^^^^^
+   = help: pass the id of the record that has it, e.g. photo_record_id uuid
+
+files.esq:17:8: error: report Photos has no columns: what does each row hold?
+   |
+17 | report Photos {
+   |        ^^^^^^
+   = help: declare its columns as fields, e.g. clicks int required
+
+files.esq:18:3: error: a report's columns and parameters are plain values: image is not one
+   |
+18 |   photo image required
+   |   ^^^^^
+   = help: select the file's id as a uuid, or its name as a string
+
+9 errors

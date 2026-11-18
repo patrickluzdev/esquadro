@@ -19,6 +19,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/spa"
+	"github.com/patrickluzdev/esquadro/blueprints/storage"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 	bpworkspace "github.com/patrickluzdev/esquadro/blueprints/workspace"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
@@ -48,6 +49,7 @@ func init() {
 	blueprint.Checks["platform/apps"] = apps.Check
 	blueprint.Checks["workspace"] = bpworkspace.Check
 	blueprint.Checks["spa"] = spa.Check
+	blueprint.Checks["storage"] = storage.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

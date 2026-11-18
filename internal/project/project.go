@@ -226,6 +226,10 @@ const (
 	// TypeMoney is an exact amount with its currency (ISO 4217): stored as
 	// both, the currency the app's by default.
 	TypeMoney Type = "money"
+	// TypeFile and TypeImage are a file in the storage blueprint's store,
+	// any kind or an image; the record keeps its id.
+	TypeFile  Type = "file"
+	TypeImage Type = "image"
 	TypeBool  Type = "bool"
 	TypeTime  Type = "time"
 	TypeDate  Type = "date"
@@ -236,8 +240,11 @@ const (
 
 var builtinTypes = []Type{
 	TypeString, TypeText, TypeInt, TypeInt64, TypeDecimal, TypeMoney,
-	TypeBool, TypeTime, TypeDate, TypeUUID, TypeJSON,
+	TypeFile, TypeImage, TypeBool, TypeTime, TypeDate, TypeUUID, TypeJSON,
 }
+
+// IsFile reports whether a field holds a file (file or image).
+func (f *Field) IsFile() bool { return f.Type == TypeFile || f.Type == TypeImage }
 
 // Field is a resolved field.
 type Field struct {

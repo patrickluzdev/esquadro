@@ -34,6 +34,7 @@ Every entity also has an `id` (a UUID v7, which sorts by creation time),
 | `int64` | `int64` | `bigint` |
 | `decimal` | `decimal.Decimal` | `numeric` |
 | `money` | `currency.Amount` | `numeric(19,4)` and a `char(3)` currency |
+| `file`, `image` | the file's id | a `uuid` to the [stored file](/esquadro/blueprints/reference/storage/) |
 | `bool` | `bool` | `boolean` |
 | `time` | `time.Time` | `timestamptz` |
 | `date` | `time.Time` | `date` |
@@ -64,6 +65,24 @@ prices finer than a cent) and `price_currency`, and travels in the API as
 text, never as a JSON number. In Go it is a
 [`currency.Amount`](https://pkg.go.dev/github.com/bojanz/currency). `min`,
 `max` and `default` apply to the amount; a money field cannot be `unique`.
+
+## Files
+
+A `file` or an `image` field is a file kept by the
+[storage](/esquadro/blueprints/reference/storage/) blueprint, which the app
+must use: an image takes png, jpeg, webp, gif and avif up to 10MB, a file
+any format up to 25MB, both changed in the blueprint's options or by the
+field's `@storage`:
+
+```esquadro
+entity Product {
+  photo  image required @storage(max "5MB")
+  manual file  @storage(max "20MB", types [pdf], url_minutes 5)
+}
+```
+
+A file field cannot be `unique`, have a `default`, `min`, `max` or a
+`pattern`, nor be a job's argument or a report's column.
 
 ## Rules
 

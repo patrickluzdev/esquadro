@@ -1,0 +1,19 @@
+package catalog
+
+app shop {
+  module "github.com/example/shop"
+  blueprint platform
+}
+
+entity Product {
+  photo  image required unique
+  manual file default("x") min(1) pattern("x")
+}
+
+job Resize {
+  photo image required
+}
+
+report Photos {
+  photo image required
+}
