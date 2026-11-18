@@ -23,7 +23,9 @@ export function Settings({ sections }: { sections: SettingsSection[] }) {
   if (!current) return null
   return (
     <Card className="gap-0 py-0">
-      <div className="grid md:grid-cols-[240px_minmax(0,1fr)]">
+      {/* As tall as the screen leaves it: choosing another section does not
+          make it grow or shrink (a longer one makes it taller). */}
+      <div className="grid md:min-h-[calc(100svh-13rem)] md:grid-cols-[240px_minmax(0,1fr)]">
         <nav className="flex gap-1 overflow-x-auto border-b border-border p-3 md:flex-col md:border-r md:border-b-0 md:p-4" aria-label={current.label}>
           {sections.map((s) => {
             const active = s === current
