@@ -194,7 +194,7 @@ function RecordsList({
   }
   const list = useQuery({
     queryKey: [meta.name, "list", query],
-    queryFn: () => meta.api(api as never).list(query),
+    queryFn: ({ signal }) => meta.api(api as never).list(query, { signal }),
     placeholderData: keepPreviousData,
   })
   // How many records each tab keeps, with the rest of the search: a page
@@ -206,7 +206,7 @@ function RecordsList({
       if (tabsField) q[tabsField.name] = v
       return {
         queryKey: [meta.name, "count", q],
-        queryFn: () => meta.api(api as never).list(q) as Promise<{ total?: number }>,
+        queryFn: ({ signal }) => meta.api(api as never).list(q, { signal }) as Promise<{ total?: number }>,
         enabled: paged,
         staleTime: 30_000,
         placeholderData: keepPreviousData,
@@ -327,7 +327,7 @@ function RecordsList({
             const value = o.cell ? o.cell(row.original) : o.editable ? (
               <EditableCell meta={meta} field={f} record={row.original} />
             ) : (
-              <FieldValue field={f} record={row.original} />
+              <FieldValue field={f} record={row.original} inline />
             )
             if (f.name !== titleColumn) return value
             // The column a record is called by carries its picture.
@@ -340,7 +340,7 @@ function RecordsList({
                   {value}
                   {sub && (
                     <span className="truncate text-xs font-medium text-muted-foreground">
-                      {typeof sub === "function" ? sub(row.original) : <FieldValue field={sub} record={row.original} />}
+                      {typeof sub === "function" ? sub(row.original) : <FieldValue field={sub} record={row.original} inline />}
                     </span>
                   )}
                 </div>

@@ -33,7 +33,8 @@ import { useSession } from "./auth.tsx"
 import { RecordHistory, seesHistory } from "./history.tsx"
 
 /** A field's value: your own renderer for its name or kind, or the kit's. */
-export function FieldValue({ field, record }: { field: FieldMeta; record: Rec }) {
+/** A field's value, as a page shows it; inline, in a line of a list. */
+export function FieldValue({ field, record, inline = false }: { field: FieldMeta; record: Rec; inline?: boolean }) {
   const value = record[field.name]
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.show) return <>{own.show(value, record)}</>
@@ -46,7 +47,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
     return <RelationValue field={field} id={String(value)} />
   }
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">—</span>
-  if (field.rich) return <RichText html={String(value)} />
+  if (field.rich) return inline ? <span className="line-clamp-2">{format(field, value)}</span> : <RichText html={String(value)} />
   if (field.kind === "text" || field.kind === "textarea") return <Highlight text={format(field, value)} />
   return <>{format(field, value)}</>
 }
@@ -56,7 +57,7 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
   const related = useQuery({
     queryKey: [target?.name ?? field.target, "get", id],
-    queryFn: () => target.api(api as never).get(id),
+    queryFn: ({ signal }) => target.api(api as never).get(id, {}, { signal }),
     enabled: target !== undefined,
     staleTime: 60_000,
   })
@@ -89,7 +90,7 @@ export function BackToList({ resource }: { resource: Resource }) {
 export function useRecord(resource: Resource, id: string | undefined) {
   return useQuery({
     queryKey: [resource.meta.name, "get", id],
-    queryFn: () => resource.meta.api(api as never).get(id ?? ""),
+    queryFn: ({ signal }) => resource.meta.api(api as never).get(id ?? "", {}, { signal }),
     enabled: id !== undefined,
   })
 }
@@ -264,7 +265,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
 function RelationCount({ resource, param, value }: { resource: Resource; param: string; value: string }) {
   const total = useQuery({
     queryKey: [resource.meta.name, "count", param, value],
-    queryFn: () => resource.meta.api(api as never).list({ [param]: value, per_page: 1, limit: 1 }),
+    queryFn: ({ signal }) => resource.meta.api(api as never).list({ [param]: value, per_page: 1, limit: 1 }, { signal }),
     select: (page: { total?: number }) => page.total,
     staleTime: 30_000,
   })

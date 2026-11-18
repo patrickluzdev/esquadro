@@ -70,7 +70,7 @@ function useRelated(field: FieldMeta) {
   const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
   const related = useQuery({
     queryKey: [target?.name ?? field.target, "options"],
-    queryFn: () => target.api(api as never).list({ per_page: 100, limit: 100 }),
+    queryFn: ({ signal }) => target.api(api as never).list({ per_page: 100, limit: 100 }, { signal }),
     enabled: field.kind === "relation" && target !== undefined,
     staleTime: 60_000,
   })

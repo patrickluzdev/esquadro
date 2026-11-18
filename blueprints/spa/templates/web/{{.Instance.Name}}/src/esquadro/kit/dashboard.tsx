@@ -81,7 +81,7 @@ export interface Widget {
   /** How many rows a ranking, a list, a timeline or a table shows. */
   rows?: number
   columns: FieldMeta[]
-  fetch: (api: never, params: Record<string, unknown>) => Promise<Row[]>
+  fetch: (api: never, params: Record<string, unknown>, signal?: AbortSignal) => Promise<Row[]>
 }
 
 const DAY = 86_400_000
@@ -269,7 +269,7 @@ function useRows(w: Widget, since?: Date, until?: Date, enabled = true) {
   const params = paramsOf(w, since, until)
   return useQuery({
     queryKey: ["reports", w.name, params],
-    queryFn: () => w.fetch(api as never, params),
+    queryFn: ({ signal }) => w.fetch(api as never, params, signal),
     enabled,
     // Numbers of a period change slowly: going back to a dashboard within a
     // minute shows them again without asking.

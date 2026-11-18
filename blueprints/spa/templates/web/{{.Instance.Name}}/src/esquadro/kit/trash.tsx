@@ -80,7 +80,7 @@ export function useTrashCount(meta: ResourceMeta, enabled = true): number | unde
   const trash = trashOf(meta)
   const count = useQuery({
     queryKey: [meta.name, "trash", "count"],
-    queryFn: () => trash!.list({ page: 1, per_page: 1 }),
+    queryFn: ({ signal }) => trash!.list({ page: 1, per_page: 1 }, { signal }),
     enabled: Boolean(trash) && enabled,
     staleTime: 30_000,
   })
@@ -100,7 +100,7 @@ export function TrashList({ resource }: { resource: Resource }) {
   const page = Number(search.page) || 1
   const list = useQuery({
     queryKey: [meta.name, "trash", page],
-    queryFn: () => trash.list({ page, per_page: PER_PAGE }),
+    queryFn: ({ signal }) => trash.list({ page, per_page: PER_PAGE }, { signal }),
     placeholderData: keepPreviousData,
   })
   const act = useMutation({

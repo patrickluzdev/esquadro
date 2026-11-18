@@ -40,10 +40,10 @@ interface ServiceKey {
 }
 
 interface ServiceKeysApi {
-  list(): Promise<ServiceKey[]>
+  list(o?: { signal?: AbortSignal }): Promise<ServiceKey[]>
   create(key: { name: string; roles: string[]; days?: number }): Promise<ServiceKey & { key: string }>
   revoke(id: string): Promise<void>
-  roles(): Promise<{ items: { name: string; permissions: string[]; keys: number }[]; days: number; max_days: number; choices: number[] }>
+  roles(o?: { signal?: AbortSignal }): Promise<{ items: { name: string; permissions: string[]; keys: number }[]; days: number; max_days: number; choices: number[] }>
 }
 
 const keysApi = () => (api.identity as unknown as { serviceKeys: ServiceKeysApi }).serviceKeys
@@ -60,8 +60,8 @@ const day = (at: string) => new Date(at).toLocaleDateString(locale, { day: "nume
 /** The service keys: their roles in cards, the keys, a new one, revoking. */
 export function ServiceKeysAdmin() {
   const queryClient = useQueryClient()
-  const keys = useQuery({ queryKey: ["service-keys"], queryFn: () => keysApi().list() })
-  const roles = useQuery({ queryKey: ["service-keys", "roles"], queryFn: () => keysApi().roles() })
+  const keys = useQuery({ queryKey: ["service-keys"], queryFn: ({ signal }) => keysApi().list({ signal }) })
+  const roles = useQuery({ queryKey: ["service-keys", "roles"], queryFn: ({ signal }) => keysApi().roles({ signal }) })
   const [creating, setCreating] = useState(false)
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["service-keys"] })
   const revoke = useMutation({

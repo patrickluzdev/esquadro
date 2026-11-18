@@ -24,8 +24,8 @@ export const widgets: Widget[] = [
     dashboard: {{with index $a "dashboard"}}"{{slug .}}"{{else}}undefined{{end}},
     rows: {{with index $a "rows"}}{{.}}{{else}}undefined{{end}},
     columns: [{{range $i, $c := $r.Columns}}{{if $i}}, {{end}}{ name: "{{$c.Snake}}", label: {{printf "%q" (or (index (ann $c) "label") (humanize $c.Snake))}}, kind: "{{spaKind $c}}", required: {{$c.Required}}{{with index (ann $c) "format"}}, format: "{{.}}"{{end}}{{if $c.Enum}}, values: [{{range $j, $v := enumValues $c.Enum}}{{if $j}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $j, $v := $c.Enum.Values}}{{if $j}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }, colors: { {{- range $j, $v := $c.Enum.Values}}{{if $j}},{{end}} {{$v.Raw}}: "{{enumColor $v (ann $v)}}"{{end}} }{{end}} }{{end}}],
-    fetch: (api: Api, params: Record<string, unknown>) =>
-      api.reports.{{$r.Camel}}(params as never) as unknown as Promise<Record<string, unknown>[]>,
+    fetch: (api: Api, params: Record<string, unknown>, signal?: AbortSignal) =>
+      api.reports.{{$r.Camel}}(params as never, { signal }) as unknown as Promise<Record<string, unknown>[]>,
   },
 {{- end}}{{end}}
 ]

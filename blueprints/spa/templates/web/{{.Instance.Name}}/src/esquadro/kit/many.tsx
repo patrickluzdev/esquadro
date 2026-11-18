@@ -17,7 +17,7 @@ import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 const targetOf = (field: FieldMeta) => (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
 
 /** The links of a relation, as the API lists them: a page of its records. */
-type Links = { list(id: string, query?: { limit?: number }): Promise<{ items: Rec[] }> }
+type Links = { list(id: string, query?: { limit?: number }, o?: { signal?: AbortSignal }): Promise<{ items: Rec[] }> }
 
 /**
  * The records a record is linked to, for the form to start with: their ids,
@@ -29,9 +29,9 @@ export function useLinked(meta: ResourceMeta, fields: FieldMeta[], id: string | 
   const linked = useQueries({
     queries: many.map((f) => ({
       queryKey: [meta.name, "links", f.relation, id],
-      queryFn: async () => {
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
         const links = (meta.api(api as never) as unknown as Record<string, Links>)[f.relation!]
-        const page = await links.list(id!, { limit: 100 })
+        const page = await links.list(id!, { limit: 100 }, { signal })
         const target = targetOf(f)
         for (const r of page.items) if (target) queryClient.setQueryData([target.name, "get", r.id], r)
         return page.items.map((r) => r.id)
@@ -49,7 +49,7 @@ export function useLinked(meta: ResourceMeta, fields: FieldMeta[], id: string | 
 function Chip({ target, display, id, onRemove }: { target: ResourceMeta; display: string; id: string; onRemove: () => void }) {
   const record = useQuery({
     queryKey: [target.name, "get", id],
-    queryFn: () => target.api(api as never).get(id),
+    queryFn: ({ signal }) => target.api(api as never).get(id, {}, { signal }),
     staleTime: 60_000,
   })
   return (
@@ -96,8 +96,8 @@ export function ManyInput({
   const searchable = target?.sorts.includes("relevance") ?? false
   const options = useQuery({
     queryKey: [target?.name, "options", searchable ? q : ""],
-    queryFn: async () => {
-      const page = await target.api(api as never).list({ ...(searchable && q ? { q } : {}), per_page: 20, limit: 20 })
+    queryFn: async ({ signal }) => {
+      const page = await target.api(api as never).list({ ...(searchable && q ? { q } : {}), per_page: 20, limit: 20 }, { signal })
       for (const r of page.items) queryClient.setQueryData([target.name, "get", r.id], r)
       return page.items
     },

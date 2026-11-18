@@ -77,6 +77,13 @@ export interface RequestOptions {
   body?: unknown
   ifMatch?: Version
   idempotencyKey?: string
+  /** Cancels the request: it then rejects with an AbortError. */
+  signal?: AbortSignal
+}
+
+/** Options of a read: a signal to cancel it (a screen left, a search typed over). */
+export interface ReadOptions {
+  signal?: AbortSignal
 }
 
 /** Sends the client's requests, with its sign-in. */
@@ -133,6 +140,7 @@ export class Transport {
       headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       credentials: o.auth ? "include" : "same-origin",
+      signal: init.signal,
     })
     const text = await res.text()
     let body: unknown
@@ -179,7 +187,7 @@ export interface AuditPage {
 /** The trash of an entity's records. */
 export interface Trash<T> {
   /** A page of it, the last deleted first, each with deleted_at. */
-  list(query?: { page?: number; per_page?: number }): Promise<Page<T & { deleted_at: string }>>
+  list(query?: { page?: number; per_page?: number }, options?: ReadOptions): Promise<Page<T & { deleted_at: string }>>
   /** Takes one out, with the records that went in with it. */
   restore(id: string): Promise<T>
   /** Deletes one in it for good. */
@@ -215,28 +223,28 @@ export interface ChangeOptions {
 // types them.
 export function records(t: Transport, path: string, pagination: readonly string[], trash = false, history = false): unknown {
   const one = (id: string) => `${path}/${encodeURIComponent(id)}`
-  const list = (query: Query = {}) => t.request<Page<unknown>>("GET", path, { query })
+  const list = (query: Query = {}, o: ReadOptions = {}) => t.request<Page<unknown>>("GET", path, { query, signal: o.signal })
   return {
     list,
-    async *all(query: Query = {}) {
+    async *all(query: Query = {}, o: ReadOptions = {}) {
       if (pagination.includes("cursor")) {
         let after: string | undefined
         do {
-          const page = await list({ ...query, after, page: undefined })
+          const page = await list({ ...query, after, page: undefined }, o)
           yield* page.items
           after = page.next
         } while (after)
       } else if (pagination.includes("page")) {
         for (let n = 1; ; n++) {
-          const page = await list({ ...query, page: n })
+          const page = await list({ ...query, page: n }, o)
           yield* page.items
           if (n >= (page.total_pages ?? 0)) break
         }
       } else {
-        yield* (await list(query)).items
+        yield* (await list(query, o)).items
       }
     },
-    get: (id: string, query: Query = {}) => t.request("GET", one(id), { query }),
+    get: (id: string, query: Query = {}, o: ReadOptions = {}) => t.request("GET", one(id), { query, signal: o.signal }),
     create: (record: unknown, o: CreateOptions = {}) =>
       t.request("POST", path, { body: record, idempotencyKey: o.idempotencyKey ?? crypto.randomUUID() }),
     update: (id: string, record: unknown, o: ChangeOptions = {}) =>
@@ -247,11 +255,12 @@ export function records(t: Transport, path: string, pagination: readonly string[
       await t.request("DELETE", one(id), { ifMatch: o.ifMatch })
     },
     ...(history && {
-      history: (id: string, query: Query = {}) => t.request<AuditPage>("GET", `${one(id)}/history`, { query }),
+      history: (id: string, query: Query = {}, o: ReadOptions = {}) =>
+        t.request<AuditPage>("GET", `${one(id)}/history`, { query, signal: o.signal }),
     }),
     ...(trash && {
       trash: {
-        list: (query: Query = {}) => t.request("GET", `${path}/trash`, { query }),
+        list: (query: Query = {}, o: ReadOptions = {}) => t.request("GET", `${path}/trash`, { query, signal: o.signal }),
         restore: (id: string) => t.request("POST", `${one(id)}/restore`, {}),
         purge: async (id: string) => {
           await t.request("DELETE", `${path}/trash/${encodeURIComponent(id)}`, {})
@@ -266,7 +275,7 @@ export function records(t: Transport, path: string, pagination: readonly string[
 export function links(t: Transport, path: string, relation: string): unknown {
   const of = (id: string) => `${path}/${encodeURIComponent(id)}/${relation}`
   return {
-    list: (id: string, query: Query = {}) => t.request("GET", of(id), { query }),
+    list: (id: string, query: Query = {}, o: ReadOptions = {}) => t.request("GET", of(id), { query, signal: o.signal }),
     add: async (id: string, other: string, o: ChangeOptions = {}) => {
       await t.request("PUT", `${of(id)}/${encodeURIComponent(other)}`, { ifMatch: o.ifMatch })
     },

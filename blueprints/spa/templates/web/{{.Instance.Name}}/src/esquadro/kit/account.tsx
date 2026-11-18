@@ -35,7 +35,7 @@ interface Device {
 
 /** The account's routes of the realm that signs in. */
 interface Account {
-  sessions(): Promise<Device[]>
+  sessions(o?: { signal?: AbortSignal }): Promise<Device[]>
   endSession(id: string): Promise<void>
   endOtherSessions(): Promise<void>
   changePassword(change: { current_password?: string; new_password: string }): Promise<void>
@@ -152,7 +152,7 @@ export function PasswordCard() {
 export function DevicesCard() {
   const queryClient = useQueryClient()
   const sensitive = useSensitive()
-  const devices = useQuery({ queryKey: ["account", "sessions"], queryFn: () => account().sessions() })
+  const devices = useQuery({ queryKey: ["account", "sessions"], queryFn: ({ signal }) => account().sessions({ signal }) })
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["account", "sessions"] })
   const others = (devices.data ?? []).filter((d) => !d.current)
   return (

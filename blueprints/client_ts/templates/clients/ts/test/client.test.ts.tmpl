@@ -40,6 +40,23 @@ test("{{.Plural.Snake}}: create once, read only some fields, change on the versi
   await {{$api}}.delete(created.id, { ifMatch: same })
   await assert.rejects({{$api}}.get(created.id), (e) => isApiError(e, "not_found"))
 })
+
+test("{{.Plural.Snake}}: a read cancelled rejects with an AbortError, sent once", async () => {
+  let calls = 0
+  // A server that never answers: only the signal ends the request.
+  const hanging = createClient({
+    baseUrl: process.env.API_URL!,
+    fetch: (_input, init) => {
+      calls++
+      return new Promise((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)))
+    },
+  })
+  const controller = new AbortController()
+  const read = hanging.{{.Plural.Camel}}.list({}, { signal: controller.signal })
+  controller.abort()
+  await assert.rejects(read, (e) => e instanceof Error && e.name === "AbortError" && !isApiError(e))
+  assert.equal(calls, 1, "a cancelled read is not sent again")
+})
 {{- range inRequest $e}}{{if and (or (eq .Type "string") (eq .Type "text")) .Min (not .Pattern)}}{{if ge .Min.Value 2.0}}
 
 test("{{$e.Plural.Snake}}: the client's rules and the API's refuse the same", async () => {

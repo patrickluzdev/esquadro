@@ -53,7 +53,7 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
       toast(code ? `${field.label}: ${fieldMessage(field, code)}` : describe(e), "error")
     },
   })
-  if (!canEdit) return <FieldValue field={field} record={record} />
+  if (!canEdit) return <FieldValue field={field} record={record} inline />
   const stop = { onClick: (e: React.MouseEvent) => e.stopPropagation() }
   const value = record[field.name]
 
@@ -167,7 +167,7 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
       }}
       aria-label={`${t("edit")} ${field.label}`}
     >
-      <FieldValue field={field} record={record} />
+      <FieldValue field={field} record={record} inline />
       <Pencil className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover/cell:opacity-100" />
     </button>
   )

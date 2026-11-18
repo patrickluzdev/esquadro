@@ -2,7 +2,9 @@
 
 /** Formatted text (HTML) as plain text: a list's cell, a filter's chip. */
 export function plainText(html: string): string {
-  if (typeof DOMParser === "undefined") return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
-  const doc = new DOMParser().parseFromString(html, "text/html")
+  // Blocks (paragraphs, headings, items) end in a space, not glued.
+  const spaced = html.replace(/<\/(p|h[1-6]|li|blockquote|pre|div)>|<br\s*\/?>/gi, "$& ")
+  if (typeof DOMParser === "undefined") return spaced.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+  const doc = new DOMParser().parseFromString(spaced, "text/html")
   return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim()
 }

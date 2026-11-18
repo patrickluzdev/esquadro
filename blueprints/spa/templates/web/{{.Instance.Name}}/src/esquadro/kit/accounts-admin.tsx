@@ -60,7 +60,7 @@ interface RoleInfo {
 }
 
 interface Accounts {
-  list(query: Record<string, string | number | undefined>): Promise<{ items: Account[]; page: number; total: number; total_pages: number }>
+  list(query: Record<string, string | number | undefined>, o?: { signal?: AbortSignal }): Promise<{ items: Account[]; page: number; total: number; total_pages: number }>
   invite(i: { email: string; roles: string[]; fields: Record<string, unknown>; redirect: string }): Promise<Account>
   reinvite(id: string, redirect?: string): Promise<void>
   setRoles(id: string, roles: string[]): Promise<Account>
@@ -68,7 +68,7 @@ interface Accounts {
   enable(id: string): Promise<Account>
   endSessions(id: string): Promise<void>
   remove(id: string): Promise<void>
-  roles(): Promise<RoleInfo[]>
+  roles(o?: { signal?: AbortSignal }): Promise<RoleInfo[]>
 }
 
 /** The client's routes of a realm's accounts. */
@@ -129,8 +129,8 @@ export function AccountsAdmin({ realm }: { realm: AccountRealm }) {
   const set = (changes: Partial<typeof search>) =>
     navigate({ to: ".", search: (prev: Record<string, unknown>) => ({ ...prev, ...changes }) as never, replace: true })
   const query = { q: search.q || undefined, role: search.role, status: search.status, page: search.page ?? 1, per_page: 20 }
-  const list = useQuery({ queryKey: ["accounts", realm.name, query], queryFn: () => accounts.list(query), placeholderData: (prev) => prev })
-  const roles = useQuery({ queryKey: ["accounts", realm.name, "roles"], queryFn: () => accounts.roles() })
+  const list = useQuery({ queryKey: ["accounts", realm.name, query], queryFn: ({ signal }) => accounts.list(query, { signal }), placeholderData: (prev) => prev })
+  const roles = useQuery({ queryKey: ["accounts", realm.name, "roles"], queryFn: ({ signal }) => accounts.roles({ signal }) })
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["accounts", realm.name] })
   const act = useMutation({
     mutationFn: (run: () => Promise<unknown>) => run(),

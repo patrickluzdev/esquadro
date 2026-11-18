@@ -83,3 +83,26 @@ An operation the project writes by hand, outside the model, is
 `go test ./cmd/<app>` runs the client's tests (`clients/ts/test`) against
 the API, with Node 22.18 or later, which runs TypeScript as it is; without
 it, they are skipped. The CI also type-checks the client.
+
+## Cancelling a read
+
+Every read takes a signal last, to cancel it when it is no longer wanted:
+a screen left, a search typed over. A cancelled read rejects with an
+`AbortError` (not an `ApiError`), and is never sent again.
+
+```ts
+const controller = new AbortController()
+const page = api.products.list({ q: "webcam" }, { signal: controller.signal })
+controller.abort()
+```
+
+With TanStack Query, pass the `signal` it gives each query: it cancels the
+queries no screen uses any more.
+
+```ts
+useQuery({ queryKey: ["products", q], queryFn: ({ signal }) => api.products.list({ q }, { signal }) })
+```
+
+Changes (create, update, patch, delete) take no signal: the server may have
+made one before it learns the request was cancelled.
+

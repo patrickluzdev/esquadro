@@ -132,7 +132,7 @@ function RelationInput({ id, field, value, onChange, invalid }: InputProps & { i
   const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
   const options = useQuery({
     queryKey: [target?.name ?? field.target, "options"],
-    queryFn: () => target.api(api as never).list({ per_page: 100, limit: 100 }),
+    queryFn: ({ signal }) => target.api(api as never).list({ per_page: 100, limit: 100 }, { signal }),
     enabled: target !== undefined,
   })
   if (!target) return <Input id={id} value={value} onChange={(e) => onChange(e.target.value || null)} aria-invalid={invalid} />

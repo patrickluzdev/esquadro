@@ -135,7 +135,8 @@ export function RecordHistory({ meta, id }: { meta: ResourceMeta; id: string }) 
   const [page, setPage] = useState(1)
   const history = useQuery({
     queryKey: [meta.name, "history", id, page],
-    queryFn: () => (meta.api(api as never) as unknown as { history(id: string, q: object): Promise<EntryPage> }).history(id, { page, per_page: PER_PAGE }),
+    queryFn: ({ signal }) =>
+      (meta.api(api as never) as unknown as { history(id: string, q: object, o: object): Promise<EntryPage> }).history(id, { page, per_page: PER_PAGE }, { signal }),
     placeholderData: keepPreviousData,
   })
   if (history.isError) return <ErrorState error={history.error} onRetry={() => history.refetch()} />
@@ -211,7 +212,7 @@ export function AuditAdmin() {
   const query = { entity: search.entity, action: search.action, since: search.since, until: search.until, actor_id: search.actor_id, page, per_page: PER_PAGE }
   const list = useQuery({
     queryKey: ["audit", query],
-    queryFn: () => (api as unknown as { audit: { list(q: object): Promise<EntryPage> } }).audit.list(query),
+    queryFn: ({ signal }) => (api as unknown as { audit: { list(q: object, o: object): Promise<EntryPage> } }).audit.list(query, { signal }),
     placeholderData: keepPreviousData,
   })
   const audited = Object.values(resources as unknown as Record<string, ResourceMeta>).filter((m) => m.history)

@@ -102,7 +102,7 @@ export function CommandPalette() {
   const found = useQueries({
     queries: searchable.map((r) => ({
       queryKey: [r.name, "palette", q],
-      queryFn: () => r.api(api as never).list({ q, sort: "relevance", limit: 5, per_page: 5 }),
+      queryFn: ({ signal }) => r.api(api as never).list({ q, sort: "relevance", limit: 5, per_page: 5 }, { signal }),
       enabled: open && q.length >= 2,
       staleTime: 30_000,
     })),

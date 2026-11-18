@@ -9,7 +9,7 @@ import { {{if $m2m}}links, {{end}}records, Transport } from "./runtime.ts"
 {{- if $hasFiles}}
 import { uploads } from "./uploads.ts"
 {{- end}}
-import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, RequestOptions } from "./runtime.ts"
+import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, ReadOptions, RequestOptions } from "./runtime.ts"
 import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
 {{- if .Reports}}
 import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
@@ -69,16 +69,16 @@ export function createClient(options: ClientOptions) {
 {{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
     /** Every change of the audited records, for those who administer. */
     audit: {
-      list: (query: { entity?: string; record_id?: string; actor_id?: string; action?: string; since?: string; until?: string; page?: number; per_page?: number } = {}) =>
-        t.request<AuditPage>("GET", "/audit", { query }),
+      list: (query: { entity?: string; record_id?: string; actor_id?: string; action?: string; since?: string; until?: string; page?: number; per_page?: number } = {}, o: ReadOptions = {}) =>
+        t.request<AuditPage>("GET", "/audit", { query, signal: o.signal }),
     },
 {{- end}}
 {{- if .Reports}}
     /** The reports: each answers its rows, up to its limit. */
     reports: {
 {{- range .Reports}}{{$req := false}}{{range .Params}}{{if .Required}}{{$req = true}}{{end}}{{end}}
-      {{.Camel}}: async (params{{if not $req}}?{{end}}: {{.Pascal}}Params) =>
-        (await t.request<{ items: {{.Pascal}}Row[] }>("GET", "/api/v1/reports/{{.Kebab}}", { query: {{if $req}}{ ...params }{{else}}{ ...(params ?? {}) }{{end}} })).items,
+      {{.Camel}}: async (params{{if not $req}}?{{end}}: {{.Pascal}}Params, o: ReadOptions = {}) =>
+        (await t.request<{ items: {{.Pascal}}Row[] }>("GET", "/api/v1/reports/{{.Kebab}}", { query: {{if $req}}{ ...params }{{else}}{ ...(params ?? {}) }{{end}}, signal: o.signal })).items,
 {{- end}}
     },
 {{- end}}

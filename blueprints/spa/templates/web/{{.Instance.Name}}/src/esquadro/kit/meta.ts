@@ -61,8 +61,8 @@ export type Rec = Record<string, unknown> & { id: string; version: number; can?:
 
 /** The operations of a resource's records, as the API client has them. */
 export interface RecordsApi {
-  list(query?: Record<string, unknown>): Promise<Page>
-  get(id: string, selection?: Record<string, unknown>): Promise<Rec>
+  list(query?: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<Page>
+  get(id: string, selection?: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<Rec>
   create(record: Record<string, unknown>, options?: { idempotencyKey?: string }): Promise<Rec>
   update(id: string, record: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
   patch(id: string, changes: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
@@ -73,7 +73,7 @@ export interface RecordsApi {
 
 /** The trash of a resource whose entity has one. */
 export interface TrashApi {
-  list(query?: { page?: number; per_page?: number }): Promise<Page>
+  list(query?: { page?: number; per_page?: number }, options?: { signal?: AbortSignal }): Promise<Page>
   restore(id: string): Promise<Rec>
   purge(id: string): Promise<void>
   empty(): Promise<{ purged: number }>
