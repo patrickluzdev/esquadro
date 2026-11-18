@@ -16,4 +16,13 @@ describe("toCsv", () => {
     const records = [{ id: "1", version: 1, name: "Mouse, wireless" }, { id: "2", version: 1, name: null }] as unknown as Rec[]
     expect(toCsv([{ field: name, label: "Name" }], records, ",")).toBe('Name\r\n"Mouse, wireless"\r\n\r\n')
   })
+  it("writes money as its amount and its currency, two columns", () => {
+    const price: FieldMeta = { name: "price", label: "Price", kind: "money", required: true }
+    const records = [{ id: "1", version: 1, price: { amount: "1234.5678", currency: "BRL" } }] as unknown as Rec[]
+    const [header, line] = toCsv([{ field: price, label: "Price" }], records, "|").split("\r\n")
+    expect(header.split("|")).toHaveLength(2)
+    const [amount, currency] = line.split("|")
+    expect(amount).toMatch(/^1[.,]?234[.,]5678$/)
+    expect(currency).toBe("BRL")
+  })
 })

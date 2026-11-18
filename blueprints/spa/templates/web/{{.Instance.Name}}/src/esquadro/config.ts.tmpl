@@ -21,3 +21,6 @@ export const idleMinutes: number = {{or .Options.idle_minutes 0}}
 
 /** The language of the frontend's own words, dates, numbers and money. */
 export const locale: string = "{{if eq .Options.locale "pt_br"}}pt-BR{{else}}en{{end}}"
+
+/** The app's currency (ISO 4217): money's when an amount has none. */
+export const currency: string = "{{.App.Currency}}"

@@ -19,7 +19,7 @@ export const resources = {
     api: (api: Api) => api.{{$e.Plural.Camel}} as unknown as import("./kit/meta.ts").RecordsApi,
     fields: {
 {{- range $f := inRequest $e}}{{$fa := ann $f}}
-      {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{with defaultOf $f}}, default: {{.}}{{end}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }{{end}} },
+      {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{with defaultOf $f}}, default: {{.}}{{end}}{{with $f.Min}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, min: {{.Text}}{{end}}{{end}}{{with $f.Max}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, max: {{.Text}}{{end}}{{end}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }{{end}} },
 {{- end}}
 {{- range $r := keys $e}}
       {{keyName $r}}: { name: "{{keyName $r}}", label: {{printf "%q" (or (index (ann $r) "label") (humanize $r.Snake))}}, kind: "relation", required: {{$r.Required}}, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}" },

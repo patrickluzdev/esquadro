@@ -3,7 +3,7 @@
 
 /** How a field is shown and edited. */
 export type FieldKind =
-  | "text" | "textarea" | "int" | "decimal" | "bool" | "date" | "datetime"
+  | "text" | "textarea" | "int" | "decimal" | "money" | "bool" | "date" | "datetime"
   | "enum" | "uuid" | "json" | "relation"
 
 /** A field of a resource, from the model. */
@@ -19,7 +19,10 @@ export interface FieldMeta {
   target?: string
   display?: string
   /** What a new record starts with, as the model says. */
-  default?: string | number | boolean
+  default?: string | number | boolean | { amount: string }
+  /** A number's bounds, as the model says: min(0). */
+  min?: number
+  max?: number
   /** Shown, never edited (created_at). */
   readOnly?: boolean
 }

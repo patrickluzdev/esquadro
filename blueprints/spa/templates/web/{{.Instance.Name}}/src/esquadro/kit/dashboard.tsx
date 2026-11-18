@@ -21,6 +21,8 @@ import { widgets as declared } from "../dashboard.gen.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta } from "./meta.ts"
+import { currencyOf, formatMoney, formatTotals, isMoney, sumMoney } from "./money.tsx"
+import type { Money } from "./money.tsx"
 import { PageHeader } from "./page.tsx"
 
 type Row = Record<string, unknown>
@@ -198,7 +200,11 @@ function StatTile({
               {t("retry")}
             </button>
           ) : (
-            format(yCol ?? ({ kind: "decimal" } as FieldMeta), total(rows.data, w.y))
+            yCol?.kind === "money" ? (
+              formatTotals(sumMoney(rows.data.map((r) => r[w.y ?? ""])))
+            ) : (
+              format(yCol ?? ({ kind: "decimal" } as FieldMeta), total(rows.data, w.y))
+            )
           )}
         </div>
       </div>
@@ -218,7 +224,7 @@ function StatChart({ widget: w, since }: { widget: Widget; since?: Date }) {
   if (!rows.data || rows.data.length === 0) return <p className="py-10 text-center text-sm text-muted-foreground">{rows.isError ? describe(rows.error) : t("noData")}</p>
   return (
     <div className="mt-6">
-      <LineChart rows={named(rows.data, x)} x={w.x!} y={w.y!} label={y?.label} />
+      <LineChart rows={named(rows.data, x)} x={w.x!} y={w.y!} label={y?.label} money={moneyOf(rows.data, y)} />
     </div>
   )
 }
@@ -245,8 +251,8 @@ function WidgetCard({ widget: w, since }: { widget: Widget; since?: Date }) {
           </div>
         )}
         {rows.data && rows.data.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">{t("noData")}</p>}
-        {rows.data && rows.data.length > 0 && w.kind === "bar" && <BarsChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
-        {rows.data && rows.data.length > 0 && w.kind === "line" && <LineChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} />}
+        {rows.data && rows.data.length > 0 && w.kind === "bar" && <BarsChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} money={moneyOf(rows.data, yCol)} />}
+        {rows.data && rows.data.length > 0 && w.kind === "line" && <LineChart rows={named(rows.data, column(w.x))} x={w.x!} y={w.y!} label={yCol?.label} money={moneyOf(rows.data, yCol)} />}
         {rows.data && rows.data.length > 0 && w.kind === "table" && <ReportTable rows={rows.data} columns={w.columns} />}
       </CardContent>
     </Card>
@@ -264,24 +270,56 @@ export function total(rows: Row[] | undefined, y?: string): number {
   return (rows ?? []).reduce((sum, r) => sum + (Number(r[y ?? ""]) || 0), 0)
 }
 
-/** A chart's scale, short: 1,4 mil. */
-const scale = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
-const tick = (v: number) => scale.format(v)
+/** The currency a money column's rows are in, for its chart. */
+function moneyOf(rows: Row[], y?: FieldMeta): string | undefined {
+  if (y?.kind !== "money") return undefined
+  const first = rows.find((r) => isMoney(r[y.name]))
+  return first ? currencyOf(first[y.name] as Money) : undefined
+}
 
+/** A chart's scale, short: 1,4 mil, or R$ 1,4 mil for money. */
+function tickOf(money?: string) {
+  const scale = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1, ...(money && { style: "currency", currency: money }) })
+  return (v: number) => scale.format(v)
+}
+
+/** A chart's tooltip: a money value with its currency. */
+function tooltipOf(money?: string, label?: string) {
+  if (!money) return <ChartTooltipContent />
+  return (
+    <ChartTooltipContent
+      formatter={(value, name) => (
+        <div className="flex w-full items-center justify-between gap-4">
+          <span className="text-muted-foreground">{label ?? name}</span>
+          <span className="font-semibold text-foreground tabular-nums">{formatMoney({ amount: String(value), currency: money })}</span>
+        </div>
+      )}
+    />
+  )
+}
+
+/**
+ * The rows as a chart draws them: the names as read, the numbers as numbers
+ * (an amount's text drawn as a number: the chart only places it; what is
+ * read, the tooltip, is exact).
+ */
 function chartRows(rows: Row[], x: string, y: string) {
-  return rows.map((r) => ({ ...r, [x]: capitalize(String(r[x] ?? "—")), [y]: Number(r[y]) || 0 }))
+  return rows.map((r) => {
+    const v = r[y]
+    return { ...r, [x]: capitalize(String(r[x] ?? "—")), [y]: Number(isMoney(v) ? v.amount : v) || 0 }
+  })
 }
 
 /** Bars of a report's rows: x, the name of each; y, the number. */
-export function BarsChart({ rows, x, y, label }: { rows: Row[]; x: string; y: string; label?: string }) {
+export function BarsChart({ rows, x, y, label, money }: { rows: Row[]; x: string; y: string; label?: string; money?: string }) {
   const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">
       <BarChart data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: 0 } }>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
-        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} tickFormatter={tick} />
-        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={money ? 72 : 56} tickFormatter={tickOf(money)} />
+        <ChartTooltip cursor={false} content={tooltipOf(money, label)} />
         <Bar dataKey={y} fill={`var(--color-${y})`} radius={[8, 8, 0, 0]} maxBarSize={48} />
       </BarChart>
     </ChartContainer>
@@ -289,15 +327,15 @@ export function BarsChart({ rows, x, y, label }: { rows: Row[]; x: string; y: st
 }
 
 /** A smooth line over a report's rows, in their order: days, months. */
-export function LineChart({ rows, x, y, label }: { rows: Row[]; x: string; y: string; label?: string }) {
+export function LineChart({ rows, x, y, label, money }: { rows: Row[]; x: string; y: string; label?: string; money?: string }) {
   const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">
       <Lines data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: 0, right: 8 } }>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
-        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} tickFormatter={tick} />
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={money ? 72 : 56} tickFormatter={tickOf(money)} />
+        <ChartTooltip content={tooltipOf(money, label)} />
         <Line dataKey={y} type="monotone" stroke={`var(--color-${y})`} strokeWidth={3} dot={false} activeDot={ { r: 5 } } />
       </Lines>
     </ChartContainer>

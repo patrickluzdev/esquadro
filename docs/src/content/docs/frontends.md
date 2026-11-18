@@ -214,8 +214,8 @@ written once with the model's fields and left alone after:
 ```tsx
 export default resource(meta, {
   table: {
-    columns: [f.name, column(f.price, { cell: (p) => money(p.price) }), column(f.status, { editable: true })],
-    filters: [f.status],
+    columns: [f.name, column(f.price, { editable: true }), column(f.status, { editable: true })],
+    filters: [f.status, f.price],
   },
   form: [f.name, f.price, f.status],
   actions: [
@@ -225,6 +225,12 @@ export default resource(meta, {
 ```
 
 A field the model gains is in `meta.fields` at once; add it where you want it.
+
+A `money` field is shown with its currency (`R$ 1.234,56`), exactly: its
+amount is text, never a float. Its input writes it as the language does,
+with the currency's symbol and places; a list filters it by a range (from,
+up to); a number card sums it exactly, one total per currency; a CSV gives
+its amount and its currency in two columns.
 
 ## Yours, and generated
 

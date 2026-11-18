@@ -13,6 +13,8 @@ import { api } from "../api.ts"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Page, Rec, ResourceMeta } from "./meta.ts"
+import { isMoney, MoneyInput } from "./money.tsx"
+import type { Money } from "./money.tsx"
 import { FieldValue } from "./show.tsx"
 import { toast } from "./toast.tsx"
 
@@ -22,6 +24,7 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
+  const [amount, setAmount] = useState<Money | null>(null)
   // Enter saves, and the input's blur after it must not save again.
   const committed = useRef(false)
   const canEdit = (record.can ?? []).includes("update")
@@ -84,6 +87,37 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
       </div>
     )
   }
+  if (editing && field.kind === "money") {
+    const commit = () => {
+      if (committed.current) return
+      committed.current = true
+      const before = isMoney(value) ? value.amount : null
+      if ((amount?.amount ?? null) === before) setEditing(false)
+      else save.mutate(amount)
+    }
+    return (
+      <div {...stop} className="flex items-center gap-2">
+        <MoneyInput
+          autoFocus
+          className="h-8 w-36"
+          value={amount}
+          onChange={setAmount}
+          negative={field.min === undefined || field.min < 0}
+          disabled={save.isPending}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit()
+            if (e.key === "Escape") {
+              committed.current = true
+              setEditing(false)
+            }
+          }}
+          aria-label={field.label}
+        />
+        {save.isPending && <Spinner />}
+      </div>
+    )
+  }
   if (editing) {
     const commit = () => {
       if (committed.current) return
@@ -124,6 +158,7 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
         e.stopPropagation()
         committed.current = false
         setDraft(value === null || value === undefined ? "" : String(value))
+        setAmount(isMoney(value) ? value : null)
         setEditing(true)
       }}
       aria-label={`${t("edit")} ${field.label}`}

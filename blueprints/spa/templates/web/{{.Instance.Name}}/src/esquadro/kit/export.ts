@@ -3,8 +3,9 @@
 // spreadsheet's way for the frontend's language (";" and a byte-order mark
 // where Excel expects them, for pt-BR).
 import { locale } from "../config.ts"
-import { format } from "./i18n.ts"
+import { format, t } from "./i18n.ts"
 import type { FieldMeta, Rec } from "./meta.ts"
+import { currencyOf, isMoney, places } from "./money.tsx"
 
 /** The separator spreadsheets expect in the frontend's language. */
 export const separator = locale === "en" ? "," : ";"
@@ -14,17 +15,32 @@ export function cell(value: string, sep = separator): string {
   return /["\r\n]/.test(value) || value.includes(sep) ? `"${value.replaceAll('"', '""')}"` : value
 }
 
-/** Records as CSV: a header of the columns' labels, then a line each. */
+/** An amount as a spreadsheet's number: in the language, without its symbol. */
+function amountCell(v: unknown): string {
+  if (!isMoney(v)) return ""
+  const digits = places(currencyOf(v))
+  const fine = v.amount.includes(".") ? v.amount.length - v.amount.indexOf(".") - 1 : 0
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, Math.min(fine, 4)) }).format(
+    v.amount as unknown as number,
+  )
+}
+
+/**
+ * Records as CSV: a header of the columns' labels, then a line each. Money
+ * is two columns, its amount (a number to the spreadsheet) and its currency.
+ */
 export function toCsv(columns: { field: FieldMeta; label: string }[], records: Rec[], sep = separator): string {
-  const lines = [columns.map((c) => cell(c.label, sep)).join(sep)]
+  const header = columns.flatMap((c) => (c.field.kind === "money" ? [c.label, `${c.label} (${t("currency")})`] : [c.label]))
+  const lines = [header.map((h) => cell(h, sep)).join(sep)]
   for (const r of records) {
     lines.push(
       columns
-        .map(({ field }) => {
+        .flatMap(({ field }) => {
           const v = r[field.name]
-          if (v === null || v === undefined) return ""
+          if (field.kind === "money") return [cell(amountCell(v), sep), isMoney(v) ? currencyOf(v) : ""]
+          if (v === null || v === undefined) return [""]
           // Numbers as the language writes them; text and choices as shown.
-          return cell(field.kind === "relation" || field.kind === "uuid" ? String(v) : format(field, v), sep)
+          return [cell(field.kind === "relation" || field.kind === "uuid" ? String(v) : format(field, v), sep)]
         })
         .join(sep),
     )

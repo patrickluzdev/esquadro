@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
+import { MoneyInput } from "./money.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
@@ -80,6 +81,8 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
       return (
         <Input id={id} inputMode="decimal" value={str} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)} aria-invalid={invalid} />
       )
+    case "money":
+      return <MoneyInput id={id} value={value} onChange={onChange} invalid={invalid} negative={field.min === undefined || field.min < 0} />
     case "date":
       return <Input id={id} type="date" value={str.slice(0, 10)} onChange={(e) => onChange(e.target.value || null)} aria-invalid={invalid} />
     case "datetime":

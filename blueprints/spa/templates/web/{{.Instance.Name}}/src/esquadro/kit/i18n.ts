@@ -3,6 +3,7 @@
 import { messages } from "@/messages.ts"
 import type { Messages } from "@/messages.ts"
 import { locale } from "../config.ts"
+import { formatMoney } from "./money.tsx"
 import type { FieldMeta } from "./meta.ts"
 
 const words: Messages = messages[locale] ?? messages.en
@@ -28,7 +29,10 @@ export function format(field: FieldMeta, value: unknown): string {
     case "int":
       return new Intl.NumberFormat(locale).format(Number(value))
     case "decimal":
-      return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value))
+      // The text as it is, never through a float: exact.
+      return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(String(value) as unknown as number)
+    case "money":
+      return formatMoney(value)
     case "date":
       return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(String(value)))
     case "datetime":
@@ -39,8 +43,3 @@ export function format(field: FieldMeta, value: unknown): string {
   return String(value)
 }
 
-/** Money, in the locale: format(field, v) shows decimals; this adds the currency. */
-export function money(value: unknown, currency = locale === "pt-BR" ? "BRL" : "USD"): string {
-  if (value === null || value === undefined || value === "") return "—"
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(Number(value))
-}

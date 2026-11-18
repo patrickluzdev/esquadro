@@ -28,6 +28,14 @@ func TemplateFuncs() template.FuncMap {
 		"titleOf":    TitleOf,
 		"lucide":     Lucide,
 		"filterable": Filterable,
+		"rangeFilterable": func(e *project.Entity, name string) bool {
+			for _, f := range rest.APIFilters(e) {
+				if f.Param == name+"_min" {
+					return true
+				}
+			}
+			return false
+		},
 		"hasMany":    HasMany,
 		"defaultOf":  DefaultOf,
 		"inverseKey": InverseKey,
@@ -43,7 +51,7 @@ func TemplateFuncs() template.FuncMap {
 }
 
 // Kind is how the frontend shows and edits a field: text, textarea, int,
-// decimal, bool, date, datetime, enum, uuid or json.
+// decimal, money, bool, date, datetime, enum, uuid or json.
 func Kind(f *project.Field) string {
 	switch f.Type {
 	case project.TypeString:
@@ -54,6 +62,8 @@ func Kind(f *project.Field) string {
 		return "int"
 	case project.TypeDecimal:
 		return "decimal"
+	case project.TypeMoney:
+		return "money"
 	case project.TypeBool:
 		return "bool"
 	case project.TypeDate:
@@ -100,6 +110,9 @@ func DefaultOf(f *project.Field) string {
 	switch Kind(f) {
 	case "bool", "int":
 		return d.Text
+	case "money":
+		// Its currency is the app's, which the API fills in.
+		return "{ amount: " + strconv.Quote(d.Text) + " }"
 	}
 	return strconv.Quote(d.Text)
 }

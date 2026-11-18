@@ -53,6 +53,7 @@ import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
 import { copy } from "./copy.tsx"
 import { DateRangeFilter } from "./daterange.tsx"
+import { MoneyRangeFilter } from "./moneyrange.tsx"
 import { ViewsMenu } from "./views.tsx"
 import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
@@ -106,9 +107,9 @@ function isDate(f: FieldMeta): boolean {
   return f.kind === "date" || f.kind === "datetime"
 }
 
-/** The URL's keys of a filter. */
+/** The URL's keys of a filter: a range's two (price_min, price_max). */
 function filterKeys(f: FieldMeta): string[] {
-  return isDate(f) ? [`${f.name}_min`, `${f.name}_max`] : [f.name]
+  return isDate(f) || f.kind === "money" ? [`${f.name}_min`, `${f.name}_max`] : [f.name]
 }
 
 /** A filter of the list: an enum's values, yes or no, or the related records. */
@@ -605,7 +606,15 @@ export function ResourceList({
       {(showFilters || activeFilters > 0) && filters.length > 0 && (
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 animate-in fade-in-0 slide-in-from-top-1">
         {filters.map((f) =>
-          isDate(f) ? (
+          f.kind === "money" ? (
+            <MoneyRangeFilter
+              key={f.name}
+              field={f}
+              min={search[`${f.name}_min`] as string | undefined}
+              max={search[`${f.name}_max`] as string | undefined}
+              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
+            />
+          ) : isDate(f) ? (
             <DateRangeFilter
               key={f.name}
               field={f}

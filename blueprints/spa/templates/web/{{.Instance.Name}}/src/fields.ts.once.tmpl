@@ -8,7 +8,7 @@ export interface FieldRenderer {
   input?: (value: unknown, onChange: (v: unknown) => void) => ReactNode
 }
 
-// For example, prices as money:
-//   import { money } from "./esquadro/kit/i18n.ts"
-//   price: { show: (v) => money(v) },
+// For example, an amount in bold (money is already shown with its currency):
+//   import { formatMoney } from "./esquadro/kit/money.tsx"
+//   price: { show: (v) => <b>{formatMoney(v)}</b> },
 export const fields: Record<string, FieldRenderer> = {}
