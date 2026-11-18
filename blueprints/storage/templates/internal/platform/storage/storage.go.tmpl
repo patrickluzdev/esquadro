@@ -21,6 +21,9 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+{{- if has .Options.drivers "s3"}}
+	"os"
+{{- end}}
 	"path"
 	"slices"
 	"strings"
@@ -100,6 +103,9 @@ func (r *Refusal) Error() string { return "storage: " + r.Field + ": " + r.Code 
 // folder's links) and STORAGE_PREFIX (of every key).
 type Config struct {
 	URL, Secret, Prefix string
+	// AccessKey and SecretKey are an S3 store's keys, when it is no AWS
+	// account's own; empty, the AWS SDK finds them.
+	AccessKey, SecretKey string
 }
 
 // Store keeps the files.
@@ -108,6 +114,7 @@ type Store struct {
 	bucket *blob.Bucket
 	// disk signs and checks the links of a folder store; nil otherwise.
 	disk   *fileblob.URLSignerHMAC
+	scheme string
 	prefix string
 	// Principal is who makes a request, from its context: empty when no
 	// one signed in. A file is used only by records of whoever asked for
@@ -122,7 +129,7 @@ func Open(ctx context.Context, cfg Config, pool *pgxpool.Pool) (*Store, error) {
 	if err != nil || u.Scheme == "" {
 		return nil, fmt.Errorf("storage: STORAGE_URL %q is no URL like file://./storage", cfg.URL)
 	}
-	s := &Store{pool: pool, prefix: cfg.Prefix}
+	s := &Store{pool: pool, prefix: cfg.Prefix, scheme: u.Scheme}
 {{- if uses "security"}}
 	s.Principal = func(ctx context.Context) string {
 		if p, ok := security.PrincipalOf(ctx); ok {
@@ -139,6 +146,13 @@ func Open(ctx context.Context, cfg Config, pool *pgxpool.Pool) (*Store, error) {
 		s.disk = fileblob.NewURLSignerHMAC(&url.URL{Path: diskPath}, []byte(cfg.Secret))
 		s.bucket, err = fileblob.OpenBucket(dir, &fileblob.Options{URLSigner: s.disk, CreateDir: true})
 	} else {
+{{- if has .Options.drivers "s3"}}
+		if u.Scheme == "s3" && cfg.AccessKey != "" {
+			// The SDK reads its keys from the environment.
+			os.Setenv("AWS_ACCESS_KEY_ID", cfg.AccessKey)
+			os.Setenv("AWS_SECRET_ACCESS_KEY", cfg.SecretKey)
+		}
+{{- end}}
 		s.bucket, err = blob.OpenBucket(ctx, cfg.URL)
 	}
 	if err != nil {
@@ -195,19 +209,25 @@ func (s *Store) Request(ctx context.Context, r UploadRequest) (Upload, error) {
 		postgres.UUID(id), key, nameOf(r.Name), ct, r.Size, r.Entity, r.Field, by); err != nil {
 		return Upload{}, fmt.Errorf("storage: request: %w", err)
 	}
-	link, err := s.bucket.SignedURL(ctx, key, &blob.SignedURLOptions{
-		Method: http.MethodPut, ContentType: ct, Expiry: uploadExpiry,
+	opts := &blob.SignedURLOptions{
+		Method: http.MethodPut, Expiry: uploadExpiry,
 		BeforeSign: func(as func(any) bool) error {
 {{- if has .Options.drivers "s3"}}
-			// S3 takes only a body of the size asked for.
+			// S3 takes only a body of the type and size asked for: both
+			// are signed.
 			var put *s3.PutObjectInput
 			if as(&put) {
+				put.ContentType = &ct
 				put.ContentLength = &r.Size
 			}
 {{- end}}
 			return nil
 		},
-	})
+	}
+	if s.scheme != "s3" {
+		opts.ContentType = ct
+	}
+	link, err := s.bucket.SignedURL(ctx, key, opts)
 	if err != nil {
 		return Upload{}, fmt.Errorf("storage: sign the upload: %w", err)
 	}

@@ -23,7 +23,7 @@ blueprint storage
 | Option | Type | Default | |
 |---|---|---|---|
 | `drivers` | list | `["s3"]` | The stores the app can open besides a folder: s3 (S3, R2, MinIO and what speaks it), gcs (Google Cloud Storage) and azure (Azure Blob Storage). Each brings its SDK into the binary. |
-| `local` | name | `"disk"` | disk (a folder of the project) or minio (a MinIO in compose.yaml): the store in development. |
+| `local` | name | `"disk"` | disk (a folder of the project) or s3 (a local S3 in compose.yaml, Versity S3 Gateway): the store in development. |
 | `local_dir` | string | `"storage"` | The folder of a disk store in development, out of git. |
 | `image_types` | list | `["png", "jpeg", "webp", "gif", "avif"]` | The formats an image field takes, and its largest size; a field's @storage(types, max) overrides them. |
 | `image_max` | string | `"10MB"` |  |
@@ -48,7 +48,9 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 
 | Variable | Type | Value | |
 |---|---|---|---|
-| `STORAGE_URL` | string, secret, required outside development | a value in development | Where files are kept: file://./storage (a folder), s3://bucket?region= (S3, and R2, MinIO and others with &endpoint= and &s3ForcePathStyle=true), gs://bucket or azblob://container. In development, a folder of the project (local_dir), or the local MinIO of compose.yaml with local minio. |
+| `STORAGE_URL` | string, secret, required outside development | a value in development | Where files are kept: file://./storage (a folder), s3://bucket?region= (S3, and R2, MinIO and others with &endpoint= and &s3ForcePathStyle=true), gs://bucket or azblob://container. In development, a folder of the project (local_dir), or the local S3 of compose.yaml with local s3. |
+| `STORAGE_ACCESS_KEY` | string, secret | a value in development | The keys of an S3 store, for one that is no AWS account's own (R2, MinIO and others); empty, the AWS SDK finds them (AWS_ACCESS_KEY_ID, a role). In development, the local S3's, with local s3. |
+| `STORAGE_SECRET_KEY` | string, secret | a value in development |  |
 | `STORAGE_SECRET` | string, secret, required outside development | generated in development | Signs the links of a folder store (the app serves them); esquadro generates one for development. |
 | `STORAGE_PREFIX` | string | `` | A prefix of every file's key, to share a bucket between apps or environments: shop/production/. |
 

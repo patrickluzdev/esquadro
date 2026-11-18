@@ -1,0 +1,17 @@
+{{- $o := optionsOf "storage"}}
+{{- if and (fileFields .Entities $o) (eq (index $o "local") "s3")}}
+{{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}
+  # Files: a local S3 (Versity S3 Gateway), so that development sends and
+  # reads files as production does; its bucket, {{.App.Kebab}}, is a folder of its volume.
+  s3:
+    container_name: {{$name}}-s3
+    image: versity/versitygw:v1.10.0
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /data/{{.App.Kebab}} && exec /usr/local/bin/versitygw --cors-allow-origin '*' posix /data"]
+    environment:
+      ROOT_ACCESS_KEY: esquadro
+      ROOT_SECRET_KEY: esquadro-local-secret
+    ports:
+      - "{{composePort "s3" "7070"}}:7070"
+    volumes:
+      - s3-data:/data
+{{- end}}

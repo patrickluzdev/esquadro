@@ -54,14 +54,14 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 				diags.Errorf(at(key), at(key), "%s is %s or %s, not %s", key, strings.Join(allowed[:len(allowed)-1], ", "), allowed[len(allowed)-1], v)
 			}
 		}
-		check("local", "disk", "minio")
+		check("local", "disk", "s3")
 		for _, d := range strs(opts["drivers"]) {
 			if !slices.Contains([]string{"s3", "gcs", "azure"}, d) {
 				diags.Errorf(at("drivers"), at("drivers"), "drivers: %s is not s3, gcs or azure", d)
 			}
 		}
-		if l, _ := opts["local"].(string); l == "minio" && !slices.Contains(strs(opts["drivers"]), "s3") {
-			diags.Errorf(at("local"), at("local"), "local minio speaks S3: drivers needs s3")
+		if l, _ := opts["local"].(string); l == "s3" && !slices.Contains(strs(opts["drivers"]), "s3") {
+			diags.Errorf(at("local"), at("local"), "local s3 needs the s3 driver: drivers [s3]")
 		}
 		check("key_layout", "entity", "random")
 		for _, key := range []string{"url_minutes", "upload_minutes", "pending_hours"} {

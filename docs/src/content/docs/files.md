@@ -36,6 +36,13 @@ git), which the app serves itself: the same flow as in production, with no
 bucket, no Docker and no account anywhere. `STORAGE_PREFIX` starts every
 file's key (`shop/production/`), to share a bucket.
 
+To develop against S3 itself, `local s3` puts a local S3 in `compose.yaml`
+(the Versity S3 Gateway, its bucket a folder of its volume) and points
+development's `STORAGE_URL` at it. An S3 store that is no AWS account's own
+(R2, MinIO and others) takes its keys in `STORAGE_ACCESS_KEY` and
+`STORAGE_SECRET_KEY`; empty, the AWS SDK finds them (`AWS_ACCESS_KEY_ID`, a
+role).
+
 ## Sending a file
 
 A file goes from the browser straight to the store, never through the app:
