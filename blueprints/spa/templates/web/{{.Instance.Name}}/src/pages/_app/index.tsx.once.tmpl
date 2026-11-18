@@ -1,13 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { PageHeader } from "../../esquadro/kit/page.tsx"
 import { useSession } from "../../esquadro/kit/auth.tsx"
+import { Dashboard } from "../../esquadro/kit/dashboard.tsx"
 import { t } from "../../esquadro/kit/i18n.ts"
+import { PageHeader } from "../../esquadro/kit/page.tsx"
 
-// The first page after signing in: yours, e.g. a dashboard of the reports'
-// numbers: <StatCard label value /> in a grid, <BarsChart rows x y />.
+// The first page after signing in: yours. The dashboard shows the reports
+// marked @{{.Instance.Name}}(widget ...); add cards and charts of your own
+// (StatCard, BarsChart, LineChart) as you like.
 export const Route = createFileRoute("/_app/")({ component: Home })
 
 function Home() {
   const session = useSession()
-  return <PageHeader title={t("welcome")} description={session?.roles.join(", ")} />
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t("welcome")} description={session?.roles.join(", ")} />
+      <Dashboard />
+    </div>
+  )
 }

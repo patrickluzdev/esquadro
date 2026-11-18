@@ -28,6 +28,7 @@ func spaProject(t *testing.T, change func(app string) string) (string, int, stri
 		"  @security(read public, write [user.admin, user.staff])\n  @admin(resource, label \"Produtos\", icon package)", 1)
 	catalog = strings.Replace(catalog, "  name        string  required", "  name        string  required @admin(label \"Nome\")", 1)
 	catalog = strings.Replace(catalog, "  ACTIVE\n", "  ACTIVE @admin(label \"Ativo\")\n", 1)
+	catalog += "\nreport ProductsInAll {\n  products int required @admin(label \"Produtos\")\n  @security(read user)\n  @admin(widget stat, y products)\n}\n"
 	catalog = strings.Replace(catalog, "  @security(read public, write user.admin)", "  @security(read public, write user.admin)\n  @admin(resource)", 1)
 	os.WriteFile(catalogEsq, []byte(catalog), 0o644)
 	code, _, errOut := esq(t, "gen", dir)
@@ -46,6 +47,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 		"src/resources/products.tsx":        "f.created_at],",
 		"src/pages/_app/products/index.tsx": `createFileRoute("/_app/products/")`,
 		"src/menu.ts":                       "icons.Package",
+		"src/esquadro/dashboard.gen.ts":     `kind: "stat"`,
 		"src/components/site-header.tsx":    "<CommandPalette />",
 		"src/resources/categories.tsx":      `relation(products, "category_id")`,
 		"src/components/app-sidebar.tsx":    `collapsible="icon"`,

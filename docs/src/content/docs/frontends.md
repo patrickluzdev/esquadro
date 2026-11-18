@@ -51,6 +51,26 @@ to any page, finds records of every searchable resource at once, creates a
 record of any resource, changes the theme and signs out, all from the
 keyboard.
 
+## The dashboard
+
+The first page shows the reports marked as widgets: a number, bars, a line
+or a table, for a period (today, the last 7 or 30 days, all time) that
+fills the report's time parameter.
+
+```esquadro
+report ProductsByCategory {
+  category string required @admin(label "Category")
+  products int    required @admin(label "Products")
+  since    time   param
+  @admin(widget bar, x category, y products, label "Products by category", since since)
+}
+```
+
+`widget` is `stat` (the `y` column summed), `bar` and `line` (`x` along,
+`y` up) or `table` (every column); `check` tells a column or parameter it
+does not have. The page is yours: place `<Dashboard />` where you want it,
+with cards and charts of your own.
+
 ## Sign-in
 
 Every page under `src/pages/_app` needs a session of the realm (`auth`, the

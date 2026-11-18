@@ -70,6 +70,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if locale, _ := opts["locale"].(string); locale != "en" {
 			diags = append(diags, unlabeled(p, name)...)
 		}
+		diags = append(diags, widgets(p, name)...)
 		if set.Get("workspace") == nil {
 			diags.Errorf(ref.Pos, ref.Pos, "spa %s lives in the workspace: add blueprint workspace", name)
 		}
@@ -85,6 +86,17 @@ func unlabeled(p *project.Project, instance string) diag.List {
 	labeled := func(ann project.Ann) bool {
 		label, _ := ann[instance]["label"].(string)
 		return label != ""
+	}
+	for _, r := range p.Reports {
+		if widget, _ := r.Ann[instance]["widget"].(string); widget == "" {
+			continue
+		}
+		for _, c := range r.Columns {
+			if !labeled(c.Ann) {
+				diags.Warnf(c.Pos, c.Pos, "%s.%s has no label in %s, whose locale is not en: its widget shows %q", r.Raw, c.Raw, instance, Humanize(c.Snake)).
+					Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
+			}
+		}
 	}
 	for _, e := range p.Entities {
 		if resource, _ := e.Ann[instance]["resource"].(bool); !resource {
@@ -113,6 +125,40 @@ func unlabeled(p *project.Project, instance string) diag.List {
 				diags.Warnf(r.Pos, r.Pos, "%s.%s has no label in %s, whose locale is not en: it shows %q", e.Raw, r.Raw, instance, Humanize(r.Snake)).
 					Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
 			}
+		}
+	}
+	return diags
+}
+
+// widgets checks the reports on an instance's dashboard: their kind, and
+// the columns and parameter they name.
+func widgets(p *project.Project, instance string) diag.List {
+	var diags diag.List
+	for _, r := range p.Reports {
+		a := r.Ann[instance]
+		kind, _ := a["widget"].(string)
+		if kind == "" {
+			continue
+		}
+		if !slices.Contains([]string{"stat", "bar", "line", "table"}, kind) {
+			diags.Errorf(r.Pos, r.Pos, "widget %s of %s is not stat, bar, line or table", kind, r.Raw)
+		}
+		has := func(fields []*project.Field, name string) bool {
+			return slices.ContainsFunc(fields, func(f *project.Field) bool { return f.Raw == name })
+		}
+		for _, key := range []string{"x", "y"} {
+			if col, _ := a[key].(string); col != "" && !has(r.Columns, col) {
+				diags.Errorf(r.Pos, r.Pos, "%s %s of %s's widget is not one of its columns", key, col, r.Raw)
+			}
+		}
+		if (kind == "stat" || kind == "bar" || kind == "line") && a["y"] == nil {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget %s needs y, the column of its numbers", r.Raw, kind)
+		}
+		if (kind == "bar" || kind == "line") && a["x"] == nil {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget %s needs x, the column of its names", r.Raw, kind)
+		}
+		if since, _ := a["since"].(string); since != "" && !has(r.Params, since) {
+			diags.Errorf(r.Pos, r.Pos, "since %s of %s's widget is not one of its parameters", since, r.Raw)
 		}
 	}
 	return diags

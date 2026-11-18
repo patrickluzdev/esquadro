@@ -58,6 +58,19 @@ blueprint spa {
     /// What people call the relation, in the frontend's language: Category.
     label string
   }
+  annotation report {
+    /// The report on the frontend's dashboard (its first page): stat (a
+    /// number, the y column summed), bar, line or table.
+    widget name
+    /// The column of the names, along the chart: category, day.
+    x name
+    /// The column of the numbers: products, total.
+    y name
+    /// What the dashboard calls it; the report's name by default.
+    label string
+    /// The time parameter the dashboard's period fills (its start): since.
+    since name
+  }
   annotation value {
     /// What people call a value of an enum, in the frontend's language:
     /// Active.

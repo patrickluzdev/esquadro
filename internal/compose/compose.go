@@ -483,6 +483,8 @@ func annOf(node any) project.Ann {
 		return n.Ann
 	case *project.EnumValue:
 		return n.Ann
+	case *project.Report:
+		return n.Ann
 	}
 	return nil
 }
