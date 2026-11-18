@@ -112,6 +112,8 @@ entity Product {
   `relations: () => [relation(products, "category_id")]`, written from the
   model when the API filters by the key.
 - A new record's form starts with the model's defaults.
+- Each value on a record's page copies to the clipboard (a button on
+  hover), as each record's id does from its menu in the list.
 - Duplicate (on a record's page and in its menu) opens the form to create
   one with its values, what it is called marked as a copy; nothing is saved
   until the person saves.

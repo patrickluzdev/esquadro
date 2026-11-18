@@ -23,6 +23,7 @@ import {
   Columns3,
   Copy,
   Download,
+  Hash,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -47,6 +48,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { api } from "../api.ts"
 import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
+import { copy } from "./copy.tsx"
 import { DateRangeFilter } from "./daterange.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
@@ -313,6 +315,9 @@ export function ResourceList({
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => copy(r.id)}>
+                    <Hash /> {t("copyId")}
+                  </DropdownMenuItem>
                   {canCreate && (
                     <DropdownMenuItem onClick={() => duplicate(r)}>
                       <Copy /> {t("duplicate")}

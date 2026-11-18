@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
+import { CopyButton } from "./copy.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -154,10 +155,17 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
         <CardContent>
           <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
             {(resource.show ?? resource.form).map((f) => (
-              <div key={f.name} className="space-y-1">
+              <div key={f.name} className="group/value space-y-1">
                 <dt className="text-sm text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm font-medium">
+                <dd className="flex min-h-6 items-center gap-1 text-sm font-medium">
                   <FieldValue field={f} record={r} />
+                  {r[f.name] !== null && r[f.name] !== undefined && r[f.name] !== "" && (
+                    <CopyButton
+                      text={f.kind === "relation" ? String(r[f.name]) : format(f, r[f.name])}
+                      label={`${t("copy")} ${f.label}`}
+                      className="opacity-0 transition-opacity group-hover/value:opacity-100 focus-visible:opacity-100"
+                    />
+                  )}
                 </dd>
               </div>
             ))}
