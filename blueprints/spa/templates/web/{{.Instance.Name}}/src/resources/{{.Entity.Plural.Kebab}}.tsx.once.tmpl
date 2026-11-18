@@ -1,0 +1,23 @@
+{{- $a := ann .Entity}}{{if index $a "resource" -}}
+// The {{.Entity.Plural.Kebab}} resource: what its list, form and page show. Yours to
+// change, as a Filament resource is: columns, form fields, filters,
+// actions. A field the model gains is in resources.{{.Entity.Plural.Camel}}.fields;
+// add it here when you want it.
+import { resource } from "../esquadro/kit/resource.ts"
+import { resources } from "../esquadro/resources.gen.ts"
+
+const meta = resources.{{.Entity.Plural.Camel}}
+const f = meta.fields
+
+export default resource(meta, {
+  table: {
+    columns: [{{$n := 0}}{{range $f := inRequest .Entity}}{{if lt $n 4}}{{if $n}}, {{end}}f.{{$f.Snake}}{{$n = add1 $n}}{{end}}{{end}}],
+    filters: [{{$m := 0}}{{range $f := inRequest .Entity}}{{if or (eq (spaKind $f) "enum") (eq (spaKind $f) "bool")}}{{if $m}}, {{end}}f.{{$f.Snake}}{{$m = add1 $m}}{{end}}{{end}}],
+  },
+  form: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}],
+  show: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}, f.created_at, f.updated_at],
+{{- with inRequest .Entity}}
+  title: f.{{(index . 0).Snake}},
+{{- end}}
+})
+{{end -}}

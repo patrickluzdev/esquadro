@@ -1,0 +1,64 @@
+{{- if instances "spa" -}}
+package web
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"testing/fstest"
+)
+
+func built() fstest.MapFS {
+	return fstest.MapFS{
+		"dist/app/index.html":         {Data: []byte("<html>app</html>")},
+		"dist/app/assets/app.1a2b.js": {Data: []byte("js")},
+	}
+}
+
+func serve(t *testing.T, mux *http.ServeMux, host, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("GET", path, nil)
+	req.Host = host
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestMountOnADomain(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/things", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("api")) })
+	if err := Mount(mux, built(), "admin.example.com", ""); err != nil {
+		t.Fatal(err)
+	}
+	if rec := serve(t, mux, "admin.example.com", "/products/1"); !strings.Contains(rec.Body.String(), "app") || rec.Header().Get("Content-Security-Policy") != CSP {
+		t.Fatalf("a route of the frontend: %d %s", rec.Code, rec.Body)
+	}
+	if rec := serve(t, mux, "admin.example.com", "/assets/app.1a2b.js"); !strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("an asset: %v", rec.Header())
+	}
+	if rec := serve(t, mux, "admin.example.com", "/api/v1/things"); rec.Body.String() != "api" {
+		t.Fatalf("the API on the frontend's domain: %d %s", rec.Code, rec.Body)
+	}
+	if rec := serve(t, mux, "api.example.com", "/products/1"); rec.Code != http.StatusNotFound {
+		t.Fatalf("another domain: %d", rec.Code)
+	}
+}
+
+func TestMountUnderAPathAndUnbuilt(t *testing.T) {
+	mux := http.NewServeMux()
+	if err := Mount(mux, built(), "", "/admin"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := serve(t, mux, "app.example.com", "/admin/products"); !strings.Contains(rec.Body.String(), "app") {
+		t.Fatalf("under the path: %d %s", rec.Code, rec.Body)
+	}
+	unbuilt := http.NewServeMux()
+	if err := Mount(unbuilt, fstest.MapFS{"dist/README.md": {Data: []byte("build me")}}, "", "/admin"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := serve(t, unbuilt, "app.example.com", "/admin/"); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("not built: %d", rec.Code)
+	}
+}
+{{end -}}

@@ -1,0 +1,19 @@
+// The menu of the {{.Instance.Name}} frontend: yours to change. Add your own
+// pages, reorder, or leave resources out.
+import * as icons from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { t } from "./esquadro/kit/i18n.ts"
+import { resources } from "./esquadro/resources.gen.ts"
+
+export interface MenuItem {
+  to: string
+  label: string
+  icon?: LucideIcon
+}
+
+export const menu: MenuItem[] = [
+  { to: "/", label: t("home"), icon: icons.Home },
+{{- range .Entities}}{{$a := ann .}}{{if index $a "resource"}}
+  { to: "/{{.Plural.Kebab}}", label: resources.{{.Plural.Camel}}.menu, icon: icons.{{index $a "icon" | lucide}} },
+{{- end}}{{end}}
+]

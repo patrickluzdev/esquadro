@@ -1,0 +1,15 @@
+{{- with instances "spa"}}
+# The frontends, built with Node before the binary that serves them.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS web
+WORKDIR /src
+COPY package.json package-lock.json* ./
+{{- if uses "client_ts"}}
+COPY clients/ts/package.json clients/ts/
+{{- end}}
+{{- range .}}
+COPY web/{{.Name}}/package.json web/{{.Name}}/
+{{- end}}
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+COPY . .
+RUN npm run build
+{{- end}}

@@ -23,10 +23,10 @@ import (
 var blueprintGroups = map[string]string{
 	"app": "base", "env": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
 	"postgres": "data", "migrations": "data", "store": "data", "testcontainers": "data", "compose": "data",
-	"rest": "api", "api_docs": "api", "client_ts": "api", "security": "api", "mail": "api", "rate_limit": "api",
+	"rest": "api", "api_docs": "api", "client_ts": "api", "spa": "api", "security": "api", "mail": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
 	"docker": "ship", "github_actions": "ship", "deploy": "ship", "observability": "ship",
-	"git": "tools", "branching": "tools",
+	"workspace": "tools", "git": "tools", "branching": "tools",
 }
 
 // platformGroups name what the blueprints of a platform are for.

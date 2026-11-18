@@ -1,0 +1,14 @@
+{{- $a := ann .Entity}}{{if index $a "resource" -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { ResourceForm } from "../../../esquadro/kit/form.tsx"
+import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"
+
+export const Route = createFileRoute("/_app/{{.Entity.Plural.Kebab}}/$id/edit")({
+  component: Edit,
+})
+
+function Edit() {
+  const { id } = Route.useParams()
+  return <ResourceForm resource={resource} id={id} />
+}
+{{end -}}

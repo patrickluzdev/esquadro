@@ -1,0 +1,14 @@
+// Fields of your own: how a field is shown and edited, by its name
+// ("price") or its kind ("decimal"), in place of the kit's. Yours to change.
+import type { ReactNode } from "react"
+import type { Rec } from "./esquadro/kit/meta.ts"
+
+export interface FieldRenderer {
+  show?: (value: unknown, record: Rec) => ReactNode
+  input?: (value: unknown, onChange: (v: unknown) => void) => ReactNode
+}
+
+// For example, prices as money:
+//   import { money } from "./esquadro/kit/i18n.ts"
+//   price: { show: (v) => money(v) },
+export const fields: Record<string, FieldRenderer> = {}

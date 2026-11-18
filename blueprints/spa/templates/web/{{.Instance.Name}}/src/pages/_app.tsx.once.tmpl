@@ -1,0 +1,10 @@
+import { createFileRoute } from "@tanstack/react-router"
+import { requireSession } from "../esquadro/kit/auth.tsx"
+import { AppLayout } from "../esquadro/kit/layout.tsx"
+
+// The signed-in pages: every file under _app/ needs a session (and a role
+// let in), and is framed by the layout.
+export const Route = createFileRoute("/_app")({
+  beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
+  component: () => <AppLayout brand="{{.App.Label}}" />,
+})

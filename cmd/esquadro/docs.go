@@ -51,10 +51,10 @@ func runDocs(args []string, _, stderr io.Writer) int {
 var blueprintOrder = []string{
 	"app", "env", "domain", "http", "worker", "jobs",
 	"postgres", "migrations", "store", "testcontainers", "compose",
-	"rest", "api_docs", "client_ts", "security", "mail", "rate_limit", "compression", "i18n",
+	"rest", "api_docs", "client_ts", "spa", "security", "mail", "rate_limit", "compression", "i18n",
 	"observability",
 	"docker", "github_actions", "deploy",
-	"git", "branching",
+	"workspace", "git", "branching",
 }
 
 // platformBlueprintOrder lists the blueprints of a platform, in the order a

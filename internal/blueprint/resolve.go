@@ -105,8 +105,11 @@ func (r *resolver) resolve() {
 	r.set.Blueprints = r.order()
 	r.annotations()
 	r.env()
+	checked := map[string]bool{}
 	for _, b := range r.set.Blueprints {
-		if check := Checks[b.Key]; check != nil && b.Ref.Source == project.SourceBuiltin {
+		// Once per blueprint: its instances share a check, which sees them all.
+		if check := Checks[b.Key]; check != nil && b.Ref.Source == project.SourceBuiltin && !checked[b.Key] {
+			checked[b.Key] = true
 			r.diags = append(r.diags, check(r.p, r.set)...)
 		}
 	}

@@ -1,0 +1,15 @@
+import type { QueryClient } from "@tanstack/react-query"
+import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router"
+import { t } from "../esquadro/kit/i18n.ts"
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  component: Outlet,
+  notFoundComponent: () => (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-2">
+      <p>{t("notFoundPage")}</p>
+      <Link to="/" className="underline">
+        {t("home")}
+      </Link>
+    </div>
+  ),
+})

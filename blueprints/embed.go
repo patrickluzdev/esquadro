@@ -34,6 +34,8 @@ import "embed"
 //go:embed client_ts/blueprint.esq all:client_ts/templates client_ts/slots
 //go:embed git/blueprint.esq
 //go:embed deploy/blueprint.esq deploy/slots
+//go:embed workspace/blueprint.esq all:workspace/templates workspace/slots
+//go:embed spa/blueprint.esq all:spa/templates
 //go:embed platform/server/blueprint.esq all:platform/server/templates
 //go:embed platform/caddy/blueprint.esq all:platform/caddy/templates platform/caddy/slots
 //go:embed platform/postgres/blueprint.esq all:platform/postgres/templates platform/postgres/slots

@@ -1,0 +1,9 @@
+{{- $a := ann .Entity}}{{if index $a "resource" -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { ResourceForm } from "../../../esquadro/kit/form.tsx"
+import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"
+
+export const Route = createFileRoute("/_app/{{.Entity.Plural.Kebab}}/new")({
+  component: () => <ResourceForm resource={resource} />,
+})
+{{end -}}

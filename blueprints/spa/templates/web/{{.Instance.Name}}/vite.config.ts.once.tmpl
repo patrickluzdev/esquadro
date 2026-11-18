@@ -1,0 +1,43 @@
+{{- $port := 8080}}{{with optionsOf "http"}}{{$port = .port}}{{end -}}
+// The build of the {{.Instance.Name}} frontend: yours to change.
+import { fileURLToPath, URL } from "node:url"
+import tailwindcss from "@tailwindcss/vite"
+import { tanstackRouter } from "@tanstack/router-plugin/vite"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vitest/config"
+import { base } from "./src/esquadro/config.ts"
+
+// In development, the API's calls go to the app: task run (or task dev).
+const app = process.env.APP_URL ?? "http://localhost:{{$port}}"
+
+export default defineConfig({
+  base,
+  plugins: [
+    // Each file of src/pages is a route; the tree is generated.
+    tanstackRouter({
+      target: "react",
+      routesDirectory: "./src/pages",
+      generatedRouteTree: "./src/esquadro/routeTree.gen.ts",
+      autoCodeSplitting: true,
+    }),
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@api": fileURLToPath(new URL("../../clients/ts/src/index.ts", import.meta.url)),
+    },
+  },
+  server: {
+    proxy: { "/api": app, "/identity": app },
+  },
+  build: {
+    // The app's binary serves dist/app; dist/README.md stays in git.
+    outDir: "dist/app",
+    emptyOutDir: true,
+  },
+  test: {
+    include: ["src/**/*.test.ts"],
+  },
+})

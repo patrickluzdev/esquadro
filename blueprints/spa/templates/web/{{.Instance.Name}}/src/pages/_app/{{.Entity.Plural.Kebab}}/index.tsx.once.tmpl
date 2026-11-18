@@ -1,0 +1,10 @@
+{{- $a := ann .Entity}}{{if index $a "resource" -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { listSearch, ResourceList } from "../../../esquadro/kit/list.tsx"
+import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"
+
+export const Route = createFileRoute("/_app/{{.Entity.Plural.Kebab}}/")({
+  validateSearch: listSearch,
+  component: () => <ResourceList resource={resource} />,
+})
+{{end -}}

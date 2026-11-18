@@ -18,7 +18,9 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/platform/apps"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
+	"github.com/patrickluzdev/esquadro/blueprints/spa"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
+	bpworkspace "github.com/patrickluzdev/esquadro/blueprints/workspace"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
@@ -35,6 +37,7 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("git", "init"):         git.Init,
 	hook.Key("branching", "setup"):  branching.Setup,
 	hook.Key("env", "files"):        env.Files,
+	hook.Key("workspace", "ignore"): bpworkspace.Ignore,
 }
 
 func init() {
@@ -43,6 +46,8 @@ func init() {
 	blueprint.Checks["rest"] = rest.Check
 	blueprint.Checks["client_ts"] = clientts.Check
 	blueprint.Checks["platform/apps"] = apps.Check
+	blueprint.Checks["workspace"] = bpworkspace.Check
+	blueprint.Checks["spa"] = spa.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
@@ -54,6 +59,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"i18n":      i18n.TemplateFuncs(),
 	"jobs":      jobs.TemplateFuncs(),
 	"security":  security.TemplateFuncs(),
+	"spa":       spa.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

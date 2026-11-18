@@ -12,6 +12,9 @@ blueprint docker {
   requires app
   optional http, compose
 
+  /// Stages before the Go build, e.g. FROM node AS web, whose output the
+  /// build stage copies (docker.build).
+  slot "docker.stages"
   /// Steps of the build stage before the binary is built, e.g. RUN lines.
   slot "docker.build"
   /// Lines of the final image before its entrypoint, e.g. COPY of a file.

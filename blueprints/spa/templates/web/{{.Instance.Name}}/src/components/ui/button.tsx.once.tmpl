@@ -1,0 +1,29 @@
+import type { ButtonHTMLAttributes, ReactNode } from "react"
+import { cn } from "./cn.ts"
+
+const variants = {
+  default: "bg-primary text-primary-foreground hover:opacity-90",
+  outline: "border border-border bg-background hover:bg-muted",
+  destructive: "bg-destructive text-white hover:opacity-90",
+}
+
+/** A button; with asLink, the frame of a link given as its child. */
+export function Button({
+  variant = "default",
+  asLink,
+  className,
+  children,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants; asLink?: boolean; children?: ReactNode }) {
+  const classes = cn(
+    "inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50",
+    variants[variant],
+    className,
+  )
+  if (asLink) return <span className={cn(classes, "[&>a]:contents")}>{children}</span>
+  return (
+    <button className={classes} {...props}>
+      {children}
+    </button>
+  )
+}

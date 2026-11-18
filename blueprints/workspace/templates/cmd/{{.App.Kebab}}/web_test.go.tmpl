@@ -1,0 +1,34 @@
+{{- with instances "spa" -}}
+package main
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"testing"
+)
+
+// TestFrontends checks each frontend as task web:build would: its types,
+// its tests and its build, once its packages are installed (task
+// web:install); without them, it is skipped.
+func TestFrontends(t *testing.T) {
+	npm, err := exec.LookPath("npm")
+	if err != nil {
+		t.Skip("npm is not installed: the frontends need Node")
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "node_modules")); err != nil {
+		t.Skip("the frontends' packages are not installed: run task web:install")
+	}
+	for _, name := range []string{ {{- range $i, $s := .}}{{if $i}}, {{end}}"{{$s.Name}}"{{end -}} } {
+		t.Run(name, func(t *testing.T) {
+			for _, script := range []string{"check", "test", "build"} {
+				cmd := exec.Command(npm, "run", script)
+				cmd.Dir = filepath.Join("..", "..", "web", name)
+				if out, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("npm run %s: %v\n%s", script, err, out)
+				}
+			}
+		})
+	}
+}
+{{end -}}

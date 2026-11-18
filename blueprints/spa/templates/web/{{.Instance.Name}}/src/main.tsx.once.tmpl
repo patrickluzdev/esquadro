@@ -1,0 +1,60 @@
+// The start of the {{.Instance.Name}} frontend: yours to change.
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { createRouter, RouterProvider } from "@tanstack/react-router"
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import { isApiError } from "@api"
+import { base } from "./esquadro/config.ts"
+import { sessionQuery } from "./esquadro/kit/auth.tsx"
+import { routeTree } from "./esquadro/routeTree.gen.ts"
+import "./theme.css"
+
+// The theme the person chose, or the system's.
+try {
+  const theme = localStorage.getItem("theme")
+  const dark = theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
+  document.documentElement.classList.toggle("dark", dark)
+} catch {
+  // Storage may be refused: the system's theme it is.
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (n, e) => !(isApiError(e) && e.status < 500) && n < 2,
+      staleTime: 10_000,
+    },
+  },
+})
+
+const router = createRouter({
+  routeTree,
+  basepath: base,
+  context: { queryClient },
+  defaultPreload: "intent",
+  scrollRestoration: true,
+})
+
+// A session that ends while the frontend is open: back to the sign-in page,
+// keeping the page the person was on.
+queryClient.getQueryCache().subscribe((event) => {
+  const e = event.query.state.error
+  if (event.type === "updated" && isApiError(e) && e.status === 401 && event.query.queryKey[0] !== "session") {
+    queryClient.setQueryData(sessionQuery.queryKey, null)
+    router.navigate({ to: "/login", search: { redirect: router.state.location.href } })
+  }
+})
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router
+  }
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </StrictMode>,
+)

@@ -1,0 +1,23 @@
+  web:install:
+    desc: Install the packages of the frontends and the TypeScript client
+    cmds:
+      - npm install
+
+  web:build:
+    desc: Build the frontends
+    cmds:
+      - npm run build
+{{- with instances "spa"}}
+
+  dev:
+    desc: Run the API and the frontends together (Ctrl-C stops them)
+    deps: [run{{range .}}, web:dev:{{.Name}}{{end}}]
+{{- range .}}
+
+  web:dev:{{.Name}}:
+    desc: Run the {{.Name}} frontend, with its API calls sent to the app
+    dir: web/{{.Name}}
+    cmds:
+      - npm run dev
+{{- end}}
+{{- end}}

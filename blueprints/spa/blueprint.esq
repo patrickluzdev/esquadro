@@ -1,0 +1,48 @@
+/// A single-page application of the app's (an admin panel, a customer
+/// portal), in React, used by name: blueprint spa admin. It lives in
+/// web/<name>, in the workspace, with the API's TypeScript client, sign-in
+/// by the session cookie of a realm (with the page asked for kept for after
+/// it), a responsive layout, a light and dark theme, and resources: each
+/// entity marked @<name>(resource) gets its list (the API's filters, sorting,
+/// search and pages, in the URL), its form (by field type, with the API's
+/// errors on their fields) and its page. What is generated is regenerated;
+/// what is yours (src/resources, src/pages, src/components, src/menu.ts,
+/// src/messages.ts, src/theme.css) is written once and left alone. With
+/// serve app, the app's binary serves it, on its domain (or under its path).
+blueprint spa {
+  version "0.1.0"
+  instances
+  requires app, http, rest, client_ts, workspace, security
+
+  /// The domain it answers on (admin.shop.com); without one, the app's
+  /// domain, under path.
+  option domain string default("")
+  /// Its path on the app's domain, when it has no domain of its own;
+  /// /<name> by default.
+  option path string default("")
+  /// The realm that signs in to it; the first realm by default.
+  option auth string default("")
+  /// The roles of the realm let in; any role when empty.
+  option roles list default([])
+  /// en or pt_br: the language of its own words (src/messages.ts) and of
+  /// dates, numbers and money.
+  option locale name default(en)
+  /// app: the app's binary serves it, built in. (image, a container of its
+  /// own, is planned.)
+  option serve name default(app)
+
+  annotation entity {
+    /// The entity is a resource of the frontend: its list, form and page.
+    resource bool
+    /// What people call it, in the frontend's language: Offers.
+    label string
+    /// Its entry in the menu; the label by default.
+    menu string
+    /// The icon of its menu entry, a Lucide name: tag, users, shopping_cart.
+    icon name
+  }
+  annotation field {
+    /// What people call the field, in the frontend's language: Price.
+    label string
+  }
+}

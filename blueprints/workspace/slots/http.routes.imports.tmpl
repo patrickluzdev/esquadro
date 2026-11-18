@@ -1,0 +1,6 @@
+{{- with instances "spa"}}
+	"{{$.App.Module}}/internal/platform/web"
+{{- range .}}
+	"{{$.App.Module}}/web/{{.Name}}"
+{{- end}}
+{{- end}}

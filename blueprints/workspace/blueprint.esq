@@ -1,0 +1,18 @@
+/// How the project's repository is organized, with its frontends: layout
+/// monorepo keeps the app, its frontends (web/<name>, from blueprints such
+/// as spa) and the TypeScript client (clients/ts) in one repository, as an
+/// npm workspace, so that a change to the model, the API and a screen goes
+/// in one commit. task web:install installs every frontend's packages,
+/// task dev runs the API and the frontends together, task web:build
+/// builds them.
+blueprint workspace {
+  version "0.1.0"
+  requires app
+  optional client_ts, http, docker, github_actions
+
+  /// monorepo: everything in one repository. (polyrepo, each frontend in a
+  /// repository of its own, is planned.)
+  option layout name default(monorepo)
+
+  hook post-gen "ignore" edits [".gitignore"]
+}

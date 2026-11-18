@@ -1,0 +1,56 @@
+import { useQueryClient } from "@tanstack/react-query"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { useState } from "react"
+import { Button } from "@/components/ui/button.tsx"
+import { Card } from "@/components/ui/card.tsx"
+import { Input } from "@/components/ui/input.tsx"
+import { afterSignIn, signIn } from "../esquadro/kit/auth.tsx"
+import { t } from "../esquadro/kit/i18n.ts"
+
+// Signing in: back to the page asked for (?redirect) afterwards.
+export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" ? s.redirect : undefined }),
+  component: Login,
+})
+
+function Login() {
+  const { redirect } = Route.useSearch()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+      <Card className="w-full max-w-sm">
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const form = new FormData(e.currentTarget)
+            setBusy(true)
+            setError("")
+            try {
+              await signIn(queryClient, String(form.get("email")), String(form.get("password")))
+              navigate({ to: afterSignIn(redirect) as never })
+            } catch {
+              setError(t("badCredentials"))
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <h1 className="text-xl font-semibold">{t("signIn")}</h1>
+          <Input name="email" type="email" autoComplete="email" placeholder={t("email")} required />
+          <Input name="password" type="password" autoComplete="current-password" placeholder={t("password")} required />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={busy}>
+            {t("signIn")}
+          </Button>
+          <Link to="/forgot-password" className="text-sm underline">
+            {t("forgotPassword")}
+          </Link>
+        </form>
+      </Card>
+    </div>
+  )
+}
