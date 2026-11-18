@@ -8,18 +8,28 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { AuthFrame } from "@/components/auth-frame"
 import { isApiError } from "@api"
+import { providers } from "../esquadro/config.ts"
 import { afterSignIn, signIn } from "../esquadro/kit/auth.tsx"
+import { SocialButtons, useSocialReturn } from "../esquadro/kit/social.tsx"
 import { describe } from "../esquadro/kit/errors.ts"
 import { t } from "../esquadro/kit/i18n.ts"
 
 // Signing in: back to the page asked for (?redirect) afterwards.
 export const Route = createFileRoute("/login")({
-  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" ? s.redirect : undefined }),
+  validateSearch: (s: Record<string, unknown>): { redirect?: string; social?: true; error?: string } => ({
+    redirect: typeof s.redirect === "string" ? s.redirect : undefined,
+    // Back from a provider: ?social=1, and ?error= when it failed.
+    social: s.social ? true : undefined,
+    error: typeof s.error === "string" ? s.error : undefined,
+  }),
   component: Login,
 })
 
 function Login() {
-  const { redirect } = Route.useSearch()
+  const search = Route.useSearch()
+  const { redirect } = search
+  const back = useSocialReturn(search)
+  const password = providers.includes("password")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [error, setError] = useState("")
@@ -27,6 +37,17 @@ function Login() {
   const [shown, setShown] = useState(false)
   return (
     <AuthFrame title={t("welcomeBack")} hint={t("signInHint")}>
+      {back.error && (
+        <p role="alert" className="mb-5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+          {back.error}
+        </p>
+      )}
+      {back.busy && (
+        <p className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner /> {t("signingIn")}
+        </p>
+      )}
+      {password && (
       <form
         onSubmit={async (e) => {
           e.preventDefault()
@@ -80,6 +101,10 @@ function Login() {
           </Button>
         </FieldGroup>
       </form>
+      )}
+      <div className={password ? "mt-6" : undefined}>
+        <SocialButtons redirect={redirect} alone={!password} />
+      </div>
     </AuthFrame>
   )
 }

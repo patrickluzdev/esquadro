@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { KeyRound, Mail, MonitorSmartphone, Palette } from "lucide-react"
+import { KeyRound, Link2, Mail, MonitorSmartphone, Palette } from "lucide-react"
 import { DevicesCard, EmailCard, PasswordCard, ThemeCard } from "../../esquadro/kit/account.tsx"
+import { ConnectedAccountsCard, socialProviders } from "../../esquadro/kit/social.tsx"
 import { t } from "../../esquadro/kit/i18n.ts"
 import { PageHeader } from "../../esquadro/kit/page.tsx"
 import { Settings } from "../../esquadro/kit/settings.tsx"
@@ -17,6 +18,7 @@ function SettingsPage() {
         sections={[
           { key: "password", label: t("password"), icon: KeyRound, content: <PasswordCard /> },
           { key: "devices", label: t("devices"), icon: MonitorSmartphone, content: <DevicesCard /> },
+          ...(socialProviders.length > 0 ? [{ key: "connected", label: t("connectedAccounts"), icon: Link2, content: <ConnectedAccountsCard /> }] : []),
           { key: "email", label: t("email"), icon: Mail, content: <EmailCard /> },
           { key: "theme", label: t("theme"), icon: Palette, content: <ThemeCard /> },
         ]}

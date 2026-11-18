@@ -36,6 +36,7 @@ blueprint spa
 | `service_keys` | bool | `true` | A Service keys page under Administration, for those who administer them, when the security blueprint declares services. |
 | `history` | bool | `true` | A History tab on the page of each audited record (the audit blueprint), for those the audit's history option lets see it. |
 | `audit_page` | bool | `true` | An Audit page under Administration, every change, for the audit's admins. |
+| `social_login` | bool | `true` | The buttons to sign in with the realm's providers (Google, GitHub) on the sign-in page, and the accounts connected in the settings. |
 
 ```esquadro
 blueprint spa {

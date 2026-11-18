@@ -58,6 +58,9 @@ blueprint spa {
   /// An Audit page under Administration, every change, for the audit's
   /// admins.
   option audit_page bool default(true)
+  /// The buttons to sign in with the realm's providers (Google, GitHub) on
+  /// the sign-in page, and the accounts connected in the settings.
+  option social_login bool default(true)
 
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.

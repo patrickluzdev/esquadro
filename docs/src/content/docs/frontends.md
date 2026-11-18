@@ -177,6 +177,16 @@ blueprint's `service_key_choices`, within `service_key_max_days`. The spa's
 `service_keys false` leaves the page out; it is
 `src/pages/_app/service-keys.tsx`, yours.
 
+When the panel's realm signs in with providers
+(`@security(providers [password, google, github])`), the sign-in page has
+their buttons below the form ("or continue with"), or only them without a
+password. Back from the provider, the person goes on to the page asked
+for; when it failed, the sign-in page says why (no account with the email
+and sign-up closed, the provider's account linked to someone else, an
+account with the email to connect from the settings). The settings have
+Connected accounts, to connect or disconnect a provider, never the last
+way to sign in. The spa's `social_login false` leaves the buttons out.
+
 Dates and times are picked in a calendar, in the frontend's language,
 with Today and Clear (and Now and the hours and minutes, for a time); a
 many-to-many relation is a field of chips with a search (see
