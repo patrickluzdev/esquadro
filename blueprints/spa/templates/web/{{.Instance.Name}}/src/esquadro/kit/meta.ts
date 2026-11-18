@@ -48,6 +48,7 @@ export interface RecordsApi {
   get(id: string, selection?: Record<string, unknown>): Promise<Rec>
   create(record: Record<string, unknown>, options?: { idempotencyKey?: string }): Promise<Rec>
   update(id: string, record: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
+  patch(id: string, changes: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
   delete(id: string, options?: { ifMatch?: number | { version: number } }): Promise<void>
 }
 

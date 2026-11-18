@@ -3,6 +3,12 @@
 // change, as a Filament resource is: columns, form fields, filters,
 // actions. A field the model gains is in resources.{{.Entity.Plural.Camel}}.fields;
 // add it here when you want it.
+//
+// A column changed in the list itself:  column(f.status, { editable: true })
+// An action on a record (in its menu and on its page), and on the records
+// selected (bulk):
+//   actions: [{ label: "Approve", icon: Check, bulk: true,
+//               run: (r) => api.request("POST", `/api/v1/{{.Entity.Plural.Kebab}}/${r.id}/approve`) }],
 import { resource } from "../esquadro/kit/resource.ts"
 import { resources } from "../esquadro/resources.gen.ts"
 

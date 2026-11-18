@@ -80,6 +80,15 @@ entity Product {
   version it read (`If-Match`: a change someone made meanwhile is not
   overwritten), creates once however often it is sent (`Idempotency-Key`),
   and asks before leaving with unsaved changes.
+- The list is a data table (TanStack Table, in shadcn/ui's way):
+  - checkboxes select records, and a bar acts on all of them: Delete, and
+    your actions marked `bulk`, each record in turn, telling how many went
+    through and failed;
+  - a column marked `editable` is changed in the list itself: a choice or a
+    checkbox saves at once, text on Enter (Esc gives up), changing that field
+    alone (`PATCH`) on the version shown (`If-Match`);
+  - each record has a menu: View, Edit, your actions, Delete;
+  - Columns shows and hides columns (`hidden` starts one hidden).
 - What the person may do (`can`) decides the buttons; the API decides again.
 
 What a resource shows is **yours**, in `src/resources/<resource>.tsx`,
@@ -87,9 +96,14 @@ written once with the model's fields and left alone after:
 
 ```tsx
 export default resource(meta, {
-  table: { columns: [f.name, column(f.price, { cell: (p) => money(p.price) })], filters: [f.status] },
+  table: {
+    columns: [f.name, column(f.price, { cell: (p) => money(p.price) }), column(f.status, { editable: true })],
+    filters: [f.status],
+  },
   form: [f.name, f.price, f.status],
-  actions: [{ label: "Publish", run: (p) => api.request("POST", `/api/v1/products/${p.id}/publish`) }],
+  actions: [
+    { label: "Publish", icon: Send, bulk: true, run: (p) => api.request("POST", `/api/v1/products/${p.id}/publish`) },
+  ],
 })
 ```
 
