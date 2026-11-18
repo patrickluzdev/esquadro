@@ -3,3 +3,4 @@ test/**
 tsconfig.json
 node_modules/**/test/**
 *.vsix
+out/**/*.test.js

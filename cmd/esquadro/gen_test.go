@@ -286,3 +286,52 @@ func TestGenAsksForUpgradeAcrossReleases(t *testing.T) {
 		t.Fatal("upgrade went back to an older esquadro")
 	}
 }
+
+func TestGenDescribesThePlanAsJSON(t *testing.T) {
+	dir := demoProject(t)
+	if code, _, errOut := gen(t, dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Shop\n\nMine.\n"), 0o644)
+	tmpl := filepath.Join(dir, "esquadro/blueprints/demo/templates/catalog/{{.Entity.Snake}}.go.tmpl")
+	os.WriteFile(tmpl, []byte("package catalog\n\n// {{.Entity.Pascal}} is generated, v2.\ntype {{.Entity.Pascal}} struct{}\n"), 0o644)
+
+	out := t.TempDir()
+	code, stdout, errOut := gen(t, "-dry-run", "-json", "-out", out, dir)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	var p struct {
+		Versions string `json:"versions"`
+		Actions  []struct {
+			Path, Change, New string
+			Once              bool
+		} `json:"actions"`
+		Counts map[string]int `json:"counts"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &p); err != nil {
+		t.Fatalf("%v\n%s", err, stdout)
+	}
+	if p.Counts["update"] != 2 || len(p.Actions) != 3 {
+		t.Fatalf("plan:\n%s", stdout)
+	}
+	for _, a := range p.Actions {
+		switch a.Path {
+		case "catalog/product.go":
+			data, err := os.ReadFile(filepath.Join(out, a.New))
+			if a.Change != "update" || err != nil || !strings.Contains(string(data), "v2") {
+				t.Fatalf("product.go: %+v %v %s", a, err, data)
+			}
+		case "README.md":
+			if a.Change != "keep" || !a.Once || a.New != "" {
+				t.Fatalf("README.md: %+v", a)
+			}
+		}
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, "catalog/product.go")); strings.Contains(string(data), "v2") {
+		t.Fatal("-json wrote to the project")
+	}
+	if code, _, _ := gen(t, "-json", dir); code != 2 {
+		t.Fatal("-json without -dry-run")
+	}
+}

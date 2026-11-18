@@ -1,12 +1,17 @@
 // The Esquadro extension: the grammar colors .esq files, and esquadro lsp,
-// the language server built into esquadro, checks and formats them.
+// the language server built into esquadro, checks and formats them; the
+// panel shows what esquadro gen would do and the conflicts it left.
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
+import { Panel } from "./panel";
 
 let client: LanguageClient | undefined;
 
+const esquadro = () => vscode.workspace.getConfiguration("esquadro").get<string>("path") || "esquadro";
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const command = vscode.workspace.getConfiguration("esquadro").get<string>("path") || "esquadro";
+  new Panel(esquadro).register(context);
+  const command = esquadro();
   const server: ServerOptions = { command, args: ["lsp"] };
   const options: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "esquadro" }],

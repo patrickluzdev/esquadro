@@ -35,19 +35,32 @@ to it: it keeps what the template wrote last time in `esquadro/base/` (as `<file
 
 - Changes in different places: both are kept, and `esquadro gen` lists the
   file as `merge`.
-- Changes to the same lines: a conflict, marked as git marks them; your
-  editor offers to keep one side, the other or both. `esquadro gen` stops,
+- Changes to the same lines: a conflict, marked as git marks them (with
+  the lines as they were, as git's `diff3` style does); your editor offers
+  to keep one side, the other or both. `esquadro gen` stops,
   and `esquadro gen -check` fails, until the markers are gone.
 
 ```text
 <<<<<<< yours
   { to: "/promotions", label: "Promotions" },
+||||||| base
+  { to: "/products", label: "Products" },
 =======
   { to: "/products", label: t("products") },
 >>>>>>> esquadro
 ```
 
 `esquadro gen -dry-run` shows each merge before it is written.
+
+### In VS Code
+
+The [Esquadro extension](https://marketplace.visualstudio.com/items?itemName=patrickluzdev.esquadro)
+adds a panel to Source Control with what `esquadro gen` would do, file by
+file, and opens a conflict in the merge editor in three columns: the base,
+yours and esquadro's. It reads `esquadro gen -dry-run -json`, which other
+editors and tools can read as well: each file's path, its `change` (create,
+update, merge, delete, keep or conflict), `markers` when it has conflicts
+to resolve, and, with `-out dir`, its new content under `dir`.
 
 ## Upgrading esquadro
 

@@ -85,7 +85,7 @@ const (
 	reasonYours      = "yours: generated once, and changed since"
 	reasonUntouched  = "yours, untouched: follows the template"
 	reasonMerged     = "yours: the template's changes merged in"
-	reasonMergedBad  = "yours: the template's changes merged in, with %d conflicts marked to resolve"
+	reasonMergedBad  = "yours: the template's changes merged in, with %s marked to resolve"
 	reasonUnresolved = "yours, with conflicts of a merge still marked: resolve them"
 	reasonNowYours   = "generated before, yours from now on"
 	reasonDeleted    = "yours, and you deleted it: esquadro does not bring it back"
@@ -125,7 +125,7 @@ func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error)
 			Hash(old) == a.locked.Hash && !bytes.Equal(old, f.Content):
 			a.Change, a.Reason = Update, reasonUntouched
 		// A merge's conflicts not resolved yet: nothing more is merged.
-		case f.Once && old != nil && hasConflictMarkers(old):
+		case f.Once && old != nil && HasConflictMarkers(old):
 			a.Change, a.Reason, a.New = Conflict, reasonUnresolved, old
 		// A file of the user's they changed: the template's changes since
 		// last time (from the base kept in esquadro/base) merged in.
@@ -223,7 +223,10 @@ func (a *Action) merge(projectDir string, f *compose.File) error {
 	}
 	a.Change, a.New, a.Conflicts, a.Reason = Merge, merged, conflicts, reasonMerged
 	if conflicts > 0 {
-		a.Reason = fmt.Sprintf(reasonMergedBad, conflicts)
+		a.Reason = fmt.Sprintf(reasonMergedBad, "1 conflict")
+		if conflicts > 1 {
+			a.Reason = fmt.Sprintf(reasonMergedBad, fmt.Sprintf("%d conflicts", conflicts))
+		}
 	}
 	return nil
 }

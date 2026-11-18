@@ -212,7 +212,7 @@ without one. Prints the result unless -w or -check is given.
 Generate the project.
 
 ```
-Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]
+Usage: esquadro gen [-dry-run [-json [-out dir]] | -check] [-force] [-update] [-trust] [dir]
 
 Generates the project in dir (default: the current directory) from its .esq
 files and blueprints. Generated files you edited are never overwritten
@@ -226,6 +226,10 @@ only once you allow them, for each commit.
     	show what would change, with diffs, without writing anything
   -force
     	overwrite or delete generated files you edited
+  -json
+    	with -dry-run: print what would change as JSON, for editors
+  -out string
+    	with -json: write the new content of each changed file under this directory
   -trust
     	let the hooks of blueprints from git run without asking
   -update
@@ -298,7 +302,7 @@ a blueprint by its name, as esquadro blueprint list shows it.
 Show what a newer esquadro changes for the project, then generate it.
 
 ```
-Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]
+Usage: esquadro gen [-dry-run [-json [-out dir]] | -check] [-force] [-update] [-trust] [dir]
 
 Generates the project in dir (default: the current directory) from its .esq
 files and blueprints. Generated files you edited are never overwritten
@@ -312,6 +316,10 @@ only once you allow them, for each commit.
     	show what would change, with diffs, without writing anything
   -force
     	overwrite or delete generated files you edited
+  -json
+    	with -dry-run: print what would change as JSON, for editors
+  -out string
+    	with -json: write the new content of each changed file under this directory
   -trust
     	let the hooks of blueprints from git run without asking
   -update

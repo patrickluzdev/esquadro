@@ -290,7 +290,7 @@ func TestAGeneratedFileThatBecomesTheUsersIsReplacedWhenUntouched(t *testing.T) 
 		t.Fatal(err)
 	}
 	expect(t, plan, "merge routes.go")
-	if got, _ := p.read("routes.go"); !hasConflictMarkers([]byte(got)) {
+	if got, _ := p.read("routes.go"); !HasConflictMarkers([]byte(got)) {
 		t.Fatalf("routes.go = %q", got)
 	}
 
@@ -398,7 +398,7 @@ func TestAMergesConflictIsMarkedAndBlocksUntilResolved(t *testing.T) {
 	}
 	expect(t, plan, "merge menu.ts")
 	got, _ := p.read("menu.ts")
-	if !hasConflictMarkers([]byte(got)) {
+	if !HasConflictMarkers([]byte(got)) {
 		t.Fatalf("no markers in %q", got)
 	}
 	// Unresolved, the next generation stops.

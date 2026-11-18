@@ -1,8 +1,8 @@
 {
   "name": "esquadro",
   "displayName": "Esquadro",
-  "description": "Syntax highlighting, live errors and formatting for Esquadro's .esq files.",
-  "version": "0.1.0",
+  "description": "Syntax highlighting, live errors and formatting for Esquadro's .esq files, and a panel for what esquadro gen would change and the conflicts it leaves.",
+  "version": "0.2.0",
   "publisher": "patrickluzdev",
   "license": "Apache-2.0",
   "repository": {
@@ -54,11 +54,109 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "patrickluzdev.esquadro"
       }
-    }
+    },
+    "views": {
+      "scm": [
+        {
+          "id": "esquadro.plan",
+          "name": "Esquadro",
+          "when": "esquadro.hasProject",
+          "icon": "$(tools)"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "esquadro.refresh",
+        "title": "See what would change",
+        "category": "Esquadro",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "esquadro.gen",
+        "title": "Generate",
+        "category": "Esquadro",
+        "icon": "$(run)"
+      },
+      {
+        "command": "esquadro.upgrade",
+        "title": "Upgrade the project",
+        "category": "Esquadro",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "esquadro.openMerge",
+        "title": "Open in the merge editor",
+        "category": "Esquadro",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "esquadro.open",
+        "title": "Open",
+        "category": "Esquadro"
+      },
+      {
+        "command": "esquadro.showNotes",
+        "title": "What changed",
+        "category": "Esquadro"
+      },
+      {
+        "command": "esquadro.showOutput",
+        "title": "Show the output",
+        "category": "Esquadro"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "esquadro.refresh",
+          "when": "view == esquadro.plan",
+          "group": "navigation@1"
+        },
+        {
+          "command": "esquadro.gen",
+          "when": "view == esquadro.plan",
+          "group": "navigation@2"
+        },
+        {
+          "command": "esquadro.upgrade",
+          "when": "view == esquadro.plan",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "esquadro.openMerge",
+          "when": "view == esquadro.plan && viewItem == conflicted",
+          "group": "inline"
+        },
+        {
+          "command": "esquadro.gen",
+          "when": "view == esquadro.plan && viewItem == project",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "esquadro.open",
+          "when": "false"
+        },
+        {
+          "command": "esquadro.showNotes",
+          "when": "false"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "esquadro.plan",
+        "contents": "Looking at what esquadro gen would change…"
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p .",
-    "test": "vscode-tmgrammar-test \"test/**/*.esq\"",
+    "test": "tsc -p . && node --test out/*.test.js && vscode-tmgrammar-test \"test/**/*.esq\"",
     "package": "cp ../../LICENSE LICENSE && vsce package"
   },
   "dependencies": {
@@ -71,5 +169,8 @@
     "ovsx": "1.3.0",
     "typescript": "6.0.3",
     "vscode-tmgrammar-test": "0.1.3"
-  }
+  },
+  "activationEvents": [
+    "workspaceContains:**/esquadro/lock.json"
+  ]
 }

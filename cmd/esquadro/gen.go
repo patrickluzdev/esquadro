@@ -31,8 +31,10 @@ func generate(cmd string, args []string, stdout, stderr io.Writer) int {
 	force := fs.Bool("force", false, "overwrite or delete generated files you edited")
 	update := fs.Bool("update", false, "resolve the versions of blueprints from git again, instead of the commits the lockfile pins")
 	trust := fs.Bool("trust", false, "let the hooks of blueprints from git run without asking")
+	asJSON := fs.Bool("json", false, "with -dry-run: print what would change as JSON, for editors")
+	out := fs.String("out", "", "with -json: write the new content of each changed file under this directory")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]")
+		fmt.Fprintln(stderr, "Usage: esquadro gen [-dry-run [-json [-out dir]] | -check] [-force] [-update] [-trust] [dir]")
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Generates the project in dir (default: the current directory) from its .esq")
 		fmt.Fprintln(stderr, "files and blueprints. Generated files you edited are never overwritten")
@@ -54,15 +56,25 @@ func generate(cmd string, args []string, stdout, stderr io.Writer) int {
 	if fs.NArg() == 1 {
 		dir = fs.Arg(0)
 	}
+	if (*asJSON && !*dryRun) || (*out != "" && !*asJSON) {
+		fmt.Fprintf(stderr, "esquadro %s: -json goes with -dry-run, and -out with -json\n", cmd)
+		return 2
+	}
 
 	l := loadProject(cmd, dir, stderr, *update)
 	if l == nil {
 		return 1
 	}
-	if !versionAllows(cmd, l.lock.Esquadro, version.String(), stderr) {
+	if *asJSON {
+		// What an editor shows: the plan even when it takes esquadro
+		// upgrade, none when this esquadro is too old for the project.
+		if workspace.CompareVersions(l.lock.Esquadro, version.String()) == workspace.OlderVersion {
+			return jsonResult(stdout, stderr, l.lock.Esquadro, nil, "")
+		}
+	} else if !versionAllows(cmd, l.lock.Esquadro, version.String(), stderr) {
 		return 1
 	}
-	if cmd == "upgrade" {
+	if cmd == "upgrade" && !*asJSON {
 		printChanges(stdout, l.lock.Esquadro, version.String())
 	}
 	trusted, err := trustHooks(l.set, l.lock, *trust, stderr)
@@ -101,6 +113,9 @@ func generate(cmd string, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintln(stderr, "esquadro gen:", err)
 		return 1
+	}
+	if *asJSON {
+		return jsonResult(stdout, stderr, l.lock.Esquadro, plan, *out)
 	}
 	printPlan(stdout, plan, *dryRun)
 	if *check {
@@ -257,4 +272,16 @@ func orUnknown(v string) string {
 
 func runUpgrade(args []string, stdout, stderr io.Writer) int {
 	return generate("upgrade", args, stdout, stderr)
+}
+
+func jsonResult(stdout, stderr io.Writer, project string, plan *workspace.Plan, out string) int {
+	p, err := newPlanJSON(project, plan, out)
+	if err == nil {
+		err = writePlanJSON(stdout, p)
+	}
+	if err != nil {
+		fmt.Fprintln(stderr, "esquadro gen:", err)
+		return 1
+	}
+	return 0
 }

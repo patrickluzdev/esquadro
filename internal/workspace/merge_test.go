@@ -37,11 +37,11 @@ func TestMerge3MarksTheConflicts(t *testing.T) {
 	if !ok || conflicts != 1 {
 		t.Fatalf("ok %v, %d conflicts", ok, conflicts)
 	}
-	want := string(lines("a", "<<<<<<< yours", "mine", "=======", "esquadro's", ">>>>>>> esquadro", "c"))
+	want := string(lines("a", "<<<<<<< yours", "mine", "||||||| base", "b", "=======", "esquadro's", ">>>>>>> esquadro", "c"))
 	if string(got) != want {
 		t.Fatalf("merged:\n%s\nwant:\n%s", got, want)
 	}
-	if !hasConflictMarkers(got) {
+	if !HasConflictMarkers(got) {
 		t.Fatal("the markers are not found")
 	}
 }

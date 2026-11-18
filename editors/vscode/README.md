@@ -9,10 +9,21 @@ Support for [Esquadro](https://github.com/patrickluzdev/esquadro)'s `.esq` files
   blueprint does not have), with the same suggestions.
 - **Format on save**, exactly as `esquadro fmt` does. Turn it off with
   `"[esquadro]": { "editor.formatOnSave": false }`.
+- **The Esquadro panel**, in Source Control, beside git: what `esquadro gen`
+  would do to each file of the project, grouped (to resolve, to merge into
+  yours, to update, to create, to delete, yours kept), refreshed when the
+  model or the lockfile changes. Click a file to see its difference; use the
+  buttons to generate or to upgrade the project (in a terminal, with the
+  notes of what changed).
+- **Conflicts in three columns.** A conflict `esquadro gen` left in one of
+  your files opens in the merge editor: the template as it was (base),
+  yours, and the template now; the result below. Conflicts also show in
+  Problems and the status bar, and saving a file still with markers warns.
 
 ## Requirements
 
-The extension runs `esquadro lsp`, the language server built into esquadro.
+The extension runs `esquadro lsp`, the language server built into esquadro,
+and, for the panel, `esquadro gen -dry-run -json` (esquadro v0.8.0 or later).
 [Install esquadro](https://patrickluzdev.github.io/esquadro/getting-started/)
 and make sure `esquadro` is on your PATH, or set `esquadro.path` to the
 command.

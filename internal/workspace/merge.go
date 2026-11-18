@@ -3,9 +3,12 @@ package workspace
 import "strings"
 
 // The markers of a conflict a merge leaves for the user to resolve, as git
-// writes them: what the user has, then what esquadro brings.
+// writes them with merge.conflictStyle diff3: what the user has, what the
+// template wrote last time (the base), then what esquadro brings. With the
+// base, the file alone holds the three sides an editor needs to show it.
 const (
 	markerOurs   = "<<<<<<< yours"
+	markerBase   = "||||||| base"
 	markerSplit  = "======="
 	markerTheirs = ">>>>>>> esquadro"
 )
@@ -37,6 +40,8 @@ func Merge3(base, ours, theirs []byte) (merged []byte, conflicts int, ok bool) {
 			conflicts++
 			out.WriteString(markerOurs + "\n")
 			write(&out, ended(co))
+			out.WriteString(markerBase + "\n")
+			write(&out, ended(cb))
 			out.WriteString(markerSplit + "\n")
 			write(&out, ended(ct))
 			out.WriteString(markerTheirs + "\n")
@@ -99,9 +104,9 @@ func ended(lines []string) []string {
 	return out
 }
 
-// hasConflictMarkers reports whether a file still has a conflict a merge
+// HasConflictMarkers reports whether a file still has a conflict a merge
 // left in it.
-func hasConflictMarkers(content []byte) bool {
+func HasConflictMarkers(content []byte) bool {
 	s := "\n" + string(content)
 	return strings.Contains(s, "\n"+markerOurs+"\n") && strings.Contains(s, "\n"+markerTheirs+"\n")
 }
