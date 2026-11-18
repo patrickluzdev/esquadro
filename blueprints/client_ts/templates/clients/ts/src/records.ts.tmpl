@@ -14,6 +14,18 @@ export type FieldsOf<F, R extends string> = F extends `${R}.${infer K}` ? K : ne
 export type Selected<T, K> = [K] extends [never] ? T : Pick<T, Extract<Always | K, keyof T>>
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- $files := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$files = true}}{{end}}{{end}}{{end}}
+{{- if $files}}
+
+/** A file a record keeps; url is a signed link to read it, which expires. */
+export interface StoredFile {
+  id: string
+  name: string
+  size: number
+  content_type: string
+  url: string
+}
+{{- end}}
 {{- if $money}}
 
 /**
@@ -67,7 +79,7 @@ export interface {{$P}} {
 /** {{if eq (slice (lower .Label) 0 1) "a" "e" "i" "o"}}An{{else}}A{{end}} {{lower .Label}} as it is written, to create or replace one. */
 export interface New{{$P}} {
 {{- range inRequest $e}}
-  {{.Snake}}{{if not .Required}}?{{end}}: {{tsType .}}
+  {{.Snake}}{{if not .Required}}?{{end}}: {{if or (eq .Type "file") (eq .Type "image")}}string{{else}}{{tsType .}}{{end}}
 {{- end}}
 {{- range keys $e}}
   {{keyName .}}{{if not (keyInRequest $.Entities $e .)}}?{{end}}: string
@@ -77,7 +89,7 @@ export interface New{{$P}} {
 /** Changes to {{if eq (slice (lower .Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower .Label}}: only the fields sent change; null empties one. */
 export interface {{$P}}Changes {
 {{- range inRequest $e}}
-  {{.Snake}}?: {{tsType .}}{{if clearable .}} | null{{end}}
+  {{.Snake}}?: {{if or (eq .Type "file") (eq .Type "image")}}string{{else}}{{tsType .}}{{end}}{{if clearable .}} | null{{end}}
 {{- end}}
 {{- range keys $e}}
   {{keyName .}}?: string{{if not .Required}} | null{{end}}

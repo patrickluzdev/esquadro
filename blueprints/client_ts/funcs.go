@@ -116,6 +116,8 @@ func tsType(f *project.Field) string {
 		return f.Enum.Module.Pascal + f.Enum.Pascal
 	case project.TypeMoney:
 		return "Money"
+	case project.TypeFile, project.TypeImage:
+		return "StoredFile"
 	}
 	return "string"
 }
@@ -157,7 +159,7 @@ func sampleable(e *project.Entity) bool {
 		}
 	}
 	for _, f := range rest.InRequest(e) {
-		if f.Required && (f.Pattern != "" || f.Type == project.TypeJSON) {
+		if f.Required && (f.Pattern != "" || f.Type == project.TypeJSON || f.IsFile()) {
 			return false
 		}
 	}

@@ -5,6 +5,10 @@
 
 {{- $m2m := false}}{{range .Entities}}{{if manyToMany .}}{{$m2m = true}}{{end}}{{end}}
 import { {{if $m2m}}links, {{end}}records, Transport } from "./runtime.ts"
+{{- $hasFiles := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$hasFiles = true}}{{end}}{{end}}{{end}}
+{{- if $hasFiles}}
+import { uploads } from "./uploads.ts"
+{{- end}}
 import type { ClientOptions, RequestOptions } from "./runtime.ts"
 import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
 {{- if .Reports}}
@@ -17,6 +21,10 @@ import { {{range $i, $r := $realms}}{{if $i}}, {{end}}{{$r.Entity.Camel}}Identit
 export * from "./runtime.ts"
 export * from "./records.ts"
 export * from "./validate.ts"
+{{- $files := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$files = true}}{{end}}{{end}}{{end}}
+{{- if $files}}
+export * from "./uploads.ts"
+{{- end}}
 {{- if .Reports}}
 export * from "./reports.ts"
 {{- end}}
@@ -62,6 +70,10 @@ export function createClient(options: ClientOptions) {
         (await t.request<{ items: {{.Pascal}}Row[] }>("GET", "/api/v1/reports/{{.Kebab}}", { query: {{if $req}}{ ...params }{{else}}{ ...(params ?? {}) }{{end}} })).items,
 {{- end}}
     },
+{{- end}}
+{{- if $hasFiles}}
+    /** Sending the files of the file and image fields. */
+    uploads: uploads(t),
 {{- end}}
     /** An operation the model does not declare, written in the project: untyped. */
     request: <T = unknown>(method: string, path: string, init?: RequestOptions) => t.request<T>(method, path, init),
