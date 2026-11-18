@@ -22,11 +22,9 @@ import {
   ChevronRight,
   Columns3,
   Eye,
-  Inbox,
   MoreHorizontal,
   Pencil,
   Plus,
-  SearchX,
   Trash2,
   X,
 } from "lucide-react"
@@ -42,9 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { api } from "../api.ts"
 import { EditableCell } from "./cell.tsx"
@@ -55,6 +51,8 @@ import { resources } from "../resources.gen.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
 import { SearchBox, SearchContext } from "./search.tsx"
+import { EmptyState, ErrorState, LoadingBar, NoResultsState, RefreshError, TableSkeleton } from "./states.tsx"
+import { cn } from "@/lib/utils"
 import { columnField, columnOptions } from "./resource.ts"
 import type { Action, Resource } from "./resource.ts"
 import { FieldValue } from "./show.tsx"
@@ -154,7 +152,8 @@ export function ResourceList({ resource, description }: { resource: Resource; de
   // instead of filling the history.
   const set = (changes: Partial<ListSearch>, replace = false) =>
     navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never, replace })
-  const filtering = Boolean(search.q) || (resource.table.filters ?? []).some((f) => search[f.name] !== undefined)
+  // The search counts only where the list has one.
+  const filtering = (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) || (resource.table.filters ?? []).some((f) => search[f.name] !== undefined)
   const clearAll = () =>
     set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries((resource.table.filters ?? []).map((f) => [f.name, undefined])) })
 
@@ -429,9 +428,11 @@ export function ResourceList({ resource, description }: { resource: Resource; de
           </div>
         </div>
       )}
-      <div className="overflow-hidden rounded-lg border">
+      {list.isError && page && <RefreshError error={list.error} onRetry={() => list.refetch()} />}
+      <div className="relative overflow-hidden rounded-lg border">
+        <LoadingBar active={list.isFetching && !list.isPending} />
         <SearchContext value={search.q ?? ""}>
-        <Table>
+        <Table className={cn("transition-opacity", list.isFetching && !list.isPending && "opacity-60")}>
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
@@ -444,16 +445,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
             ))}
           </TableHeader>
           <TableBody>
-            {list.isPending &&
-              Array.from({ length: 5 }, (_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: width }, (_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full max-w-40" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+            {list.isPending && <TableSkeleton columns={width} />}
             {table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
@@ -471,24 +463,25 @@ export function ResourceList({ resource, description }: { resource: Resource; de
           </TableBody>
         </Table>
         </SearchContext>
-        {page?.items.length === 0 && (
-          <Empty className="border-t">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">{filtering ? <SearchX /> : <Inbox />}</EmptyMedia>
-              <EmptyTitle>{search.q ? t("noResults", { q: search.q }) : filtering ? t("noMatches") : t("empty")}</EmptyTitle>
-              <EmptyDescription>{filtering ? t("noResultsHint") : t("emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {filtering && (
-              <EmptyContent>
-                <Button variant="outline" onClick={clearAll}>
-                  {search.q ? t("clearSearch") : t("clearFilters")}
-                </Button>
-              </EmptyContent>
-            )}
-          </Empty>
-        )}
+        {list.isError && !page && <ErrorState className="border-t" error={list.error} onRetry={() => list.refetch()} />}
+        {page?.items.length === 0 &&
+          (filtering ? (
+            <NoResultsState className="border-t" query={search.q} onClear={clearAll} />
+          ) : (
+            <EmptyState
+              className="border-t"
+              action={
+                page.can.includes("create") && (
+                  <Button asChild>
+                    <Link to={`/${meta.name}/new` as never}>
+                      <Plus /> {t("creating", { name: meta.singular })}
+                    </Link>
+                  </Button>
+                )
+              }
+            />
+          ))}
       </div>
-      {list.isError && <p className="text-sm text-destructive">{t("somethingWrong")}</p>}
       {paged && page?.total_pages !== undefined && page.total_pages > 1 && (
         <div className="flex items-center justify-end gap-2 text-sm">
           <span className="mr-2 text-muted-foreground">{t("pageOf", { page: current, pages: page.total_pages })}</span>

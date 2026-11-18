@@ -6,12 +6,20 @@ import type { FieldMeta } from "./meta.ts"
 
 /** The message of an error, for a notice. */
 export function describe(e: unknown): string {
+  // The frontend's own words, in its language: the API's titles are in
+  // English.
   if (isApiError(e)) {
     if (e.code === "precondition_failed") return t("conflict")
+    if (e.code === "invalid_fields") return t("fixFields")
+    if (e.status === 400) return t("badRequest")
+    if (e.status === 401) return t("sessionEnded")
     if (e.status === 403) return t("forbidden")
     if (e.status === 404) return t("notFound")
-    if (e.title) return e.title
+    if (e.status === 409) return t("conflict")
+    if (e.status === 429) return t("tooMany")
+    if (e.status >= 500) return t("serverError")
   }
+  if (e instanceof TypeError) return t("offline")
   return t("somethingWrong")
 }
 

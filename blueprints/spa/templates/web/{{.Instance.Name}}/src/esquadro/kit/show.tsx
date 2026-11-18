@@ -15,6 +15,7 @@ import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
+import { DetailSkeleton, ErrorState } from "./states.tsx"
 import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
@@ -60,6 +61,15 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   )
 }
 
+/** Back to the resource's list. */
+export function BackToList({ resource }: { resource: Resource }) {
+  return (
+    <Button variant="outline" asChild>
+      <Link to={`/${resource.meta.name}` as never}>{t("backTo", { name: resource.meta.label })}</Link>
+    </Button>
+  )
+}
+
 /** A record of the resource; none without an id (a create). */
 export function useRecord(resource: Resource, id: string | undefined) {
   return useQuery({
@@ -83,15 +93,8 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
     },
     onError: (e) => toast(describe(e), "error"),
   })
-  if (record.isPending) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full rounded-xl" />
-      </div>
-    )
-  }
-  if (record.isError) return <p className="text-sm text-destructive">{describe(record.error)}</p>
+  if (record.isPending) return <DetailSkeleton fields={(resource.show ?? resource.form).length} />
+  if (record.isError) return <ErrorState error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
   const r = record.data
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular

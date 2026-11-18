@@ -95,6 +95,12 @@ entity Product {
   - each record has a menu: View, Edit, your actions, Delete;
   - Columns shows and hides columns (`hidden` starts one hidden).
 - What the person may do (`can`) decides the buttons; the API decides again.
+- Every page has the same states: a skeleton of what comes while it first
+  loads; what was there, dimmed under a moving bar, while it loads again;
+  empty, with a button to create the first; nothing found, with a button to
+  clear the search and filters; and an error, in the frontend's words, with
+  Try again (and, for a record not found or not allowed, Back to the list).
+  When a list cannot be refreshed, it keeps what it had and says so.
 
 What a resource shows is **yours**, in `src/resources/<resource>.tsx`,
 written once with the model's fields and left alone after:

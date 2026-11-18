@@ -24,7 +24,8 @@ import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
-import { useRecord } from "./show.tsx"
+import { BackToList, useRecord } from "./show.tsx"
+import { ErrorState, FormSkeleton } from "./states.tsx"
 import { toast } from "./toast.tsx"
 
 type Values = Record<string, unknown>
@@ -125,6 +126,16 @@ function RelationInput({ id, field, value, onChange, invalid }: InputProps & { i
   })
   if (!target) return <Input id={id} value={value} onChange={(e) => onChange(e.target.value || null)} aria-invalid={invalid} />
   if (options.isPending) return <Skeleton className="h-9 w-full" />
+  if (options.isError) {
+    return (
+      <div className="flex h-9 items-center justify-between rounded-md border border-destructive/50 px-3 text-sm text-destructive">
+        {t("loadFailed")}
+        <Button type="button" variant="ghost" size="sm" onClick={() => options.refetch()}>
+          {t("retry")}
+        </Button>
+      </div>
+    )
+  }
   return (
     <Choice id={id} field={field} value={value} onChange={onChange} invalid={invalid}>
       {options.data?.items.map((r: Rec) => (
@@ -147,15 +158,8 @@ function initial(fields: FieldMeta[], record?: Rec): Values {
 /** The form to create a record, or to change one (with its id). */
 export function ResourceForm({ resource, id }: { resource: Resource; id?: string }) {
   const record = useRecord(resource, id)
-  if (id !== undefined && record.isPending) {
-    return (
-      <div className="flex max-w-2xl flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-72 w-full rounded-xl" />
-      </div>
-    )
-  }
-  if (record.isError) return <p className="text-sm text-destructive">{describe(record.error)}</p>
+  if (id !== undefined && record.isPending) return <FormSkeleton fields={resource.form.length} />
+  if (record.isError) return <ErrorState error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
   return <Form resource={resource} record={record.data} />
 }
 

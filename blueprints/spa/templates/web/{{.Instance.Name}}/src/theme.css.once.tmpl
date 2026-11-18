@@ -114,6 +114,16 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* The bar over a list loading again (kit/states.tsx). */
+@keyframes loading-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
