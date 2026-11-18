@@ -46,6 +46,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { api } from "../api.ts"
 import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
+import { DateRangeFilter } from "./daterange.tsx"
 import { download, fileName, toCsv } from "./export.ts"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
@@ -87,6 +88,16 @@ export function listSearch(search: Record<string, unknown>): ListSearch {
     else if (typeof v === "string" || typeof v === "number") out[k] = v
   }
   return out
+}
+
+/** A filter by a date: a period, in two params (created_at_min, _max). */
+function isDate(f: FieldMeta): boolean {
+  return f.kind === "date" || f.kind === "datetime"
+}
+
+/** The URL's keys of a filter. */
+function filterKeys(f: FieldMeta): string[] {
+  return isDate(f) ? [`${f.name}_min`, `${f.name}_max`] : [f.name]
 }
 
 /** A filter of the list: an enum's values, yes or no, or the related records. */
@@ -180,9 +191,11 @@ export function ResourceList({
   const filters = (resource.table.filters ?? []).filter((f) => f.name !== scope?.param)
   const tableColumns = resource.table.columns.filter((c) => columnField(c).name !== scope?.param)
   // The search counts only where the list has one.
-  const filtering = (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) || filters.some((f) => search[f.name] !== undefined)
+  const filtering =
+    (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) ||
+    filters.some((f) => filterKeys(f).some((k) => search[k] !== undefined))
   const clearAll = () =>
-    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries(filters.map((f) => [f.name, undefined])) })
+    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries(filters.flatMap(filterKeys).map((k) => [k, undefined])) })
 
   const page = list.data
   const items = useMemo(() => page?.items ?? [], [page])
@@ -420,14 +433,24 @@ export function ResourceList({
             shortcut={!embedded}
           />
         )}
-        {filters.map((f) => (
+        {filters.map((f) =>
+          isDate(f) ? (
+            <DateRangeFilter
+              key={f.name}
+              field={f}
+              min={search[`${f.name}_min`] as string | undefined}
+              max={search[`${f.name}_max`] as string | undefined}
+              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
+            />
+          ) : (
           <ListFilter
             key={f.name}
             field={f}
             value={search[f.name] === undefined ? undefined : String(search[f.name])}
             onChange={(v) => set({ [f.name]: v, page: undefined, cursor: undefined })}
           />
-        ))}
+          ),
+        )}
         {filtering && (
           <Button variant="ghost" onClick={clearAll}>
             <X /> {t("clearFilters")}

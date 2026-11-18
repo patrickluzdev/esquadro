@@ -43,7 +43,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 	for path, want := range map[string]string{
 		"src/esquadro/resources.gen.ts":     `label: "Produtos"`,
 		"src/esquadro/config.ts":            `export const roles: readonly string[] = ["admin", "staff"]`,
-		"src/resources/products.tsx":        "export default resource(meta, {",
+		"src/resources/products.tsx":        "f.created_at],",
 		"src/pages/_app/products/index.tsx": `createFileRoute("/_app/products/")`,
 		"src/menu.ts":                       "icons.Package",
 		"src/components/site-header.tsx":    "<CommandPalette />",
