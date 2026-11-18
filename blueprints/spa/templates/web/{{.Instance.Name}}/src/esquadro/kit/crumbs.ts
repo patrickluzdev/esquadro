@@ -2,6 +2,7 @@
 // header's breadcrumb: Home, a resource, one of its records (by its name),
 // editing it.
 import { isApiError } from "@api"
+import { dashboards } from "../dashboard.gen.ts"
 import { useQuery } from "@tanstack/react-query"
 import { useMatches, useRouterState } from "@tanstack/react-router"
 import { menu, isGroup } from "@/menu.ts"
@@ -47,6 +48,13 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   const parts = partsOf(pathname)
   const out: Crumb[] = [{ label: t("home"), to: "/" }]
   if (parts.length === 0) return out
+  // A dashboard is called by the name the model gives it.
+  if (parts[0] === "dashboards") {
+    const d = dashboards.find((x) => x.slug === parts[1])
+    out.push({ label: t("dashboards") })
+    if (parts[1]) out.push({ label: d?.name ?? capitalize(parts[1]), to: `/dashboards/${parts[1]}` })
+    return out
+  }
   const meta = metaOf(parts[0])
   const page = pages().find((p) => p.to === `/${parts[0]}`)
   out.push({ label: meta?.label ?? page?.label ?? (parts.length === 1 && title ? title : parts[0]), to: `/${parts[0]}` })

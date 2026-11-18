@@ -4,9 +4,11 @@ package spa
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
@@ -32,6 +34,10 @@ func TemplateFuncs() template.FuncMap {
 		"filterable":  Filterable,
 		"fileMeta":    FileMeta,
 		"enumColor":   EnumColor,
+		"names":       strs,
+		"list":        func(items ...string) []string { return items },
+		"slug":        Slug,
+		"dashboards":  Dashboards,
 		"onColor":     OnColor,
 		"darkPrimary": DarkPrimary,
 		"rangeFilterable": func(e *project.Entity, name string) bool {
@@ -226,4 +232,50 @@ func EnumColor(v *project.EnumValue, ann map[string]any) string {
 		}
 	}
 	return "gray"
+}
+
+// unaccent takes the accents off the letters of Latin languages.
+var unaccent = strings.NewReplacer(
+	"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
+	"é", "e", "è", "e", "ê", "e", "ë", "e",
+	"í", "i", "ì", "i", "î", "i", "ï", "i",
+	"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ö", "o",
+	"ú", "u", "ù", "u", "û", "u", "ü", "u",
+	"ç", "c", "ñ", "n",
+)
+
+// Slug is a dashboard's name in its address: Sales and marketing,
+// sales-and-marketing.
+func Slug(name string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range unaccent.Replace(strings.ToLower(name)) {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			b.WriteRune(r)
+			dash = false
+		default:
+			dash = true
+		}
+	}
+	return b.String()
+}
+
+// Dashboards are the dashboards the reports of a frontend name, in the
+// order the model names them first: the first page's is not among them.
+func Dashboards(reports []*project.Report, instance string) []string {
+	var out []string
+	for _, r := range reports {
+		a := r.Ann[instance]
+		if a["widget"] == nil {
+			continue
+		}
+		if d, _ := a["dashboard"].(string); d != "" && !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	return out
 }

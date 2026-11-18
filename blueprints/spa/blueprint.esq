@@ -68,24 +68,56 @@ blueprint spa {
   annotation field {
     /// What people call the field, in the frontend's language: Price.
     label string
+    /// How a report's column is shown: percent (0.42 as 42%, with a bar in
+    /// a table) or duration (seconds as 03:45).
+    format name
   }
   annotation relation {
     /// What people call the relation, in the frontend's language: Category.
     label string
   }
   annotation report {
-    /// The report on the frontend's dashboard (its first page): stat (a
-    /// number, the y column summed), bar, line or table.
+    /// The report on a dashboard of the frontend: stat (a number, the y
+    /// column summed), area, line, bar, combo (bars and a line), donut,
+    /// progress (bars of shares), goal (a ring of y over target), top (a
+    /// ranking), table, radar or timeline.
     widget name
     /// The column of the names, along the chart: category, day. On a
-    /// number, the column it is drawn over in the overview: day.
+    /// number, the column it is drawn over in the overview: day. On a
+    /// timeline, the column of when.
     x name
-    /// The column of the numbers: products, total.
-    y name
+    /// The column of the numbers, or several, a series each:
+    /// [ongoing, finished]. On a timeline, the column of what happened.
+    y list
+    /// A column whose values split the rows into series, a line or bars
+    /// each: channel (the rows, a day, a channel and a total).
+    series name
     /// What the dashboard calls it; the report's name by default.
     label string
     /// The time parameter the dashboard's period fills (its start): since.
     since name
+    /// The time parameter of the period's end: with since, a number shows
+    /// how it changed from the period before.
+    until name
+    /// How a number is reckoned from its rows: sum (by default), last (a
+    /// running total, a balance: the last row's), average or max.
+    total name
+    /// The column of the goal (goal), or of what is 100% (progress).
+    target name
+    /// On a ranking: the column of each one's picture, of a second line
+    /// under its name, and of its change (a percentage).
+    image name
+    subtitle name
+    delta name
+    /// How wide its card is: third, half, two_thirds or full. By default,
+    /// two_thirds for area, line, bar, combo; full for table and number;
+    /// third for the rest.
+    width name
+    /// How many rows a ranking, a list, a timeline or a table shows: by
+    /// default 6 (8 for a table).
+    rows int
+    /// The dashboard it is on: Sales. Without one, the first page's.
+    dashboard string
     /// A number's icon, a Lucide name: shopping_cart.
     icon name
   }

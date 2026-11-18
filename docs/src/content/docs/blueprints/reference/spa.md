@@ -51,6 +51,7 @@ blueprint spa {
 | entity | `group` | string | The section of the menu it is in, with the other resources of the same group: "Catalog". |
 | entity | `icon` | name | The icon of its menu entry, a Lucide name: tag, users, shopping_cart. |
 | field | `label` | string | What people call the field, in the frontend's language: Price. |
+| field | `format` | name | How a report's column is shown: percent (0.42 as 42%, with a bar in a table) or duration (seconds as 03:45). |
 | relation | `label` | string | What people call the relation, in the frontend's language: Category. |
 | value | `label` | string | What people call a value of an enum, in the frontend's language: Active. |
 | value | `color` | name | The color of its dot: green, amber, red, blue, violet, sky, orange or gray. Without one, a guess from its name: ACTIVE, PAID and DONE are green, PENDING and DRAFT amber, CANCELED and FAILED red; others gray. |

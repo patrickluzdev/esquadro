@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,7 +15,10 @@ var ErrRateLimited = &Problem{Status: 429, Code: "rate_limited", Title: "Too man
 // RateLimit lets each client make perMinute requests a minute, refilled
 // evenly, and answers ErrRateLimited with Retry-After past that. It counts
 // in memory, so it holds for one instance of the service; 0 turns it off.
-// trustProxy takes the client from X-Forwarded-For.
+// trustProxy takes the client from X-Forwarded-For. A file read (a
+// frontend's scripts, styles, images: a GET of a path ending in a name
+// with an extension) is not counted: a page loads dozens of them, served
+// from memory.
 func RateLimit(perMinute int, trustProxy bool) Middleware {
 	return func(next http.Handler) http.Handler {
 		if perMinute <= 0 {
@@ -22,6 +26,10 @@ func RateLimit(perMinute int, trustProxy bool) Middleware {
 		}
 		l := newLimiter(perMinute, time.Now)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if isFile(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			ok, remaining, wait := l.take(ClientOf(r, trustProxy))
 			w.Header().Set("RateLimit-Limit", strconv.Itoa(perMinute))
 			w.Header().Set("RateLimit-Remaining", strconv.Itoa(remaining))
@@ -33,6 +41,17 @@ func RateLimit(perMinute int, trustProxy bool) Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// isFile reports whether r reads a file: a GET or a HEAD of a path whose
+// last part has an extension (/admin/assets/index-1a2b.js).
+func isFile(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	last := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+	dot := strings.LastIndex(last, ".")
+	return dot > 0 && dot < len(last)-1
 }
 
 // limiter is a token bucket per client.

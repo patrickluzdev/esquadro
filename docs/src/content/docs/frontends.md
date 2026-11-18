@@ -85,38 +85,69 @@ to any page, finds records of every searchable resource at once, creates a
 record of any resource, changes the theme and signs out, all from the
 keyboard.
 
-## The dashboard
+## Dashboards
 
-The first page shows the reports marked as widgets: a number, bars, a line
-or a table, for a period (today, the last 7 or 30 days, all time) that
-fills the report's time parameter, chosen at the right of its title. The
-numbers sit side by side in an overview, each with its icon (`icon`) in a
-colored circle; the charts and tables, each in a card, below them. A number
-with an `x` (a day) is also drawn over it, under the numbers: a click on
-another number with one draws that one instead.
+The reports marked as widgets make dashboards: the first page's, and one
+page for each `dashboard` the reports name, in a Dashboards group of the
+menu (`/dashboards/sales`). Each has a period at the right of its title
+(today, the last 7, 30 or 90 days, this month, all time) that fills the
+reports' time parameters.
 
 ```esquadro
-report SalesPerDay {
-  day   string  required
-  total decimal required @admin(label "Sales")
-  since time    param
-  @admin(widget stat, x day, y total, icon dollar_sign, since since)
+report RevenuePerDay {
+  day     string required @admin(label "Day")
+  revenue money  required @admin(label "Revenue")
+  since   time   param
+  until   time   param
+  @admin(widget stat, x day, y revenue, icon dollar_sign, since since, until until, width two_thirds, dashboard "Sales")
+}
+
+report RevenueByChannel {
+  channel Channel required
+  revenue money   required
+  since   time    param
+  @admin(widget donut, x channel, y revenue, label "Revenue by channel", since since, dashboard "Sales")
 }
 ```
 
-```esquadro
-report ProductsByCategory {
-  category string required @admin(label "Category")
-  products int    required @admin(label "Products")
-  since    time   param
-  @admin(widget bar, x category, y products, label "Products by category", since since)
-}
-```
+| Widget | What it shows | Needs |
+|---|---|---|
+| `stat` | A number in the overview, with its icon; with `x`, a click draws it over time; with `until`, how it changed from the period before | `y` |
+| `area`, `line` | Curves over `x` (days, months), a series per `y` column or per value of `series`, with a legend | `x`, `y` |
+| `bar` | Bars, grouped with several series; across, when the names are long | `x`, `y` |
+| `combo` | Bars of the first `y`, a line of the second, on two scales | `x`, `y [bars, line]` |
+| `donut` | Each name's share, the total in the middle, the percentages under it | `x`, `y` |
+| `progress` | Each name with a bar of its share of the total (or of its `target`) | `x`, `y` |
+| `goal` | A ring of `y` over `target`: how far along | `y`, `target` |
+| `top` | A ranking: picture (`image`) or initials, name, second line (`subtitle`), value and change (`delta`) | `x`, `y` |
+| `table` | Every column: enums with their dots, money exact, percentages with a bar | — |
+| `radar` | Scores on a radar, numbered under it, colored by how high | `x`, `y` |
+| `timeline` | What happened: who (`subtitle`), what (`y`) and when (`x`) | `x`, `y` |
 
-`widget` is `stat` (the `y` column summed), `bar` and `line` (`x` along,
-`y` up) or `table` (every column); `check` tells a column or parameter it
-does not have. The page is yours: place `<Dashboard />` where you want it,
-with cards and charts of your own.
+| Option | What | Default |
+|---|---|---|
+| `x`, `y`, `series` | The names, the numbers (one column or a list), the column splitting the rows into series | — |
+| `since`, `until` | The time parameters the period fills; with `until`, a number compares with the period before | — |
+| `total` | How a number is reckoned from its rows: `sum`, `last` (a running total), `average`, `max` | `sum` |
+| `target` | The goal (`goal`), or what is 100% (`progress`) | — |
+| `image`, `subtitle`, `delta` | A ranking's picture, second line and change | — |
+| `width` | `third`, `half`, `two_thirds`, `full` | the charts two thirds, numbers and tables full, the rest a third |
+| `rows` | How many rows a ranking, list, timeline or table shows | 6 (8 for a table) |
+| `dashboard` | The dashboard it is on | the first page's |
+| `icon`, `label` | A number's Lucide icon; what the dashboard calls it | a chart; the report's name |
+
+A column's `@admin(format percent)` shows `0.42` as `42%` (with a bar in a
+table, on a 0–100% scale on a radar), and `format duration` shows seconds as
+`03:45`. An enum's colors (`@admin(color green)`) color its slices, series
+and dots. The numbers are the reports': a dashboard asks each once for the
+period (and once more for the period before, with `until`), and keeps them a
+minute.
+
+The pages are yours: `src/pages/_app/index.tsx` and
+`src/pages/_app/dashboards/$slug.tsx`. Each widget is in the kit
+(`SeriesChart`, `DonutChart`, `ProgressList`, `GoalRing`, `TopList`,
+`RadarScores`, `Timeline`, `ReportTable`) for pages of your own, drawn with
+shadcn/ui's charts.
 
 ## Sign-in
 
@@ -268,7 +299,8 @@ changed where it belongs: the model (`.esq`), the resource
 | `label` | field, relation | What people call it | its name, humanized |
 | `label` | enum value | What people call the value | the value |
 | `color` | enum value | Its dot: green, amber, red, blue, violet, sky, orange, gray | a guess from its name |
-| `widget`, `x`, `y`, `label`, `since`, `icon` | report | A widget of the [dashboard](#the-dashboard) | not one |
+| `widget`, `x`, `y`, `series`, `since`, `until`, `total`, `width`, `dashboard`… | report | A widget of a [dashboard](#dashboards) | not one |
+| `format` | report column | `percent` or `duration` | the value as is |
 
 Each annotation is named after the frontend: `@admin(...)` for
 `blueprint spa admin`. The [blueprint's reference](/esquadro/blueprints/reference/spa/)

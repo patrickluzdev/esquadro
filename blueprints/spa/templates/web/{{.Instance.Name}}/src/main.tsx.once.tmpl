@@ -8,13 +8,17 @@ import { isApiError } from "@api"
 import { base } from "./esquadro/config.ts"
 import { sessionQuery } from "./esquadro/kit/auth.tsx"
 import { PageLoader } from "./esquadro/kit/states.tsx"
+import { retryDelay, retryQuery } from "./esquadro/kit/errors.ts"
 import { routeTree } from "./esquadro/routeTree.gen.ts"
 import "./theme.css"
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (n, e) => !(isApiError(e) && e.status < 500) && n < 2,
+      // Too many requests (a dashboard asks for many at once) are tried
+      // again after a pause; a refusal (400, 403, 404) is not.
+      retry: retryQuery,
+      retryDelay,
       staleTime: 10_000,
     },
   },

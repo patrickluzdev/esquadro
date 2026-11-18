@@ -10,7 +10,7 @@ const DOTS: Record<string, string> = {
   green: "bg-success",
   amber: "bg-warning",
   red: "bg-destructive",
-  blue: "bg-primary",
+  blue: "bg-blue-500",
   violet: "bg-violet-500",
   sky: "bg-sky-500",
   orange: "bg-orange-500",

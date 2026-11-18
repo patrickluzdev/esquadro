@@ -17,6 +17,8 @@ export interface FieldMeta {
   labels?: Readonly<Record<string, string>>
   /** The color of each value's dot: green, amber, red, blue, violet, sky, orange, gray. */
   colors?: Readonly<Record<string, string>>
+  /** How a report's column is shown: a share as a percentage, seconds as a duration. */
+  format?: "percent" | "duration"
   /** A relation's resource, and the field its records are shown by. */
   target?: string
   display?: string

@@ -143,6 +143,12 @@ func unlabeled(p *project.Project, instance string) diag.List {
 
 // widgets checks the reports on an instance's dashboard: their kind, and
 // the columns and parameter they name.
+// widgetKinds are the widgets a report may be on a dashboard.
+var widgetKinds = []string{"stat", "area", "line", "bar", "combo", "donut", "progress", "goal", "top", "table", "radar", "timeline"}
+
+// widthNames are how wide a widget's card may be.
+var widthNames = []string{"third", "half", "two_thirds", "full"}
+
 func widgets(p *project.Project, instance string) diag.List {
 	var diags diag.List
 	for _, r := range p.Reports {
@@ -151,25 +157,66 @@ func widgets(p *project.Project, instance string) diag.List {
 		if kind == "" {
 			continue
 		}
-		if !slices.Contains([]string{"stat", "bar", "line", "table"}, kind) {
-			diags.Errorf(r.Pos, r.Pos, "widget %s of %s is not stat, bar, line or table", kind, r.Raw)
+		if !slices.Contains(widgetKinds, kind) {
+			diags.Errorf(r.Pos, r.Pos, "widget %s of %s is not %s", kind, r.Raw, strings.Join(widgetKinds, ", "))
+			continue
 		}
-		has := func(fields []*project.Field, name string) bool {
-			return slices.ContainsFunc(fields, func(f *project.Field) bool { return f.Raw == name })
+		column := func(name string) *project.Field {
+			for _, f := range r.Columns {
+				if f.Raw == name {
+					return f
+				}
+			}
+			return nil
 		}
-		for _, key := range []string{"x", "y"} {
-			if col, _ := a[key].(string); col != "" && !has(r.Columns, col) {
+		ys := strs(a["y"])
+		for _, key := range []string{"x", "series", "target", "image", "subtitle", "delta"} {
+			if col, _ := a[key].(string); col != "" && column(col) == nil {
 				diags.Errorf(r.Pos, r.Pos, "%s %s of %s's widget is not one of its columns", key, col, r.Raw)
 			}
 		}
-		if (kind == "stat" || kind == "bar" || kind == "line") && a["y"] == nil {
+		for _, y := range ys {
+			if column(y) == nil {
+				diags.Errorf(r.Pos, r.Pos, "y %s of %s's widget is not one of its columns", y, r.Raw)
+			}
+		}
+		if kind != "table" && len(ys) == 0 {
 			diags.Errorf(r.Pos, r.Pos, "%s's widget %s needs y, the column of its numbers", r.Raw, kind)
 		}
-		if (kind == "bar" || kind == "line") && a["x"] == nil {
+		needsX := kind != "stat" && kind != "goal" && kind != "table"
+		if needsX && a["x"] == nil {
 			diags.Errorf(r.Pos, r.Pos, "%s's widget %s needs x, the column of its names", r.Raw, kind)
 		}
-		if since, _ := a["since"].(string); since != "" && !has(r.Params, since) {
-			diags.Errorf(r.Pos, r.Pos, "since %s of %s's widget is not one of its parameters", since, r.Raw)
+		if kind == "goal" && a["target"] == nil {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget goal needs target, the column of its goal", r.Raw)
+		}
+		if kind == "combo" && len(ys) != 2 {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget combo needs two y columns, [bars, line]", r.Raw)
+		}
+		if a["series"] != nil && len(ys) > 1 {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget has series and several y columns: one or the other", r.Raw)
+		}
+		for _, key := range []string{"since", "until"} {
+			if param, _ := a[key].(string); param != "" && !slices.ContainsFunc(r.Params, func(f *project.Field) bool { return f.Raw == param }) {
+				diags.Errorf(r.Pos, r.Pos, "%s %s of %s's widget is not one of its parameters", key, param, r.Raw)
+			}
+		}
+		if a["until"] != nil && a["since"] == nil {
+			diags.Errorf(r.Pos, r.Pos, "%s's widget has until without since: the period's start comes first", r.Raw)
+		}
+		if t, _ := a["total"].(string); t != "" && !slices.Contains([]string{"sum", "last", "average", "max"}, t) {
+			diags.Errorf(r.Pos, r.Pos, "total %s of %s's widget is not sum, last, average or max", t, r.Raw)
+		}
+		if n, ok := a["rows"].(int64); ok && n < 1 {
+			diags.Errorf(r.Pos, r.Pos, "rows %d of %s's widget is less than one", n, r.Raw)
+		}
+		if w, _ := a["width"].(string); w != "" && !slices.Contains(widthNames, w) {
+			diags.Errorf(r.Pos, r.Pos, "width %s of %s's widget is not %s", w, r.Raw, strings.Join(widthNames, ", "))
+		}
+		for _, f := range r.Columns {
+			if format, _ := f.Ann[instance]["format"].(string); format != "" && format != "percent" && format != "duration" {
+				diags.Errorf(f.Pos, f.Pos, "format %s of %s is not percent or duration", format, f.Raw)
+			}
 		}
 	}
 	return diags

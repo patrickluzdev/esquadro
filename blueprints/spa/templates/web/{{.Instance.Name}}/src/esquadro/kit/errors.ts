@@ -61,3 +61,18 @@ export function fieldErrors(e: unknown): Record<string, string> {
   }
   return out
 }
+
+/**
+ * Whether a query is tried again after an error: a refusal is final (400,
+ * 403, 404), but too many requests (429) and a server's error are tried
+ * again, a few times.
+ */
+export function retryQuery(failures: number, e: unknown): boolean {
+  if (isApiError(e) && e.status === 429) return failures < 4
+  return !(isApiError(e) && e.status < 500) && failures < 2
+}
+
+/** How long before trying again: longer each time, a little at random (many at once spread out). */
+export function retryDelay(failures: number): number {
+  return Math.min(8000, 600 * 2 ** failures) + Math.random() * 400
+}

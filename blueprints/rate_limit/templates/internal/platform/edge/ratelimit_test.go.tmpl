@@ -38,3 +38,20 @@ func TestLimiterRefillsOverTime(t *testing.T) {
 		t.Fatal("not refilled after a second")
 	}
 }
+
+func TestRateLimitLeavesFilesOut(t *testing.T) {
+	t.Parallel()
+	h := RateLimit(1, false)(noContent)
+	for range 5 {
+		if code := serve(h, httptest.NewRequest("GET", "/admin/assets/index-1a2b.js", nil)).Code; code != 204 {
+			t.Fatalf("a file was limited: %d", code)
+		}
+	}
+	serve(h, httptest.NewRequest("GET", "/api/v1/products", nil))
+	if code := serve(h, httptest.NewRequest("GET", "/api/v1/products", nil)).Code; code != 429 {
+		t.Fatalf("the API was not limited: %d", code)
+	}
+	if code := serve(h, httptest.NewRequest("POST", "/upload.json", nil)).Code; code != 429 {
+		t.Fatalf("a POST was not limited: %d", code)
+	}
+}

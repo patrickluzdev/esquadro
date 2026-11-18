@@ -26,3 +26,11 @@ func TestColors(t *testing.T) {
 		t.Error("colors are #rgb or #rrggbb")
 	}
 }
+
+func TestSlug(t *testing.T) {
+	for in, want := range map[string]string{"Vendas": "vendas", "Marketing e Análise": "marketing-e-analise", "  E-commerce ": "e-commerce"} {
+		if got := Slug(in); got != want {
+			t.Errorf("Slug(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

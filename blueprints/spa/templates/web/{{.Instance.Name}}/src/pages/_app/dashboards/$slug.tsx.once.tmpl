@@ -1,0 +1,20 @@
+import { createFileRoute, notFound } from "@tanstack/react-router"
+import { dashboards } from "../../../esquadro/dashboard.gen.ts"
+import { Dashboard } from "../../../esquadro/kit/dashboard.tsx"
+
+// A dashboard the reports name (@{{.Instance.Name}}(widget ..., dashboard "Sales")):
+// yours, like the first page; one page for them all, by their address.
+export const Route = createFileRoute("/_app/dashboards/$slug")({
+  loader: ({ params }) => {
+    const dashboard = dashboards.find((d) => d.slug === params.slug)
+    if (!dashboard) throw notFound()
+    return dashboard
+  },
+  staticData: { title: "" },
+  component: DashboardPage,
+})
+
+function DashboardPage() {
+  const dashboard = Route.useLoaderData()
+  return <Dashboard dashboard={dashboard.slug} title={dashboard.name} />
+}
