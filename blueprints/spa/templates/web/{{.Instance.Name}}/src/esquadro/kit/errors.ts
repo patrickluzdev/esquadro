@@ -2,6 +2,7 @@
 // people, in the frontend's words.
 import { isApiError } from "@api"
 import { t } from "./i18n.ts"
+import type { FieldMeta } from "./meta.ts"
 
 /** The message of an error, for a notice. */
 export function describe(e: unknown): string {
@@ -12,6 +13,32 @@ export function describe(e: unknown): string {
     if (e.title) return e.title
   }
   return t("somethingWrong")
+}
+
+/** What is wrong with a field, as people read it, from the API's code. */
+export function fieldMessage(field: FieldMeta, code: string): string {
+  switch (code) {
+    case "required":
+      return field.kind === "enum" || field.kind === "relation" ? t("fieldChoose") : t("fieldRequired")
+    case "too_short":
+      return t("fieldTooShort")
+    case "too_long":
+      return t("fieldTooLong")
+    case "too_small":
+      return t("fieldTooSmall")
+    case "too_large":
+      return t("fieldTooLarge")
+    case "pattern":
+      return t("fieldPattern")
+    case "unique":
+    case "taken":
+    case "in_use":
+      return t("fieldTaken")
+    case "not_found":
+    case "foreign_key":
+      return t("fieldGone")
+  }
+  return t("fieldInvalid")
 }
 
 /** The fields an error refused, by name, with why: required, too_long... */

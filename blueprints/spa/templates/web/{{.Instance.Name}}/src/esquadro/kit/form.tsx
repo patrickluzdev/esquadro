@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
-import { describe, fieldErrors } from "./errors.ts"
+import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
@@ -198,12 +198,20 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
       navigate({ to: `/${meta.name}/${saved.id}` as never })
     },
     onError: (e) => {
-      if (e instanceof MissingFields) {
-        setErrors(e.fields)
+      const refused = e instanceof MissingFields ? e.fields : fieldErrors(e)
+      setErrors(refused)
+      const first = fields.find((f) => refused[f.name])
+      if (!first) {
+        toast(describe(e), "error")
         return
       }
-      setErrors(fieldErrors(e))
-      toast(describe(e), "error")
+      toast(t("fixFields"), "error")
+      // The first field to fix, in view and with the cursor in it.
+      requestAnimationFrame(() => {
+        const input = document.getElementById(`field-${first.name}`)
+        input?.scrollIntoView({ block: "center", behavior: "smooth" })
+        input?.focus({ preventScroll: true })
+      })
     },
   })
 
@@ -252,7 +260,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                       {input}
                     </>
                   )}
-                  {error && <FieldError>{error === "required" ? t("required") : t("invalid", { code: error })}</FieldError>}
+                  {error && <FieldError>{fieldMessage(f, error)}</FieldError>}
                 </Field>
               )
             })}
