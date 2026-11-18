@@ -6,7 +6,8 @@ description: "Notices to the people who sign in, sent by the model's rules or by
 With the `notifications` blueprint, the people who sign in get notices: a
 new order for the admins, a task's status changed for everyone. Each person
 lists, counts and reads their own; a [frontend](/esquadro/frontends/) shows
-them under a bell in its header.
+them under a bell in its header, each to open (it leads to the record and
+is then read) or to mark as read where it is.
 
 ## From the model
 
@@ -36,7 +37,9 @@ entity Task {
 - `to`: a realm's people (`user`), a role's (`user.admin`), or the record's
   owner (`owner`). Who made the change is never notified, and neither is a
   disabled account.
-- `title` and `text`: `{field}` is the record's field.
+- `title` and `text`: `{field}` is the record's field, as people read it:
+  an amount in the app's language and currency (`R$ 1.299,00`), an enum by
+  the name its frontend gives it (`Ativo`), a date as a date.
 
 The notice is written in the same transaction as the change: if the change
 does not stay, neither does the notice. It leads to the record's page.
@@ -72,5 +75,6 @@ The [TypeScript client](/esquadro/typescript-client/) has them as
 | `poll_seconds` | `30` | how often a frontend's bell asks; `0`, only when a page opens or its window comes back to the front |
 | `retention_days` | `90` | notices read longer ago are deleted, by a daily job with [jobs](/esquadro/blueprints/reference/jobs/), and by `<app> notifications purge [--days N]`; `0` keeps them |
 | `page_size` | `10` | how many the bell shows |
+| `locale` | `""` | the language a notice writes values in (`pt-BR`, `en`); empty, the first frontend's |
 
 The spa's `notifications false` leaves the bell out.

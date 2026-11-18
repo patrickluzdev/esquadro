@@ -1,4 +1,7 @@
 {{- $pg := optionsOf "postgres" -}}
+{{- $loc := .Options.locale}}{{range instances "spa"}}{{if not $loc}}{{$loc = .Options.locale}}{{end}}{{end -}}
+{{- if eq $loc "pt_br"}}{{$loc = "pt-BR"}}{{else if not $loc}}{{$loc = "en"}}{{end -}}
+{{- $money := noticeMoney .Entities -}}
 // Package notifications keeps the notices of the people who sign in: sent
 // from code or by the model's rules, in the transaction of the change that
 // sends them; each person lists, counts and reads their own.
@@ -19,6 +22,9 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5/pgconn"
+{{- if $money}}
+	"github.com/bojanz/currency"
+{{- end}}
 
 	"{{.App.Module}}/internal/platform/edge"
 	"{{.App.Module}}/internal/platform/postgres"
@@ -34,6 +40,51 @@ const (
 	// RetentionDays is how long a notice read is kept; 0 keeps it.
 	RetentionDays = {{.Options.retention_days}}
 )
+
+// Locale is the language a notice writes a record's values in.
+const Locale = "{{$loc}}"
+{{- if $money}}
+
+var moneyFormat = currency.NewFormatter(currency.NewLocale(Locale))
+
+// Money is an amount as people of Locale write it: R$ 199,90.
+func Money(a currency.Amount) string {
+	if a.CurrencyCode() == "" {
+		return ""
+	}
+	return moneyFormat.Format(a)
+}
+{{- end}}
+
+// Date is a day as people of Locale write it: 18/11/2026, Nov 18, 2026.
+func Date(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	if strings.HasPrefix(Locale, "pt") {
+		return t.Format("02/01/2006")
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+// DateTime is a moment as people of Locale write it, in its time zone.
+func DateTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	if strings.HasPrefix(Locale, "pt") {
+		return t.Local().Format("02/01/2006 15:04")
+	}
+	return t.Local().Format("Jan 2, 2006 3:04 PM")
+}
+
+// Label is an enum's value by the name people know it by, or as it is.
+func Label(value string, labels map[string]string) string {
+	if l, ok := labels[value]; ok {
+		return l
+	}
+	return value
+}
 
 // Notice is what a person is told: a title, a text, and where it leads (a
 // path of the frontend: /orders/<id>), with the record it is about.

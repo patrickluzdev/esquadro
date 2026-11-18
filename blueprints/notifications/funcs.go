@@ -76,8 +76,18 @@ func RuleOf(e *project.Entity) *Rule {
 // TemplateFuncs are the functions of the notifications blueprint's templates.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"noticeRule":      RuleOf,
-		"realms":          security.RealmsOf,
+		"noticeRule": RuleOf,
+		"realms":     security.RealmsOf,
+		"noticeMoney": func(entities []*project.Entity) bool {
+			for _, e := range Noticed(entities) {
+				for _, f := range e.Fields {
+					if f.Type == project.TypeMoney {
+						return true
+					}
+				}
+			}
+			return false
+		},
 		"noticeEntities":  Noticed,
 		"noticeOwner":     OwnerFor,
 		"identitiesTable": func(pg map[string]any) string { return security.Table("identities", pg) },

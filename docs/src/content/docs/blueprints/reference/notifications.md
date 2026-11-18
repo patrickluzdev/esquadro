@@ -25,6 +25,7 @@ blueprint notifications
 | `poll_seconds` | int | `30` | Seconds between a frontend's checks for new notices; 0 checks only when a page opens and when its window comes back to the front. |
 | `retention_days` | int | `90` | Days a notice read is kept, then deleted by a daily job and &lt;app> notifications purge; 0 keeps them. |
 | `page_size` | int | `10` | How many notices a frontend's bell shows. |
+| `locale` | string | `""` | The language a notice writes a record's values in (an amount, a date): pt-BR, en; empty, the first frontend's. |
 
 ```esquadro
 blueprint notifications {

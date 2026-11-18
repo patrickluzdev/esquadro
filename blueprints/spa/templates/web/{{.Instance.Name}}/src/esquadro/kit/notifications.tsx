@@ -3,7 +3,7 @@
 // a page with all of them.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Bell, BellOff, CheckCheck, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
+import { Bell, BellOff, Check, CheckCheck, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -63,7 +63,7 @@ function useNoticeActions() {
 }
 
 /** A notice in a list: unread ones marked; a click leads where it says. */
-function NoticeRow({ n, onOpen, onRemove }: { n: Notice; onOpen: () => void; onRemove?: () => void }) {
+function NoticeRow({ n, onOpen, onRead, onRemove }: { n: Notice; onOpen: () => void; onRead: () => void; onRemove?: () => void }) {
   return (
     <div className={cn("group flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted", !n.read_at && "bg-primary/5")}>
       <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read_at ? "bg-transparent" : "bg-primary")} />
@@ -72,11 +72,25 @@ function NoticeRow({ n, onOpen, onRemove }: { n: Notice; onOpen: () => void; onR
         {n.text && <p className="line-clamp-2 text-xs text-muted-foreground">{n.text}</p>}
         <p className="mt-0.5 text-xs text-muted-foreground">{seen(n.created_at)}</p>
       </button>
-      {onRemove && (
-        <Button variant="ghost" size="icon-sm" className="opacity-0 group-hover:opacity-100" aria-label={t("delete")} onClick={onRemove}>
-          <Trash2 />
-        </Button>
-      )}
+      <div className="flex shrink-0 items-center gap-0.5">
+        {!n.read_at && (
+          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" aria-label={t("markRead")} title={t("markRead")} onClick={onRead}>
+            <Check />
+          </Button>
+        )}
+        {onRemove && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+            aria-label={t("delete")}
+            title={t("delete")}
+            onClick={onRemove}
+          >
+            <Trash2 />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -139,10 +153,13 @@ export function NotificationBell() {
           {list.data?.items.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
               <BellOff className="size-6" />
-              {only === "unread" ? t("noUnreadNotifications") : t("noNotifications")}
+              <p className="font-semibold text-foreground">{only === "unread" ? t("noUnreadNotifications") : t("noNotifications")}</p>
+              <p className="max-w-60 text-xs">{only === "unread" ? t("noUnreadNotificationsHint") : t("noNotificationsHint")}</p>
             </div>
           )}
-          {list.data?.items.map((n) => <NoticeRow key={n.id} n={n} onOpen={() => openNotice(n)} />)}
+          {list.data?.items.map((n) => (
+            <NoticeRow key={n.id} n={n} onOpen={() => openNotice(n)} onRead={() => void actions.read(n)} />
+          ))}
         </div>
         <div className="border-t border-border p-2">
           <Button variant="ghost" className="w-full" asChild onClick={() => setOpen(false)}>
@@ -192,7 +209,11 @@ export function NotificationsPage() {
         {list.isError ? (
           <ErrorState error={list.error} onRetry={() => list.refetch()} />
         ) : list.data?.items.length === 0 ? (
-          <StateView icon={<BellOff />} title={only === "unread" ? t("noUnreadNotifications") : t("noNotifications")} description={t("notificationsHint")} />
+          <StateView
+            icon={<BellOff />}
+            title={only === "unread" ? t("noUnreadNotifications") : t("noNotifications")}
+            description={only === "unread" ? t("noUnreadNotificationsHint") : t("noNotificationsHint")}
+          />
         ) : (
           <div className="flex flex-col gap-1">
             {list.isPending && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14" />)}
@@ -204,6 +225,7 @@ export function NotificationsPage() {
                   await actions.read(n)
                   if (n.link) navigate({ to: n.link as never })
                 }}
+                onRead={() => void actions.read(n)}
                 onRemove={() => actions.remove(n)}
               />
             ))}

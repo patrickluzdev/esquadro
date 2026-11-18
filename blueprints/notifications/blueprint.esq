@@ -17,6 +17,9 @@ blueprint notifications {
   option retention_days int default(90)
   /// How many notices a frontend's bell shows.
   option page_size int default(10)
+  /// The language a notice writes a record's values in (an amount, a
+  /// date): pt-BR, en; empty, the first frontend's.
+  option locale string default("")
 
   annotation entity {
     /// When to notify: create, update (with when, only when one of those
