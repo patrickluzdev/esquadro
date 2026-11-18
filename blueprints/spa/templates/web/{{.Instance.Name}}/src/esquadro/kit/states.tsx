@@ -105,7 +105,9 @@ export function RefreshError({ error, onRetry }: { error: unknown; onRetry: () =
       <AlertTriangle />
       <AlertTitle>{t("refreshFailed")}</AlertTitle>
       <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-        <span>{describe(error)}</span>
+        <span>
+          {t("staleData")} {describe(error)}
+        </span>
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RotateCw /> {t("retry")}
         </Button>

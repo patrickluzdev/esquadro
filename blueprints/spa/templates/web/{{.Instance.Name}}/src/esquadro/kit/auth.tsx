@@ -8,6 +8,7 @@ import type { QueryClient } from "@tanstack/react-query"
 import { redirect } from "@tanstack/react-router"
 import { api } from "../api.ts"
 import { realmKey, roles } from "../config.ts"
+import { announceSession } from "./connection.tsx"
 
 const identity = () => api.identity[realmKey]
 
@@ -52,6 +53,7 @@ export async function requireSession(queryClient: QueryClient, href: string): Pr
 export async function signIn(queryClient: QueryClient, email: string, password: string): Promise<void> {
   const session = await identity().signIn({ email, password })
   queryClient.setQueryData(sessionQuery.queryKey, session)
+  announceSession("signed-in")
 }
 
 export async function signOut(queryClient: QueryClient): Promise<void> {
@@ -60,6 +62,7 @@ export async function signOut(queryClient: QueryClient): Promise<void> {
   } finally {
     queryClient.setQueryData(sessionQuery.queryKey, null)
     queryClient.clear()
+    announceSession("signed-out")
   }
 }
 

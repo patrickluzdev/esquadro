@@ -125,7 +125,10 @@ entity Product {
   empty, with a button to create the first; nothing found, with a button to
   clear the search and filters; and an error, in the frontend's words, with
   Try again (and, for a record not found or not allowed, Back to the list).
-  When a list cannot be refreshed, it keeps what it had and says so.
+  When a list cannot be refreshed, it keeps what it had and says it may be
+  out of date.
+- Offline, a bar says so (and a notice when the connection is back, when
+  the data reload); signing in or out in a tab does it in the others.
 
 What a resource shows is **yours**, in `src/resources/<resource>.tsx`,
 written once with the model's fields and left alone after:

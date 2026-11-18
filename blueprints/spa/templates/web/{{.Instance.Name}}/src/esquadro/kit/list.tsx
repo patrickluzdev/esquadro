@@ -31,7 +31,7 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -202,7 +202,11 @@ export function ResourceList({
   const clearAll = () =>
     set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries(filters.flatMap(filterKeys).map((k) => [k, undefined])) })
 
-  const page = list.data
+  // A refresh that fails keeps the last page loaded, under an alert, as
+  // TanStack Query drops it when the new query errs.
+  const last = useRef(list.data)
+  if (list.data) last.current = list.data
+  const page = list.data ?? (list.isError ? last.current : undefined)
   const items = useMemo(() => page?.items ?? [], [page])
   const canCreate = page?.can.includes("create") ?? false
   const duplicate = useDuplicate(meta)
