@@ -105,7 +105,7 @@ export function Dashboard({
           </CardHeader>
           <CardContent>
             {/* The numbers, side by side in a tray, as many as fit. */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 rounded-2xl bg-muted p-3">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-2 *:last:odd:col-span-2 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-3 sm:p-3 sm:*:last:odd:col-span-1">
               {stats.map((w, i) => (
                 <StatTile
                   key={w.name}
@@ -184,7 +184,7 @@ function StatTile({
     <Tile
       {...(onPick && { type: "button" as const, onClick: onPick, "aria-pressed": active })}
       className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-2xl p-4 text-left transition-[background-color,box-shadow] duration-150",
+        "flex min-w-0 flex-col gap-2 rounded-xl p-3 text-left transition-[background-color,box-shadow] duration-150 sm:gap-3 sm:rounded-2xl sm:p-4",
         active === false ? "hover:bg-card/60" : "bg-card shadow-xs",
         active && "shadow-md",
         onPick && "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -192,12 +192,12 @@ function StatTile({
     >
       {/* Its name and icon on a line, the number under them, the whole width. */}
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 truncate pt-1 text-sm font-semibold text-muted-foreground">{w.label}</p>
-        <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
-          <Icon className="size-5" />
+        <p className="line-clamp-2 min-w-0 pt-1 text-xs font-semibold text-muted-foreground sm:truncate sm:text-sm">{w.label}</p>
+        <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full sm:size-12", TONES[tone % TONES.length])}>
+          <Icon className="size-4 sm:size-5" />
         </div>
       </div>
-      <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums [overflow-wrap:anywhere] xl:text-3xl">
+      <div className="text-xl font-bold tracking-tight text-foreground tabular-nums break-words sm:text-2xl xl:text-3xl">
           {rows.isPending ? (
             <Skeleton className="h-9 w-24" />
           ) : rows.isError ? (
