@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$own := ownerColumn .Entities $e -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$own := ownerColumn .Entities $e -}}
 {{- if softDeleted $e -}}
 package {{$m.Snake}}
 
@@ -39,7 +39,11 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	if trashed == 0 {
 		return {{$e.Camel}}Gone(ctx, db, id)
 	}
+{{- if $audited}}
+	return {{$e.Camel}}Recorded(ctx, db, "delete", id, nil, nil)
+{{- else}}
 	return nil
+{{- end}}
 }
 
 // Restore{{$e.Pascal}} takes the {{lower $e.Label}} with the given id out of the trash,
@@ -85,6 +89,11 @@ func restore{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID) ({{
 	if err != nil {
 		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)
 	}
+{{- if $audited}}
+	if err := {{$e.Camel}}Recorded(ctx, db, "restore", id, nil, nil); err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+{{- end}}
 {{- range dependents $e}}{{if and (eq .Action "cascade") .Soft}}
 	{
 		children, err := q.Trashed{{.Name}}(ctx, sqlgen.Trashed{{.Name}}Params{ID: postgres.UUID(id), DeletedAt: before.DeletedAt})
@@ -156,7 +165,7 @@ func ({{$r}} *{{$m.Pascal}}) ListDeleted{{$e.Plural.Pascal}}(ctx context.Context
 func ({{$r}} *{{$m.Pascal}}) Purge{{$e.Pascal}}(ctx context.Context, id uuid.UUID) error {
 	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
 		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
-{{- if $files}}
+{{- if or $files $audited}}
 		before, err := q.GetDeleted{{$e.Pascal}}(ctx, postgres.UUID(id))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Err{{$e.Pascal}}NotFound
@@ -176,6 +185,11 @@ func ({{$r}} *{{$m.Pascal}}) Purge{{$e.Pascal}}(ctx context.Context, id uuid.UUI
 		if purged == 0 {
 			return Err{{$e.Pascal}}NotFound
 		}
+{{- if $audited}}
+		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "purge", id, &stored, nil); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $files}}
 		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil)
 {{- else}}

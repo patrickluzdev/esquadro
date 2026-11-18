@@ -1,0 +1,45 @@
+{{- if auditedOf .Entities .Options -}}
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"time"
+
+	"{{.App.Module}}/internal/platform/audit"
+)
+
+const auditUsage = `usage: {{.App.Kebab}} audit purge [--days N]
+
+Deletes the changes kept for more than --days days ({{.Options.retention_days}} by default).`
+
+// auditCommand runs {{.App.Kebab}} audit.
+func auditCommand(ctx context.Context, args []string) error {
+	if len(args) == 0 || args[0] != "purge" {
+		fmt.Fprintln(os.Stderr, auditUsage)
+		return fmt.Errorf("audit: purge is the only command")
+	}
+	flags := flag.NewFlagSet("audit purge", flag.ContinueOnError)
+	flags.Usage = func() { fmt.Fprintln(os.Stderr, auditUsage) }
+	days := flags.Int("days", audit.RetentionDays, "")
+	if err := flags.Parse(args[1:]); err != nil {
+		return err
+	}
+	if *days <= 0 {
+		return fmt.Errorf("audit: --days is at least 1")
+	}
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	n, err := audit.Purge(ctx, d.pool, time.Now().AddDate(0, 0, -*days))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%d changes deleted\n", n)
+	return nil
+}
+{{end -}}

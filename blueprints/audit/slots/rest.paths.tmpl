@@ -1,0 +1,29 @@
+{{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
+  /audit:
+    get:
+      tags: [audit]
+      operationId: listAudit
+      summary: Every change of the audited records
+      description: |
+        The newest first, by page (`page` from 1, `per_page` 25 by default, at
+        most 100), narrowed by `entity` (the plural: products), `record_id`,
+        `actor_id`, `action` and `since`/`until` (a moment or a day). For those
+        who administer ({{join ", " (auditAdmins .Entities (optionsOf "audit"))}}).
+      parameters:
+        - {name: entity, in: query, schema: {type: string}}
+        - {name: record_id, in: query, schema: {type: string, format: uuid}}
+        - {name: actor_id, in: query, schema: {type: string}}
+        - {name: action, in: query, schema: {type: string, enum: [create, update, delete, restore, purge]}}
+        - {name: since, in: query, schema: {type: string}}
+        - {name: until, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: A page of changes.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AuditPage"}
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}

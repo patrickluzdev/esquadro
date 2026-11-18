@@ -297,6 +297,13 @@ func (s *Security) serviceKeyRoutes(mux *http.ServeMux, prefix string, realms []
 	})
 }
 
+// serviceName is the name of the service key id.
+func (s *Security) serviceName(ctx context.Context, id uuid.UUID) string {
+	var name string
+	_ = s.db.QueryRow(ctx, `SELECT name FROM {{$keys}} WHERE id = $1`, id).Scan(&name)
+	return name
+}
+
 // service is the principal of a service key: valid, not expired, not
 // revoked. Its last use is kept, at most once a minute, so that a busy key
 // does not write on every request.

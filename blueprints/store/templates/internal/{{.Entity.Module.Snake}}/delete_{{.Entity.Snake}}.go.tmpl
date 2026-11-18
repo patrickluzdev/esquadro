@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
 package {{$m.Snake}}
 {{if softDeleted $e}}
 {{importBlock "context" "time" "uuid" (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -14,13 +14,13 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 }
 {{- else}}
 
-{{importBlock "context" (and $files "errors") "uuid" (and $files "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" (and $tx "errors") "uuid" (and $tx "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Delete{{$e.Pascal}} deletes the {{lower $e.Label}} with the given id, unless
 // other records still point at it. With a version (not 0), only that
 // version: Err{{$e.Pascal}}Changed when someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
-{{- if $files}}
-	// The record, and then its files, released together.
+{{- if $tx}}
+	// The record{{if $files}}, and then its files{{end}}{{if $audited}}, with the change kept{{end}}, together.
 	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
 		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
 		before, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
@@ -41,7 +41,17 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		if deleted == 0 {
 			return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
 		}
+{{- if $audited}}
+		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "delete", id, &stored, nil); err != nil {
+			return err
+		}
+{{- end}}
+{{- if $files}}
 		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil)
+{{- else}}
+		_ = stored
+		return nil
+{{- end}}
 	})
 }
 {{- else}}

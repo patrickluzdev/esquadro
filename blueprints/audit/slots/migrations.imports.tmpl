@@ -1,0 +1,3 @@
+{{- if auditedOf .Entities (optionsOf "audit")}}
+	auditmigrations "{{.App.Module}}/internal/platform/audit/migrations"
+{{- end}}

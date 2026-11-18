@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -16,8 +16,8 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		return {{$e.Pascal}}{}, err
 	}
 {{- end}}
-{{- if $files}}
-	// The record and its files, together: the files it had, then the new.
+{{- if $tx}}
+	// The record{{if $files}} and its files (the files it had, then the new){{end}}{{if $audited}}, and the change kept{{end}}, together.
 	var updated {{$e.Pascal}}
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
 		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
@@ -29,9 +29,13 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return err
 		}
 		stored := {{$e.Camel}}Of(before)
+{{- if $ws}}
 		params := update{{$e.Pascal}}Params(id, n)
 		params.IfVersion = postgres.Version(version)
 		row, err := q.Update{{$e.Pascal}}(ctx, params)
+{{- else}}
+		row, err := q.Update{{$e.Pascal}}(ctx, sqlgen.Update{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+{{- end}}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
 		}
@@ -39,7 +43,17 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return {{$e.Camel}}Refusal(err)
 		}
 		updated = {{$e.Camel}}Of(row)
+{{- if $audited}}
+		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "update", id, &stored, &updated); err != nil {
+			return err
+		}
+{{- end}}
+{{- if $files}}
 		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}}))
+{{- else}}
+		_ = stored
+		return nil
+{{- end}}
 	})
 	if err != nil {
 		return {{$e.Pascal}}{}, err

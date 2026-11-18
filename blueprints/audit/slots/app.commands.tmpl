@@ -1,0 +1,4 @@
+{{- if auditedOf .Entities (optionsOf "audit")}}
+	case "audit":
+		return auditCommand(ctx, os.Args[2:])
+{{- end}}

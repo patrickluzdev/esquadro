@@ -1,0 +1,6 @@
+{{- if auditedOf .Entities (optionsOf "audit")}}
+	// The audit table, as this version of esquadro has it.
+	if err := auditmigrations.Apply(ctx, db); err != nil {
+		return err
+	}
+{{- end}}

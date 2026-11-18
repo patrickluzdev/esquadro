@@ -17,17 +17,22 @@ func TestServiceKeys(t *testing.T) {
 	ctx := t.Context()
 	s, _ := testSecurity(t)
 	role := ServiceRoles[0]
-	if _, err := s.CreateServiceKey(ctx, "x", []string{"no-such-role"}, time.Time{}); err == nil {
+	// As long as a key may last: until revoked, or the most the app allows.
+	lasting := time.Time{}
+	if ServiceKeyMaxDays > 0 {
+		lasting = time.Now().AddDate(0, 0, ServiceKeyMaxDays-1)
+	}
+	if _, err := s.CreateServiceKey(ctx, "x", []string{"no-such-role"}, lasting); err == nil {
 		t.Fatal("a key with a role the model does not declare")
 	}
-	key, err := s.CreateServiceKey(ctx, "partner", []string{role}, time.Time{})
+	key, err := s.CreateServiceKey(ctx, "partner", []string{role}, lasting)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(key, ServiceKeyPrefix) || len(key) < 40 {
 		t.Fatalf("key %q", key)
 	}
-	if _, err := s.CreateServiceKey(ctx, "partner", []string{role}, time.Time{}); !errors.Is(err, ErrServiceKeyExists) {
+	if _, err := s.CreateServiceKey(ctx, "partner", []string{role}, lasting); !errors.Is(err, ErrServiceKeyExists) {
 		t.Fatalf("the same name twice: %v", err)
 	}
 

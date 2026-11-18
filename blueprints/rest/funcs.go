@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -106,6 +107,9 @@ func TemplateFuncs() template.FuncMap {
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
 		"softDeleted":      store.SoftDeleted,
+		"audited":          audit.Audited,
+		"auditedOf":        audit.AuditedOf,
+		"auditAdmins":      audit.Admins,
 		"links": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {

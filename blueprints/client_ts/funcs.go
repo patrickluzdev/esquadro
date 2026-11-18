@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
@@ -64,6 +65,8 @@ func TemplateFuncs() template.FuncMap {
 		"tsPattern":   tsPattern,
 		"enumName":    func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
 		"softDeleted": store.SoftDeleted,
+		"audited":     audit.Audited,
+		"auditedOf":   audit.AuditedOf,
 		"manyToMany": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {

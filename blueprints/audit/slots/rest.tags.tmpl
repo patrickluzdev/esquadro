@@ -1,0 +1,4 @@
+{{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
+  - name: audit
+    description: Who changed what, and when.
+{{- end}}

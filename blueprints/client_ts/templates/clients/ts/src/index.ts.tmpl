@@ -9,7 +9,7 @@ import { {{if $m2m}}links, {{end}}records, Transport } from "./runtime.ts"
 {{- if $hasFiles}}
 import { uploads } from "./uploads.ts"
 {{- end}}
-import type { ClientOptions, RequestOptions } from "./runtime.ts"
+import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, RequestOptions } from "./runtime.ts"
 import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
 {{- if .Reports}}
 import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
@@ -48,11 +48,11 @@ export function createClient(options: ClientOptions) {
   return {
 {{- range $e := .Entities}}
 {{- $pag := paginationOf $e (optionsOf "rest")}}
-    {{.Plural.Camel}}: {{if manyToMany $e}}Object.assign(records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if softDeleted $e}}, true{{end}}) as object, {
+    {{.Plural.Camel}}: {{if manyToMany $e}}Object.assign(records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as object, {
 {{- range manyToMany $e}}
       {{.Camel}}: links(t, "/api/v1/{{$e.Plural.Kebab}}", "{{.Kebab}}"),
 {{- end}}
-    }) as {{.Plural.Pascal}}Api{{else}}records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if softDeleted $e}}, true{{end}}) as {{.Plural.Pascal}}Api{{end}},
+    }) as {{.Plural.Pascal}}Api{{else}}records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as {{.Plural.Pascal}}Api{{end}},
 {{- end}}
 {{- if $realms}}
     /** Signing up and in, the session and the account, by realm. */
@@ -64,6 +64,13 @@ export function createClient(options: ClientOptions) {
       /** The service keys, for those who administer them. */
       serviceKeys: serviceKeys(t),
 {{- end}}
+    },
+{{- end}}
+{{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
+    /** Every change of the audited records, for those who administer. */
+    audit: {
+      list: (query: { entity?: string; record_id?: string; actor_id?: string; action?: string; since?: string; until?: string; page?: number; per_page?: number } = {}) =>
+        t.request<AuditPage>("GET", "/audit", { query }),
     },
 {{- end}}
 {{- if .Reports}}

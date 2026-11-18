@@ -147,6 +147,35 @@ export class Transport {
 }
 
 /** A page of a list, with what the person may do with the list. */
+/** Who made a change: a person, a service key or the system. */
+export interface AuditActor {
+  kind: "person" | "service" | "system"
+  realm?: string
+  id?: string
+  name: string
+}
+
+/** A change of a record: each field that changed, before and after. */
+export interface AuditEntry {
+  id: string
+  at: string
+  /** The entity's plural: products. */
+  entity: string
+  record_id: string
+  action: "create" | "update" | "delete" | "restore" | "purge"
+  actor: AuditActor
+  changes: Record<string, { from?: unknown; to?: unknown; secret?: boolean }>
+}
+
+/** A page of changes, the newest first. */
+export interface AuditPage {
+  items: AuditEntry[]
+  page: number
+  per_page: number
+  total: number
+  total_pages: number
+}
+
 /** The trash of an entity's records. */
 export interface Trash<T> {
   /** A page of it, the last deleted first, each with deleted_at. */
@@ -184,7 +213,7 @@ export interface ChangeOptions {
 
 // The operations of an entity's records, untyped: each entity's interface
 // types them.
-export function records(t: Transport, path: string, pagination: readonly string[], trash = false): unknown {
+export function records(t: Transport, path: string, pagination: readonly string[], trash = false, history = false): unknown {
   const one = (id: string) => `${path}/${encodeURIComponent(id)}`
   const list = (query: Query = {}) => t.request<Page<unknown>>("GET", path, { query })
   return {
@@ -217,6 +246,9 @@ export function records(t: Transport, path: string, pagination: readonly string[
     delete: async (id: string, o: ChangeOptions = {}) => {
       await t.request("DELETE", one(id), { ifMatch: o.ifMatch })
     },
+    ...(history && {
+      history: (id: string, query: Query = {}) => t.request<AuditPage>("GET", `${one(id)}/history`, { query }),
+    }),
     ...(trash && {
       trash: {
         list: (query: Query = {}) => t.request("GET", `${path}/trash`, { query }),

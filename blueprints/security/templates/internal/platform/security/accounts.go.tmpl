@@ -306,6 +306,28 @@ func (s *Security) emailOf(ctx context.Context, id uuid.UUID) string {
 	return email
 }
 
+// NameOf is what p is called, as people know it: its name (the field its
+// realm shows), or its email; a service key's name.
+func (s *Security) NameOf(ctx context.Context, p Principal) string {
+{{- if .Options.services}}
+	if p.Realm == ServiceRealm {
+		return s.serviceName(ctx, p.ID)
+	}
+{{- end}}
+	for _, realm := range s.realms {
+		if realm.Name != p.Realm {
+			continue
+		}
+		if a, err := s.account(ctx, realm, p.ID); err == nil {
+			if a.Name != "" {
+				return a.Name
+			}
+			return a.Email
+		}
+	}
+	return s.emailOf(ctx, p.ID)
+}
+
 // inviteAccount makes an account without a password and sends it an
 // invitation to choose one.
 func (s *Security) inviteAccount(realm Realm) http.HandlerFunc {

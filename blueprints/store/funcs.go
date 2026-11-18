@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/postgres"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -122,6 +123,9 @@ func TemplateFuncs() template.FuncMap {
 		"trashedParents":  TrashedParents,
 		"onDelete":        OnDelete,
 		"trashModules":    TrashModules,
+		"audited":         audit.Audited,
+		"auditSecret":     audit.Secret,
+		"auditIgnored":    audit.Ignored,
 		"links":           links,
 		"manyToMany":      func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}

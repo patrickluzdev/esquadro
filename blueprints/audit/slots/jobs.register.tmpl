@@ -1,0 +1,3 @@
+{{- if and (auditedOf .Entities (optionsOf "audit")) (index (optionsOf "audit") "retention_days")}}
+	audit.RegisterJobs(registry, d.pool)
+{{- end}}

@@ -1,0 +1,3 @@
+{{- if auditedOf .Entities (optionsOf "audit")}}
+	"{{.App.Module}}/internal/platform/audit"
+{{- end}}

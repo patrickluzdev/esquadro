@@ -1,0 +1,23 @@
+{{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
+	// Who makes a change: the person or the service key of the request.
+	audit.Who = func(ctx context.Context) (audit.Actor, bool) {
+		p, ok := security.PrincipalOf(ctx)
+		if !ok {
+			return audit.Actor{}, false
+		}
+		kind := "person"
+{{- if index (optionsOf "security") "services"}}
+		if p.Realm == security.ServiceRealm {
+			kind = "service"
+		}
+{{- end}}
+		return audit.Actor{Kind: kind, Realm: p.Realm, ID: p.ID.String(), Name: d.security.NameOf(ctx, p)}, true
+	}
+	// Who sees every change.
+	audit.Allowed = func(ctx context.Context) error {
+		if security.Allows(ctx, {{range $i, $a := auditAdmins .Entities (optionsOf "audit")}}{{if $i}}, {{end}}{{printf "%q" $a}}{{end}}) {
+			return nil
+		}
+		return security.Refusal(ctx)
+	}
+{{- end}}

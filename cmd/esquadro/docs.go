@@ -50,7 +50,7 @@ func runDocs(args []string, _, stderr io.Writer) int {
 // by group, in the order an app lists them.
 var blueprintOrder = []string{
 	"app", "env", "domain", "http", "worker", "jobs",
-	"postgres", "migrations", "store", "seed", "testcontainers", "compose",
+	"postgres", "migrations", "store", "seed", "audit", "testcontainers", "compose",
 	"rest", "api_docs", "client_ts", "spa", "security", "mail", "storage", "rate_limit", "compression", "i18n",
 	"observability",
 	"docker", "github_actions", "deploy",

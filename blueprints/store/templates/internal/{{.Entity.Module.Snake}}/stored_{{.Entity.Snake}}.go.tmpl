@@ -1,7 +1,8 @@
 {{- $e := .Entity}}{{$ws := writable $e}}{{$rs := refusals $e -}}
 package {{$e.Module.Snake}}
 
-{{importBlock "context" "errors" (and (needs $e "json") "encoding/json") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{- $audited := audited $e (optionsOf "audit")}}
+{{importBlock "context" "errors" (and (needs $e "json") "encoding/json") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $e.Module.Snake) (printf "%s/internal/platform/postgres" .App.Module) (and $audited (printf "%s/internal/platform/audit" .App.Module))}}
 // {{$e.Camel}}Gone is why a change of the {{lower $e.Label}} id changed nothing: it
 // does not exist (Err{{$e.Pascal}}NotFound), or its version is no longer the one
 // asked for (Err{{$e.Pascal}}Changed).
@@ -115,5 +116,41 @@ func {{$e.Camel}}Parents(ctx context.Context, db sqlgen.DBTX, n New{{$e.Pascal}}
 	}
 {{- end}}
 	return nil
+}
+{{- end}}
+{{- if $audited}}
+
+// {{$e.Camel}}Secret are the fields of {{$e.Plural.Snake}} whose changes are kept
+// without their values.
+var {{$e.Camel}}Secret = []string{ {{- $n := 0}}{{range $e.Fields}}{{if and (auditSecret .) (not (auditIgnored .))}}{{if $n}}, {{end}}{{$n = 1}}{{quote .Snake}}{{end}}{{end -}} }
+
+// {{$e.Camel}}Audited are the fields of x whose changes are kept, by name.
+func {{$e.Camel}}Audited(x {{$e.Pascal}}) map[string]any {
+	return map[string]any{
+{{- range $e.Fields}}{{if and (not .Implicit) (not (auditIgnored .))}}
+{{- if eq (printf "%v" .Type) "money"}}
+		{{quote .Snake}}: audit.Money(x.{{.Pascal}}),
+{{- else if or (eq (printf "%v" .Type) "file") (eq (printf "%v" .Type) "image")}}
+		{{quote .Snake}}: audit.ID(x.{{.Pascal}}),
+{{- else}}
+		{{quote .Snake}}: x.{{.Pascal}},
+{{- end}}
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if .OwnsForeignKey}}
+		{{quote (printf "%s_id" .Snake)}}: audit.ID(x.{{.Pascal}}ID),
+{{- end}}{{end}}
+	}
+}
+
+// {{$e.Camel}}Recorded keeps a change of a {{lower $e.Label}}, in the transaction of ctx.
+func {{$e.Camel}}Recorded(ctx context.Context, db sqlgen.DBTX, action string, id uuid.UUID, before, after *{{$e.Pascal}}) error {
+	c := audit.Change{Entity: {{quote $e.Plural.Snake}}, RecordID: id, Action: action, Secret: {{$e.Camel}}Secret}
+	if before != nil {
+		c.Before = {{$e.Camel}}Audited(*before)
+	}
+	if after != nil {
+		c.After = {{$e.Camel}}Audited(*after)
+	}
+	return audit.Record(ctx, db, c)
 }
 {{- end}}

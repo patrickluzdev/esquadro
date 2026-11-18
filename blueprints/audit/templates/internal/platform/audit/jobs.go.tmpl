@@ -1,0 +1,25 @@
+{{- if and (auditedOf .Entities .Options) (uses "jobs") .Options.retention_days -}}
+package audit
+
+import (
+	"context"
+	"time"
+
+	"{{.App.Module}}/internal/platform/jobs"
+	"{{.App.Module}}/internal/platform/postgres"
+)
+
+// purgeArgs deletes, every day, the changes older than RetentionDays.
+type purgeArgs struct{}
+
+func (purgeArgs) Kind() string { return "audit_purge" }
+
+// RegisterJobs registers the daily purge of the old changes.
+func RegisterJobs(r *jobs.Registry, db postgres.DB) {
+	jobs.Add(r, func(ctx context.Context, _ purgeArgs) error {
+		_, err := Purge(ctx, db, time.Now().AddDate(0, 0, -RetentionDays))
+		return err
+	})
+	jobs.Every(r, "30 3 * * *", purgeArgs{})
+}
+{{end -}}

@@ -70,6 +70,7 @@ type Security struct {
 	keys    keyCache
 	lists   map[string]bool
 	prefix  string
+	realms  []Realm
 	mailer  Mailer
 	logger  *slog.Logger
 	now     func() time.Time

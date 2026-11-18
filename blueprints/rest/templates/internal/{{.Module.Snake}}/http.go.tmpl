@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) "encoding/json") (and (auditedOf $m.Entities (optionsOf "audit")) "github.com/go-faster/jx")}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -431,6 +431,37 @@ func (h HTTP) trashOf{{.Plural.Pascal}}(ctx context.Context) (uuid.UUID, error) 
 	return uuid.Nil(), nil
 }
 {{- end}}
+{{- end}}
+{{- if audited $e (optionsOf "audit")}}{{$h := index (optionsOf "audit") "history"}}
+
+func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Params) (*apigen.AuditPage, error) {
+{{- if $pol}}
+	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	if err != nil {
+		return nil, problemOf(err)
+	}
+{{- if eq $h "update"}}
+	if !({{$P}}Policy{}).Update(ctx, stored) {
+		return nil, security.Refusal(ctx)
+	}
+{{- else if eq $h "admins"}}
+	if !security.Allows(ctx, {{range $i, $a := auditAdmins $.Entities (optionsOf "audit")}}{{if $i}}, {{end}}{{printf "%q" $a}}{{end}}) {
+		return nil, security.Refusal(ctx)
+	}
+{{- else}}
+	_ = stored
+{{- end}}
+{{- else}}
+	if _, err := h.{{$p}}.Read{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
+	page, err := audit.List(ctx, h.{{$p}}.Pool, audit.Filter{Entity: {{quote .Plural.Snake}}, RecordID: uuid.UUID(params.{{$id}})}, params.Page.Or(1), params.PerPage.Or(25))
+	if err != nil {
+		return nil, err
+	}
+	return auditAnswer(page), nil
+}
 {{- end}}
 {{- if $pol}}
 
@@ -988,5 +1019,44 @@ func fileAnswer(ctx context.Context, id uuid.UUID) (apigen.StoredFile, bool) {
 func moneyOf(amount string, code apigen.OptString) (currency.Amount, bool) {
 	a, err := currency.NewAmount(amount, code.Or({{quote .App.Currency}}))
 	return a, err == nil
+}
+{{- end}}
+{{- if auditedOf .Module.Entities (optionsOf "audit")}}
+
+// auditAnswer is a page of changes as the contract writes it.
+func auditAnswer(page audit.Page) *apigen.AuditPage {
+	out := &apigen.AuditPage{Items: make([]apigen.AuditEntry, 0, len(page.Items)), Page: page.Page, PerPage: page.PerPage, Total: page.Total, TotalPages: page.TotalPages}
+	for _, e := range page.Items {
+		changes := apigen.AuditEntryChanges{}
+		for field, c := range e.Changes {
+			var answer apigen.AuditFieldChange
+			if c.Secret {
+				answer.Secret = apigen.NewOptBool(true)
+			}
+			if c.From != nil {
+				data, _ := json.Marshal(c.From)
+				answer.From = jx.Raw(data)
+			}
+			if c.To != nil {
+				data, _ := json.Marshal(c.To)
+				answer.To = jx.Raw(data)
+			}
+			changes[field] = answer
+		}
+		out.Items = append(out.Items, apigen.AuditEntry{
+			ID: ogenuuid.UUID(e.ID), At: e.At, Entity: e.Entity, RecordID: ogenuuid.UUID(e.RecordID),
+			Action: apigen.AuditEntryAction(e.Action), Changes: changes,
+			Actor: apigen.AuditActor{Kind: apigen.AuditActorKind(e.Actor.Kind), Realm: optString(e.Actor.Realm), ID: optString(e.Actor.ID), Name: e.Actor.Name},
+		})
+	}
+	return out
+}
+
+// optString is a text that may be absent: absent when empty.
+func optString(s string) apigen.OptString {
+	if s == "" {
+		return apigen.OptString{}
+	}
+	return apigen.NewOptString(s)
 }
 {{- end}}

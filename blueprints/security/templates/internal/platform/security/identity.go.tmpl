@@ -51,6 +51,7 @@ type Realm struct {
 // password, oauth/<provider>, providers, and the account itself.
 func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
 	s.prefix = prefix
+	s.realms = realms
 	for _, r := range realms {
 		base := prefix + "/" + r.Name
 		if slices.Contains(r.Providers, "password") {

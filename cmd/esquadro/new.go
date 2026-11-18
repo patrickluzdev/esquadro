@@ -22,7 +22,7 @@ import (
 // over them in an app.esq written from a list of blueprints.
 var blueprintGroups = map[string]string{
 	"app": "base", "env": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
-	"postgres": "data", "migrations": "data", "store": "data", "seed": "data", "testcontainers": "data", "compose": "data",
+	"postgres": "data", "migrations": "data", "store": "data", "seed": "data", "audit": "data", "testcontainers": "data", "compose": "data",
 	"rest": "api", "api_docs": "api", "client_ts": "api", "spa": "api", "security": "api", "mail": "api", "storage": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
 	"docker": "ship", "github_actions": "ship", "deploy": "ship", "observability": "ship",

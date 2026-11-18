@@ -1,0 +1,4 @@
+{{- if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}
+	// Every change, to those who administer: GET /audit.
+	audit.Routes(mux, d.pool)
+{{- end}}

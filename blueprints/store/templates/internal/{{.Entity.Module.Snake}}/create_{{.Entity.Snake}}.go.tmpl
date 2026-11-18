@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
 package {{$m.Snake}}
 
 {{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -14,16 +14,29 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 		return {{$e.Pascal}}{}, err
 	}
 {{- end}}
-{{- if $files}}
-	// The record and its files, together.
+{{- if $tx}}
+	// The record{{if $files}}, its files{{end}}{{if $audited}} and the change kept{{end}}, together.
 	var created {{$e.Pascal}}
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+{{- if $ws}}
 		row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params({{$r}}.NewID(), n))
+{{- else}}
+		row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Create{{$e.Pascal}}(ctx, postgres.UUID({{$r}}.NewID()))
+{{- end}}
 		if err != nil {
 			return {{$e.Camel}}Refusal(err)
 		}
 		created = {{$e.Camel}}Of(row)
+{{- if $audited}}
+		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "create", created.ID, nil, &created); err != nil {
+			return err
+		}
+{{- end}}
+{{- if $files}}
 		return {{$r}}.{{$e.Camel}}Files(ctx, created.ID, nil, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}}))
+{{- else}}
+		return nil
+{{- end}}
 	})
 	if err != nil {
 		return {{$e.Pascal}}{}, err

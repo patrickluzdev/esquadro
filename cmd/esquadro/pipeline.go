@@ -8,6 +8,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/blueprints"
 	"github.com/patrickluzdev/esquadro/blueprints/app"
+	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/branching"
 	clientts "github.com/patrickluzdev/esquadro/blueprints/client_ts"
 	"github.com/patrickluzdev/esquadro/blueprints/env"
@@ -52,6 +53,7 @@ func init() {
 	blueprint.Checks["workspace"] = bpworkspace.Check
 	blueprint.Checks["spa"] = spa.Check
 	blueprint.Checks["seed"] = seed.Check
+	blueprint.Checks["audit"] = audit.Check
 	blueprint.Checks["storage"] = storage.Check
 }
 
@@ -66,6 +68,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"security":  security.TemplateFuncs(),
 	"spa":       spa.TemplateFuncs(),
 	"seed":      seed.TemplateFuncs(),
+	"audit":     audit.TemplateFuncs(),
 	"storage":   storage.TemplateFuncs(),
 }
 

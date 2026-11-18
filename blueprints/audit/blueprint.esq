@@ -1,0 +1,35 @@
+/// Who changed what, and when: each create, change, delete (to the trash or
+/// for good) and restore of the audited entities is kept, in the same
+/// transaction as the change, with who made it (a person, a service key, or
+/// the system: a command, a job) and each field's value before and after.
+/// Each record shows its history, and those who administer see all of it.
+blueprint audit {
+  version "0.1.0"
+  requires app, domain, postgres, migrations, store
+  optional security, jobs, http, rest, client_ts, spa, testcontainers
+
+  /// Which entities are audited: marked (those with @audit) or all (but
+  /// those with @audit(off)).
+  option entities name default(marked)
+  /// Days a change is kept, then deleted by a daily job and <app> audit
+  /// purge; 0 keeps them.
+  option retention_days int default(365)
+  /// Who sees all the changes (GET /audit, the frontends' Audit page), as
+  /// realm.role rules; empty, those who administer the accounts of the
+  /// first realm.
+  option admins list default([])
+  /// Who sees a record's history: update (those who may change it), read
+  /// (those who may read it) or admins.
+  option history name default(update)
+
+  annotation entity {
+    /// Not audited, with entities all.
+    off bool
+  }
+  annotation field {
+    /// Its changes are kept without its values: only that it changed.
+    secret bool
+    /// Its changes are not kept.
+    ignore bool
+  }
+}

@@ -263,6 +263,36 @@ paths:
           description: {{if softDeleted $e}}In the trash.{{else}}Deleted.{{end}}
         default:
           $ref: "#/components/responses/Problem"
+{{- if audited $e (optionsOf "audit")}}
+  /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/history:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: history{{.Pascal}}
+      summary: {{quote (printf "The history of a %s" (lower .Label))}}
+      description: |
+        Its changes, the newest first: who, when, and each field before and
+        after (a secret one only that it changed). By page, `page` from 1 and
+        `per_page` (25 by default, at most 100).
+{{- $h := index (optionsOf "audit") "history"}}
+        {{if eq $h "read"}}Who may read it sees it.{{else if eq $h "admins"}}Those who administer see it.{{else}}Who may change it sees it.{{end}}
+      tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: A page of changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditPage"
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
 {{- if softDeleted $e}}
   /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/restore:
     parameters:
@@ -512,6 +542,45 @@ components:
 {{.}}
 {{- end}}
   schemas:
+{{- if auditedOf .Entities (optionsOf "audit")}}
+    AuditPage:
+      type: object
+      required: [items, page, per_page, total, total_pages]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/AuditEntry"}}
+        page: {type: integer}
+        per_page: {type: integer}
+        total: {type: integer, format: int64}
+        total_pages: {type: integer}
+    AuditEntry:
+      type: object
+      required: [id, at, entity, record_id, action, actor, changes]
+      properties:
+        id: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+        entity: {type: string, description: "The entity's plural: products."}
+        record_id: {type: string, format: uuid}
+        action: {type: string, enum: [create, update, delete, restore, purge]}
+        actor: {$ref: "#/components/schemas/AuditActor"}
+        changes:
+          type: object
+          description: "Each field that changed: {from, to}, or {secret: true}."
+          additionalProperties: {$ref: "#/components/schemas/AuditFieldChange"}
+    AuditActor:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: {type: string, enum: [person, service, system]}
+        realm: {type: string}
+        id: {type: string}
+        name: {type: string}
+    AuditFieldChange:
+      type: object
+      properties:
+        from: {description: The value before.}
+        to: {description: The value after.}
+        secret: {type: boolean, description: It changed; its values are not kept.}
+{{- end}}
 {{- $soft := false}}{{range .Entities}}{{if softDeleted .}}{{$soft = true}}{{end}}{{end}}
 {{- if $soft}}
     Purged:
