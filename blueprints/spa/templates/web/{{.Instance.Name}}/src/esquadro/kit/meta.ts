@@ -4,7 +4,7 @@
 /** How a field is shown and edited. */
 export type FieldKind =
   | "text" | "textarea" | "int" | "decimal" | "money" | "file" | "image" | "bool" | "date" | "datetime"
-  | "enum" | "uuid" | "json" | "relation"
+  | "enum" | "uuid" | "json" | "relation" | "many"
 
 /** A field of a resource, from the model. */
 export interface FieldMeta {
@@ -31,6 +31,8 @@ export interface FieldMeta {
   /** A number's bounds, as the model says: min(0). */
   min?: number
   max?: number
+  /** A many-to-many relation's: its name in the client (tags), for its links. */
+  relation?: string
   /** Formatted text, as HTML (@rest(html)): a rich text editor. */
   rich?: boolean
   /** Shown, never edited (created_at). */

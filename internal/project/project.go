@@ -361,6 +361,20 @@ func (r *Relation) CrossesModules() bool {
 	return r.Entity.Module != r.Target.Module
 }
 
+// IDs names the ids a many-to-many relation is written with: TagIDs and
+// tag_ids for tags of Tag, and the relation's own name otherwise (for
+// related of Product: RelatedIDs, related_ids).
+func (r *Relation) IDs() Names {
+	base := r.Names
+	if r.Target != nil && r.Snake == r.Target.Plural.Snake {
+		base = r.Target.Names
+	}
+	return Names{
+		Raw: base.Raw + "IDs", Label: base.Label + " IDs", Pascal: base.Pascal + "IDs",
+		Camel: base.Camel + "IDs", Snake: base.Snake + "_ids", Kebab: base.Kebab + "-ids",
+	}
+}
+
 // OwnsForeignKey reports whether this side stores the foreign key column:
 // the many side of a many-to-one, and the declared side of a one-to-one.
 func (r *Relation) OwnsForeignKey() bool {

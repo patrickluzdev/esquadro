@@ -32,7 +32,7 @@ export default resource(meta, {
     // A funnel in the header of each column the list filters by.
     // columnFilters: true,
   },
-  form: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}],
+  form: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}{{range $r := idLinks .Entity}}, f.{{($r.IDs).Snake}}{{end}}],
   show: [{{$s := 0}}{{range $f := inRequest .Entity}}{{if ne (spaKind $f) "image"}}{{if $s}}, {{end}}f.{{$f.Snake}}{{$s = add1 $s}}{{end}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}, f.created_at, f.updated_at],
 {{- with inRequest .Entity}}
   title: f.{{(index . 0).Snake}},

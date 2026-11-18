@@ -154,3 +154,27 @@ func {{$e.Camel}}Recorded(ctx context.Context, db sqlgen.DBTX, action string, id
 	return audit.Record(ctx, db, c)
 }
 {{- end}}
+{{- with idLinks $e}}
+
+// {{$e.Camel}}Links writes the records the {{lower $e.Label}} id is linked to, as n
+// lists them (a nil list leaves them), in the transaction of db: an id that
+// is no record is a field refused.
+func {{$e.Camel}}Links(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, n New{{$e.Pascal}}) error {
+	q := sqlgen.New(db)
+{{- range .}}
+	if n.{{(.IDs).Pascal}} != nil {
+		ids := postgres.UUIDs(n.{{(.IDs).Pascal}})
+		if err := q.Unlink{{$e.Pascal}}{{.Pascal}}Except(ctx, sqlgen.Unlink{{$e.Pascal}}{{.Pascal}}ExceptParams{OwnID: postgres.UUID(id), Keep: ids}); err != nil {
+			return err
+		}
+		if err := q.Link{{$e.Pascal}}{{.Pascal}}All(ctx, sqlgen.Link{{$e.Pascal}}{{.Pascal}}AllParams{OwnID: postgres.UUID(id), OtherIds: ids}); err != nil {
+			if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
+				return &InvalidFields{Fields: []FieldError{ {Field: {{quote (.IDs).Snake}}, Code: "not_found"} }}
+			}
+			return err
+		}
+	}
+{{- end}}
+	return nil
+}
+{{- end}}

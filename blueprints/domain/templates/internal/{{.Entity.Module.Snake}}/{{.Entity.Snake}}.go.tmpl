@@ -34,6 +34,11 @@ type New{{$e.Pascal}} struct {
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
 	{{.Pascal}}ID uuid.UUID
 {{- end}}{{end}}
+{{- range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}
+	// {{(.IDs).Pascal}} are the {{.Snake}} it is linked to, written with it: nil
+	// leaves them as they are, empty unlinks them all.
+	{{(.IDs).Pascal}} []uuid.UUID
+{{- end}}{{end}}
 }
 
 // {{$e.Pascal}}Changes are changes to {{if eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower $e.Label}}: each field not nil is
@@ -44,6 +49,9 @@ type {{$e.Pascal}}Changes struct {
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
 	{{.Pascal}}ID *uuid.UUID
+{{- end}}{{end}}
+{{- range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}
+	{{(.IDs).Pascal}} *[]uuid.UUID
 {{- end}}{{end}}
 }
 
@@ -67,12 +75,17 @@ func (c {{$e.Pascal}}Changes) Apply(x {{$e.Pascal}}) New{{$e.Pascal}} {
 		n.{{.Pascal}}ID = *c.{{.Pascal}}ID
 	}
 {{- end}}{{end}}
+{{- range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}
+	if c.{{(.IDs).Pascal}} != nil {
+		n.{{(.IDs).Pascal}} = *c.{{(.IDs).Pascal}}
+	}
+{{- end}}{{end}}
 	return n
 }
 
 // Empty reports whether c changes nothing.
 func (c {{$e.Pascal}}Changes) Empty() bool {
-	return {{$first := true}}{{range $e.Fields}}{{if not .Implicit}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{if $first}}true{{end}}
+	return {{$first := true}}{{range $e.Fields}}{{if not .Implicit}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}{{if not $first}} && {{end}}{{$first = false}}c.{{(.IDs).Pascal}} == nil{{end}}{{end}}{{if $first}}true{{end}}
 }
 {{- $defaults := false}}
 {{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date") (eq .Type "money"))}}{{$defaults = true}}{{end}}{{end}}

@@ -89,6 +89,10 @@ export interface New{{$P}} {
 {{- range keys $e}}
   {{keyName .}}{{if not (keyInRequest $.Entities $e .)}}?{{end}}: string
 {{- end}}
+{{- range idLinks $e}}
+  /** The {{.Snake}} it is linked to; left out, they stay as they are. */
+  {{(.IDs).Snake}}?: string[]
+{{- end}}
 }
 
 /** Changes to {{if eq (slice (lower .Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower .Label}}: only the fields sent change; null empties one. */
@@ -98,6 +102,9 @@ export interface {{$P}}Changes {
 {{- end}}
 {{- range keys $e}}
   {{keyName .}}?: string{{if not .Required}} | null{{end}}
+{{- end}}
+{{- range idLinks $e}}
+  {{(.IDs).Snake}}?: string[]
 {{- end}}
 }
 

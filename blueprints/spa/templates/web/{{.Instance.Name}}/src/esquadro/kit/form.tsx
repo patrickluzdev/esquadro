@@ -3,6 +3,7 @@
 // required checked before sending, the API's refusals on their fields, a
 // change on the version read (If-Match), a create sent once
 // (Idempotency-Key), and a question before leaving with changes unsaved.
+import { ManyInput, useLinked } from "./many.tsx"
 import { RichTextInput } from "./rich.tsx"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useBlocker, useNavigate, useRouterState, useSearch } from "@tanstack/react-router"
@@ -73,6 +74,8 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
       )
     case "relation":
       return <RelationInput id={id} field={field} value={str} onChange={onChange} invalid={invalid} />
+    case "many":
+      return <ManyInput id={id} field={field} value={value} onChange={onChange} invalid={invalid} />
     case "int":
       return (
         <Input
@@ -183,7 +186,7 @@ type FormSection = { title: string; description?: string; fields: FieldMeta[]; s
  */
 export function defaultSections(form: FieldMeta[]): FormSection[] {
   const media = form.filter((f) => f.kind === "image" || f.kind === "file")
-  const filed = form.filter((f) => f.kind === "enum" || f.kind === "relation" || f.kind === "bool")
+  const filed = form.filter((f) => f.kind === "enum" || f.kind === "relation" || f.kind === "many" || f.kind === "bool")
   const details = form.filter((f) => !media.includes(f) && !filed.includes(f))
   const out: FormSection[] = [{ title: t("details"), fields: details.length > 0 ? details : form }]
   if (details.length === 0) return out
@@ -195,9 +198,11 @@ export function defaultSections(form: FieldMeta[]): FormSection[] {
 /** The form to create a record, or to change one (with its id). */
 export function ResourceForm({ resource, id }: { resource: Resource; id?: string }) {
   const record = useRecord(resource, id)
-  if (id !== undefined && record.isPending) return <FormSkeleton fields={resource.form.length} />
+  // What a record is linked to (its tags) is not in it: read apart.
+  const linked = useLinked(resource.meta, resource.form, id)
+  if (id !== undefined && (record.isPending || linked.pending)) return <FormSkeleton fields={resource.form.length} />
   if (record.isError) return <ErrorState framed error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
-  return <Form resource={resource} record={record.data} />
+  return <Form resource={resource} record={record.data && { ...record.data, ...linked.values }} />
 }
 
 function Form({ resource, record }: { resource: Resource; record?: Rec }) {

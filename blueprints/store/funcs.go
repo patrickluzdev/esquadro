@@ -123,6 +123,7 @@ func TemplateFuncs() template.FuncMap {
 		"trashedParents":  TrashedParents,
 		"onDelete":        OnDelete,
 		"trashModules":    TrashModules,
+		"idLinks":         IDLinks,
 		"audited":         audit.Audited,
 		"auditSecret":     audit.Secret,
 		"auditIgnored":    audit.Ignored,
@@ -770,6 +771,18 @@ func reportImports(r *project.Report) []string {
 	for _, f := range r.Params {
 		if !f.Required && (f.Type == project.TypeInt || f.Type == project.TypeEnum) {
 			add("github.com/jackc/pgx/v5/pgtype")
+		}
+	}
+	return out
+}
+
+// IDLinks are the many-to-many relations an entity writes with its record,
+// as lists of ids (tag_ids): those it declares.
+func IDLinks(e *project.Entity) []*project.Relation {
+	var out []*project.Relation
+	for _, r := range e.Relations {
+		if r.Kind == project.ManyToMany && !r.Inferred {
+			out = append(out, r)
 		}
 	}
 	return out

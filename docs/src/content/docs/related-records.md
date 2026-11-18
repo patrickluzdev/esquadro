@@ -81,3 +81,22 @@ catalog module):
 price := decimal.RequireFromString("13.00")
 updated, err := c.PatchProduct(ctx, id, 0, catalog.ProductChanges{Price: &price}, nil)
 ```
+
+## Many-to-many, written with the record
+
+A many-to-many relation can be written with the record itself: create,
+update and patch take its ids, named after the target (`tag_ids` for
+`tags <> Tag`, or the relation's name otherwise), and change the links in
+the same transaction as the record. Left out, the links stay as they are;
+`[]` unlinks them all; an id that is no record refuses the whole change
+(`invalid_fields`, `not_found`), so nothing is written halfway.
+
+```sh
+POST  /api/v1/products         {"name": "Webcam", "tag_ids": ["0198…", "0198…"]}
+PATCH /api/v1/products/0198…   {"tag_ids": []}
+```
+
+The links' own routes (`PUT`/`DELETE /products/{id}/tags/{tagId}`) still add
+or remove one at a time. In a [frontend](/esquadro/frontends/)'s form, the
+relation is a field of chips with a search to add or take some off.
+

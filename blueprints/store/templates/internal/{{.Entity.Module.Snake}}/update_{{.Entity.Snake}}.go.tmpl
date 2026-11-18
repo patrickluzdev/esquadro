@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$links := idLinks $e}}{{$tx := or $files $audited $links -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -43,6 +43,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return {{$e.Camel}}Refusal(err)
 		}
 		updated = {{$e.Camel}}Of(row)
+{{- if $links}}
+		if err := {{$e.Camel}}Links(ctx, postgres.Querier(ctx, {{$r}}.Pool), id, n); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $audited}}
 		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "update", id, &stored, &updated); err != nil {
 			return err

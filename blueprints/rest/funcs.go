@@ -107,6 +107,7 @@ func TemplateFuncs() template.FuncMap {
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
 		"softDeleted":      store.SoftDeleted,
+		"idLinks":          store.IDLinks,
 		"html":             HTML,
 		"anyHTML": func(entities []*project.Entity) bool {
 			for _, e := range entities {

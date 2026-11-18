@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$tx := or $files $audited -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$links := idLinks $e}}{{$tx := or $files $audited $links -}}
 package {{$m.Snake}}
 
 {{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -27,6 +27,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 			return {{$e.Camel}}Refusal(err)
 		}
 		created = {{$e.Camel}}Of(row)
+{{- if $links}}
+		if err := {{$e.Camel}}Links(ctx, postgres.Querier(ctx, {{$r}}.Pool), created.ID, n); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $audited}}
 		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "create", created.ID, nil, &created); err != nil {
 			return err

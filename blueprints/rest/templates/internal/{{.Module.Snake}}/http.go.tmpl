@@ -633,6 +633,14 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 	}
 {{- end}}
 {{- end}}
+{{- range idLinks $e}}
+	if req.{{ogenName (.IDs).Snake}} != nil {
+		n.{{(.IDs).Pascal}} = make([]uuid.UUID, 0, len(req.{{ogenName (.IDs).Snake}}))
+		for _, id := range req.{{ogenName (.IDs).Snake}} {
+			n.{{(.IDs).Pascal}} = append(n.{{(.IDs).Pascal}}, uuid.UUID(id))
+		}
+	}
+{{- end}}
 	return n, invalid
 }
 
@@ -694,6 +702,15 @@ func {{.Camel}}ChangesOf(req *apigen.{{$P}}Changes) ({{$P}}Changes, []FieldError
 		c.{{.Pascal}}ID = new(uuid.UUID(req.{{$g}}.Value))
 	}
 {{- end}}
+{{- end}}
+{{- range idLinks $e}}
+	if req.{{ogenName (.IDs).Snake}} != nil {
+		ids := make([]uuid.UUID, 0, len(req.{{ogenName (.IDs).Snake}}))
+		for _, id := range req.{{ogenName (.IDs).Snake}} {
+			ids = append(ids, uuid.UUID(id))
+		}
+		c.{{(.IDs).Pascal}} = &ids
+	}
 {{- end}}
 	return c, invalid
 }

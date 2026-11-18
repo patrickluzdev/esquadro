@@ -65,6 +65,7 @@ func TemplateFuncs() template.FuncMap {
 		"tsPattern":   tsPattern,
 		"enumName":    func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
 		"softDeleted": store.SoftDeleted,
+		"idLinks":     store.IDLinks,
 		"audited":     audit.Audited,
 		"auditedOf":   audit.AuditedOf,
 		"manyToMany": func(e *project.Entity) []*project.Relation {

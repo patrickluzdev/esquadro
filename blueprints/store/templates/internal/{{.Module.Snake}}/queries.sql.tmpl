@@ -119,6 +119,14 @@ ON CONFLICT DO NOTHING;
 -- name: RemoveFrom{{$e.Pascal}}{{.Pascal}} :exec
 DELETE FROM {{$l.Table}} WHERE {{$l.Own}} = @own_id AND {{$l.Other}} = @other_id;
 
+-- name: Unlink{{$e.Pascal}}{{.Pascal}}Except :exec
+DELETE FROM {{$l.Table}} WHERE {{$l.Own}} = @own_id AND NOT ({{$l.Other}} = ANY(@keep::uuid[]));
+
+-- name: Link{{$e.Pascal}}{{.Pascal}}All :exec
+INSERT INTO {{$l.Table}} ({{$l.Own}}, {{$l.Other}})
+SELECT @own_id, unnest(@other_ids::uuid[])
+ON CONFLICT DO NOTHING;
+
 -- name: List{{$e.Pascal}}{{.Pascal}}Of :many
 SELECT own_id, other_id FROM (
   SELECT {{$l.Own}} AS own_id, {{$l.Other}} AS other_id,

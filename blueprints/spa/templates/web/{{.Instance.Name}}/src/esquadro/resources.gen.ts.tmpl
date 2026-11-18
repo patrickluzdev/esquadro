@@ -24,6 +24,9 @@ export const resources = {
 {{- range $r := keys $e}}
       {{keyName $r}}: { name: "{{keyName $r}}", label: {{printf "%q" (or (index (ann $r) "label") (humanize $r.Snake))}}, kind: "relation", required: {{$r.Required}}, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}" },
 {{- end}}
+{{- range $r := idLinks $e}}
+      {{(.IDs).Snake}}: { name: "{{(.IDs).Snake}}", label: {{printf "%q" (or (index (ann $r) "label") (humanize $r.Snake))}}, kind: "many", required: false, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}", relation: "{{$r.Camel}}" },
+{{- end}}
       created_at: { name: "created_at", label: t("createdAt"), kind: "datetime", required: false, readOnly: true },
       updated_at: { name: "updated_at", label: t("updatedAt"), kind: "datetime", required: false, readOnly: true },
     },

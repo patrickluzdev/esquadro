@@ -701,7 +701,13 @@ components:
 {{- range keys $e}}
         {{keyName .}}: {type: string, format: uuid}
 {{- end}}
-{{- if and (not (inRequest $e)) (not (keys $e))}} {}
+{{- range idLinks $e}}
+        {{(.IDs).Snake}}:
+          type: array
+          description: "The {{.Snake}} it is linked to, written with it; left out, they stay as they are, and [] unlinks them all."
+          items: {type: string, format: uuid}
+{{- end}}
+{{- if and (not (inRequest $e)) (not (keys $e)) (not (idLinks $e))}} {}
 {{- end}}
     {{.Pascal}}Changes:
       type: object
@@ -713,7 +719,13 @@ components:
 {{- range keys $e}}
         {{keyName .}}: {type: string, format: uuid{{if not .Required}}, nullable: true{{end}}}
 {{- end}}
-{{- if and (not (inRequest $e)) (not (keys $e))}} {}
+{{- range idLinks $e}}
+        {{(.IDs).Snake}}:
+          type: array
+          description: "The {{.Snake}} it is linked to, written with it; left out, they stay as they are, and [] unlinks them all."
+          items: {type: string, format: uuid}
+{{- end}}
+{{- if and (not (inRequest $e)) (not (keys $e)) (not (idLinks $e))}} {}
 {{- end}}
     {{.Pascal}}Page:
       type: object
