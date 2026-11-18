@@ -1,0 +1,23 @@
+{{- if and (fileFields .Entities .Options) (uses "jobs") -}}
+package storage
+
+import (
+	"context"
+
+	"{{.App.Module}}/internal/platform/jobs"
+)
+
+// cleanArgs runs the cleanup of the files never used and released.
+type cleanArgs struct{}
+
+func (cleanArgs) Kind() string { return "storage_clean" }
+
+// RegisterJobs registers the cleanup, every {{.Options.clean_every}}.
+func (s *Store) RegisterJobs(r *jobs.Registry) {
+	jobs.Add(r, func(ctx context.Context, _ cleanArgs) error {
+		_, err := s.Clean(ctx)
+		return err
+	})
+	jobs.Every(r, "@every {{.Options.clean_every}}", cleanArgs{})
+}
+{{end -}}

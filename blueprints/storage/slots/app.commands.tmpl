@@ -1,0 +1,4 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	case "storage":
+		return storageCommand(ctx, os.Args[2:])
+{{- end}}

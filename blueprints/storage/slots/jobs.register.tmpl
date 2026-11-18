@@ -1,0 +1,3 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	d.storage.RegisterJobs(registry)
+{{- end}}

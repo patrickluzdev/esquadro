@@ -1,0 +1,26 @@
+{{- if and (fileFields .Entities .Options) (not (uses "jobs")) (uses "worker") -}}
+package storage
+
+import (
+	"context"
+	"log/slog"
+	"time"
+)
+
+// Maintain runs the cleanup every {{.Options.clean_every}}, in the worker, until ctx ends.
+func (s *Store) Maintain(ctx context.Context) error {
+	every, _ := time.ParseDuration({{quote .Options.clean_every}})
+	tick := time.NewTicker(every)
+	defer tick.Stop()
+	for {
+		if _, err := s.Clean(ctx); err != nil && ctx.Err() == nil {
+			slog.ErrorContext(ctx, "storage cleanup", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tick.C:
+		}
+	}
+}
+{{end -}}

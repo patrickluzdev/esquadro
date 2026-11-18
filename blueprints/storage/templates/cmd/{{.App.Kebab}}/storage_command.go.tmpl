@@ -1,0 +1,54 @@
+{{- if fileFields .Entities .Options -}}
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+)
+
+const storageUsage = `usage: {{.App.Kebab}} storage <command>
+
+  clean            delete the files sent and never used, and those released
+  cors [origin...] the CORS rules a bucket needs for browsers to send files
+                   to it (S3, R2, MinIO), for the origins given or the app's`
+
+// storageCommand runs {{.App.Kebab}} storage <command>.
+func storageCommand(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return errors.New(storageUsage)
+	}
+	switch args[0] {
+	case "clean":
+		d, release, err := open(ctx)
+		if err != nil {
+			return err
+		}
+		defer release()
+		n, err := d.storage.Clean(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("deleted %d files\n", n)
+		return nil
+	case "cors":
+		origins := args[1:]
+		if len(origins) == 0 {
+			origins = []string{"https://your-app.example.com"}
+		}
+		rules := []map[string]any{ {
+			"AllowedOrigins": origins,
+			"AllowedMethods": []string{"PUT", "GET"},
+			"AllowedHeaders": []string{"Content-Type"},
+			"MaxAgeSeconds":  3600,
+		} }
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		fmt.Fprintln(os.Stderr, "# The bucket's CORS configuration (S3, R2, MinIO), to paste in the provider's console:")
+		return enc.Encode(rules)
+	}
+	return errors.New(storageUsage)
+}
+{{end -}}

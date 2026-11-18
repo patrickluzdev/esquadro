@@ -1,0 +1,3 @@
+{{- if and (fileFields .Entities (optionsOf "storage")) (not (uses "jobs"))}}
+		{Name: "storage", Run: d.storage.Maintain},
+{{- end}}
