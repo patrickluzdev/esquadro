@@ -28,6 +28,7 @@ blueprint spa
 | `locale` | name | `"en"` | en or pt_br: the language of its own words (src/messages.ts) and of dates, numbers and money. |
 | `serve` | name | `"app"` | app: the app's binary serves it, built in. (image, a container of its own, is planned.) |
 | `sidebar` | name | `"icon"` | The sidebar, from shadcn/ui's blocks: icon (sidebar-07, it collapses to its icons), inset (sidebar-08, the page in an inset card) or dashboard (dashboard-01, it slides away, wider). |
+| `idle_minutes` | int | `0` | Minutes without use after which the frontend signs out (a warning comes a minute before); 0, never. |
 
 ```esquadro
 blueprint spa {

@@ -89,6 +89,7 @@ func TestSPAChecksItsInstances(t *testing.T) {
 		"serve":     {func(s string) string { return strings.Replace(s, "locale pt_br", "serve image", 1) }, "serve image is not one esquadro generates yet"},
 		"sidebar":   {func(s string) string { return strings.Replace(s, "locale pt_br", "sidebar floating", 1) }, "sidebar floating is not icon, inset or dashboard"},
 		"name":      {func(s string) string { return strings.Replace(s, "blueprint spa admin", "blueprint spa Admin", 1) }, "Admin cannot name a frontend"},
+		"idle":      {func(s string) string { return strings.Replace(s, "locale pt_br", "idle_minutes 1", 1) }, "idle_minutes 1 is too short"},
 		"workspace": {func(s string) string { return strings.Replace(s, "  blueprint workspace\n", "", 1) }, "requires workspace"},
 		"no name":   {func(s string) string { return strings.Replace(s, "blueprint spa admin", "blueprint spa", 1) }, "is used by named instances"},
 	} {

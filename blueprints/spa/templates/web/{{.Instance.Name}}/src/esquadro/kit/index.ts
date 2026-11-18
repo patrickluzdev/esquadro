@@ -13,6 +13,7 @@ export { OfflineBanner, SessionSync, useOnline, announceSession } from "./connec
 export { Dashboard, LineChart, ReportTable } from "./dashboard.tsx"
 export { useKeys, ShortcutsHelp } from "./keys.tsx"
 export { PasswordCard, DevicesCard, EmailCard, deviceName } from "./account.tsx"
+export { IdleTimeout } from "./idle.tsx"
 export type { Widget } from "./dashboard.tsx"
 export { StateView, EmptyState, NoResultsState, ErrorState, RefreshError, LoadingBar, TableSkeleton, FormSkeleton, DetailSkeleton } from "./states.tsx"
 export type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"

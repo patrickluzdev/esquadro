@@ -16,6 +16,7 @@ app shop {
     roles  [admin, staff]        // who of the realm may use it
     locale pt_br                 // en or pt_br
     sidebar icon                 // icon, inset or dashboard
+    idle_minutes 30              // sign out after 30 minutes without use
   }
 }
 ```
@@ -82,6 +83,10 @@ first realm by default) and, with `roles`, one of those roles. Without one,
 the sign-in page opens, keeping the page asked for: after signing in, the
 person is back on it. A session that ends while the frontend is open does the
 same. Sign-in, the forgotten password and its link's page come ready.
+
+With `idle_minutes`, the frontend signs out after that long without use
+(in any of its tabs), warning a minute before, and comes back to the page
+after signing in again.
 
 The account page (from the account's menu) changes the password, lists the
 devices signed in and signs out of one or of all the others, and changes the

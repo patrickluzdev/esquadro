@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { requireSession } from "../esquadro/kit/auth.tsx"
+import { IdleTimeout } from "../esquadro/kit/idle.tsx"
 
 // The signed-in pages: every file under _app/ needs a session (and a role
 // let in), and is framed by the sidebar (src/components/app-sidebar.tsx).
@@ -31,6 +32,7 @@ function Layout() {
           <Outlet />
         </div>
       </SidebarInset>
+      <IdleTimeout />
     </SidebarProvider>
 {{- else}}
     <SidebarProvider style={ {} as CSSProperties }>
@@ -41,6 +43,7 @@ function Layout() {
           <Outlet />
         </div>
       </SidebarInset>
+      <IdleTimeout />
     </SidebarProvider>
 {{- end}}
   )

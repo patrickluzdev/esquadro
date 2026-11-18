@@ -71,6 +71,9 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 			diags = append(diags, unlabeled(p, name)...)
 		}
 		diags = append(diags, widgets(p, name)...)
+		if idle, _ := opts["idle_minutes"].(int64); idle != 0 && idle < 2 {
+			diags.Errorf(at("idle_minutes"), at("idle_minutes"), "idle_minutes %d is too short: at least 2, a minute of warning and one of use, or 0 for never", idle)
+		}
 		if set.Get("workspace") == nil {
 			diags.Errorf(ref.Pos, ref.Pos, "spa %s lives in the workspace: add blueprint workspace", name)
 		}
