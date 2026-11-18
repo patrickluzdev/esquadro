@@ -10,6 +10,7 @@ export function describe(e: unknown): string {
   // English.
   if (isApiError(e)) {
     if (e.code === "precondition_failed") return t("conflict")
+    if (e.code === "reauthentication_required") return t("reauthenticate")
     if (e.code === "invalid_fields") return t("fixFields")
     if (e.status === 400) return t("badRequest")
     if (e.status === 401) return t("sessionEnded")

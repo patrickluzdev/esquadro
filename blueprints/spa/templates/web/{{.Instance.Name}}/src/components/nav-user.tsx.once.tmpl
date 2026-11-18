@@ -1,8 +1,8 @@
 // The account, at the bottom of the sidebar (shadcn/ui's block sidebar-07):
 // the theme and signing out. Yours to change: a profile page, settings.
 import { useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react"
+import { Link, useNavigate } from "@tanstack/react-router"
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserCog } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -62,6 +62,13 @@ export function NavUser() {
                 {who}
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/account">
+                <UserCog />
+                {t("account")}
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("theme")}</DropdownMenuLabel>

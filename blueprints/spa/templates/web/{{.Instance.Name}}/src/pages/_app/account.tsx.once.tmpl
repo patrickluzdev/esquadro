@@ -1,0 +1,18 @@
+import { createFileRoute } from "@tanstack/react-router"
+import { DevicesCard, EmailCard, PasswordCard } from "../../esquadro/kit/account.tsx"
+import { t } from "../../esquadro/kit/i18n.ts"
+import { PageHeader } from "../../esquadro/kit/page.tsx"
+
+// The account of whoever signed in: yours to change (a profile, settings).
+export const Route = createFileRoute("/_app/account")({ staticData: { title: t("account") }, component: Account })
+
+function Account() {
+  return (
+    <div className="flex max-w-2xl flex-col gap-6">
+      <PageHeader title={t("account")} description={t("accountHint")} />
+      <PasswordCard />
+      <DevicesCard />
+      <EmailCard />
+    </div>
+  )
+}

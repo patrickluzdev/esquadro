@@ -83,6 +83,11 @@ the sign-in page opens, keeping the page asked for: after signing in, the
 person is back on it. A session that ends while the frontend is open does the
 same. Sign-in, the forgotten password and its link's page come ready.
 
+The account page (from the account's menu) changes the password, lists the
+devices signed in and signs out of one or of all the others, and changes the
+email with a link to the new one. What changes an account needs a recent
+sign-in: when it is old, the page offers to sign in again and comes back.
+
 ## Resources
 
 An entity marked `@admin(resource)` is a resource of the admin frontend: its
