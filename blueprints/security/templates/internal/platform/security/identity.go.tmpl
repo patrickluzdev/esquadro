@@ -162,8 +162,7 @@ func (s *Security) signUp(realm Realm) http.HandlerFunc {
 				}
 			}
 		}
-		w.WriteHeader(http.StatusAccepted)
-		writeJSON(w, map[string]string{"status": "signed_up"})
+		writeJSONStatus(w, http.StatusAccepted, map[string]string{"status": "signed_up"})
 	}
 }
 
