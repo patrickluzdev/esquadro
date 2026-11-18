@@ -3,12 +3,14 @@
 package spa
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
+	"github.com/patrickluzdev/esquadro/blueprints/storage"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -28,6 +30,7 @@ func TemplateFuncs() template.FuncMap {
 		"titleOf":    TitleOf,
 		"lucide":     Lucide,
 		"filterable": Filterable,
+		"fileMeta":   FileMeta,
 		"rangeFilterable": func(e *project.Entity, name string) bool {
 			for _, f := range rest.APIFilters(e) {
 				if f.Param == name+"_min" {
@@ -51,7 +54,7 @@ func TemplateFuncs() template.FuncMap {
 }
 
 // Kind is how the frontend shows and edits a field: text, textarea, int,
-// decimal, money, bool, date, datetime, enum, uuid or json.
+// decimal, money, file, image, bool, date, datetime, enum, uuid or json.
 func Kind(f *project.Field) string {
 	switch f.Type {
 	case project.TypeString:
@@ -64,6 +67,10 @@ func Kind(f *project.Field) string {
 		return "decimal"
 	case project.TypeMoney:
 		return "money"
+	case project.TypeFile:
+		return "file"
+	case project.TypeImage:
+		return "image"
 	case project.TypeBool:
 		return "bool"
 	case project.TypeDate:
@@ -167,4 +174,21 @@ func DisplayOf(r *project.Relation) string {
 		}
 	}
 	return "id"
+}
+
+// FileMeta is what a frontend needs of a file field, as the rest of a
+// TypeScript literal: what to send it for (the entity's plural and the
+// field), the formats it takes and its largest size, from the storage
+// blueprint's rules. Empty for other fields.
+func FileMeta(e *project.Entity, f *project.Field, opts map[string]any) string {
+	if !f.IsFile() {
+		return ""
+	}
+	r := storage.RulesOf(f, opts)
+	accept := make([]string, len(r.Types))
+	for i, t := range r.Types {
+		accept[i] = strconv.Quote(t)
+	}
+	return fmt.Sprintf(", upload: { entity: %s, field: %s }, accept: [%s], maxSize: %d",
+		strconv.Quote(e.Plural.Snake), strconv.Quote(f.Snake), strings.Join(accept, ", "), r.Max)
 }

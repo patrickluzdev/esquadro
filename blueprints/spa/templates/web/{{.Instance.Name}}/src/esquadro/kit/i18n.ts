@@ -33,6 +33,10 @@ export function format(field: FieldMeta, value: unknown): string {
       return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(String(value) as unknown as number)
     case "money":
       return formatMoney(value)
+    case "file":
+    case "image":
+      // Its name (a CSV, a search).
+      return typeof value === "object" && value !== null && "name" in value ? String((value as { name: unknown }).name) : "—"
     case "date":
       return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(String(value)))
     case "datetime":

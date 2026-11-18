@@ -3,7 +3,7 @@
 
 /** How a field is shown and edited. */
 export type FieldKind =
-  | "text" | "textarea" | "int" | "decimal" | "money" | "bool" | "date" | "datetime"
+  | "text" | "textarea" | "int" | "decimal" | "money" | "file" | "image" | "bool" | "date" | "datetime"
   | "enum" | "uuid" | "json" | "relation"
 
 /** A field of a resource, from the model. */
@@ -20,6 +20,10 @@ export interface FieldMeta {
   display?: string
   /** What a new record starts with, as the model says. */
   default?: string | number | boolean | { amount: string }
+  /** A file field's: what to send it for, its formats and its largest size. */
+  upload?: { entity: string; field: string }
+  accept?: readonly string[]
+  maxSize?: number
   /** A number's bounds, as the model says: min(0). */
   min?: number
   max?: number

@@ -12,7 +12,7 @@ import (
 
 // CSP is the Content-Security-Policy of a frontend: its own files, images
 // from anywhere over HTTPS, the API on its own origin, and nothing else.
-const CSP = "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; " +
+const CSP = "default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; " +
 	"font-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'"
 
 // own are the app's paths, which a frontend on a domain of its own leaves

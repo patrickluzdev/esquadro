@@ -29,6 +29,15 @@ func PrincipalIn(ctx context.Context, realm string) (Principal, bool) {
 func (s *Security) Authenticate(realms []string, origins []string) edge.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+{{- if uses "storage"}}
+			// The storage's signed links carry their own authority (the
+			// file, the method, the type and an expiry, signed): no session
+			// is read, nor a CSRF token asked for.
+			if r.URL.Path == "/storage/blob" {
+				next.ServeHTTP(w, r)
+				return
+			}
+{{- end}}
 			ctx := r.Context()
 			principals := map[string]Principal{}
 			unsafe := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions

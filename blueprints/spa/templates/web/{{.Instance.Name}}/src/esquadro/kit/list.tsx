@@ -67,7 +67,7 @@ import { PageHeader } from "./page.tsx"
 import { SearchBox, SearchContext } from "./search.tsx"
 import { EmptyState, ErrorState, LoadingBar, NoResultsState, RefreshError, TableSkeleton } from "./states.tsx"
 import { cn } from "@/lib/utils"
-import { Picture } from "./picture.tsx"
+import { imageOf, Picture } from "./picture.tsx"
 import { columnField, columnOptions } from "./resource.ts"
 import type { Action, Resource } from "./resource.ts"
 import { FieldValue } from "./show.tsx"
@@ -338,7 +338,7 @@ export function ResourceList({
             // The column a record is called by carries its picture.
             return (
               <div className="flex items-center gap-3">
-                <Picture src={resource.image?.(row.original)} name={String(row.original[f.name] ?? "")} />
+                <Picture src={imageOf(resource, row.original)} name={String(row.original[f.name] ?? "")} />
                 {value}
               </div>
             )

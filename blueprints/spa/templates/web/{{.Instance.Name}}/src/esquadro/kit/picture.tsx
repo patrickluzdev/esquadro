@@ -2,6 +2,8 @@
 // without one (or while it fails to load), the first letters of its name.
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import type { Rec } from "./meta.ts"
+import type { Resource } from "./resource.ts"
 
 /** The first letters of what a record is called: "Webcam HD" is WH. */
 export function initials(text: string): string {
@@ -40,4 +42,16 @@ export function Picture({
       {initials(name)}
     </span>
   )
+}
+
+/**
+ * A record's picture: the resource's image, or else its first image
+ * field's file; none when it has neither.
+ */
+export function imageOf(resource: Resource, record: Rec): string | null | undefined {
+  const own = resource.image?.(record)
+  if (own) return own
+  const field = Object.values(resource.meta.fields).find((f) => f.kind === "image")
+  const file = field && (record[field.name] as { url?: string } | null | undefined)
+  return file?.url
 }

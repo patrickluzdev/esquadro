@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
+import { FileInput, isStoredFile } from "./files.tsx"
 import { MoneyInput } from "./money.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -81,6 +82,9 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
       return (
         <Input id={id} inputMode="decimal" value={str} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)} aria-invalid={invalid} />
       )
+    case "file":
+    case "image":
+      return <FileInput id={id} field={field} value={value} onChange={onChange} invalid={invalid} />
     case "money":
       return <MoneyInput id={id} value={value} onChange={onChange} invalid={invalid} negative={field.min === undefined || field.min < 0} />
     case "date":
@@ -206,7 +210,12 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
       if (Object.keys(missing).length > 0) throw new MissingFields(missing)
       // What is empty is left out: the API's default on a create, and empty
       // on a change (which replaces the record).
-      const filled = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null && v !== undefined && v !== ""))
+      // A file goes as its id.
+      const filled = Object.fromEntries(
+        Object.entries(values)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => [k, isStoredFile(v) ? v.id : v]),
+      )
       if (record) return meta.api(api as never).update(record.id, filled, { ifMatch: record })
       return meta.api(api as never).create(filled, { idempotencyKey })
     },

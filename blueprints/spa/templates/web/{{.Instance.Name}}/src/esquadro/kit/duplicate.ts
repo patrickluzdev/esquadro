@@ -9,7 +9,8 @@ import type { Rec, ResourceMeta } from "./meta.ts"
 export function copyOf(meta: ResourceMeta, record: Rec): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const f of Object.values(meta.fields)) {
-    if (f.readOnly || record[f.name] === null || record[f.name] === undefined) continue
+    // A file belongs to its record: a copy is sent its own.
+    if (f.readOnly || f.kind === "file" || f.kind === "image" || record[f.name] === null || record[f.name] === undefined) continue
     out[f.name] = record[f.name]
   }
   if (typeof out[meta.title] === "string") out[meta.title] = `${out[meta.title]} ${t("copySuffix")}`

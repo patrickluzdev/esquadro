@@ -14,7 +14,8 @@ import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { CopyButton } from "./copy.tsx"
-import { Picture } from "./picture.tsx"
+import { FileValue } from "./files.tsx"
+import { imageOf, Picture } from "./picture.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -31,6 +32,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
   const value = record[field.name]
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.show) return <>{own.show(value, record)}</>
+  if (field.kind === "file" || field.kind === "image") return <FileValue field={field} value={value} />
   if (field.kind === "enum" && value) return <Badge variant="secondary">{format(field, value)}</Badge>
   if (field.kind === "bool") return <Badge variant={value ? "default" : "outline"}>{format(field, value)}</Badge>
   if (field.kind === "relation" && value) {
@@ -177,7 +179,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
       <Card className={cn(relations.length === 0 && "max-w-3xl")}>
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-3 pt-2 text-center">
-            <Picture src={resource.image?.(r)} name={title} size="lg" />
+            <Picture src={imageOf(resource, r)} name={title} size="lg" />
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
               <p className="text-sm text-muted-foreground">{capitalize(meta.singular)}</p>

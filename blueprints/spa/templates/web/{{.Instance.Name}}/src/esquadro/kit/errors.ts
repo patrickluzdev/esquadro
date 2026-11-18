@@ -39,6 +39,8 @@ export function fieldMessage(field: FieldMeta, code: string): string {
       return t("fieldTooLarge")
     case "pattern":
       return t("fieldPattern")
+    case "invalid_type":
+      return t("fieldFileType")
     case "unique":
     case "taken":
     case "in_use":
