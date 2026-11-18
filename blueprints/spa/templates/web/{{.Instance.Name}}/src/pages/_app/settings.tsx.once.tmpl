@@ -1,28 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { KeyRound, Link2, Mail, MonitorSmartphone, Palette } from "lucide-react"
-import { DevicesCard, EmailCard, PasswordCard, ThemeCard } from "../../esquadro/kit/account.tsx"
-import { ConnectedAccountsCard, socialProviders } from "../../esquadro/kit/social.tsx"
 import { t } from "../../esquadro/kit/i18n.ts"
-import { PageHeader } from "../../esquadro/kit/page.tsx"
-import { Settings } from "../../esquadro/kit/settings.tsx"
+import { SettingsPage } from "../../esquadro/kit/pages/settings.tsx"
 
 // The settings of whoever signed in, all in one place: each section is in
-// the menu at the left; add your own (a profile, notifications) to the list.
-export const Route = createFileRoute("/_app/settings")({ staticData: { title: t("settings") }, component: SettingsPage })
-
-function SettingsPage() {
-  return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t("settings")} description={t("settingsHint")} />
-      <Settings
-        sections={[
-          { key: "password", label: t("password"), icon: KeyRound, content: <PasswordCard /> },
-          { key: "devices", label: t("devices"), icon: MonitorSmartphone, content: <DevicesCard /> },
-          ...(socialProviders.length > 0 ? [{ key: "connected", label: t("connectedAccounts"), icon: Link2, content: <ConnectedAccountsCard /> }] : []),
-          { key: "email", label: t("email"), icon: Mail, content: <EmailCard /> },
-          { key: "theme", label: t("theme"), icon: Palette, content: <ThemeCard /> },
-        ]}
-      />
-    </div>
-  )
-}
+// the menu at the left. The page comes from the kit, and esquadro keeps it
+// up to date; add your own sections (a profile, preferences) with
+// <SettingsPage sections={(own) => [...own, { key, label, icon, content }]} />.
+export const Route = createFileRoute("/_app/settings")({ staticData: { title: t("settings") }, component: () => <SettingsPage /> })

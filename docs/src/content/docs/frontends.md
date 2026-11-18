@@ -495,8 +495,26 @@ alone.
 | The kit: lists, forms, pages, sign-in | `src/esquadro/kit/` | generated |
 | Each resource's columns, form and actions | `src/resources/` | yours |
 | Pages of your own, and each resource's routes | `src/pages/` | yours: a file is a route |
-| Components, the menu, the theme, the words | `src/components/`, `src/menu.ts`, `src/theme.css`, `src/messages.ts` | yours |
+| Components and the theme | `src/components/`, `src/theme.css` | yours |
+| The menu: it starts from the model's entries (`src/esquadro/menu.gen.ts`, generated), to add, reorder or leave out | `src/menu.ts` | yours |
+| The words: only those you change, and your own; the rest are the kit's (`src/esquadro/kit/messages.ts`) | `src/messages.ts` | yours |
+| The sign-in and account pages: they show the kit's (`src/esquadro/kit/pages/`), or a page of yours | `src/pages/login.tsx`, `src/pages/_app/settings.tsx`... | yours |
 | How a field is shown or edited, by name or kind | `src/fields.ts` | yours |
+
+So that a new version of esquadro reaches a project, what is yours starts
+small: the words, the menu and the sign-in and account pages take the kit's,
+which esquadro keeps up to date, and say only what the project changes. A
+new word, menu entry or page section of a new version shows up without
+touching them; and what you did change in a file of yours gets esquadro's
+changes merged in (see [Regenerating safely](/esquadro/regenerating/)).
+
+```ts
+// src/messages.ts: change the kit's words, and add your own
+export const messages = {
+  en: { signIn: "Log in", promoQueue: "Offers queue" },
+  "pt-BR": { signIn: "Acessar", promoQueue: "Fila de ofertas" },
+} satisfies Record<string, Words>
+```
 
 ## Where it runs
 

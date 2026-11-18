@@ -1,29 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Button } from "@/components/ui/button"
-import { AuthFrame } from "@/components/auth-frame"
-import { signOut } from "../esquadro/kit/auth.tsx"
-import { t } from "../esquadro/kit/i18n.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { ForbiddenPage } from "../esquadro/kit/pages/forbidden.tsx"
 
 // Signed in, with no role this panel lets in: out, to sign in with another
 // account.
-export const Route = createFileRoute("/forbidden")({ component: Forbidden })
-
-function Forbidden() {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  return (
-    <AuthFrame tone="forbidden" title={t("noAccess")} hint={t("forbiddenPage")}>
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={async () => {
-          await signOut(queryClient)
-          navigate({ to: "/login", search: { redirect: undefined } })
-        }}
-      >
-        {t("signInAnother")}
-      </Button>
-    </AuthFrame>
-  )
-}
+// The page comes from the kit, and esquadro keeps it up to date; to make
+// it yours, put your own component here.
+export const Route = createFileRoute("/forbidden")({ component: ForbiddenPage })

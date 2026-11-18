@@ -46,7 +46,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 		"src/esquadro/config.ts":            `export const roles: readonly string[] = ["admin", "staff"]`,
 		"src/resources/products.tsx":        "f.created_at],",
 		"src/pages/_app/products/index.tsx": `createFileRoute("/_app/products/")`,
-		"src/menu.ts":                       "icons.Package",
+		"src/esquadro/menu.gen.ts":          "icons.Package",
 		"src/esquadro/dashboard.gen.ts":     `kind: "stat"`,
 		"src/components/site-header.tsx":    "<CommandPalette />",
 		"src/resources/categories.tsx":      `relation(products, "category_id")`,

@@ -1,37 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { AuthFrame } from "@/components/auth-frame"
-import { account } from "../esquadro/kit/account.tsx"
-import { describe } from "../esquadro/kit/errors.ts"
-import { t } from "../esquadro/kit/i18n.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { ConfirmEmailPage, confirmEmailSearch } from "../esquadro/kit/pages/confirm-email.tsx"
 
 // The page the email change's link opens, with its ?token.
-export const Route = createFileRoute("/confirm-email")({
-  validateSearch: (s: Record<string, unknown>) => ({ token: typeof s.token === "string" ? s.token : "" }),
-  component: Confirm,
-})
-
-function Confirm() {
-  const { token } = Route.useSearch()
-  const confirm = useQuery({ queryKey: ["confirm-email", token], queryFn: () => account().confirmEmail(token).then(() => true), retry: false })
-  if (confirm.isPending) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-card">
-        <Spinner className="size-6" />
-      </div>
-    )
-  }
-  return (
-    <AuthFrame
-      tone={confirm.isError ? "error" : "success"}
-      title={confirm.isError ? t("emailNotConfirmed") : t("emailConfirmed")}
-      hint={confirm.isError ? describe(confirm.error) : t("emailConfirmedHint")}
-    >
-      <Button asChild size="lg" className="w-full">
-        <Link to="/">{t("goHome")}</Link>
-      </Button>
-    </AuthFrame>
-  )
-}
+// The page comes from the kit, and esquadro keeps it up to date; to make
+// it yours, put your own component here.
+export const Route = createFileRoute("/confirm-email")({ validateSearch: confirmEmailSearch, component: ConfirmEmailPage })

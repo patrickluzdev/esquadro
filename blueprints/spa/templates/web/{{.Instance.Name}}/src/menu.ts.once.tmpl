@@ -1,95 +1,16 @@
-// The menu of the {{.Instance.Name}} frontend: yours to change. Add your own
-// pages, reorder, group (a group opens and closes), or leave resources out.
-import * as icons from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { t } from "./esquadro/kit/i18n.ts"
-import { accountRealms, auditAdmins, serviceKeyAdmins } from "./esquadro/accounts.gen.ts"
-import { dashboards } from "./esquadro/dashboard.gen.ts"
-import { administers, allowedBy } from "./esquadro/kit/accounts-admin.tsx"
-import { resources } from "./esquadro/resources.gen.ts"
+// The menu of the {{.Instance.Name}} frontend: yours to change. It starts
+// from the entries the model makes (src/esquadro/menu.gen.ts: resources,
+// dashboards, administration), which esquadro keeps up to date: a resource
+// added to the model shows up here. Add your own pages, reorder, group (a
+// group opens and closes) or leave some out:
+//
+//   main: [...generated.main.filter((e) => !("to" in e) || e.to !== "/tags"), { to: "/queue", label: "Queue" }],
+import { generated, type Menu } from "./esquadro/menu.gen.ts"
 
-/** Who signed in, for the entries some may not see. */
-export interface MenuSession {
-  realm: string
-  roles: string[]
-}
-
-export interface MenuItem {
-  to: string
-  label: string
-  icon?: LucideIcon
-  /** Shown only to those this answers true for. */
-  show?: (session: MenuSession | null) => boolean
-}
-
-export interface MenuGroup {
-  label: string
-  icon?: LucideIcon
-  items: MenuItem[]
-  show?: (session: MenuSession | null) => boolean
-}
-
-export interface Menu {
-  /** The main entries: pages, and groups of them. */
-  main: (MenuItem | MenuGroup)[]
-  /** Smaller entries at the bottom of the sidebar: help, settings. */
-  secondary: MenuItem[]
-}
-
-// The first page, and the dashboards the reports name (a group of them,
-// once there are some): new ones show up as the model names them.
-const home: MenuItem | MenuGroup = dashboards.length
-  ? {
-      label: t("dashboards"),
-      icon: icons.LayoutDashboard,
-      items: [{ to: "/", label: t("home") }, ...dashboards.map((d) => ({ to: `/dashboards/${d.slug}`, label: d.name }))],
-    }
-  : { to: "/", label: t("home"), icon: icons.House }
+export { isGroup } from "./esquadro/menu.gen.ts"
+export type { Menu, MenuGroup, MenuItem, MenuSession } from "./esquadro/menu.gen.ts"
 
 export const menu: Menu = {
-  main: [
-    home,
-{{- range $i, $e := .Entities}}{{$a := ann $e}}{{if index $a "resource"}}
-{{- $g := printf "%v" (index $a "group")}}
-{{- if eq $g "<nil>"}}
-    { to: "/{{$e.Plural.Kebab}}", label: resources.{{$e.Plural.Camel}}.menu, icon: icons.{{index $a "icon" | lucide}} },
-{{- else}}
-{{- $first := true}}{{range $j, $o := $.Entities}}{{if lt $j $i}}{{$oa := ann $o}}{{if and (index $oa "resource") (eq (printf "%v" (index $oa "group")) $g)}}{{$first = false}}{{end}}{{end}}{{end}}
-{{- if $first}}
-    {
-      label: {{printf "%q" $g}},
-      icon: icons.{{index $a "icon" | lucide}},
-      items: [
-{{- range $o := $.Entities}}{{$oa := ann $o}}{{if and (index $oa "resource") (eq (printf "%v" (index $oa "group")) $g)}}
-        { to: "/{{$o.Plural.Kebab}}", label: resources.{{$o.Plural.Camel}}.menu, icon: icons.{{index $oa "icon" | lucide}} },
-{{- end}}{{end}}
-      ],
-    },
-{{- end}}
-{{- end}}
-{{- end}}{{end}}
-{{- /* The accounts of the realms this frontend administers, to those who may. */}}
-    ...(accountRealms.length || serviceKeyAdmins || auditAdmins
-      ? [
-          {
-            label: t("administration"),
-            icon: icons.ShieldCheck,
-            show: (s: MenuSession | null) =>
-              accountRealms.some((r) => administers(s, r)) || allowedBy(s, serviceKeyAdmins ?? []) || allowedBy(s, auditAdmins ?? []),
-            items: [
-              ...accountRealms.map((r) => ({ to: `/accounts/${r.slug}`, label: r.label, icon: icons.Users, show: (s: MenuSession | null) => administers(s, r) })),
-              ...(serviceKeyAdmins
-                ? [{ to: "/service-keys", label: t("serviceKeys"), icon: icons.KeyRound, show: (s: MenuSession | null) => allowedBy(s, serviceKeyAdmins ?? []) }]
-                : []),
-              ...(auditAdmins ? [{ to: "/audit", label: t("audit"), icon: icons.History, show: (s: MenuSession | null) => allowedBy(s, auditAdmins ?? []) }] : []),
-            ],
-          },
-        ]
-      : []),
-  ],
-  secondary: [],
-}
-
-export function isGroup(entry: MenuItem | MenuGroup): entry is MenuGroup {
-  return "items" in entry
+  main: [...generated.main],
+  secondary: [...generated.secondary],
 }
