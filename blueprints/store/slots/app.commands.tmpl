@@ -1,0 +1,4 @@
+{{- if trashModules .Modules}}
+	case "purge":
+		return purgeCommand(ctx, os.Args[2:])
+{{- end}}

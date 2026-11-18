@@ -117,6 +117,11 @@ func TemplateFuncs() template.FuncMap {
 		"mustRefuseEmpty": mustRefuseEmpty,
 		"initialisms":     project.Initialisms,
 		"link":            link,
+		"softDeleted":     SoftDeleted,
+		"dependents":      Dependents,
+		"trashedParents":  TrashedParents,
+		"onDelete":        OnDelete,
+		"trashModules":    TrashModules,
 		"links":           links,
 		"manyToMany":      func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}

@@ -97,3 +97,23 @@ func {{$e.Camel}}Refusal(err error) error {
 {{- end}}
 	return err
 }
+{{- with trashedParents $e}}
+
+// {{$e.Camel}}Parents refuses a {{lower $e.Label}} that points at a record in the
+// trash, as one that points at none.
+func {{$e.Camel}}Parents(ctx context.Context, db sqlgen.DBTX, n New{{$e.Pascal}}) error {
+	q := sqlgen.New(db)
+{{- range .}}
+	if parent := postgres.UUID(n.{{.Pascal}}ID); parent.Valid {
+		live, err := q.Live{{.Target.Pascal}}(ctx, parent)
+		if err != nil {
+			return err
+		}
+		if !live {
+			return &InvalidFields{Fields: []FieldError{ {Field: {{quote .Snake}}, Code: "not_found"} }}
+		}
+	}
+{{- end}}
+	return nil
+}
+{{- end}}

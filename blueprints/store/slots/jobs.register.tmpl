@@ -1,0 +1,5 @@
+{{- if index (optionsOf "store") "purge_days"}}
+{{- range trashModules .Modules}}
+	d.{{.Camel}}.RegisterTrashJobs(registry)
+{{- end}}
+{{- end}}

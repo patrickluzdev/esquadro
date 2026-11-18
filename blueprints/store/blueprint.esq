@@ -6,7 +6,7 @@
 blueprint store {
   version "0.1.0"
   requires domain, postgres, migrations
-  optional testcontainers
+  optional testcontainers, jobs
 
   hook post-gen "sqlc" writes "internal/*/sqlgen/**"
 
@@ -15,6 +15,15 @@ blueprint store {
   /// decides how words are reduced to their root.
   option search_language name default(simple)
 
+  /// How many days a record stays in the trash before it is deleted for
+  /// good (entities with @store(soft_delete)); 0 keeps it there.
+  option purge_days int default(30)
+
+  annotation entity {
+    /// Deleting a record puts it in the trash (deleted_at), from which it
+    /// may be restored or deleted for good; reads and lists leave it out.
+    soft_delete bool
+  }
   annotation field {
     /// Lists may filter by it: by value, by range (numbers and dates), or
     /// by a list of values (enums).

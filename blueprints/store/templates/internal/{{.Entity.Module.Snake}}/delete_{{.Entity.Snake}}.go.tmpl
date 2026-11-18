@@ -1,5 +1,18 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
 package {{$m.Snake}}
+{{if softDeleted $e}}
+{{importBlock "context" "time" "uuid" (printf "%s/internal/platform/postgres" .App.Module)}}
+// Delete{{$e.Pascal}} puts the {{lower $e.Label}} with the given id in the trash, and
+// with it the records that go with it (their relation cascades); unless
+// other records still point at it. Restore{{$e.Pascal}} takes it out. With a
+// version (not 0), only that version: Err{{$e.Pascal}}Changed when someone
+// changed it since.
+func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
+	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		return trash{{$e.Pascal}}(ctx, postgres.Querier(ctx, {{$r}}.Pool), id, version, time.Now())
+	})
+}
+{{- else}}
 
 {{importBlock "context" (and $files "errors") "uuid" (and $files "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Delete{{$e.Pascal}} deletes the {{lower $e.Label}} with the given id, unless
@@ -44,4 +57,5 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	}
 	return nil
 }
+{{- end}}
 {{- end}}

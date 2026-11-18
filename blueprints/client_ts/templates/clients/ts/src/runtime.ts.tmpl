@@ -147,6 +147,18 @@ export class Transport {
 }
 
 /** A page of a list, with what the person may do with the list. */
+/** The trash of an entity's records. */
+export interface Trash<T> {
+  /** A page of it, the last deleted first, each with deleted_at. */
+  list(query?: { page?: number; per_page?: number }): Promise<Page<T & { deleted_at: string }>>
+  /** Takes one out, with the records that went in with it. */
+  restore(id: string): Promise<T>
+  /** Deletes one in it for good. */
+  purge(id: string): Promise<void>
+  /** Deletes for good what it holds, but what others still point at. */
+  empty(): Promise<{ purged: number }>
+}
+
 export interface Page<T> {
   items: T[]
   can: "create"[]
@@ -172,7 +184,7 @@ export interface ChangeOptions {
 
 // The operations of an entity's records, untyped: each entity's interface
 // types them.
-export function records(t: Transport, path: string, pagination: readonly string[]): unknown {
+export function records(t: Transport, path: string, pagination: readonly string[], trash = false): unknown {
   const one = (id: string) => `${path}/${encodeURIComponent(id)}`
   const list = (query: Query = {}) => t.request<Page<unknown>>("GET", path, { query })
   return {
@@ -205,6 +217,16 @@ export function records(t: Transport, path: string, pagination: readonly string[
     delete: async (id: string, o: ChangeOptions = {}) => {
       await t.request("DELETE", one(id), { ifMatch: o.ifMatch })
     },
+    ...(trash && {
+      trash: {
+        list: (query: Query = {}) => t.request("GET", `${path}/trash`, { query }),
+        restore: (id: string) => t.request("POST", `${one(id)}/restore`, {}),
+        purge: async (id: string) => {
+          await t.request("DELETE", `${path}/trash/${encodeURIComponent(id)}`, {})
+        },
+        empty: () => t.request("DELETE", `${path}/trash`, {}),
+      },
+    }),
   }
 }
 

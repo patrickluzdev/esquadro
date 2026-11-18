@@ -11,6 +11,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
 	}
+{{- if trashedParents $e}}
+	if err := {{$e.Camel}}Parents(ctx, postgres.Querier(ctx, {{$r}}.Pool), n); err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+{{- end}}
 {{- if $files}}
 	// The record and its files, together: the files it had, then the new.
 	var updated {{$e.Pascal}}

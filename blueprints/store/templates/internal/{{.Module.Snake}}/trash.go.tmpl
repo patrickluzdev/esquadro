@@ -1,0 +1,63 @@
+{{- $m := .Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$soft := false}}{{range $m.Entities}}{{if softDeleted .}}{{$soft = true}}{{end}}{{end -}}
+{{- $days := index (optionsOf "store") "purge_days" -}}
+{{- if $soft -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "time" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module) (and (uses "jobs") $days (printf "%s/internal/platform/jobs" .App.Module))}}
+// TrashDays is how many days a record stays in the trash before the
+// purge deletes it for good; 0 keeps it there.
+const TrashDays = {{$days}}
+
+// PurgeTrash deletes for good the records of the module in the trash since
+// before the time given, how many it deleted: a record goes once the ones
+// that point at it went, and those still pointed at stay.
+func ({{$r}} *{{$m.Pascal}}) PurgeTrash(ctx context.Context, before time.Time) (int, error) {
+	total := 0
+	for {
+		purged := 0
+{{- range $m.Entities}}{{if softDeleted .}}
+		if n, err := {{$r}}.PurgeDeleted{{.Plural.Pascal}}(ctx, before); err != nil {
+			return total + purged + n, err
+		} else {
+			purged += n
+		}
+{{- end}}{{end}}
+		total += purged
+		if purged == 0 {
+			return total, nil
+		}
+	}
+}
+
+// TrashedBefore is how many records of the module PurgeTrash would look at:
+// those in the trash since before the time given.
+func ({{$r}} *{{$m.Pascal}}) TrashedBefore(ctx context.Context, before time.Time) (int64, error) {
+	q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+	var total int64
+{{- range $m.Entities}}{{if softDeleted .}}
+	if n, err := q.CountDeletedBefore{{.Plural.Pascal}}(ctx, postgres.Timestamptz(before)); err != nil {
+		return 0, err
+	} else {
+		total += n
+	}
+{{- end}}{{end}}
+	return total, nil
+}
+{{- if and (uses "jobs") $days}}
+
+// purgeTrashArgs empties, every day, what has been in the trash for
+// TrashDays.
+type purgeTrashArgs struct{}
+
+func (purgeTrashArgs) Kind() string { return "{{$m.Snake}}_purge_trash" }
+
+// RegisterTrashJobs registers the daily purge of the trash.
+func ({{$r}} *{{$m.Pascal}}) RegisterTrashJobs(r *jobs.Registry) {
+	jobs.Add(r, func(ctx context.Context, _ purgeTrashArgs) error {
+		_, err := {{$r}}.PurgeTrash(ctx, time.Now().AddDate(0, 0, -TrashDays))
+		return err
+	})
+	jobs.Every(r, "0 3 * * *", purgeTrashArgs{})
+}
+{{- end}}
+{{- end}}

@@ -105,6 +105,7 @@ func TemplateFuncs() template.FuncMap {
 		"apiSample":        apiSample,
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
+		"softDeleted":      store.SoftDeleted,
 		"links": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {

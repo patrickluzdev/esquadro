@@ -262,7 +262,7 @@ func alterTable(s *steps, from, to table) {
 	for _, ix := range to.indexes {
 		prev := findIndex(from, ix.name)
 		dropped := slices.ContainsFunc(ix.columns, func(c string) bool { return regenerated[c] })
-		if prev != nil && slices.Equal(prev.columns, ix.columns) && prev.unique == ix.unique && prev.method == ix.method && !dropped {
+		if prev != nil && slices.Equal(prev.columns, ix.columns) && prev.unique == ix.unique && prev.method == ix.method && prev.where == ix.where && !dropped {
 			continue
 		}
 		if prev != nil && !dropped {
@@ -358,7 +358,11 @@ func createIndex(t table, ix index) string {
 	if ix.method != "" {
 		using = " USING " + ix.method
 	}
-	return fmt.Sprintf("CREATE %s %s ON %s%s (%s);", kind, ix.name, t.qualified(), using, idents(ix.columns))
+	where := ""
+	if ix.where != "" {
+		where = " WHERE " + ix.where
+	}
+	return fmt.Sprintf("CREATE %s %s ON %s%s (%s)%s;", kind, ix.name, t.qualified(), using, idents(ix.columns), where)
 }
 
 func findEnum(db database, key string) *enumType {

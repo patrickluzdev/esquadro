@@ -304,6 +304,134 @@ func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params
 	}
 	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}}), version))
 }
+{{- if softDeleted $e}}{{$own := ownerColumn $.Entities $e}}
+
+func (h HTTP) Restore{{$P}}(ctx context.Context, params apigen.Restore{{$P}}Params) (*apigen.{{$P}}, error) {
+{{- if $pol}}
+	if err := h.deleted{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return nil, problemOf(err)
+	}
+{{- end}}
+	restored, err := h.{{$p}}.Restore{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	edge.SetETag(ctx, restored.Version)
+	answer := {{.Camel}}Answer(ctx, restored)
+	return &answer, nil
+}
+
+func (h HTTP) Purge{{$P}}(ctx context.Context, params apigen.Purge{{$P}}Params) error {
+{{- if $pol}}
+	if err := h.deleted{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+		return problemOf(err)
+	}
+{{- end}}
+	return problemOf(h.{{$p}}.Purge{{$P}}(ctx, uuid.UUID(params.{{$id}})))
+}
+
+func (h HTTP) ListDeleted{{.Plural.Pascal}}(ctx context.Context, params apigen.ListDeleted{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
+	page, perPage := params.Page.Or(1), params.PerPage.Or(25)
+{{- if $pol}}
+	{{if $own}}owner{{else}}_{{end}}, err := h.trashOf{{.Plural.Pascal}}(ctx)
+	if err != nil {
+		return nil, err
+	}
+{{- end}}
+	trash, err := h.{{$p}}.ListDeleted{{.Plural.Pascal}}(ctx, page, perPage{{if $own}}, owner{{end}})
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	answer := apigen.{{$P}}Page{Items: make([]apigen.{{$P}}, 0, len(trash.{{.Plural.Pascal}})), Can: []apigen.{{$P}}PageCanItem{}}
+	for _, d := range trash.{{.Plural.Pascal}} {
+{{- if $pol}}
+		if !({{$P}}Policy{}).Delete(ctx, d.{{$P}}) {
+			continue
+		}
+{{- end}}
+		item := {{.Camel}}Answer(ctx, d.{{$P}})
+		item.DeletedAt = apigen.NewOptDateTime(d.DeletedAt)
+		answer.Items = append(answer.Items, item)
+	}
+	answer.Page, answer.PerPage = apigen.NewOptInt(page), apigen.NewOptInt(perPage)
+	answer.Total = apigen.NewOptInt64(trash.Total)
+	answer.TotalPages = apigen.NewOptInt(int((trash.Total + int64(perPage) - 1) / int64(perPage)))
+	return &answer, nil
+}
+
+func (h HTTP) EmptyTrashOf{{.Plural.Pascal}}(ctx context.Context) (*apigen.Purged, error) {
+{{- if $pol}}
+	{{if $own}}owner{{else}}_{{end}}, err := h.trashOf{{.Plural.Pascal}}(ctx)
+	if err != nil {
+		return nil, err
+	}
+{{- end}}
+	// A page at a time; one where nothing could go (others point at it, or
+	// the request may not delete it) is passed by.
+	purged := 0
+	for page := 1; ; {
+		trash, err := h.{{$p}}.ListDeleted{{.Plural.Pascal}}(ctx, page, Max{{$P}}Page{{if $own}}, owner{{end}})
+		if err != nil {
+			return nil, problemOf(err)
+		}
+		if len(trash.{{.Plural.Pascal}}) == 0 {
+			return &apigen.Purged{Purged: purged}, nil
+		}
+		gone := 0
+		for _, d := range trash.{{.Plural.Pascal}} {
+{{- if $pol}}
+			if !({{$P}}Policy{}).Delete(ctx, d.{{$P}}) {
+				continue
+			}
+{{- end}}
+			switch err := h.{{$p}}.Purge{{$P}}(ctx, d.ID); {
+			case errors.Is(err, Err{{$P}}InUse), errors.Is(err, Err{{$P}}NotFound):
+			case err != nil:
+				return nil, problemOf(err)
+			default:
+				gone++
+			}
+		}
+		purged += gone
+		if gone == 0 {
+			page++
+		}
+	}
+}
+{{- if $pol}}
+
+// deleted{{$P}} checks that the {{lower .Label}} id is in the trash and that the
+// request of ctx may delete it; else, as if it were not there{{if not (publicRead $.Entities $e)}}, and
+// unauthorized to a request no one signed in to{{end}}.
+func (h HTTP) deleted{{$P}}(ctx context.Context, id uuid.UUID) error {
+	found, err := h.{{$p}}.ReadDeleted{{$P}}(ctx, id)
+	if err == nil && !({{$P}}Policy{}).Delete(ctx, found.{{$P}}) {
+		err = Err{{$P}}NotFound
+	}
+{{- if not (publicRead $.Entities $e)}}
+	if errors.Is(err, Err{{$P}}NotFound) && security.Anonymous(ctx) {
+		return security.ErrUnauthorized
+	}
+{{- end}}
+	return err
+}
+
+// trashOf{{.Plural.Pascal}} is whose trash of {{.Plural.Snake}} the request of ctx sees:
+// all of it{{if $own}} (the nil UUID), or its owner's{{end}}; refused when it may list none.
+func (h HTTP) trashOf{{.Plural.Pascal}}(ctx context.Context) (uuid.UUID, error) {
+	scope := {{$P}}Policy{}.List(ctx)
+{{- if $own}}
+	if owner, owned := scope.Owner(); owned {
+		return owner, nil
+	}
+{{- end}}
+	if !scope.All() {
+		return uuid.Nil(), security.Refusal(ctx)
+	}
+	return uuid.Nil(), nil
+}
+{{- end}}
+{{- end}}
 {{- if $pol}}
 
 // readable{{$P}} is the {{lower .Label}} id, when the request of ctx may read it;

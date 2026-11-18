@@ -1,0 +1,60 @@
+{{- $soft := trashModules .Modules -}}
+{{- if $soft -}}
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"time"
+)
+
+const purgeUsage = `usage: {{.App.Kebab}} purge [options]
+
+Deletes for good what has been in the trash for --days days (the records
+of entities with @store(soft_delete)); those other records still point at
+stay.
+
+  --days N    how long in the trash, in days ({{index (optionsOf "store") "purge_days"}} by default; 0 empties it)
+  --dry-run   only tell how many records are that old`
+
+// purgeCommand runs {{.App.Kebab}} purge.
+func purgeCommand(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("purge", flag.ContinueOnError)
+	flags.Usage = func() { fmt.Fprintln(os.Stderr, purgeUsage) }
+	days := flags.Int("days", {{index (optionsOf "store") "purge_days"}}, "")
+	dryRun := flags.Bool("dry-run", false, "")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	before := time.Now().AddDate(0, 0, -*days)
+	d, release, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if *dryRun {
+		var total int64
+{{- range $soft}}
+		if n, err := d.{{.Camel}}.TrashedBefore(ctx, before); err != nil {
+			return err
+		} else {
+			total += n
+		}
+{{- end}}
+		fmt.Printf("%d records in the trash since before %s\n", total, before.Format(time.DateOnly))
+		return nil
+	}
+	total := 0
+{{- range $soft}}
+	if n, err := d.{{.Camel}}.PurgeTrash(ctx, before); err != nil {
+		return err
+	} else {
+		total += n
+	}
+{{- end}}
+	fmt.Printf("%d records deleted for good\n", total)
+	return nil
+}
+{{- end}}

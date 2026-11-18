@@ -16,13 +16,14 @@ blueprint store
 ## Works with
 
 - **Requires** [domain](../domain/), [postgres](../postgres/), [migrations](../migrations/): the app must use them too.
-- **Works with** [testcontainers](../testcontainers/) when the app uses them.
+- **Works with** [testcontainers](../testcontainers/), [jobs](../jobs/) when the app uses them.
 
 ## Options
 
 | Option | Type | Default | |
 |---|---|---|---|
 | `search_language` | name | `"simple"` | The language of the search column, as PostgreSQL's text search names it: simple (words as written), portuguese, english, spanish...; it decides how words are reduced to their root. |
+| `purge_days` | int | `30` | How many days a record stays in the trash before it is deleted for good (entities with @store(soft_delete)); 0 keeps it there. |
 
 ```esquadro
 blueprint store {
@@ -34,6 +35,7 @@ blueprint store {
 
 | Where | Key | Type | |
 |---|---|---|---|
+| entity | `soft_delete` | bool | Deleting a record puts it in the trash (deleted_at), from which it may be restored or deleted for good; reads and lists leave it out. |
 | field | `filter` | bool | Lists may filter by it: by value, by range (numbers and dates), or by a list of values (enums). |
 | field | `sort` | bool | Lists may be ordered by it; only a required field, so that pages keep every record. |
 | field | `search` | bool | Lists may search its text (q). |

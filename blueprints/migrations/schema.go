@@ -86,6 +86,8 @@ type index struct {
 	unique  bool
 	// method is the index's access method: "" (btree) or gin.
 	method string
+	// where makes it partial: the rows it covers, or "" for all.
+	where string
 }
 
 var sqlTypes = map[project.Type]string{
@@ -312,7 +314,9 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 			t.indexes = append(t.indexes, index{name: t.name + "_" + c.name + "_idx", columns: []string{c.name}})
 		}
 	}
+	related := len(t.indexes)
 	listIndexes(l, e, &t)
+	listed := len(t.indexes)
 	for _, key := range []string{"index", "unique_index"} {
 		names, _ := e.Ann["postgres"][key].([]any)
 		if len(names) == 0 {
@@ -339,7 +343,51 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 			name: t.name + "_" + strings.Join(cols, "_") + suffix, columns: cols, unique: key == "unique_index",
 		})
 	}
+	if SoftDeleted(e) {
+		trash(&t, related, listed)
+	}
 	return t
+}
+
+// Live are the rows of a table with soft delete that are not in the trash.
+const Live = "deleted_at IS NULL"
+
+// SoftDeleted reports whether deleting a record of the entity puts it in
+// the trash (@store(soft_delete)) instead of removing it.
+func SoftDeleted(e project.EntityDescription) bool {
+	on, _ := e.Ann["store"]["soft_delete"].(bool)
+	return on
+}
+
+// trash gives a table its trash: deleted_at, and uniqueness and the
+// indexes of the lists only among the records not in it (a value of one in
+// the trash may be taken again). The unique constraints become partial
+// unique indexes of the same name, which the store reads the same way.
+func trash(t *table, related, listed int) {
+	at := len(t.columns)
+	for i, c := range t.columns {
+		if c.name == "created_at" {
+			at = i
+			break
+		}
+	}
+	t.columns = slices.Insert(t.columns, at, column{name: "deleted_at", sqlType: "timestamptz"})
+	// The lists' indexes, and the unique ones declared; the relations'
+	// stay whole (a delete checks them all), and so do the other ones
+	// declared, which serve queries of their own.
+	for i := range t.indexes {
+		if (i >= related && i < listed) || (i >= listed && t.indexes[i].unique) {
+			t.indexes[i].where = Live
+		}
+	}
+	for i := range t.columns {
+		c := &t.columns[i]
+		if !c.unique {
+			continue
+		}
+		c.unique = false
+		t.indexes = append(t.indexes, index{name: uniqueName(*t, *c), columns: []string{c.name}, unique: true, where: Live})
+	}
 }
 
 // SearchColumn is the column lists search: the text of the fields marked

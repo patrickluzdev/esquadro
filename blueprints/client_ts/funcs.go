@@ -11,6 +11,7 @@ import (
 
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -58,10 +59,11 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return tsType(f)
 		},
-		"tsFilter":  tsFilter,
-		"tsString":  strconv.Quote,
-		"tsPattern": tsPattern,
-		"enumName":  func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
+		"tsFilter":    tsFilter,
+		"tsString":    strconv.Quote,
+		"tsPattern":   tsPattern,
+		"enumName":    func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
+		"softDeleted": store.SoftDeleted,
 		"manyToMany": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {

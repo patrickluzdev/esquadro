@@ -260,9 +260,92 @@ paths:
         - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
-          description: Deleted.
+          description: {{if softDeleted $e}}In the trash.{{else}}Deleted.{{end}}
         default:
           $ref: "#/components/responses/Problem"
+{{- if softDeleted $e}}
+  /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/restore:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: restore{{.Pascal}}
+      summary: {{quote (printf "Restore a %s from the trash" (lower .Label))}}
+      description: |
+        Takes it out of the trash, with the records that went in with it.
+        Codes: `not_found` (404) when it is not in the trash; `invalid_fields`
+        (422): `in_trash` when a record it points at is in the trash too,
+        `taken` when a unique value of it was taken meanwhile.
+        Who may delete it may restore it.
+      tags: [{{.Module.Snake}}]
+      responses:
+        "200":
+          description: {{quote (printf "The restored %s." (lower .Label))}}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{.Pascal}}"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/{{.Plural.Kebab}}/trash:
+    get:
+      operationId: listDeleted{{.Plural.Pascal}}
+      summary: {{quote (printf "List the trash of %s" (lower .Plural.Label))}}
+      description: |
+        The {{lower .Plural.Label}} in the trash, the last deleted first, each with
+        `deleted_at`: by page, `page` from 1 and `per_page` (25 by default, at
+        most 100).{{with index (optionsOf "store") "purge_days"}} After {{.}} days there, they are deleted for good.{{end}}
+        Who may delete them sees them.
+      tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: {{quote (printf "A page of the trash of %s." (lower .Plural.Label))}}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{.Pascal}}Page"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: emptyTrashOf{{.Plural.Pascal}}
+      summary: {{quote (printf "Empty the trash of %s" (lower .Plural.Label))}}
+      description: |
+        Deletes for good the {{lower .Plural.Label}} in the trash the request may
+        delete, but those other records still point at.
+      tags: [{{.Module.Snake}}]
+      responses:
+        "200":
+          description: How many were deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Purged"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/{{.Plural.Kebab}}/trash/{{"{"}}{{$id}}{{"}"}}:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    delete:
+      operationId: purge{{.Pascal}}
+      summary: {{quote (printf "Delete a %s for good" (lower .Label))}}
+      description: |
+        Only one in the trash. Codes: `not_found` (404) when it is not in the
+        trash; `in_use` (409) while other records point at it.
+      tags: [{{.Module.Snake}}]
+      responses:
+        "204":
+          description: Deleted for good.
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
 {{- range links $e}}{{$rel := .}}{{$other := linkParam .}}
   /api/v1/{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}:
     parameters:
@@ -429,6 +512,14 @@ components:
 {{.}}
 {{- end}}
   schemas:
+{{- $soft := false}}{{range .Entities}}{{if softDeleted .}}{{$soft = true}}{{end}}{{end}}
+{{- if $soft}}
+    Purged:
+      type: object
+      required: [purged]
+      properties:
+        purged: {type: integer, description: How many were deleted for good.}
+{{- end}}
     Problem:
       type: object
       description: Problem Details (RFC 9457).
@@ -504,6 +595,9 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         version: {type: integer, description: "Goes up with each change: the ETag, and what If-Match sends back."}
+{{- if softDeleted $e}}
+        deleted_at: {type: string, format: date-time, description: In the trash, since when.}
+{{- end}}
 {{- range includable $e}}
 {{- if eq .Kind.String "many-to-many"}}
         {{.Snake}}:

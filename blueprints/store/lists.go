@@ -181,6 +181,9 @@ func listImports(entities []*project.Entity, e *project.Entity, opts map[string]
 // the search, NULL when not asked.
 func ListWhere(entities []*project.Entity, e *project.Entity, opts map[string]any, lang string) string {
 	var conds []string
+	if SoftDeleted(e) {
+		conds = append(conds, "deleted_at IS NULL")
+	}
 	if col := ownerColumnOf(entities, e); col != "" {
 		conds = append(conds, "(sqlc.narg(owner_id)::uuid IS NULL OR "+col+" = sqlc.narg(owner_id)::uuid)")
 	}

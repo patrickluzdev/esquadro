@@ -9,6 +9,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
 	}
+{{- if trashedParents $e}}
+	if err := {{$e.Camel}}Parents(ctx, postgres.Querier(ctx, {{$r}}.Pool), n); err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+{{- end}}
 {{- if $files}}
 	// The record and its files, together.
 	var created {{$e.Pascal}}

@@ -1,0 +1,222 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$own := ownerColumn .Entities $e -}}
+{{- if softDeleted $e -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "errors" "time" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// trash{{$e.Pascal}} puts the {{lower $e.Label}} id in the trash at the time at, in
+// the transaction of db: first the records that go with it (a relation
+// that cascades, to an entity with a trash), refusing when records that
+// may not lose it still point at it.
+func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, version int, at time.Time) error {
+	q := sqlgen.New(db)
+{{- range dependents $e}}
+{{- if and (eq .Action "cascade") .Soft}}
+	// The {{lower .Relation.Entity.Plural.Snake}} of its {{.Relation.Snake}} go with it.
+	{
+		children, err := q.Live{{.Name}}(ctx, postgres.UUID(id))
+		if err != nil {
+			return err
+		}
+		for _, child := range children {
+			if err := trash{{.Relation.Entity.Pascal}}(ctx, db, postgres.ID(child), 0, at); err != nil {
+				return err
+			}
+		}
+	}
+{{- else if ne .Action "set_null"}}
+	// Not while {{lower .Relation.Entity.Plural.Snake}}{{if .Soft}} not in the trash{{end}} point at it ({{.Relation.Snake}}).
+	if in, err := q.Has{{.Name}}(ctx, postgres.UUID(id)); err != nil {
+		return err
+	} else if in {
+		return Err{{$e.Pascal}}InUse
+	}
+{{- end}}
+{{- end}}
+	trashed, err := q.Trash{{$e.Pascal}}(ctx, sqlgen.Trash{{$e.Pascal}}Params{DeletedAt: postgres.Timestamptz(at), ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+	if err != nil {
+		return err
+	}
+	if trashed == 0 {
+		return {{$e.Camel}}Gone(ctx, db, id)
+	}
+	return nil
+}
+
+// Restore{{$e.Pascal}} takes the {{lower $e.Label}} with the given id out of the trash,
+// with the records that went in with it. Refused when a record it points
+// at is in the trash too, or a unique value of it was taken meanwhile.
+func ({{$r}} *{{$m.Pascal}}) Restore{{$e.Pascal}}(ctx context.Context, id uuid.UUID) ({{$e.Pascal}}, error) {
+	var restored {{$e.Pascal}}
+	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		var err error
+		restored, err = restore{{$e.Pascal}}(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
+		return err
+	})
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+	return restored, nil
+}
+
+// restore{{$e.Pascal}} takes the {{lower $e.Label}} id out of the trash, in the
+// transaction of db, and then the records that went in with it.
+func restore{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID) ({{$e.Pascal}}, error) {
+	q := sqlgen.New(db)
+{{- $cascades := false}}{{range dependents $e}}{{if and (eq .Action "cascade") .Soft}}{{$cascades = true}}{{end}}{{end}}
+	{{if or $cascades (trashedParents $e)}}before{{else}}_{{end}}, err := q.GetDeleted{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return {{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
+	}
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+{{- range trashedParents $e}}
+	if parent := before.{{keyField .}}; parent.Valid {
+		live, err := q.Live{{.Target.Pascal}}(ctx, parent)
+		if err != nil {
+			return {{$e.Pascal}}{}, err
+		}
+		if !live {
+			return {{$e.Pascal}}{}, &InvalidFields{Fields: []FieldError{ {Field: {{quote .Snake}}, Code: "in_trash"} }}
+		}
+	}
+{{- end}}
+	row, err := q.Restore{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if err != nil {
+		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)
+	}
+{{- range dependents $e}}{{if and (eq .Action "cascade") .Soft}}
+	{
+		children, err := q.Trashed{{.Name}}(ctx, sqlgen.Trashed{{.Name}}Params{ID: postgres.UUID(id), DeletedAt: before.DeletedAt})
+		if err != nil {
+			return {{$e.Pascal}}{}, err
+		}
+		for _, child := range children {
+			if _, err := restore{{.Relation.Entity.Pascal}}(ctx, db, postgres.ID(child)); err != nil {
+				return {{$e.Pascal}}{}, err
+			}
+		}
+	}
+{{- end}}{{end}}
+	return {{$e.Camel}}Of(row), nil
+}
+
+// Deleted{{$e.Pascal}} is a {{lower $e.Label}} in the trash, and since when.
+type Deleted{{$e.Pascal}} struct {
+	{{$e.Pascal}}
+	DeletedAt time.Time
+}
+
+// ReadDeleted{{$e.Pascal}} returns the {{lower $e.Label}} in the trash with the given id:
+// Err{{$e.Pascal}}NotFound when it is not there.
+func ({{$r}} *{{$m.Pascal}}) ReadDeleted{{$e.Pascal}}(ctx context.Context, id uuid.UUID) (Deleted{{$e.Pascal}}, error) {
+	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).GetDeleted{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Deleted{{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
+	}
+	if err != nil {
+		return Deleted{{$e.Pascal}}{}, err
+	}
+	return Deleted{{$e.Pascal}}{ {{- $e.Pascal}}: {{$e.Camel}}Of(row), DeletedAt: row.DeletedAt.Time}, nil
+}
+
+// Deleted{{$e.Pascal}}Page is a page of the trash of {{$e.Plural.Snake}}.
+type Deleted{{$e.Pascal}}Page struct {
+	{{$e.Plural.Pascal}} []Deleted{{$e.Pascal}}
+	// Total is how many {{$e.Plural.Snake}} the trash holds in all.
+	Total int64
+}
+
+// ListDeleted{{$e.Plural.Pascal}} reads a page (from 1) of the trash of {{$e.Plural.Snake}}, the
+// last ones deleted first.{{if $own}} With an owner (not the nil UUID), only
+// theirs.{{end}}
+func ({{$r}} *{{$m.Pascal}}) ListDeleted{{$e.Plural.Pascal}}(ctx context.Context, page, perPage int{{if $own}}, owner uuid.UUID{{end}}) (Deleted{{$e.Pascal}}Page, error) {
+	if perPage <= 0 || perPage > Max{{$e.Pascal}}Page {
+		perPage = Max{{$e.Pascal}}Page
+	}
+	page = max(page, 1)
+	q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+	rows, err := q.ListDeleted{{$e.Plural.Pascal}}(ctx, sqlgen.ListDeleted{{$e.Plural.Pascal}}Params{ {{- if $own}}OwnerID: postgres.UUID(owner), {{end}}PageSize: int32(perPage), Skip: int32((page - 1) * perPage)})
+	if err != nil {
+		return Deleted{{$e.Pascal}}Page{}, err
+	}
+	total, err := q.CountDeleted{{$e.Plural.Pascal}}(ctx{{if $own}}, postgres.UUID(owner){{end}})
+	if err != nil {
+		return Deleted{{$e.Pascal}}Page{}, err
+	}
+	out := Deleted{{$e.Pascal}}Page{ {{- $e.Plural.Pascal}}: make([]Deleted{{$e.Pascal}}, 0, len(rows)), Total: total}
+	for _, row := range rows {
+		out.{{$e.Plural.Pascal}} = append(out.{{$e.Plural.Pascal}}, Deleted{{$e.Pascal}}{ {{- $e.Pascal}}: {{$e.Camel}}Of(row), DeletedAt: row.DeletedAt.Time})
+	}
+	return out, nil
+}
+
+// Purge{{$e.Pascal}} deletes for good the {{lower $e.Label}} in the trash with the given
+// id{{if $files}}, and its files{{end}}: Err{{$e.Pascal}}InUse while records still point at it.
+func ({{$r}} *{{$m.Pascal}}) Purge{{$e.Pascal}}(ctx context.Context, id uuid.UUID) error {
+	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+{{- if $files}}
+		before, err := q.GetDeleted{{$e.Pascal}}(ctx, postgres.UUID(id))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Err{{$e.Pascal}}NotFound
+		}
+		if err != nil {
+			return err
+		}
+		stored := {{$e.Camel}}Of(before)
+{{- end}}
+		purged, err := q.Purge{{$e.Pascal}}(ctx, postgres.UUID(id))
+		if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
+			return Err{{$e.Pascal}}InUse
+		}
+		if err != nil {
+			return err
+		}
+		if purged == 0 {
+			return Err{{$e.Pascal}}NotFound
+		}
+{{- if $files}}
+		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil)
+{{- else}}
+		return nil
+{{- end}}
+	})
+}
+
+// PurgeDeleted{{$e.Plural.Pascal}} deletes for good the {{$e.Plural.Snake}} in the trash since
+// before the time given, how many it deleted; those records still point at
+// stay. The zero time empties the trash.
+func ({{$r}} *{{$m.Pascal}}) PurgeDeleted{{$e.Plural.Pascal}}(ctx context.Context, before time.Time) (int, error) {
+	if before.IsZero() {
+		before = time.Now().Add(time.Hour)
+	}
+	purged := 0
+	skipped := map[uuid.UUID]bool{}
+	for {
+		ids, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).DeletedBefore{{$e.Plural.Pascal}}(ctx, sqlgen.DeletedBefore{{$e.Plural.Pascal}}Params{Before: postgres.Timestamptz(before), PageSize: int32(100 + len(skipped))})
+		if err != nil {
+			return purged, err
+		}
+		progress := false
+		for _, raw := range ids {
+			id := postgres.ID(raw)
+			if skipped[id] {
+				continue
+			}
+			progress = true
+			switch err := {{$r}}.Purge{{$e.Pascal}}(ctx, id); {
+			case errors.Is(err, Err{{$e.Pascal}}InUse), errors.Is(err, Err{{$e.Pascal}}NotFound):
+				skipped[id] = true
+			case err != nil:
+				return purged, err
+			default:
+				purged++
+			}
+		}
+		if !progress {
+			return purged, nil
+		}
+	}
+}
+{{- end}}

@@ -179,3 +179,50 @@ func TestCheckFindsTablesThatCollideInPublic(t *testing.T) {
 		t.Fatalf("problems = %v", problems)
 	}
 }
+
+// softDeleting is d with @store(soft_delete) on the entity named.
+func softDeleting(t *testing.T, d project.Description, entity string) project.Description {
+	t.Helper()
+	out := *snapshot(t, d)
+	for i, e := range out.Entities {
+		if e.Raw == entity {
+			if out.Entities[i].Ann == nil {
+				out.Entities[i].Ann = map[string]map[string]any{}
+			}
+			out.Entities[i].Ann["store"] = map[string]any{"soft_delete": true}
+		}
+	}
+	return out
+}
+
+func TestSoftDeleteGivesATrashAndUniquenessAmongTheLive(t *testing.T) {
+	cur := load(t, "testdata/shop/v1")
+	trashed := softDeleting(t, cur, "Category")
+	on := Diff(snapshot(t, cur), trashed)
+	for _, want := range []string{
+		"ALTER TABLE public.categories DROP CONSTRAINT categories_name_key;",
+		"ALTER TABLE public.categories ADD COLUMN deleted_at timestamptz;",
+		"CREATE UNIQUE INDEX categories_name_key ON public.categories (name) WHERE deleted_at IS NULL;",
+		"CREATE INDEX categories_created_at_id_idx ON public.categories (created_at, id) WHERE deleted_at IS NULL;",
+	} {
+		if !strings.Contains(on.Up, want) {
+			t.Errorf("turning it on misses %q:\n%s", want, on.Up)
+		}
+	}
+	if strings.Contains(on.Up, "products") {
+		t.Errorf("only the entity marked changes:\n%s", on.Up)
+	}
+	off := Diff(snapshot(t, trashed), cur)
+	for _, want := range []string{
+		"DROP INDEX public.categories_name_key;",
+		"ALTER TABLE public.categories DROP COLUMN deleted_at;",
+		"ALTER TABLE public.categories ADD CONSTRAINT categories_name_key UNIQUE (name);",
+	} {
+		if !strings.Contains(off.Up, want) {
+			t.Errorf("turning it off misses %q:\n%s", want, off.Up)
+		}
+	}
+	if again := Diff(snapshot(t, trashed), trashed); strings.TrimSpace(again.Up) != "" {
+		t.Errorf("no change, no migration:\n%s", again.Up)
+	}
+}
