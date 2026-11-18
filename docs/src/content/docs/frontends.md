@@ -226,25 +226,116 @@ export default resource(meta, {
 
 A field the model gains is in `meta.fields` at once; add it where you want it.
 
-What else a resource may say, each with a default that works without it:
-
-- `subtitle`: a second line under each name in the list, a field
-  (`f.category_id`, the default when the entity has a relation) or a
-  function of the record.
-- `sections`: the form's cards, each a title and its fields; one with
-  `side: true` goes in a narrower column at the right. Without them, the
-  details are at the left, and the media (images and files) and how the
-  record is filed (choices, related records) at the right.
-- An enum's value shows as a dot of its color and its label. The color is
-  the value's `@<frontend>(color green)` (green, amber, red, blue, violet,
-  sky, orange or gray), or a guess from its name: ACTIVE, PAID and DONE are
-  green, PENDING and DRAFT amber, CANCELED and FAILED red; others gray.
+Everything a resource may say, each with a default that works without it,
+is in [Customizing a frontend](#customizing-a-frontend).
 
 A `money` field is shown with its currency (`R$ 1.234,56`), exactly: its
 amount is text, never a float. Its input writes it as the language does,
 with the currency's symbol and places; a list filters it by a range (from,
 up to); a number card sums it exactly, one total per currency; a CSV gives
 its amount and its currency in two columns.
+
+## Customizing a frontend
+
+Everything has a default that works without saying anything; each is
+changed where it belongs: the model (`.esq`), the resource
+(`src/resources/<resource>.tsx`), your fields (`src/fields.ts`), the look
+(`src/theme.css`, `src/components/ui`) and your pages (`src/pages`).
+
+### In the model
+
+| Annotation | On | What | Default |
+|---|---|---|---|
+| `resource` | entity | It is a resource: its list, form and page | not one |
+| `label`, `singular` | entity | What people call it, and one of it | its name, humanized |
+| `menu`, `group`, `icon` | entity | Its menu entry, the section it is in, its Lucide icon | the label, none, a circle |
+| `label` | field, relation | What people call it | its name, humanized |
+| `label` | enum value | What people call the value | the value |
+| `color` | enum value | Its dot: green, amber, red, blue, violet, sky, orange, gray | a guess from its name |
+| `widget`, `x`, `y`, `label`, `since`, `icon` | report | A widget of the [dashboard](#the-dashboard) | not one |
+
+Each annotation is named after the frontend: `@admin(...)` for
+`blueprint spa admin`. The [blueprint's reference](/esquadro/blueprints/reference/spa/)
+lists them, and its options (the domain, the realm and roles, the language,
+the sidebar, the idle time).
+
+### A resource
+
+```tsx
+export default resource(meta, {
+  table: {
+    columns: [f.name, column(f.price, { editable: true }), column(f.status, { label: "State", hidden: true })],
+    filters: [f.status, f.price, f.created_at],
+    search: true,
+    sort: "-created_at",
+    select: true,
+  },
+  form: [f.name, f.description, f.price, f.photo, f.status, f.category_id],
+  sections: [
+    { title: "Details", fields: [f.name, f.description, f.price] },
+    { title: "Photo", fields: [f.photo], side: true },
+    { title: "Filing", description: "Where it shows up.", fields: [f.status, f.category_id], side: true },
+  ],
+  show: [f.name, f.price, f.status, f.category_id, f.created_at],
+  title: f.name,
+  subtitle: (p) => `SKU ${p.sku}`,
+  image: (p) => (p.photo as { url?: string } | null)?.url,
+  relations: () => [relation(offers, "product_id", { label: "Offers" })],
+  actions: [
+    { label: "Publish", icon: Send, bulk: true, when: (p) => p.status === "DRAFT", run: (p) => api.request("POST", `/api/v1/products/${p.id}/publish`) },
+    { label: "Archive", icon: Archive, destructive: true, confirm: "Archive it?", run: (p) => api.products.patch(p.id, { status: "ARCHIVED" }, { ifMatch: p }) },
+  ],
+})
+```
+
+| Option | What | Default |
+|---|---|---|
+| `table.columns` | The list's columns: a field, or `column(field, {label, cell, editable, hidden})` | the first fields but images |
+| `table.filters` | The filters shown: only those the API has | the enums, booleans and money the API filters by, its relations, and `created_at` |
+| `table.search`, `table.sort`, `table.select` | The search box, the first order, the checkboxes | as the API allows, `-created_at`, on |
+| `form` | The fields of the form | every field |
+| `sections` | The form's cards: `{title, description, fields, side}`; `side` puts one in the narrower column at the right | details at the left; media and filing at the right |
+| `show` | The fields of a record's page | every field but images, and when it was created and changed |
+| `title` | What a record is called, in titles, the breadcrumb and pickers | the first field |
+| `subtitle` | A second line under each name in the list: a field or a function | the first relation |
+| `image` | A record's picture, in lists and atop its page | its first image field, else its initials |
+| `relations` | Lists of related records on its page | those the API filters by |
+| `actions` | Your actions: `{label, icon, run, when, confirm, bulk, destructive}` | none |
+
+### Fields of your own
+
+`src/fields.ts` shows or edits a field your way, by its name (`price`) or by
+its kind (`money`, `enum`, `image`), everywhere it appears:
+
+```ts
+export const fields: Record<string, FieldRenderer> = {
+  price: { show: (v) => <b>{formatMoney(v)}</b> },
+  color: { show: (v) => <span style={ { color: String(v) } }>●</span>, input: (v, onChange) => <input type="color" value={String(v ?? "")} onChange={(e) => onChange(e.target.value)} /> },
+}
+```
+
+### The look
+
+The colors, the radius and the font are tokens in `src/theme.css` (light
+and dark); the components are shadcn/ui's, in `src/components/ui`, and the
+layout's (sidebar, header, account menu) in `src/components`: all yours to
+change. `npx shadcn add <component>` adds more.
+
+### Pages of your own
+
+A file in `src/pages/_app/` is a page behind the sign-in. The kit's parts
+are yours to use there: `PageHeader`, `Dashboard`, the charts, and
+`Settings`, sections in a menu at the left, the one chosen kept in the URL,
+which the account page is made of:
+
+```tsx
+<Settings
+  sections={[
+    { key: "password", label: t("password"), icon: KeyRound, content: <PasswordCard /> },
+    { key: "profile", label: "Profile", icon: User, content: <MyProfile /> },
+  ]}
+/>
+```
 
 ## Yours, and generated
 

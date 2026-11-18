@@ -1,18 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { KeyRound, Mail, MonitorSmartphone } from "lucide-react"
 import { DevicesCard, EmailCard, PasswordCard } from "../../esquadro/kit/account.tsx"
 import { t } from "../../esquadro/kit/i18n.ts"
 import { PageHeader } from "../../esquadro/kit/page.tsx"
+import { Settings } from "../../esquadro/kit/settings.tsx"
 
-// The account of whoever signed in: yours to change (a profile, settings).
+// The account of whoever signed in: yours to change. Each section is in the
+// menu at the left; add your own (a profile, notifications) to the list.
 export const Route = createFileRoute("/_app/account")({ staticData: { title: t("account") }, component: Account })
 
 function Account() {
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <PageHeader title={t("account")} description={t("accountHint")} />
-      <PasswordCard />
-      <DevicesCard />
-      <EmailCard />
+      <Settings
+        sections={[
+          { key: "password", label: t("password"), icon: KeyRound, content: <PasswordCard /> },
+          { key: "devices", label: t("devices"), icon: MonitorSmartphone, content: <DevicesCard /> },
+          { key: "email", label: t("email"), icon: Mail, content: <EmailCard /> },
+        ]}
+      />
     </div>
   )
 }
