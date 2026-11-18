@@ -280,9 +280,171 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
       responses:
         "204": {description: Deleted.}
         default: {$ref: "#/components/responses/Problem"}
+{{- with realmAdmins $.Entities $r.Entity}}
+  {{$p}}/{{$r.Name}}/accounts:
+    get:
+      tags: [{{$r.Name}}]
+      summary: The accounts, for those who administer them ({{join ", " .}})
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: Words of the email or the name.}
+        - {name: role, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [active, invited, unverified, disabled]}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: A page of accounts.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentityAccountPage"}
+        default: {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [{{$r.Name}}]
+      summary: Invite an account; an email with a link to choose its password goes to it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, format: email}
+                roles: {type: array, items: {type: string}}
+                fields: {type: object, description: The account's fields, as its sign-up takes them.}
+                redirect: {type: string, description: The page of the app the link opens.}
+      responses:
+        "201":
+          description: Invited.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentityAccount"}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}:
+    delete:
+      tags: [{{$r.Name}}]
+      summary: Delete an account and its record (never one's own, nor the last admin)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: Deleted.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}/invite:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Send the invitation again, to an account without a password yet
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect: {type: string}
+      responses:
+        "202": {description: Sent.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}/roles:
+    put:
+      tags: [{{$r.Name}}]
+      summary: Set an account's roles
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles: {type: array, items: {type: string}}
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentityAccount"}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}/disable:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Disable an account; its sessions end
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentityAccount"}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}/enable:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Enable a disabled account
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IdentityAccount"}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/accounts/{id}/sessions:
+    delete:
+      tags: [{{$r.Name}}]
+      summary: Sign an account out everywhere
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: Ended.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/{{$r.Name}}/roles:
+    get:
+      tags: [{{$r.Name}}]
+      summary: The realm's roles, their permissions and how many accounts have each
+      responses:
+        "200":
+          description: The roles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/IdentityRole"}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- define "identity-schemas"}}
+    IdentityAccount:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string}
+        name: {type: string}
+        fields: {type: object}
+        roles: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, invited, unverified, disabled]}
+        last_seen_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+    IdentityAccountPage:
+      type: object
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/IdentityAccount"}}
+        page: {type: integer}
+        per_page: {type: integer}
+        total: {type: integer}
+        total_pages: {type: integer}
+    IdentityRole:
+      type: object
+      properties:
+        name: {type: string}
+        permissions: {type: array, items: {type: string}}
+        accounts: {type: integer}
+        administers: {type: boolean}
     IdentityCredentials:
       type: object
       required: [email, password]

@@ -237,10 +237,33 @@ answers `403`. An unknown, expired or revoked key answers `401`. A key is
 not the owner of records, so `owner` never lets one in. The TypeScript
 client takes it as its `token`, on a server.
 
+## Administering accounts
+
+Those an account's entity lets write it (`@security(write user.admin)`)
+administer its realm's accounts through the API, and in a
+[frontend](/esquadro/frontends/)'s Users page:
+
+| Route | What |
+|---|---|
+| `GET <prefix>/<realm>/accounts?q=&role=&status=&page=` | the accounts: email, name, roles, status (`active`, `invited`, `unverified`, `disabled`), last seen |
+| `POST <prefix>/<realm>/accounts` | invite: `{email, roles, fields, redirect}` makes the account without a password, and emails it a link to choose one, which works for `invite_days` (7) |
+| `POST .../accounts/{id}/invite` | the invitation again, while it has no password |
+| `PUT .../accounts/{id}/roles` | its roles: `{roles}` |
+| `POST .../accounts/{id}/disable`, `.../enable` | disable it (its sessions end; it cannot sign in), enable it again |
+| `DELETE .../accounts/{id}/sessions` | sign it out everywhere |
+| `DELETE .../accounts/{id}` | delete it, and its record |
+| `GET <prefix>/<realm>/roles` | the realm's roles as the model declares them, their permissions and how many accounts have each |
+
+No one disables, deletes or takes the administering role from their own
+account (`own_account`), and the realm always keeps someone enabled who
+administers it (`last_administrator`). The invitation is the mail
+blueprint's `invitation` template, saying who invited.
+
 ## Commands
 
 ```sh
 go run ./cmd/shop security create user ana@example.com name=Ana -role admin
+go run ./cmd/shop security invite user bia@example.com name=Bia -role staff -redirect /admin/reset-password
 go run ./cmd/shop security grant user ana@example.com staff
 go run ./cmd/shop security revoke user ana@example.com admin
 go run ./cmd/shop security sessions user ana@example.com

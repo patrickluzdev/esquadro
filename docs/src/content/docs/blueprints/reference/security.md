@@ -36,6 +36,7 @@ blueprint security
 | `rotate_keys_days` | int | `0` | Days between rotations of the JWT signing key, checked every hour by jobs or the worker; 0 is never. |
 | `verify_email_hours` | int | `24` | Hours an email verification link works, and minutes a password reset link does. |
 | `password_reset_minutes` | int | `60` |  |
+| `invite_days` | int | `7` | Days an invitation's link works: an account made by an administrator (from the frontend, or &lt;app> security invite), to choose its password. |
 | `password_min` | int | `12` | The shortest password. NIST asks for 15 when the password is the only factor. |
 | `password_max` | int | `128` |  |
 | `password_blocklist` | name | `"none"` | none, lists (the passwords of password_lists, and those made of a sequence, a repetition, the app's name or the person's email) or pwned (all that, and Pwned Passwords). |

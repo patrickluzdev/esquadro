@@ -38,6 +38,12 @@ type Realm struct {
 	Create   func(ctx context.Context, id uuid.UUID, fields json.RawMessage) error
 	Validate func(fields json.RawMessage) error
 	Delete   func(ctx context.Context, id uuid.UUID) error
+	// Table is the entity's table, Display the column it is called by
+	// (name), for the list of accounts.
+	Table, Display string
+	// Admins are the rules of who administers the realm's accounts: those
+	// its entity lets write it (user.admin); none, no one by the API.
+	Admins []string
 }
 
 // Routes are the identity routes of each realm, under prefix:
@@ -79,6 +85,7 @@ func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
 		mux.HandleFunc("DELETE "+base+"/sessions/{id}", s.endSession(r))
 		mux.HandleFunc("POST "+base+"/password", s.changePassword(r))
 		mux.HandleFunc("DELETE "+base, s.deleteAccount(r))
+		s.accountRoutes(mux, base, r)
 	}
 }
 

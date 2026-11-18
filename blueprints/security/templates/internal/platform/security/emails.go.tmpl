@@ -23,10 +23,13 @@ import (
 // person's language and the app's voice.
 type Message struct {
 	// Kind is verify_email, reset_password, confirm_email_change (to the
-	// new address) or email_changed (a notice to the old one).
+	// new address), email_changed (a notice to the old one) or invitation
+	// (an account made by someone else, to choose its password).
 	Kind  string
 	Realm string
 	To    string
+	// From is who invited, on an invitation.
+	From string
 	// Link is where the person goes on, with a token used once; empty for
 	// a notice.
 	Link string

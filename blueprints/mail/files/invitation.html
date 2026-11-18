@@ -1,0 +1,5 @@
+{{define "content"}}
+<p>{{if .From}}{{.From}} invited you{{else}}You were invited{{end}} to {{.App}}.</p>
+<p><a href="{{.Link}}">Choose your password</a></p>
+<p>It works until {{.Expires}}. If you did not expect it, ignore this email.</p>
+{{end}}

@@ -1,0 +1,591 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+{{- $credentials := securityTable "credentials" $pg -}}
+{{- $sessions := securityTable "sessions" $pg -}}
+{{- $roles := securityTable "role_assignments" $pg -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// The problems of administering accounts.
+var (
+	ErrNoSuchAccount = &edge.Problem{Status: http.StatusNotFound, Code: "not_found", Title: "There is no such account."}
+	ErrOwnAccount    = &edge.Problem{Status: http.StatusConflict, Code: "own_account", Title: "You may not do this to your own account."}
+	ErrLastAdmin     = &edge.Problem{Status: http.StatusConflict, Code: "last_administrator", Title: "Someone else must be able to administer the accounts first."}
+	ErrAccountActive = &edge.Problem{Status: http.StatusConflict, Code: "already_active", Title: "The account has a password already: it needs no invitation."}
+)
+
+// Account is an account of a realm, as those who administer it see it.
+type Account struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+	// Name is what the account is called (its entity's display field).
+	Name string `json:"name"`
+	// Fields are its entity's fields.
+	Fields json.RawMessage `json:"fields"`
+	Roles  []string        `json:"roles"`
+	// Status is active, invited (no password yet), unverified (its email
+	// not confirmed) or disabled.
+	Status     string     `json:"status"`
+	LastSeenAt *time.Time `json:"last_seen_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// accountRoutes are the routes that administer a realm's accounts, for
+// those its entity lets write it (user.admin).
+func (s *Security) accountRoutes(mux *http.ServeMux, base string, realm Realm) {
+	if len(realm.Admins) == 0 {
+		return
+	}
+	mux.HandleFunc("GET "+base+"/accounts", s.listAccounts(realm))
+	mux.HandleFunc("POST "+base+"/accounts", s.inviteAccount(realm))
+	mux.HandleFunc("POST "+base+"/accounts/{id}/invite", s.reinvite(realm))
+	mux.HandleFunc("PUT "+base+"/accounts/{id}/roles", s.setRoles(realm))
+	mux.HandleFunc("POST "+base+"/accounts/{id}/disable", s.setDisabled(realm, true))
+	mux.HandleFunc("POST "+base+"/accounts/{id}/enable", s.setDisabled(realm, false))
+	mux.HandleFunc("DELETE "+base+"/accounts/{id}/sessions", s.endAccountSessions(realm))
+	mux.HandleFunc("DELETE "+base+"/accounts/{id}", s.deleteOtherAccount(realm))
+	mux.HandleFunc("GET "+base+"/roles", s.realmRoles(realm))
+}
+
+// administrator is who administers the realm's accounts in the request:
+// 401 for no one, 403 for someone the realm's rules do not let in.
+func (s *Security) administrator(w http.ResponseWriter, r *http.Request, realm Realm) (Principal, bool) {
+	ctx := r.Context()
+	for _, rule := range realm.Admins {
+		name, role, hasRole := strings.Cut(rule, ".")
+		if p, ok := PrincipalIn(ctx, name); ok && (!hasRole || slices.Contains(p.Roles, role)) {
+			return p, true
+		}
+	}
+	if Anonymous(ctx) {
+		edge.Write(w, r, ErrUnauthorized)
+	} else {
+		edge.Write(w, r, ErrForbidden)
+	}
+	return Principal{}, false
+}
+
+// adminRoles are the realm's own roles that administer its accounts:
+// admin, for user.admin on the realm user.
+func (realm Realm) adminRoles() []string {
+	var out []string
+	for _, rule := range realm.Admins {
+		if name, role, ok := strings.Cut(rule, "."); ok && name == realm.Name {
+			out = append(out, role)
+		}
+	}
+	return out
+}
+
+// target is the account of the request's {id}, of the realm: 404 when it
+// is not one.
+func (s *Security) target(w http.ResponseWriter, r *http.Request, realm Realm) (uuid.UUID, bool) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err == nil {
+		var found bool
+		err = s.db.QueryRow(r.Context(), `SELECT EXISTS (SELECT 1 FROM {{$identities}} WHERE id = $1 AND realm = $2)`, id, realm.Name).Scan(&found)
+		if err == nil && found {
+			return id, true
+		}
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) && id != uuid.Nil() {
+		s.fail(w, r, err)
+		return uuid.Nil(), false
+	}
+	edge.Write(w, r, ErrNoSuchAccount)
+	return uuid.Nil(), false
+}
+
+// mine reports whether the account is the administrator's own.
+func mine(p Principal, realm Realm, id uuid.UUID) bool { return p.Realm == realm.Name && p.ID == id }
+
+// keepsAdmins refuses what would leave the realm with none who administer
+// it: id losing roles (or every role, disabled or deleted).
+func (s *Security) keepsAdmins(ctx context.Context, realm Realm, id uuid.UUID, keeps []string) error {
+	for _, role := range realm.adminRoles() {
+		if slices.Contains(keeps, role) {
+			continue
+		}
+		var has bool
+		if err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM {{$roles}} WHERE identity_id = $1 AND role = $2)`, id, role).Scan(&has); err != nil {
+			return err
+		}
+		if !has {
+			continue
+		}
+		var others int
+		if err := s.db.QueryRow(ctx, `SELECT count(*) FROM {{$roles}} r JOIN {{$identities}} i ON i.id = r.identity_id
+			WHERE r.role = $1 AND i.realm = $2 AND i.id <> $3 AND i.disabled_at IS NULL`, role, realm.Name, id).Scan(&others); err != nil {
+			return err
+		}
+		if others == 0 {
+			return ErrLastAdmin
+		}
+	}
+	return nil
+}
+
+// accountsQuery reads a realm's accounts with what they are called, their
+// roles, their status and when they were last seen.
+const accountsQuery = `WITH a AS (
+	SELECT i.id, i.email, i.created_at,
+		COALESCE((SELECT array_agg(r.role ORDER BY r.role) FROM {{$roles}} r WHERE r.identity_id = i.id), '{}') AS roles,
+		(SELECT max(s.last_seen_at) FROM {{$sessions}} s WHERE s.identity_id = i.id) AS last_seen,
+		CASE
+			WHEN i.disabled_at IS NOT NULL THEN 'disabled'
+			WHEN NOT EXISTS (SELECT 1 FROM {{$credentials}} c WHERE c.identity_id = i.id) THEN 'invited'
+			WHEN NOT i.email_verified AND $2::boolean THEN 'unverified'
+			ELSE 'active'
+		END AS status,
+		COALESCE(to_jsonb(e) - 'search_vector' - 'version', '{}'::jsonb) AS fields
+	FROM {{$identities}} i LEFT JOIN %s e ON e.id = i.id
+	WHERE i.realm = $1
+)
+SELECT id, email, created_at, roles, last_seen, status, fields, count(*) OVER () AS total
+FROM a
+WHERE ($3 = '' OR email ILIKE '%' || $3 || '%' OR COALESCE(fields->>$4, '') ILIKE '%' || $3 || '%')
+	AND ($5 = '' OR $5 = ANY (roles))
+	AND ($6 = '' OR status = $6)
+	AND ($7::uuid IS NULL OR id = $7)
+ORDER BY created_at DESC
+LIMIT $8 OFFSET $9`
+
+// accounts reads a page of the realm's accounts (or one, by id).
+func (s *Security) accounts(ctx context.Context, realm Realm, q, role, status string, one *uuid.UUID, limit, offset int) ([]Account, int, error) {
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)
+	var only any
+	if one != nil {
+		only = *one
+	}
+	// A realm without a table (its principals kept elsewhere) lists no names.
+	table := realm.Table
+	if table == "" {
+		table = "(SELECT NULL::uuid AS id WHERE false)"
+	}
+	rows, err := s.db.Query(ctx, strings.Replace(accountsQuery, "%s", table, 1),
+		realm.Name, realm.VerifyEmail != "off", escaped, realm.Display, role, status, only, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	out := []Account{}
+	total := 0
+	for rows.Next() {
+		var a Account
+		var fields []byte
+		var lastSeen *time.Time
+		if err := rows.Scan(&a.ID, &a.Email, &a.CreatedAt, &a.Roles, &lastSeen, &a.Status, &fields, &total); err != nil {
+			return nil, 0, err
+		}
+		a.LastSeenAt = lastSeen
+		a.Fields = fields
+		var named map[string]any
+		if json.Unmarshal(fields, &named) == nil && realm.Display != "" {
+			if v, ok := named[realm.Display].(string); ok {
+				a.Name = v
+			}
+		}
+		out = append(out, a)
+	}
+	return out, total, rows.Err()
+}
+
+// account reads one account of the realm.
+func (s *Security) account(ctx context.Context, realm Realm, id uuid.UUID) (Account, error) {
+	list, _, err := s.accounts(ctx, realm, "", "", "", &id, 1, 0)
+	if err != nil {
+		return Account{}, err
+	}
+	if len(list) == 0 {
+		return Account{}, ErrNoSuchAccount
+	}
+	return list[0], nil
+}
+
+func (s *Security) listAccounts(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.administrator(w, r, realm); !ok {
+			return
+		}
+		query := r.URL.Query()
+		page, _ := strconv.Atoi(query.Get("page"))
+		perPage, _ := strconv.Atoi(query.Get("per_page"))
+		page = max(page, 1)
+		if perPage < 1 || perPage > 100 {
+			perPage = 25
+		}
+		status := query.Get("status")
+		if status != "" && !slices.Contains([]string{"active", "invited", "unverified", "disabled"}, status) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		list, total, err := s.accounts(r.Context(), realm, query.Get("q"), query.Get("role"), status, nil, perPage, (page-1)*perPage)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, map[string]any{"items": list, "page": page, "per_page": perPage, "total": total, "total_pages": (total + perPage - 1) / perPage})
+	}
+}
+
+// validRoles reports whether every role is one of the realm's.
+func (realm Realm) validRoles(roles []string) bool {
+	for _, role := range roles {
+		if !slices.Contains(realm.Roles, role) {
+			return false
+		}
+	}
+	return true
+}
+
+var unknownRole = &edge.Problem{Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "A role is not one of the realm's.",
+	Errors: []edge.FieldProblem{ {Field: "roles", Code: "invalid_value"} }}
+
+// invitation sends an account its invitation: a link to choose its
+// password, which works for InviteDays.
+func (s *Security) invitation(ctx context.Context, realm Realm, id uuid.UUID, email, redirect, from string) error {
+	days := s.cfg.InviteDays
+	if days <= 0 {
+		days = 7
+	}
+	token, expires, err := s.newVerification(ctx, s.db, realm.Name, "reset_password", id, "", time.Duration(days)*24*time.Hour)
+	if err != nil {
+		return err
+	}
+	s.send(ctx, Message{Kind: "invitation", Realm: realm.Name, To: email, From: from, Link: s.link(redirect, token), Expires: expires})
+	return nil
+}
+
+// Invite makes an account without a password, with its fields and roles,
+// and sends it an invitation to choose one (from, who invited, may be
+// empty): an account taken answers ErrEmailTaken.
+func (s *Security) Invite(ctx context.Context, realm Realm, email string, fields json.RawMessage, redirect, from string, roles ...string) (uuid.UUID, error) {
+	if _, err := s.AccountID(ctx, realm.Name, email); err == nil {
+		return uuid.Nil(), ErrEmailTaken
+	}
+	if len(fields) == 0 {
+		fields = json.RawMessage("{}")
+	}
+	id, err := s.CreateAccount(ctx, realm, email, "", fields, roles...)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	if err := s.invitation(ctx, realm, id, normalEmail(email), redirect, from); err != nil {
+		return id, err
+	}
+	s.event(ctx, "account_invited", realm.Name, id.String(), true)
+	return id, nil
+}
+
+// emailOf is an identity's email.
+func (s *Security) emailOf(ctx context.Context, id uuid.UUID) string {
+	var email string
+	_ = s.db.QueryRow(ctx, `SELECT email FROM {{$identities}} WHERE id = $1`, id).Scan(&email)
+	return email
+}
+
+// inviteAccount makes an account without a password and sends it an
+// invitation to choose one.
+func (s *Security) inviteAccount(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.administrator(w, r, realm)
+		if !ok {
+			return
+		}
+		var in struct {
+			Email    string          `json:"email"`
+			Roles    []string        `json:"roles"`
+			Fields   json.RawMessage `json:"fields"`
+			Redirect string          `json:"redirect"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		email := normalEmail(in.Email)
+		if email == "" {
+			edge.Write(w, r, invalidEmail)
+			return
+		}
+		if !realm.validRoles(in.Roles) {
+			edge.Write(w, r, unknownRole)
+			return
+		}
+		if !s.allowedRedirect(in.Redirect) {
+			edge.Write(w, r, ErrBadRedirect)
+			return
+		}
+		id, err := s.Invite(ctx, realm, email, in.Fields, in.Redirect, s.emailOf(ctx, p.ID), in.Roles...)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		a, err := s.account(ctx, realm, id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(w, a)
+	}
+}
+
+// reinvite sends an invitation again, to an account that has not chosen
+// its password yet.
+func (s *Security) reinvite(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.administrator(w, r, realm)
+		if !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		var in struct {
+			Redirect string `json:"redirect"`
+		}
+		if !decode(w, r, &in) || !s.allowedRedirect(in.Redirect) {
+			edge.Write(w, r, ErrBadRedirect)
+			return
+		}
+		a, err := s.account(ctx, realm, id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if a.Status != "invited" {
+			edge.Write(w, r, ErrAccountActive)
+			return
+		}
+		if err := s.invitation(ctx, realm, id, a.Email, in.Redirect, s.emailOf(ctx, p.ID)); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// setRoles makes an account's roles these: those missing are given, the
+// others taken.
+func (s *Security) setRoles(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.administrator(w, r, realm)
+		if !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		var in struct {
+			Roles []string `json:"roles"`
+		}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		if !realm.validRoles(in.Roles) {
+			edge.Write(w, r, unknownRole)
+			return
+		}
+		for _, role := range realm.adminRoles() {
+			if mine(p, realm, id) && slices.Contains(p.Roles, role) && !slices.Contains(in.Roles, role) {
+				edge.Write(w, r, ErrOwnAccount)
+				return
+			}
+		}
+		if err := s.keepsAdmins(ctx, realm, id, in.Roles); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			for _, role := range realm.Roles {
+				var err error
+				if slices.Contains(in.Roles, role) {
+					err = s.Grant(ctx, tx, id, role)
+				} else {
+					err = s.Revoke(ctx, tx, id, role)
+				}
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "roles_changed", realm.Name, id.String(), true)
+		a, err := s.account(ctx, realm, id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, a)
+	}
+}
+
+// setDisabled disables an account (its sessions end; it cannot sign in)
+// or enables it again.
+func (s *Security) setDisabled(realm Realm, disabled bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.administrator(w, r, realm)
+		if !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		if disabled {
+			if mine(p, realm, id) {
+				edge.Write(w, r, ErrOwnAccount)
+				return
+			}
+			if err := s.keepsAdmins(ctx, realm, id, nil); err != nil {
+				s.fail(w, r, err)
+				return
+			}
+		}
+		err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			if disabled {
+				if _, err := tx.Exec(ctx, `UPDATE {{$identities}} SET disabled_at = now(), updated_at = now() WHERE id = $1`, id); err != nil {
+					return err
+				}
+				return s.EndSessions(ctx, tx, id, uuid.Nil())
+			}
+			_, err := tx.Exec(ctx, `UPDATE {{$identities}} SET disabled_at = NULL, updated_at = now() WHERE id = $1`, id)
+			return err
+		})
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		event := "account_enabled"
+		if disabled {
+			event = "account_disabled"
+		}
+		s.event(ctx, event, realm.Name, id.String(), true)
+		a, err := s.account(ctx, realm, id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, a)
+	}
+}
+
+// endAccountSessions signs an account out everywhere.
+func (s *Security) endAccountSessions(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.administrator(w, r, realm); !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		if err := s.EndSessions(r.Context(), s.db, id, uuid.Nil()); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// deleteOtherAccount deletes an account and its record, never one's own.
+func (s *Security) deleteOtherAccount(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.administrator(w, r, realm)
+		if !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		if mine(p, realm, id) {
+			edge.Write(w, r, ErrOwnAccount)
+			return
+		}
+		if err := s.keepsAdmins(ctx, realm, id, nil); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if err := s.DeleteAccount(ctx, realm, id); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// RoleInfo is a role of a realm: its permissions, and how many accounts
+// have it.
+type RoleInfo struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+	Accounts    int      `json:"accounts"`
+	// Administers is whether it administers the realm's accounts.
+	Administers bool `json:"administers"`
+}
+
+// realmRoles answers the realm's roles, as the model declares them.
+func (s *Security) realmRoles(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.administrator(w, r, realm); !ok {
+			return
+		}
+		counts := map[string]int{}
+		rows, err := s.db.Query(r.Context(), `SELECT r.role, count(*) FROM {{$roles}} r JOIN {{$identities}} i ON i.id = r.identity_id
+			WHERE i.realm = $1 GROUP BY r.role`, realm.Name)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		for rows.Next() {
+			var role string
+			var n int
+			if err := rows.Scan(&role, &n); err != nil {
+				rows.Close()
+				s.fail(w, r, err)
+				return
+			}
+			counts[role] = n
+		}
+		rows.Close()
+		out := []RoleInfo{}
+		for _, role := range realm.Roles {
+			perms := grants[realm.Name][role]
+			if perms == nil {
+				perms = []string{}
+			}
+			out = append(out, RoleInfo{Name: role, Permissions: perms, Accounts: counts[role], Administers: slices.Contains(realm.adminRoles(), role)})
+		}
+		writeJSON(w, out)
+	}
+}
+{{end -}}

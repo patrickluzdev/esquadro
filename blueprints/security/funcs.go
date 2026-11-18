@@ -17,6 +17,8 @@ func TemplateFuncs() template.FuncMap {
 		"usesProvider":  UsesProvider,
 		"access":        Access,
 		"rulesOf":       RulesOf,
+		"realmDisplay":  Display,
+		"realmAdmins":   Admins,
 		"whosOf":        WhosOf,
 		"allowed":       Allowed,
 		"listScope":     ListScope,
@@ -77,4 +79,32 @@ func Table(name string, postgresOptions map[string]any) string {
 		return "security." + name
 	}
 	return "security_" + name
+}
+
+// Display is the column a realm's accounts are called by in their list: a
+// field name, or the first text field.
+func Display(e *project.Entity) string {
+	for _, f := range e.Fields {
+		if f.Snake == "name" {
+			return f.Snake
+		}
+	}
+	for _, f := range e.Fields {
+		if !f.Implicit && (f.Type == project.TypeString || f.Type == project.TypeText) {
+			return f.Snake
+		}
+	}
+	return ""
+}
+
+// Admins are the rules of who administers a realm's accounts: those its
+// entity lets update it, but its owner (each account itself) and anyone.
+func Admins(entities []*project.Entity, e *project.Entity) []string {
+	out := []string{}
+	for _, w := range RulesOf(entities, e, "update").Others {
+		if w != "public" {
+			out = append(out, w)
+		}
+	}
+	return out
 }

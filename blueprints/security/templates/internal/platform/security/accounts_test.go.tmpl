@@ -1,0 +1,149 @@
+{{- if and (realms .Entities) (uses "testcontainers") -}}
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"testing"
+
+	"{{.App.Module}}/internal/platform/edge"
+
+	"uuid"
+)
+
+// adminFlow is the routes of a realm whose admins administer its
+// accounts, kept in a table of their own (team), with Boss its admin.
+func adminFlow(t *testing.T) (*flow, Realm) {
+	t.Helper()
+	f := newFlow(t)
+	ctx := context.Background()
+	f.s.cfg.RedirectURLs = []string{"https://app.example/reset"}
+	if _, err := f.s.db.Exec(ctx, `CREATE TABLE team (id uuid PRIMARY KEY, name text NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	team := Realm{
+		Name: "team", Roles: []string{"admin", "member"}, Providers: []string{"password"}, Signup: "closed", VerifyEmail: "optional", PasswordReset: true,
+		Policy: PasswordPolicy{Min: 12, Max: 128, Blocklist: "lists"},
+		Validate: func(fields json.RawMessage) error {
+			var in struct{ Name string }
+			if json.Unmarshal(fields, &in) != nil || in.Name == "" {
+				return &edge.Problem{Status: 422, Code: "invalid_fields"}
+			}
+			return nil
+		},
+		Create: func(ctx context.Context, id uuid.UUID, fields json.RawMessage) error {
+			var in struct{ Name string }
+			_ = json.Unmarshal(fields, &in)
+			_, err := f.s.db.Exec(ctx, `INSERT INTO team (id, name) VALUES ($1, $2)`, id, in.Name)
+			return err
+		},
+		Delete: func(ctx context.Context, id uuid.UUID) error {
+			_, err := f.s.db.Exec(ctx, `DELETE FROM team WHERE id = $1`, id)
+			return err
+		},
+		Table: "team", Display: "name", Admins: []string{"team.admin"},
+	}
+	mux := http.NewServeMux()
+	f.s.Routes(mux, "/identity", []Realm{team})
+	f.handler = f.s.Authenticate([]string{"team"}, nil)(mux)
+	if _, err := f.s.CreateAccount(ctx, team, "boss@example.com", password, json.RawMessage(`{"name":"Boss"}`), "admin"); err != nil {
+		t.Fatal(err)
+	}
+	return f, team
+}
+
+// as signs someone of team in: the headers to send back.
+func (f *flow) as(email string) []string {
+	f.t.Helper()
+	a := f.call("POST", "/identity/team/sign-in", map[string]string{"email": email, "password": password})
+	f.expect(a, 200, "")
+	cookie, _, _ := strings.Cut(a.header.Get("Set-Cookie"), ";")
+	return []string{"Cookie: " + cookie, "X-CSRF-Token: " + a.str("csrf_token")}
+}
+
+func TestAnAdminInvitesAndTheInvitedComesIn(t *testing.T) {
+	f, _ := adminFlow(t)
+	boss := f.as("boss@example.com")
+	f.expect(f.call("GET", "/identity/team/accounts", nil), 401, "unauthorized")
+
+	invite := map[string]any{"email": "Ana@Example.com", "roles": []string{"member"}, "fields": map[string]string{"name": "Ana"}, "redirect": "https://app.example/reset"}
+	a := f.call("POST", "/identity/team/accounts", invite, boss...)
+	f.expect(a, 201, "")
+	if a.str("status") != "invited" || a.str("name") != "Ana" || a.str("email") != "ana@example.com" {
+		t.Fatalf("invited: %v", a.body)
+	}
+	msg, token := f.mail.last(t, "invitation")
+	if msg.From != "boss@example.com" || msg.To != "ana@example.com" || token == "" {
+		t.Fatalf("invitation: %+v", msg)
+	}
+	f.expect(f.call("POST", "/identity/team/accounts", invite, boss...), 409, "email_taken")
+	invite["email"], invite["roles"] = "bia@example.com", []string{"owner"}
+	f.expect(f.call("POST", "/identity/team/accounts", invite, boss...), 422, "invalid_fields")
+
+	// The invited chooses a password with the link, and comes in.
+	f.expect(f.call("POST", "/identity/team/password/reset", map[string]string{"token": token, "new_password": password}), 204, "")
+	ana := f.as("ana@example.com")
+	f.expect(f.call("GET", "/identity/team/accounts", nil, ana...), 403, "forbidden")
+
+	list := f.call("GET", "/identity/team/accounts?q=ana", nil, boss...)
+	f.expect(list, 200, "")
+	items, _ := list.body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["status"] != "active" {
+		t.Fatalf("list: %v", list.body)
+	}
+	if n := len(f.call("GET", "/identity/team/accounts?role=admin", nil, boss...).body["items"].([]any)); n != 1 {
+		t.Fatalf("admins: %d", n)
+	}
+	roles := f.call("GET", "/identity/team/roles", nil, boss...)
+	if !strings.Contains(roles.raw, `"name":"admin","permissions":[],"accounts":1,"administers":true`) {
+		t.Fatalf("roles: %s", roles.raw)
+	}
+}
+
+func TestAnAdminChangesRolesAndDisablesButNeverTheirOwnWay(t *testing.T) {
+	f, team := adminFlow(t)
+	ctx := context.Background()
+	boss := f.as("boss@example.com")
+	bossID, _ := f.s.AccountID(ctx, "team", "boss@example.com")
+	anaID, err := f.s.CreateAccount(ctx, team, "ana@example.com", password, json.RawMessage(`{"name":"Ana"}`), "member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ana := f.as("ana@example.com")
+
+	f.expect(f.call("PUT", "/identity/team/accounts/"+bossID.String()+"/roles", map[string]any{"roles": []string{"member"}}, boss...), 409, "own_account")
+	f.expect(f.call("POST", "/identity/team/accounts/"+bossID.String()+"/disable", nil, boss...), 409, "own_account")
+	f.expect(f.call("DELETE", "/identity/team/accounts/"+bossID.String(), nil, boss...), 409, "own_account")
+	if err := f.s.keepsAdmins(ctx, team, bossID, nil); !errors.Is(err, ErrLastAdmin) {
+		t.Fatalf("the last admin: %v", err)
+	}
+
+	a := f.call("PUT", "/identity/team/accounts/"+anaID.String()+"/roles", map[string]any{"roles": []string{"admin", "member"}}, boss...)
+	f.expect(a, 200, "")
+	if !strings.Contains(a.raw, `"roles":["admin","member"]`) {
+		t.Fatalf("roles: %s", a.raw)
+	}
+	// Disabled, her sessions end and she cannot sign in.
+	f.expect(f.call("POST", "/identity/team/accounts/"+anaID.String()+"/disable", nil, boss...), 200, "")
+	f.expect(f.call("GET", "/identity/team/session", nil, ana...), 401, "")
+	f.expect(f.call("POST", "/identity/team/sign-in", map[string]string{"email": "ana@example.com", "password": password}), 401, "invalid_credentials")
+	f.expect(f.call("POST", "/identity/team/accounts/"+anaID.String()+"/enable", nil, boss...), 200, "")
+	f.as("ana@example.com")
+
+	// Ana, an admin now, may take Boss's role; then Boss is no admin.
+	ana = f.as("ana@example.com")
+	f.expect(f.call("PUT", "/identity/team/accounts/"+bossID.String()+"/roles", map[string]any{"roles": []string{"member"}}, ana...), 200, "")
+	f.expect(f.call("GET", "/identity/team/accounts", nil, boss...), 403, "forbidden")
+
+	f.expect(f.call("DELETE", "/identity/team/accounts/"+bossID.String(), nil, ana...), 204, "")
+	f.expect(f.call("DELETE", "/identity/team/accounts/"+bossID.String(), nil, ana...), 404, "not_found")
+	var left int
+	_ = f.s.db.QueryRow(ctx, `SELECT count(*) FROM team WHERE id = $1`, bossID).Scan(&left)
+	if left != 0 {
+		t.Fatal("the record of a deleted account was left")
+	}
+}
+{{end -}}

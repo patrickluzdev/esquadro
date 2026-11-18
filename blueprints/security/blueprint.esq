@@ -71,6 +71,9 @@ blueprint security {
   /// link does.
   option verify_email_hours int default(24)
   option password_reset_minutes int default(60)
+  /// Days an invitation's link works: an account made by an administrator
+  /// (from the frontend, or <app> security invite), to choose its password.
+  option invite_days int default(7)
 
   /// The shortest password. NIST asks for 15 when the password is the only
   /// factor.

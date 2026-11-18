@@ -54,6 +54,8 @@ type Config struct {
 	Mailer Mailer
 	// How long the links of the emails work.
 	VerifyEmailHours, PasswordResetMinutes int
+	// InviteDays is how long an invitation's link works.
+	InviteDays int
 	// RotateKeysDays makes a new JWT signing key that often; 0 never does.
 	RotateKeysDays int
 }

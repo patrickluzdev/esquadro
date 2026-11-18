@@ -25,6 +25,8 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
 
   create <realm> <email> [field=value...] [-role r]... [-password-stdin] [-redirect /path]
         an account, and a link to set its password (or the password, from stdin)
+  invite <realm> <email> [field=value...] [-role r]... [-redirect /path]
+        an account, and an email inviting it to choose its password
   grant <realm> <email> <role>     give a role
   revoke <realm> <email> <role>    take a role away
   sessions <realm> <email>         the open sessions of an account
@@ -66,7 +68,9 @@ func securityCommand(ctx context.Context, args []string) error {
 		fmt.Println("a new signing key signs the tokens; the old ones check theirs until they expire")
 		return nil
 	case "create":
-		return createAccount(ctx, d, args, os.Stdin)
+		return createAccount(ctx, d, args, os.Stdin, false)
+	case "invite":
+		return createAccount(ctx, d, args, os.Stdin, true)
 {{- if .Options.services}}
 	case "key":
 		return serviceKeyCommand(ctx, d, args)
@@ -110,8 +114,8 @@ func securityCommand(ctx context.Context, args []string) error {
 	return errors.New(securityUsage)
 }
 
-// createAccount runs security create.
-func createAccount(ctx context.Context, d dependencies, args []string, stdin io.Reader) error {
+// createAccount runs security create, or security invite.
+func createAccount(ctx context.Context, d dependencies, args []string, stdin io.Reader, invite bool) error {
 	if len(args) < 2 {
 		return errors.New(securityUsage)
 	}
@@ -154,6 +158,13 @@ func createAccount(ctx context.Context, d dependencies, args []string, stdin io.
 	body, err := json.Marshal(fields)
 	if err != nil {
 		return err
+	}
+	if invite {
+		if _, err := d.security.Invite(ctx, realm, email, body, *redirect, "", roles...); err != nil {
+			return describe(err)
+		}
+		fmt.Printf("invited %s %s: an email with a link to choose the password is on its way\n", realm.Name, email)
+		return nil
 	}
 	id, err := d.security.CreateAccount(ctx, realm, email, password, body, roles...)
 	if err != nil {

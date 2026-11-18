@@ -47,6 +47,7 @@ func (d dependencies) realms() []security.Realm {
 				}
 				return nil
 			},
+			Table: "{{$e.Plural.Snake}}", Display: "{{realmDisplay $e}}", Admins: {{goStrings (realmAdmins $.Entities $e)}},
 		},
 {{- end}}
 	}

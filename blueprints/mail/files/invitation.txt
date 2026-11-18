@@ -1,0 +1,6 @@
+Subject: You are invited to {{.App}}
+{{if .From}}{{.From}} invited you{{else}}You were invited{{end}} to {{.App}}. Open this link to choose your password and come in:
+
+{{.Link}}
+
+It works until {{.Expires}}. If you did not expect it, ignore this email.
