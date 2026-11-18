@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
@@ -37,6 +38,9 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if n, ok := e.Ann["rest"]["unpaged_max"].(int64); ok && n < 1 {
 			diags.Errorf(e.Pos, e.Pos, "%s: unpaged_max %d must be at least 1", e.Raw, n)
 		}
+	}
+	for _, e := range p.Entities {
+		diags = append(diags, collisions(e)...)
 	}
 	modes := []string{"optional", "required"}
 	for _, e := range p.Entities {
@@ -93,4 +97,49 @@ func IdempotencyRequired(e *project.Entity, opts map[string]any) bool {
 	}
 	v, _ := opts["idempotency"].(string)
 	return v == "required"
+}
+
+// ListParams are the query parameters every list has, besides its filters.
+var ListParams = []string{"page", "per_page", "limit", "after", "sort", "q", "fields", "include"}
+
+// collisions are the filters of e's list whose parameter is one of the
+// list's own (a field page with @store(filter)), or another filter's (a
+// field price_min beside price filtered by range): the contract cannot
+// hold both, and the API's code would not generate.
+func collisions(e *project.Entity) diag.List {
+	var diags diag.List
+	seen := map[string]bool{}
+	for _, f := range APIFilters(e) {
+		pos := paramPos(e, f.Param)
+		switch {
+		case slices.Contains(ListParams, f.Param):
+			diags.Errorf(pos, pos, "%s: a filter is the list's parameter %s (%s): rename the field, or leave it out of the filters", e.Raw, f.Param, strings.Join(ListParams, ", "))
+		case seen[f.Param]:
+			diags.Errorf(pos, pos, "%s: two filters are the parameter %s (a range's _min and _max, and a field of that name): rename the field, or leave one out of the filters", e.Raw, f.Param)
+		}
+		seen[f.Param] = true
+	}
+	return diags
+}
+
+// paramPos is where the field a filter parameter comes from is declared:
+// price for price_min, category for category_id.
+func paramPos(e *project.Entity, param string) diag.Pos {
+	for _, f := range e.Fields {
+		if f.Snake == param {
+			return f.Pos
+		}
+	}
+	for _, r := range e.Relations {
+		if r.Snake+"_id" == param && r.OwnsForeignKey() {
+			return r.Pos
+		}
+	}
+	base := strings.TrimSuffix(strings.TrimSuffix(param, "_min"), "_max")
+	for _, f := range e.Fields {
+		if f.Snake == base && f.Pos.IsValid() {
+			return f.Pos
+		}
+	}
+	return e.Pos
 }

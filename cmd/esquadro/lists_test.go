@@ -40,3 +40,32 @@ entity Product {
 		}
 	}
 }
+
+func TestListsRefuseFiltersNamedLikeTheirParameters(t *testing.T) {
+	dir, _ := smallProject(t, "app,env,domain,http,postgres,migrations,store,rest")
+	os.WriteFile(filepath.Join(dir, "esquadro", "catalog.esq"), []byte(`package catalog
+
+entity Visit {
+  page      string required @store(filter)
+  sort      string required
+  price     int    required @store(filter)
+  price_min int    required @store(filter)
+}
+`), 0o644)
+	code, _, errOut := esq(t, "check", dir)
+	if code != 1 {
+		t.Fatalf("exit %d\n%s", code, errOut)
+	}
+	for _, want := range []string{
+		`catalog.esq:4:3: error: Visit: a filter is the list's parameter page`,
+		`catalog.esq:7:3: error: Visit: two filters are the parameter price_min`,
+	} {
+		if !strings.Contains(errOut, want) {
+			t.Errorf("missing %q in:\n%s", want, errOut)
+		}
+	}
+	// A field named like a parameter but not filtered is fine.
+	if strings.Contains(errOut, "parameter sort") {
+		t.Errorf("a field not filtered was refused:\n%s", errOut)
+	}
+}

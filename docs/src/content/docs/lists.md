@@ -26,7 +26,10 @@ entity Product {
 
 - `filter`: by a value; numbers and dates also by a range (`_min`, `_max`,
   inclusive); an enum by a list of values. Relations filter by the related
-  record's id.
+  record's id. A filter's parameter cannot be one of the list's own
+  (`page`, `per_page`, `limit`, `after`, `sort`, `q`, `fields`, `include`),
+  nor another filter's (a field `price_min` beside `price` filtered by
+  range): `esquadro check` says so at the field.
 - `sort`: the list may be ordered by it, either way. Only a required field
   (or one with a default) may be: a page ordered by a field that may be empty
   would skip the records without it.
