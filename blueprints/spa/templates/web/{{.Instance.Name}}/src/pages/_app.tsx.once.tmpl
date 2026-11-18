@@ -31,6 +31,8 @@ function Layout() {
         <div className="@container/main mx-auto flex w-full max-w-[1536px] flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
           <Outlet />
         </div>
+        {/* Where a page puts the bar of its actions: the inset's whole width, at the foot of the screen. */}
+        <div id="page-foot" className="sticky bottom-0 z-10" />
       </SidebarInset>
       <IdleTimeout />
     </SidebarProvider>
@@ -42,6 +44,8 @@ function Layout() {
         <div className="@container/main mx-auto flex w-full max-w-[1536px] flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
           <Outlet />
         </div>
+        {/* Where a page puts the bar of its actions: the inset's whole width, at the foot of the screen. */}
+        <div id="page-foot" className="sticky bottom-0 z-10" />
       </SidebarInset>
       <IdleTimeout />
     </SidebarProvider>

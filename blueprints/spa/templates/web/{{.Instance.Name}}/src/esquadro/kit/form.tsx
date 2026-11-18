@@ -5,7 +5,7 @@
 // (Idempotency-Key), and a question before leaving with changes unsaved.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useBlocker, useNavigate, useRouterState, useSearch } from "@tanstack/react-router"
-import { useMemo, useRef, useState } from "react"
+import { useId, useMemo, useRef, useState } from "react"
 import { fields as yours } from "@/fields.ts"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,7 +24,7 @@ import { ask } from "./confirm.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
-import { PageHeader } from "./page.tsx"
+import { PageFoot, PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
 import { BackToList, useRecord } from "./show.tsx"
 import { ErrorState, FormSkeleton } from "./states.tsx"
@@ -185,6 +185,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   // One key for this form: sending it again (a double click, a retry)
   // creates the record once.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
+  const formId = useId()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   useBlocker({
@@ -232,7 +233,8 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
 
   return (
     <form
-      className="flex flex-1 flex-col gap-6"
+      id={formId}
+      className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault()
         save.mutate()
@@ -297,11 +299,14 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
         ))}
       </div>
       {/* The form's actions, fixed at the foot of the screen. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-auto -mb-6 flex items-center justify-between gap-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm lg:-mx-8 lg:px-8">
-        <Button type="button" variant="ghost" onClick={() => history.back()}>
-          <ArrowLeft /> {t("back")}
-        </Button>
-        <div className="flex gap-2">
+      <PageFoot>
+        {/* Editing goes back to the record; creating has only its actions. */}
+        {record && (
+          <Button type="button" variant="ghost" onClick={() => history.back()}>
+            <ArrowLeft /> {t("back")}
+          </Button>
+        )}
+        <div className="ml-auto flex gap-2">
           {record && (record.can ?? []).includes("delete") && (
             <Button
               type="button"
@@ -322,12 +327,12 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
               <Trash2 /> {t("delete")}
             </Button>
           )}
-          <Button type="submit" disabled={save.isPending}>
+          <Button type="submit" form={formId} disabled={save.isPending}>
             {save.isPending && <Spinner />}
             {t("save")}
           </Button>
         </div>
-      </div>
+      </PageFoot>
     </form>
   )
 }
