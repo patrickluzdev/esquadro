@@ -2,7 +2,9 @@
 {{- $m := .Module -}}
 package {{$m.Snake}}
 
-{{importBlock "bytes" "context" "encoding/json" "errors" "log/slog" "testing" "time" (sampleImports $m) (printf "%s/internal/platform/jobs" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) "github.com/jackc/pgx/v5/pgxpool"}}
+{{- /* The tests of each job use these; a job without arguments to check, not errors. */ -}}
+{{- $sampled := false}}{{$refuses := false}}{{range $m.Jobs}}{{if canSample .}}{{$sampled = true}}{{if refusesEmpty .}}{{$refuses = true}}{{end}}{{end}}{{end}}
+{{importBlock (and $sampled "bytes") (and $sampled "context") (and $sampled "encoding/json") (and $refuses "errors") "log/slog" "testing" (and $sampled "time") (sampleImports $m) (printf "%s/internal/platform/jobs" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) "github.com/jackc/pgx/v5/pgxpool"}}
 
 // openJobs opens a job queue on a fresh database, with what register adds.
 func openJobs(t *testing.T, register func(r *jobs.Registry)) (*{{$m.Pascal}}, *jobs.Queue, *pgxpool.Pool) {

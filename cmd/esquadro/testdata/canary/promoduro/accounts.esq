@@ -1,0 +1,17 @@
+// The Promo do Duro, as its MVP needs it: the team that runs the groups, and
+// the visitors of the site. A canary: esquadro's tests generate it with each
+// change, and upgrade it from the last release.
+package accounts
+
+/// Someone of the team: admins manage everything, operators approve and
+/// send offers, viewers read.
+entity User {
+  name string required min(2) max(80)
+  @security(principal, roles [admin, operator, viewer], read user, write user.admin)
+}
+
+/// A visitor of the site: signs up on their own.
+entity Visitor {
+  name string required min(2) max(80)
+  @security(principal, signup open, read user, write user.admin)
+}

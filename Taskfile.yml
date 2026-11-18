@@ -33,7 +33,7 @@ tasks:
   e2e:
     desc: Follow a generated project through its life, the tutorial step by step and every kind of project, against Postgres (needs Docker; minutes)
     cmds:
-      - go test -tags e2e -run 'TestLifecycle|TestTutorial|TestEveryKindOfProjectRuns' -count 1 -timeout 30m -v ./cmd/esquadro
+      - go test -tags e2e -run 'TestLifecycle|TestTutorial|TestEveryKindOfProjectRuns|TestCanaryUpgrades' -count 1 -timeout 30m -v ./cmd/esquadro
 
   e2e:platform:
     desc: Follow a platform from a fresh Debian 13 (a container) to an app deployed and rolled back (needs Docker, Ansible, SOPS and age; minutes)

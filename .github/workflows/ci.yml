@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # the canary upgrades a project from the last release's tag
+          fetch-depth: 0
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod

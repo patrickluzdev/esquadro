@@ -77,7 +77,7 @@ func TestGenWritesThenRespectsEdits(t *testing.T) {
 	}
 
 	// Running again changes nothing.
-	if code, out, _ := gen(t, dir); code != 0 || !strings.Contains(out, "0 created, 0 updated, 0 deleted, 2 unchanged, 1 kept") {
+	if code, out, _ := gen(t, dir); code != 0 || !strings.Contains(out, "0 created, 0 updated, 0 deleted, 3 unchanged") {
 		t.Fatalf("second run: exit %d\n%s", code, out)
 	}
 

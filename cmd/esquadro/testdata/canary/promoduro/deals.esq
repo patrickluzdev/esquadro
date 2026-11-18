@@ -1,0 +1,102 @@
+// The deals the groups get: niches, where they are sent, the offers from the
+// affiliate programs, the links that count the clicks, and the commissions.
+package deals
+
+enum Channel { TELEGRAM WHATSAPP }
+enum Source { SHOPEE MANUAL }
+enum OfferStatus { PENDING APPROVED SKIPPED EXPIRED }
+enum SendStatus { PENDING POSTED FAILED PASTED }
+enum CommissionStatus { ESTIMATED CONFIRMED PAID }
+
+/// A niche of the groups: casa, beleza, bebê.
+entity Niche {
+  slug       string required unique min(2) max(40)
+  name       string required min(2) max(80)
+  daily_goal int    default(5) min(0)
+  @security(read user, write user.admin)
+}
+
+/// A group or channel offers are sent to.
+entity Destination {
+  channel          Channel required @store(filter)
+  number           int     required min(1)
+  telegram_chat_id string
+  invite_url       string
+  active           bool    default(true) @store(filter)
+  niche            > Niche required @store(filter)
+  @security(read user, write user.admin)
+}
+
+/// An offer, from an affiliate program or typed by the team.
+entity Offer {
+  source               Source      required @store(filter)
+  store                string      required max(60) @store(filter)
+  external_id          string
+  title                string      required max(300) @store(search, sort)
+  product_url          string      required
+  image_url            string
+  price                decimal       required min(0) @store(sort)
+  original_price       decimal
+  coupon               string      max(60)
+  estimated_commission decimal
+  status               OfferStatus default(PENDING) @store(filter)
+  hook                 string      max(120)
+  approved_at          time
+  niche                > Niche @store(filter)
+  @security(read public, write [user.admin, user.operator])
+}
+
+/// A short link of an offer for one destination: it counts the clicks.
+entity Link {
+  code        string required unique min(4) max(12)
+  target_url  string required
+  offer       > Offer required on_delete(cascade)
+  destination > Destination
+  @security(read user, write [user.admin, user.operator])
+}
+
+/// An offer sent to a destination, once.
+entity Send {
+  status      SendStatus default(PENDING) @store(filter)
+  error       string
+  offer       > Offer required on_delete(cascade)
+  destination > Destination required
+  @postgres(unique_index [offer, destination])
+  @security(read user, write [user.admin, user.operator])
+}
+
+/// A click on a link; people only, without who they are.
+entity Click {
+  occurred_at time   default(now) @store(sort)
+  user_agent  string
+  ip_hash     string
+  bot         bool   default(false) @store(filter)
+  link        > Link required on_delete(cascade)
+  @security(read user.admin, write user.admin)
+}
+
+/// A coupon of a store, apart from any product.
+entity Coupon {
+  code       string required max(60)
+  store      string required max(60) @store(filter)
+  discount   string max(60)
+  rules      text
+  expires_on date
+  @security(read public, write [user.admin, user.operator])
+}
+
+/// What a store paid, or will pay, for a period.
+entity Commission {
+  store       string           required max(60) @store(filter)
+  period      string           required max(20)
+  status      CommissionStatus default(ESTIMATED) @store(filter)
+  amount      decimal            required min(0)
+  external_id string
+  niche       > Niche
+  @security(read user.admin, write user.admin)
+}
+
+/// Looks for new offers in the affiliate programs, every two hours.
+job FetchOffers {
+  @jobs(every "0 */2 * * *")
+}

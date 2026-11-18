@@ -116,6 +116,9 @@ func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error)
 			a.Change, a.Reason = Update, reasonNowYours
 		case wasGenerated:
 			a.Change, a.Reason = Conflict, reasonEdited
+		// A file of the user's already as the template writes it.
+		case f.Once && old != nil && bytes.Equal(old, f.Content):
+			a.Change = Unchanged
 		// A file of the user's still as esquadro wrote it: it follows the
 		// template, as a generated file does.
 		case f.Once && old != nil && a.locked != nil && a.locked.Once && a.locked.Hash != "" &&
