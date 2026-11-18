@@ -19,4 +19,8 @@ describe("crumbsOf", () => {
     expect(crumbsOf(path)[2]?.label).toBe("123")
     expect(crumbsOf(path, undefined, { id: "123", version: 1, [m.title]: "Webcam HD" })[2]?.label).toBe("Webcam HD")
   })
+
+  it("calls a missing record Not found, not by its id", () => {
+    expect(crumbsOf("/things/123", undefined, undefined, true)[2]?.label).not.toBe("123")
+  })
 })

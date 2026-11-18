@@ -194,7 +194,7 @@ export function defaultSections(form: FieldMeta[]): FormSection[] {
 export function ResourceForm({ resource, id }: { resource: Resource; id?: string }) {
   const record = useRecord(resource, id)
   if (id !== undefined && record.isPending) return <FormSkeleton fields={resource.form.length} />
-  if (record.isError) return <ErrorState error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
+  if (record.isError) return <ErrorState framed error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
   return <Form resource={resource} record={record.data} />
 }
 

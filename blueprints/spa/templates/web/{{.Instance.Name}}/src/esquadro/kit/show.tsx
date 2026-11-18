@@ -111,7 +111,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
     onError: (e) => toast(describe(e), "error"),
   })
   if (record.isPending) return <DetailSkeleton fields={(resource.show ?? resource.form).length} />
-  if (record.isError) return <ErrorState error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
+  if (record.isError) return <ErrorState framed error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
   const r = record.data
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular

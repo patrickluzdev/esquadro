@@ -1,8 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query"
 import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router"
-import { FileQuestion } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Toaster } from "@/components/ui/sonner"
 import { Confirmer } from "../esquadro/kit/confirm.tsx"
 import { OfflineBanner, SessionSync } from "../esquadro/kit/connection.tsx"
@@ -20,19 +18,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <ShortcutsHelp />
     </>
   ),
+  // An address that is no page: the number, what happened, and home.
   notFoundComponent: () => (
-    <Empty className="min-h-svh">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <FileQuestion />
-        </EmptyMedia>
-        <EmptyTitle>{t("notFoundPage")}</EmptyTitle>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button asChild variant="outline">
-          <Link to="/">{t("home")}</Link>
+    <main className="flex min-h-svh items-center justify-center bg-card p-6">
+      <div className="flex max-w-md flex-col items-center gap-6 text-center">
+        <p className="text-8xl leading-none font-black tracking-tighter text-primary" aria-hidden>
+          404
+        </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("pageNotFound")}</h1>
+          <p className="text-muted-foreground">{t("pageNotFoundHint")}</p>
+        </div>
+        <Button asChild size="lg">
+          <Link to="/">{t("goHome")}</Link>
         </Button>
-      </EmptyContent>
-    </Empty>
+      </div>
+    </main>
   ),
 })

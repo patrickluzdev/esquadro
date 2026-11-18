@@ -14,32 +14,48 @@ import { cn } from "@/lib/utils"
 import { describe } from "./errors.ts"
 import { t } from "./i18n.ts"
 
-/** A state with its icon, what happened, and what to do about it. */
+/** What a state is about: its icon's color. */
+export type StateTone = "default" | "muted" | "warning" | "error"
+
+const TONES: Record<StateTone, string> = {
+  default: "bg-primary/10 text-primary ring-primary/5",
+  muted: "bg-muted text-muted-foreground ring-muted/50",
+  warning: "bg-amber-100 text-amber-600 ring-amber-50 dark:bg-amber-500/20 dark:text-amber-100 dark:ring-amber-500/5",
+  error: "bg-destructive/10 text-destructive ring-destructive/5",
+}
+
+/**
+ * A state with its icon (in a circle of its tone), what happened, and what
+ * to do about it. Framed, it is a card of its own: a page with nothing else.
+ */
 export function StateView({
   icon,
   title,
   description,
   action,
   tone = "default",
+  framed = false,
   className,
 }: {
   icon: ReactNode
   title: ReactNode
   description?: ReactNode
   action?: ReactNode
-  tone?: "default" | "error"
+  tone?: StateTone
+  framed?: boolean
   className?: string
 }) {
   return (
-    <Empty className={cn("py-12", className)} role={tone === "error" ? "alert" : "status"}>
-      <EmptyHeader>
-        <EmptyMedia variant="icon" className={tone === "error" ? "bg-destructive/10 text-destructive" : undefined}>
-          {icon}
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        {description && <EmptyDescription>{description}</EmptyDescription>}
+    <Empty
+      className={cn("gap-5 py-14", framed && "min-h-[60svh] rounded-xl border border-border bg-card", className)}
+      role={tone === "error" ? "alert" : "status"}
+    >
+      <EmptyHeader className="max-w-md gap-3">
+        <EmptyMedia className={cn("mb-2 size-16 rounded-full ring-8 [&_svg:not([class*='size-'])]:size-7", TONES[tone])}>{icon}</EmptyMedia>
+        <EmptyTitle className="text-lg font-bold tracking-tight text-foreground">{title}</EmptyTitle>
+        {description && <EmptyDescription className="text-sm text-muted-foreground">{description}</EmptyDescription>}
       </EmptyHeader>
-      {action && <EmptyContent>{action}</EmptyContent>}
+      {action && <EmptyContent className="flex-row flex-wrap justify-center gap-2">{action}</EmptyContent>}
     </Empty>
   )
 }
@@ -70,28 +86,41 @@ export function NoResultsState({ query, onClear, className }: { query?: string; 
  * Something could not be loaded: not found, not allowed, or another error,
  * with a way to try again, or to go back.
  */
-export function ErrorState({ error, onRetry, back, className }: { error: unknown; onRetry?: () => void; back?: ReactNode; className?: string }) {
+export function ErrorState({
+  error,
+  onRetry,
+  back,
+  framed,
+  className,
+}: {
+  error: unknown
+  onRetry?: () => void
+  back?: ReactNode
+  framed?: boolean
+  className?: string
+}) {
   if (isApiError(error) && error.status === 404) {
-    return <StateView icon={<FileQuestion />} title={t("notFound")} description={t("notFoundHint")} action={back} className={className} />
+    return <StateView icon={<FileQuestion />} title={t("notFound")} description={t("notFoundHint")} action={back} framed={framed} className={className} />
   }
   if (isApiError(error) && error.status === 403) {
-    return <StateView icon={<ShieldX />} title={t("forbidden")} description={t("forbiddenPage")} action={back} className={className} />
+    return <StateView tone="warning" icon={<ShieldX />} title={t("forbidden")} description={t("forbiddenPage")} action={back} framed={framed} className={className} />
   }
   return (
     <StateView
       tone="error"
+      framed={framed}
       icon={<AlertTriangle />}
       title={t("loadFailed")}
       description={describe(error)}
       action={
-        <div className="flex gap-2">
+        <>
           {back}
           {onRetry && (
             <Button variant="outline" onClick={onRetry}>
               <RotateCw /> {t("retry")}
             </Button>
           )}
-        </div>
+        </>
       }
       className={className}
     />
