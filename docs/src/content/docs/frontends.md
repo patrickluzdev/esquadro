@@ -125,7 +125,8 @@ entity Product {
     through and failed;
   - a column marked `editable` is changed in the list itself: a choice or a
     checkbox saves at once, text on Enter (Esc gives up), changing that field
-    alone (`PATCH`) on the version shown (`If-Match`);
+    alone (`PATCH`) on the version shown (`If-Match`), showing the new value
+    at once and going back to the old one if the API refuses it;
   - each record has a menu: View, Edit, your actions, Delete;
   - Columns shows and hides columns (`hidden` starts one hidden).
   - A date in the filters (`created_at`, which every resource can filter

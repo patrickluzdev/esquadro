@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { api } from "../api.ts"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
-import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
+import type { FieldMeta, Page, Rec, ResourceMeta } from "./meta.ts"
 import { FieldValue } from "./show.tsx"
 import { toast } from "./toast.tsx"
 
@@ -27,12 +27,23 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
   const canEdit = (record.can ?? []).includes("update")
   const save = useMutation({
     mutationFn: (value: unknown) => meta.api(api as never).patch(record.id, { [field.name]: value }, { ifMatch: record }),
-    onSuccess: () => {
+    // Optimistic: the lists show the new value at once, and go back to what
+    // they had if the API refuses it.
+    onMutate: async (value: unknown) => {
       setEditing(false)
-      toast(t("saved"))
-      queryClient.invalidateQueries({ queryKey: [meta.name] })
+      await queryClient.cancelQueries({ queryKey: [meta.name, "list"] })
+      const before = queryClient.getQueriesData<Page>({ queryKey: [meta.name, "list"] })
+      queryClient.setQueriesData<Page>({ queryKey: [meta.name, "list"] }, (page) =>
+        page && { ...page, items: page.items.map((r) => (r.id === record.id ? { ...r, [field.name]: value } : r)) },
+      )
+      return { before }
     },
-    onError: (e) => {
+    onSuccess: () => {
+      toast(t("saved"))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [meta.name] }),
+    onError: (e, _value, context) => {
+      for (const [key, page] of context?.before ?? []) queryClient.setQueryData(key, page)
       committed.current = false
       const code = fieldErrors(e)[field.name]
       toast(code ? `${field.label}: ${fieldMessage(field, code)}` : describe(e), "error")
