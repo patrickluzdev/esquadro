@@ -7,6 +7,8 @@ import { fields as yours } from "@/fields.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
@@ -17,7 +19,6 @@ import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { ResourceList } from "./list.tsx"
-import { PageHeader } from "./page.tsx"
 import { DetailSkeleton, ErrorState } from "./states.tsx"
 import { useKeys } from "./keys.tsx"
 import { Highlight } from "./search.tsx"
@@ -65,6 +66,12 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   )
 }
 
+/** The first letters of what a record is called: "Webcam HD" is WH. */
+export function initials(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toLocaleUpperCase() || "#"
+}
+
 /** Back to the resource's list. */
 export function BackToList({ resource }: { resource: Resource }) {
   return (
@@ -109,81 +116,105 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const r = record.data
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
+  const fields = resource.show ?? resource.form
+  const relations = resource.relations?.() ?? []
+  const value = (f: FieldMeta) => (
+    <div key={f.name} className="group/value flex flex-col gap-1">
+      <dt className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{f.label}</dt>
+      <dd className="flex min-h-6 items-center gap-1 text-sm font-semibold text-foreground">
+        <FieldValue field={f} record={r} />
+        {r[f.name] !== null && r[f.name] !== undefined && r[f.name] !== "" && (
+          <CopyButton
+            text={f.kind === "relation" ? String(r[f.name]) : format(f, r[f.name])}
+            label={`${t("copy")} ${f.label}`}
+            className="opacity-0 transition-opacity group-hover/value:opacity-100 focus-visible:opacity-100"
+          />
+        )}
+      </dd>
+    </div>
+  )
+  const buttons = (
+    <div className="flex flex-col gap-2">
+      {can.includes("update") && (
+        <Button asChild>
+          <Link to={`/${meta.name}/${r.id}/edit` as never}>
+            <Pencil /> {t("edit")}
+          </Link>
+        </Button>
+      )}
+      {resource.actions
+        ?.filter((a) => !a.when || a.when(r))
+        .map((a) => (
+          <Button
+            key={a.label}
+            variant={a.destructive ? "destructive-outline" : "outline"}
+            onClick={async () => {
+              if (a.confirm && !(await ask(a.confirm, { destructive: a.destructive }))) return
+              try {
+                await a.run(r)
+                toast(t("done"))
+                queryClient.invalidateQueries({ queryKey: [meta.name] })
+              } catch (e) {
+                toast(describe(e), "error")
+              }
+            }}
+          >
+            {a.icon && <a.icon />} {a.label}
+          </Button>
+        ))}
+      <Button variant="outline" onClick={() => duplicate(r)}>
+        <Copy /> {t("duplicate")}
+      </Button>
+      {can.includes("delete") && (
+        <Button
+          variant="destructive-outline"
+          disabled={remove.isPending}
+          onClick={async () => (await ask(t("confirmDelete"), { destructive: true })) && remove.mutate(r)}
+        >
+          <Trash2 /> {t("delete")}
+        </Button>
+      )}
+    </div>
+  )
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title={title}
-        description={capitalize(meta.singular)}
-        actions={
-          <>
-            {resource.actions
-              ?.filter((a) => !a.when || a.when(r))
-              .map((a) => (
-                <Button
-                  key={a.label}
-                  variant="outline"
-                  onClick={async () => {
-                    if (a.confirm && !(await ask(a.confirm))) return
-                    try {
-                      await a.run(r)
-                      toast(t("done"))
-                      queryClient.invalidateQueries({ queryKey: [meta.name] })
-                    } catch (e) {
-                      toast(describe(e), "error")
-                    }
-                  }}
-                >
-                  {a.label}
-                </Button>
-              ))}
-            <Button variant="outline" onClick={() => duplicate(r)}>
-              <Copy /> {t("duplicate")}
-            </Button>
-            {can.includes("update") && (
-              <Button variant="outline" asChild>
-                <Link to={`/${meta.name}/${r.id}/edit` as never}>
-                  <Pencil /> {t("edit")}
-                </Link>
-              </Button>
-            )}
-            {can.includes("delete") && (
-              <Button
-                variant="destructive"
-                disabled={remove.isPending}
-                onClick={async () => (await ask(t("confirmDelete"), { destructive: true })) && remove.mutate(r)}
-              >
-                <Trash2 /> {t("delete")}
-              </Button>
-            )}
-          </>
-        }
-      />
-      <Card>
-        <CardContent>
-          <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-            {(resource.show ?? resource.form).map((f) => (
-              <div key={f.name} className="group/value space-y-1">
-                <dt className="text-sm text-muted-foreground">{f.label}</dt>
-                <dd className="flex min-h-6 items-center gap-1 text-sm font-medium">
-                  <FieldValue field={f} record={r} />
-                  {r[f.name] !== null && r[f.name] !== undefined && r[f.name] !== "" && (
-                    <CopyButton
-                      text={f.kind === "relation" ? String(r[f.name]) : format(f, r[f.name])}
-                      label={`${t("copy")} ${f.label}`}
-                      className="opacity-0 transition-opacity group-hover/value:opacity-100 focus-visible:opacity-100"
-                    />
-                  )}
-                </dd>
-              </div>
-            ))}
-          </dl>
+    <div className={cn("grid items-start gap-6", relations.length > 0 && "lg:grid-cols-[340px_minmax(0,1fr)]")}>
+      <Card className={cn(relations.length === 0 && "max-w-3xl")}>
+        <CardContent className="flex flex-col gap-6">
+          <div className="flex flex-col items-center gap-3 pt-2 text-center">
+            <div className="flex size-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
+              {initials(title)}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
+              <p className="text-sm text-muted-foreground">{capitalize(meta.singular)}</p>
+            </div>
+          </div>
+          <dl className={cn("grid gap-5", relations.length === 0 && "sm:grid-cols-2")}>{fields.map(value)}</dl>
+          {buttons}
         </CardContent>
       </Card>
-      {resource.relations?.().map((rel) => (
-        <section key={`${rel.resource.meta.name}-${rel.param}`} className="flex flex-col gap-3">
-          <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
-        </section>
-      ))}
+      {relations.length > 0 && (
+        <Card className="py-0">
+          <Tabs defaultValue={`${relations[0].resource.meta.name}-${relations[0].param}`} className="gap-0">
+            <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b border-border bg-transparent px-5 pt-3 pb-0">
+              {relations.map((rel) => (
+                <TabsTrigger
+                  key={`${rel.resource.meta.name}-${rel.param}`}
+                  value={`${rel.resource.meta.name}-${rel.param}`}
+                  className="flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-1 pb-3 font-semibold text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent"
+                >
+                  {rel.label ?? rel.resource.meta.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {relations.map((rel) => (
+              <TabsContent key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`} className="p-5">
+                <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </Card>
+      )}
     </div>
   )
 }

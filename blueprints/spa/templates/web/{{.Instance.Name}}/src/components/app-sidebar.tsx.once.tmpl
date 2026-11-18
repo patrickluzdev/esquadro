@@ -3,7 +3,6 @@
 // {{if eq $mode "icon"}}sidebar-07 (it collapses to its icons){{else if eq $mode "inset"}}sidebar-08 (the page in an inset card){{else}}dashboard-01 (it slides away){{end}}. Yours to change: see
 // ui.shadcn.com/blocks for others.
 import { Link } from "@tanstack/react-router"
-import { Command } from "lucide-react"
 import type { ComponentProps } from "react"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -21,21 +20,22 @@ import {
 {{- end}}
 } from "@/components/ui/sidebar"
 import { menu } from "@/menu.ts"
+import { t } from "../esquadro/kit/i18n.ts"
 
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {{if eq $mode "icon"}}collapsible="icon"{{else if eq $mode "inset"}}variant="inset"{{else}}collapsible="offcanvas"{{end}} {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="h-16 justify-center">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Command className="size-4" />
+                <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
+                  {{slice .App.Label 0 1}}
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{{.App.Label}}</span>
-                  <span className="truncate text-xs">{{humanize .Instance.Name}}</span>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate text-lg font-bold text-foreground">{{.App.Label}}</span>
+                  <span className="truncate text-xs text-muted-foreground">{{humanize .Instance.Name}}</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -43,7 +43,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={menu.main} />
+        <NavMain items={menu.main} label={t("menu")} />
         <NavSecondary items={menu.secondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

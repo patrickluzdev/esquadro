@@ -12,6 +12,7 @@ export const widgets: Widget[] = [
     x: {{with index $a "x"}}"{{.}}"{{else}}undefined{{end}},
     y: {{with index $a "y"}}"{{.}}"{{else}}undefined{{end}},
     since: {{with index $a "since"}}"{{.}}"{{else}}undefined{{end}},
+    icon: {{with index $a "icon"}}"{{.}}"{{else}}undefined{{end}},
     columns: [{{range $i, $c := $r.Columns}}{{if $i}}, {{end}}{ name: "{{$c.Snake}}", label: {{printf "%q" (or (index (ann $c) "label") (humanize $c.Snake))}}, kind: "{{spaKind $c}}", required: {{$c.Required}}{{if $c.Enum}}, values: [{{range $j, $v := enumValues $c.Enum}}{{if $j}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $j, $v := $c.Enum.Values}}{{if $j}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }{{end}} }{{end}}],
     fetch: (api: Api, params: Record<string, unknown>) =>
       api.reports.{{$r.Camel}}(params as never) as unknown as Promise<Record<string, unknown>[]>,

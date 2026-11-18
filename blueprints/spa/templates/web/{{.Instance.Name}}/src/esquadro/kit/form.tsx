@@ -8,7 +8,9 @@ import { useBlocker, useNavigate, useRouterState, useSearch } from "@tanstack/re
 import { useMemo, useRef, useState } from "react"
 import { fields as yours } from "@/fields.ts"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import { ArrowLeft, Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -169,6 +171,8 @@ export function ResourceForm({ resource, id }: { resource: Resource; id?: string
 function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const { meta } = resource
   const fields = resource.form.filter((f) => !f.readOnly)
+  // The form's cards: the resource's sections, or one with every field.
+  const sections = resource.sections ?? [{ title: t("details"), fields: resource.form }]
   // A new record starts with what the URL gives (?category_id=), or with a
   // copy of another (Duplicate).
   const given = useSearch({ strict: false }) as Record<string, unknown>
@@ -228,65 +232,103 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
 
   return (
     <form
-      className="flex max-w-2xl flex-col gap-6"
+      className="flex flex-1 flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault()
         save.mutate()
       }}
     >
       <PageHeader title={record ? t("editing", { name: meta.singular }) : t("creating", { name: meta.singular })} />
-      <Card>
-        <CardContent>
-          <FieldGroup>
-            {fields.map((f) => {
-              const error = errors[f.name]
-              const input = (
-                <FieldInput
-                  field={f}
-                  value={values[f.name]}
-                  invalid={error !== undefined}
-                  onChange={(v) => {
-                    dirty.current = true
-                    setErrors(({ [f.name]: _, ...rest }) => rest)
-                    setValues((all) => ({ ...all, [f.name]: v }))
-                  }}
-                />
-              )
-              const label = (
-                <FieldLabel htmlFor={`field-${f.name}`}>
-                  {f.label}
-                  {f.required && f.kind !== "bool" && <span className="text-destructive">*</span>}
-                </FieldLabel>
-              )
-              return (
-                <Field key={f.name} orientation={f.kind === "bool" ? "horizontal" : "vertical"} data-invalid={error !== undefined || undefined}>
-                  {f.kind === "bool" ? (
-                    <>
-                      {input}
-                      {label}
-                    </>
-                  ) : (
-                    <>
-                      {label}
-                      {input}
-                    </>
-                  )}
-                  {error && <FieldError>{fieldMessage(f, error)}</FieldError>}
-                </Field>
-              )
-            })}
-          </FieldGroup>
-        </CardContent>
-        <CardFooter className="justify-end gap-2 border-t">
-          <Button type="button" variant="outline" onClick={() => history.back()}>
-            {t("cancel")}
-          </Button>
+      <div className="flex max-w-4xl flex-col gap-6">
+        {sections.map((section) => (
+          <Card key={section.title}>
+            <CardHeader>
+              <CardTitle>{section.title}</CardTitle>
+              {section.description && <CardDescription>{section.description}</CardDescription>}
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-5 sm:grid-cols-2">
+                {section.fields
+                  .filter((f) => !f.readOnly)
+                  .map((f) => {
+                    const error = errors[f.name]
+                    const input = (
+                      <FieldInput
+                        field={f}
+                        value={values[f.name]}
+                        invalid={error !== undefined}
+                        onChange={(v) => {
+                          dirty.current = true
+                          setErrors(({ [f.name]: _, ...rest }) => rest)
+                          setValues((all) => ({ ...all, [f.name]: v }))
+                        }}
+                      />
+                    )
+                    const label = (
+                      <FieldLabel htmlFor={`field-${f.name}`}>
+                        {f.label}
+                        {f.required && f.kind !== "bool" && <span className="text-destructive">*</span>}
+                      </FieldLabel>
+                    )
+                    return (
+                      <Field
+                        key={f.name}
+                        orientation={f.kind === "bool" ? "horizontal" : "vertical"}
+                        data-invalid={error !== undefined || undefined}
+                        className={cn(f.kind === "textarea" && "sm:col-span-2")}
+                      >
+                        {f.kind === "bool" ? (
+                          <>
+                            {input}
+                            {label}
+                          </>
+                        ) : (
+                          <>
+                            {label}
+                            {input}
+                          </>
+                        )}
+                        {error && <FieldError>{fieldMessage(f, error)}</FieldError>}
+                      </Field>
+                    )
+                  })}
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {/* The form's actions, fixed at the foot of the screen. */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-auto -mb-4 flex items-center justify-between gap-2 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm lg:-mx-8 lg:-mb-8 lg:px-8">
+        <Button type="button" variant="ghost" onClick={() => history.back()}>
+          <ArrowLeft /> {t("back")}
+        </Button>
+        <div className="flex gap-2">
+          {record && (record.can ?? []).includes("delete") && (
+            <Button
+              type="button"
+              variant="destructive-outline"
+              onClick={async () => {
+                if (!(await ask(t("confirmDelete"), { destructive: true }))) return
+                try {
+                  await meta.api(api as never).delete(record.id, { ifMatch: record })
+                  dirty.current = false
+                  toast(t("deleted"))
+                  queryClient.invalidateQueries({ queryKey: [meta.name] })
+                  navigate({ to: `/${meta.name}` as never })
+                } catch (e) {
+                  toast(describe(e), "error")
+                }
+              }}
+            >
+              <Trash2 /> {t("delete")}
+            </Button>
+          )}
           <Button type="submit" disabled={save.isPending}>
             {save.isPending && <Spinner />}
             {t("save")}
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </form>
   )
 }

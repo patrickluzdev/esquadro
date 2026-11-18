@@ -73,6 +73,8 @@ blueprint spa {
     label string
     /// The time parameter the dashboard's period fills (its start): since.
     since name
+    /// A number's icon, a Lucide name: shopping_cart.
+    icon name
   }
   annotation value {
     /// What people call a value of an enum, in the frontend's language:

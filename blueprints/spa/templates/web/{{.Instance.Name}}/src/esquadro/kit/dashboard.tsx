@@ -2,6 +2,8 @@
 // widgets, each a number, a chart or a table, for a period (today, the last
 // 7 or 30 days, all time) that fills their time parameter.
 import { useQuery } from "@tanstack/react-query"
+import * as icons from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { AlertTriangle, RotateCw } from "lucide-react"
 import { useState } from "react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts"
@@ -29,6 +31,8 @@ export interface Widget {
   y?: string
   since?: string
   columns: FieldMeta[]
+  /** A Lucide icon for a number: shopping_cart. */
+  icon?: string
   fetch: (api: never, params: Record<string, unknown>) => Promise<Row[]>
 }
 
@@ -57,7 +61,7 @@ export function Dashboard({ widgets = declared }: { widgets?: Widget[] }) {
   return (
     <div className="flex flex-col gap-4">
       {timed && (
-        <div className="flex flex-wrap gap-1 self-end rounded-lg border bg-muted/40 p-1" role="group" aria-label={t("period")}>
+        <div className="flex flex-wrap gap-1 self-end rounded-xl bg-card p-1" role="group" aria-label={t("period")}>
           {periods().map((p) => (
             <Button
               key={p.key}
@@ -74,8 +78,8 @@ export function Dashboard({ widgets = declared }: { widgets?: Widget[] }) {
       )}
       {stats.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((w) => (
-            <WidgetCard key={w.name} widget={w} since={since} />
+          {stats.map((w, i) => (
+            <WidgetCard key={w.name} widget={w} since={since} tone={i} />
           ))}
         </div>
       )}
@@ -90,7 +94,24 @@ export function Dashboard({ widgets = declared }: { widgets?: Widget[] }) {
   )
 }
 
-function WidgetCard({ widget: w, since }: { widget: Widget; since?: Date }) {
+/** The colors of the numbers' icons, in turn. */
+const TONES = [
+  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
+  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
+  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
+  "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+]
+
+function iconOf(name?: string): LucideIcon {
+  const key = (name ?? "")
+    .split(/[-_ ]/)
+    .filter(Boolean)
+    .map((p) => p[0].toUpperCase() + p.slice(1))
+    .join("")
+  return ((icons as unknown as Record<string, LucideIcon>)[key] ?? icons.ChartColumn) as LucideIcon
+}
+
+function WidgetCard({ widget: w, since, tone = 0 }: { widget: Widget; since?: Date; tone?: number }) {
   const params: Record<string, unknown> = {}
   if (w.since && since) params[w.since] = since.toISOString()
   const rows = useQuery({
@@ -101,10 +122,22 @@ function WidgetCard({ widget: w, since }: { widget: Widget; since?: Date }) {
   const yCol = column(w.y)
   return (
     <Card className={cn(w.kind === "stat" && "@container/card gap-2")}>
-      <CardHeader>
-        <CardDescription>{w.label}</CardDescription>
+      <CardHeader className={cn(w.kind === "stat" && "relative")}>
+        {w.kind === "stat" ? (
+          <>
+            <CardDescription className="pr-14 font-semibold">{w.label}</CardDescription>
+            <div className={cn("absolute top-0 right-5 flex size-11 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
+              {(() => {
+                const Icon = iconOf(w.icon)
+                return <Icon className="size-5" />
+              })()}
+            </div>
+          </>
+        ) : (
+          <CardTitle>{w.label}</CardTitle>
+        )}
         {w.kind === "stat" && (
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+          <CardTitle className="mt-3 text-2xl font-bold tabular-nums @[250px]/card:text-3xl">
             {rows.isPending ? (
               <Skeleton className="h-8 w-24" />
             ) : rows.isError ? (

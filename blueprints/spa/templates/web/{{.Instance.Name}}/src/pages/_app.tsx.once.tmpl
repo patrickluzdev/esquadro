@@ -28,7 +28,7 @@ function Layout() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <div className="@container/main flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        <div className="@container/main mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 lg:p-8">
           <Outlet />
         </div>
       </SidebarInset>
@@ -39,7 +39,7 @@ function Layout() {
       <AppSidebar />
       <SidebarInset>
         <SiteHeader />
-        <div className="flex flex-1 flex-col gap-6 p-4 pt-0 md:px-6">
+        <div className="@container/main mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 lg:p-8">
           <Outlet />
         </div>
       </SidebarInset>

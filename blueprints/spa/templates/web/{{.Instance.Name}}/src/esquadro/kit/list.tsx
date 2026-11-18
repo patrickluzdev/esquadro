@@ -24,6 +24,7 @@ import {
   Copy,
   Download,
   Hash,
+  ListFilter as ListFilterIcon,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -71,7 +72,8 @@ import { FieldValue } from "./show.tsx"
 import { toast } from "./toast.tsx"
 
 const ALL = "__all"
-const PER_PAGE = 25
+const PER_PAGE = 10
+const PAGE_SIZES = [10, 25, 50, 100]
 /** Exporting: records asked for at a time, and at most. */
 const EXPORT_PAGE = 100
 const EXPORT_MAX = 10_000
@@ -163,6 +165,16 @@ function useDensity(): [Density, (d: Density) => void] {
   ]
 }
 
+/** The pages to offer: the first, the last, and those around the current; 0 is a gap. */
+export function pageNumbers(current: number, total: number): number[] {
+  const out: number[] = []
+  for (let n = 1; n <= total; n++) {
+    if (n === 1 || n === total || Math.abs(n - current) <= 1) out.push(n)
+    else if (out[out.length - 1] !== 0) out.push(0)
+  }
+  return out
+}
+
 /** Runs an action on each record, in turn; how many went through and failed. */
 async function each(records: Rec[], run: (r: Rec) => Promise<unknown> | unknown) {
   let done = 0
@@ -205,9 +217,11 @@ export function ResourceList({
   const query: Record<string, unknown> = { ...search, ...(scope && { [scope.param]: scope.value }) }
   if (paged) {
     query.page = search.page ?? 1
-    query.per_page = PER_PAGE
+    query.per_page = Number(search.per) || PER_PAGE
+    delete query.per
   } else {
-    query.limit = PER_PAGE
+    query.limit = Number(search.per) || PER_PAGE
+    delete query.per
   }
   const list = useQuery({
     queryKey: [meta.name, "list", query],
@@ -302,7 +316,7 @@ export function ResourceList({
               <Button
                 variant="ghost"
                 size="sm"
-                className="-ml-3 h-8"
+                className="-ml-3 h-8 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
                 onClick={() => set({ sort: search.sort === f.name ? `-${f.name}` : f.name, cursor: undefined })}
               >
                 {label}
@@ -328,7 +342,14 @@ export function ResourceList({
           const can = r.can ?? []
           const own = actions.filter((a) => !a.when || a.when(r))
           return (
-            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end gap-0.5 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+              {can.includes("update") && (
+                <Button variant="ghost" size="icon-sm" asChild aria-label={t("edit")}>
+                  <Link to={`/${meta.name}/${r.id}/edit` as never}>
+                    <Pencil />
+                  </Link>
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon-sm" className="data-[state=open]:bg-muted" aria-label={t("openMenu")}>
@@ -475,6 +496,7 @@ export function ResourceList({
   )
 
   const [density, setDensity] = useDensity()
+  const [showFilters, setShowFilters] = useState(false)
 
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
   const current = search.page ?? 1
@@ -487,62 +509,59 @@ export function ResourceList({
   )
   const hideable = table.getAllColumns().filter((c) => c.getCanHide())
   const width = table.getVisibleLeafColumns().length
+  const exportButton = (
+    <Button variant="outline" onClick={exportAll} disabled={!page || page.items.length === 0} size={embedded ? "sm" : "default"}>
+      <Download /> {t("export")}
+    </Button>
+  )
+  const activeFilters = filters.filter((f) => filterKeys(f).some((k) => search[k] !== undefined)).length
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5 rounded-2xl bg-card p-5">
       {embedded ? (
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">{scope.label ?? meta.label}</h2>
-          {create}
+          <h2 className="text-lg font-bold tracking-tight">{scope.label ?? meta.label}</h2>
+          <div className="flex gap-2">
+            {exportButton}
+            {create}
+          </div>
         </div>
       ) : (
-        <PageHeader title={meta.label} description={description} actions={create} />
+        <PageHeader
+          title={meta.label}
+          description={description}
+          actions={
+            <>
+              {exportButton}
+              {create}
+            </>
+          }
+        />
       )}
       <div className="flex flex-wrap items-center gap-2">
         {searchable && (
-          <SearchBox
-            value={search.q ?? ""}
-            busy={list.isFetching}
-            placeholder={t("searchIn", { name: meta.label.toLocaleLowerCase() })}
-            onSearch={(q) => set({ q: q || undefined, page: undefined, cursor: undefined }, true)}
-            shortcut={!embedded}
-          />
-        )}
-        {filters.map((f) =>
-          isDate(f) ? (
-            <DateRangeFilter
-              key={f.name}
-              field={f}
-              min={search[`${f.name}_min`] as string | undefined}
-              max={search[`${f.name}_max`] as string | undefined}
-              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
+          <div className="min-w-60 flex-1">
+            <SearchBox
+              value={search.q ?? ""}
+              busy={list.isFetching}
+              placeholder={t("searchIn", { name: meta.label.toLocaleLowerCase() })}
+              onSearch={(q) => set({ q: q || undefined, page: undefined, cursor: undefined }, true)}
+              shortcut={!embedded}
+              wide
             />
-          ) : (
-          <ListFilter
-            key={f.name}
-            field={f}
-            value={search[f.name] === undefined ? undefined : String(search[f.name])}
-            onChange={(v) => set({ [f.name]: v, page: undefined, cursor: undefined })}
-          />
-          ),
-        )}
-        {filtering && (
-          <Button variant="ghost" onClick={clearAll}>
-            <X /> {t("clearFilters")}
-          </Button>
-        )}
-        {!embedded && (
-          <div className="ml-auto">
-            <ViewsMenu meta={meta} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} />
           </div>
         )}
-        <Button variant="outline" className={embedded ? "ml-auto" : undefined} onClick={exportAll} disabled={!page || page.items.length === 0}>
-          <Download /> {t("export")}
-        </Button>
+        {filters.length > 0 && (
+          <Button variant={showFilters || activeFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
+            <ListFilterIcon /> {t("filters")}
+            {activeFilters > 0 && <span className="rounded-md bg-primary px-1.5 text-xs text-primary-foreground">{activeFilters}</span>}
+          </Button>
+        )}
+        {!embedded && <ViewsMenu meta={meta} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} />}
         {(hideable.length > 1 || !embedded) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Columns3 /> {t("columns")}
+              <Button variant="outline" size="icon" aria-label={t("columns")}>
+                <Columns3 />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -571,8 +590,35 @@ export function ResourceList({
           </DropdownMenu>
         )}
       </div>
+      {(showFilters || activeFilters > 0) && filters.length > 0 && (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 p-3 animate-in fade-in-0 slide-in-from-top-1">
+        {filters.map((f) =>
+          isDate(f) ? (
+            <DateRangeFilter
+              key={f.name}
+              field={f}
+              min={search[`${f.name}_min`] as string | undefined}
+              max={search[`${f.name}_max`] as string | undefined}
+              onChange={(min, max) => set({ [`${f.name}_min`]: min, [`${f.name}_max`]: max, page: undefined, cursor: undefined })}
+            />
+          ) : (
+          <ListFilter
+            key={f.name}
+            field={f}
+            value={search[f.name] === undefined ? undefined : String(search[f.name])}
+            onChange={(v) => set({ [f.name]: v, page: undefined, cursor: undefined })}
+          />
+          ),
+        )}
+        {filtering && (
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={clearAll}>
+            <X /> {t("clearFilters")}
+          </Button>
+        )}
+      </div>
+      )}
       {selected.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm animate-in fade-in-0 slide-in-from-top-1">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm animate-in fade-in-0 slide-in-from-top-1">
           <span className="font-medium">{t("selected", { count: selected.length })}</span>
           <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
             <X /> {t("clearSelection")}
@@ -587,7 +633,7 @@ export function ResourceList({
                 <Button
                   key={a.label}
                   size="sm"
-                  variant={a.destructive ? "destructive" : "outline"}
+                  variant={a.destructive ? "destructive-outline" : "outline"}
                   disabled={records.length === 0}
                   onClick={() => runBulk(a.label, records, a.run, a.confirm, a.destructive)}
                 >
@@ -598,7 +644,7 @@ export function ResourceList({
             {selected.some((r) => (r.can ?? []).includes("delete")) && (
               <Button
                 size="sm"
-                variant="destructive"
+                variant="destructive-outline"
                 onClick={() => {
                   const records = selected.filter((r) => (r.can ?? []).includes("delete"))
                   runBulk(t("delete"), records, remove, t("confirmDeleteMany", { count: records.length }), true)
@@ -611,7 +657,7 @@ export function ResourceList({
         </div>
       )}
       {list.isError && page && <RefreshError error={list.error} onRetry={() => list.refetch()} />}
-      <div className="relative overflow-hidden rounded-lg border">
+      <div className="relative -mx-5 overflow-x-auto border-t border-border">
         <LoadingBar active={list.isFetching && !list.isPending} />
         <SearchContext value={search.q ?? ""}>
         <Table
@@ -621,7 +667,7 @@ export function ResourceList({
             density === "compact" && "[&_td]:py-1 [&_th]:h-8",
           )}
         >
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="[&_th:first-child]:pl-5 [&_th:last-child]:pr-5">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => (
@@ -640,7 +686,7 @@ export function ResourceList({
                 data-row-index={i}
                 data-state={row.getIsSelected() ? "selected" : undefined}
                 aria-current={i === active || undefined}
-                className={cn("cursor-pointer", i === active && "bg-muted/60 shadow-[inset_3px_0_0_var(--primary)]")}
+                className={cn("cursor-pointer [&>td:first-child]:pl-5 [&>td:last-child]:pr-5", i === active && "bg-muted/60 shadow-[inset_3px_0_0_var(--primary)]")}
                 onClick={() => navigate({ to: `/${meta.name}/${row.original.id}` as never })}
               >
                 {row.getVisibleCells().map((cell) => (
@@ -672,15 +718,52 @@ export function ResourceList({
             />
           ))}
       </div>
-      {paged && page?.total_pages !== undefined && page.total_pages > 1 && (
-        <div className="flex items-center justify-end gap-2 text-sm">
-          <span className="mr-2 text-muted-foreground">{t("pageOf", { page: current, pages: page.total_pages })}</span>
-          <Button variant="outline" size="sm" disabled={current <= 1} onClick={() => set({ page: current - 1 })}>
-            <ChevronLeft /> {t("previous")}
-          </Button>
-          <Button variant="outline" size="sm" disabled={current >= page.total_pages} onClick={() => set({ page: current + 1 })}>
-            {t("next")} <ChevronRight />
-          </Button>
+      {paged && page && page.items.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon-sm" disabled={current <= 1} onClick={() => set({ page: current - 1 })} aria-label={t("previous")}>
+              <ChevronLeft />
+            </Button>
+            {pageNumbers(current, page.total_pages ?? 1).map((n, i) =>
+              n === 0 ? (
+                <span key={`gap-${i}`} className="px-1 text-muted-foreground">
+                  …
+                </span>
+              ) : (
+                <Button
+                  key={n}
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn(n === current && "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary")}
+                  aria-current={n === current ? "page" : undefined}
+                  onClick={() => set({ page: n })}
+                >
+                  {n}
+                </Button>
+              ),
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={current >= (page.total_pages ?? 1)}
+              onClick={() => set({ page: current + 1 })}
+              aria-label={t("next")}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+          <Select value={String(Number(search.per) || PER_PAGE)} onValueChange={(v) => set({ per: Number(v) === PER_PAGE ? undefined : v, page: undefined })}>
+            <SelectTrigger size="sm" className="w-auto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              {PAGE_SIZES.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {t("perPage", { count: n })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
       {!paged && (search.cursor || page?.next) && (

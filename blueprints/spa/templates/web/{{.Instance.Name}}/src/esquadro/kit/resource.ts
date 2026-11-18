@@ -56,6 +56,8 @@ export interface ResourceDef {
     select?: boolean
   }
   form: FieldMeta[]
+  /** The form in cards: a title, and the fields of each (of those in form). */
+  sections?: { title: string; description?: string; fields: FieldMeta[] }[]
   show?: FieldMeta[]
   actions?: Action[]
   /** The field a record is called by (in titles and pickers). */

@@ -27,6 +27,22 @@ theme, and the app's binary serves its build. `task web:install` installs its
 packages, `task dev` runs the API and the frontend together, `task web:build`
 builds it.
 
+## The look
+
+The frontend looks like a modern admin template: the Inter font, a vivid
+blue, a light gray page with white rounded cards, filled fields, bold
+buttons, tags tinted by their state, tables with small-capital headers. Its
+colors and radii are tokens in `src/theme.css`, and its components are in
+`src/components/ui`: both are yours to change.
+
+- A list is one card: its title and actions, a wide search, Filters opening
+  a panel, the table, and numbered pages with how many per page.
+- A form is in cards (the resource's `sections`, or one), with Back, Delete
+  and Save in a bar at the foot of the screen.
+- A record's page is a summary card (its initials, its fields, its actions)
+  beside tabs of its related records.
+- The sign-in page is a narrow column on white.
+
 ## The layout
 
 The frontend is built with [shadcn/ui](https://ui.shadcn.com): its

@@ -44,7 +44,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
   )
   return (
     <SidebarGroup>
-      {label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
+      {label && <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{label}</SidebarGroupLabel>}
       <SidebarMenu>
         {items.map((item) =>
           isGroup(item) ? (
@@ -57,18 +57,23 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.label}>
+                  <SidebarMenuButton tooltip={item.label} isActive={item.items.some((i) => active(i.to))} className="h-10 gap-3 font-semibold text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
                     {item.icon && <item.icon />}
                     <span>{item.label}</span>
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <SidebarMenuSub>
+                  <SidebarMenuSub className="ml-5 border-l-0 px-0 py-1">
                     {item.items.map((sub) => (
                       <SidebarMenuSubItem key={sub.to}>
-                        <SidebarMenuSubButton asChild isActive={active(sub.to)}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={active(sub.to)}
+                          className="h-9 gap-3 font-semibold text-sidebar-foreground hover:text-foreground data-[active=true]:bg-transparent data-[active=true]:text-primary"
+                        >
                           <Link to={sub.to as never} onClick={close}>
+                            <span className="size-1.5 shrink-0 rounded-full bg-current opacity-40 in-data-[active=true]:opacity-100" />
                             <span>{sub.label}</span>
                           </Link>
                         </SidebarMenuSubButton>
@@ -80,7 +85,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
             </Collapsible>
           ) : (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild tooltip={item.label} isActive={active(item.to)}>
+              <SidebarMenuButton asChild tooltip={item.label} isActive={active(item.to)} className="h-10 gap-3 font-semibold text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
                 {link(item)}
               </SidebarMenuButton>
             </SidebarMenuItem>

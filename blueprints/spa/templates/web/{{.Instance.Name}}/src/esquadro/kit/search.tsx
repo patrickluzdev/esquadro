@@ -17,6 +17,7 @@ export function SearchBox({
   busy,
   placeholder,
   shortcut = true,
+  wide = false,
 }: {
   value: string
   onSearch: (q: string) => void
@@ -24,6 +25,8 @@ export function SearchBox({
   placeholder?: string
   /** Reached with "/": the page's own list, not a related one. */
   shortcut?: boolean
+  /** As wide as where it is. */
+  wide?: boolean
 }) {
   const [text, setText] = useState(value)
   const input = useRef<HTMLInputElement>(null)
@@ -54,7 +57,7 @@ export function SearchBox({
     input.current?.focus()
   }
   return (
-    <div className="relative w-full sm:w-72">
+    <div className={wide ? "relative w-full" : "relative w-full sm:w-72"}>
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={input}

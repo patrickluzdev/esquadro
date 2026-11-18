@@ -1,0 +1,19 @@
+import type { ReactNode } from "react"
+
+/** The frame of the pages before signing in: the brand, a title, a hint. */
+export function AuthFrame({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-svh items-center justify-center bg-card p-6">
+      <div className="flex w-full max-w-[360px] flex-col gap-8">
+        <div className="flex flex-col gap-6">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-foreground text-xl font-bold text-background">{{slice .App.Label 0 1}}</div>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+            {hint && <p className="font-semibold text-foreground">{hint}</p>}
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
