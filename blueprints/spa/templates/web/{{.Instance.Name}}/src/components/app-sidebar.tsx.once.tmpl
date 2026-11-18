@@ -21,7 +21,7 @@ import { t } from "../esquadro/kit/i18n.ts"
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {{if eq $mode "icon"}}collapsible="icon"{{else if eq $mode "inset"}}variant="inset"{{else}}collapsible="offcanvas"{{end}} {...props}>
-      {/* The brand, as tall as the header: its mark and name; closed, its mark alone. */}
+      {/* The brand, as tall as the header: its mark and the panel's badge; closed, its mark alone. */}
       <SidebarHeader className="h-16 shrink-0 justify-center p-0">
         <Link
           to="/"
@@ -31,7 +31,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
             {{slice .App.Label 0 1}}
           </div>
-          <span className="truncate text-2xl font-bold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">{{.App.Label}}</span>
           {/* Which of the app's panels this is. */}
           <Badge className="shrink-0 group-data-[collapsible=icon]:hidden">{{humanize .Instance.Name}}</Badge>
         </Link>
