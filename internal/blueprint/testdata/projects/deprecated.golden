@@ -1,0 +1,15 @@
+testdata/projects/deprecated/app.esq:7:5: warning: option color of blueprint old is deprecated: use theme, a name: blue, red
+  |
+7 |     color "blue"
+  |     ^^^^^
+
+testdata/projects/deprecated/app.esq:13:8: warning: key legacy of @old is deprecated: use fresh
+   |
+13 |   @old(legacy, fresh true)
+   |        ^^^^^^
+
+2 warnings
+order: app(built-in) old(testdata/projects/deprecated/blueprints/old)
+options app: {}
+options old: {color="blue", theme="red"}
+@old on Product: {fresh=true, legacy=true}

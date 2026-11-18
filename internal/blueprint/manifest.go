@@ -107,8 +107,11 @@ type Spec struct {
 	Required bool
 	// Default is the typed default value, or nil.
 	Default any
-	Doc     []string
-	Span    dsl.Span
+	// Deprecated is why it is deprecated and what to use instead, or "":
+	// a project using it gets a warning, and it still works.
+	Deprecated string
+	Doc        []string
+	Span       dsl.Span
 }
 
 // AnnotationSpec lists the keys of an annotation on one target.
@@ -408,8 +411,21 @@ func (v *validator) spec(name, typ dsl.Ident, mods []*dsl.Modifier, doc []string
 				continue
 			}
 			def = m
+		case "deprecated":
+			msg, err := "", ""
+			if m.HasParens && len(m.Args) == 1 {
+				var val any
+				val, err = Convert(m.Args[0], TypeString)
+				msg, _ = val.(string)
+			}
+			if msg == "" || err != "" {
+				v.errorf(m.Span, `deprecated needs what to use instead, e.g. deprecated("use x")`)
+				ok = false
+				continue
+			}
+			s.Deprecated = msg
 		default:
-			v.errorf(m.Name.Span, "unknown modifier %q", m.Name.Name).Suggestion = didYouMean(m.Name.Name, []string{"required", "default"})
+			v.errorf(m.Name.Span, "unknown modifier %q", m.Name.Name).Suggestion = didYouMean(m.Name.Name, []string{"required", "default", "deprecated"})
 			ok = false
 		}
 	}

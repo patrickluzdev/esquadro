@@ -69,6 +69,10 @@ func (r *resolver) errorf(s dsl.Span, format string, args ...any) *diag.Diagnost
 	return r.diags.Errorf(s.Pos, s.End, format, args...)
 }
 
+func (r *resolver) warnf(s dsl.Span, format string, args ...any) *diag.Diagnostic {
+	return r.diags.Warnf(s.Pos, s.End, format, args...)
+}
+
 func (r *resolver) resolve() {
 	r.byName = map[string]*Blueprint{}
 	r.failed = map[string]bool{}
@@ -149,6 +153,9 @@ func (r *resolver) options(b *Blueprint) map[string]any {
 		if msg != "" {
 			r.errorf(o.Value.Span, "option %s of blueprint %s: %s", o.Key.Name, m.Name, msg)
 			continue
+		}
+		if spec.Deprecated != "" {
+			r.warnf(o.Key.Span, "option %s of blueprint %s is deprecated: %s", spec.Name, m.Name, spec.Deprecated)
 		}
 		out[spec.Name] = v
 	}
@@ -372,6 +379,9 @@ func (r *resolver) annotationArgs(a *dsl.Annotation, spec *AnnotationSpec, name 
 			r.errorf(arg.Key.Span, "key %s is already set", key.Name)
 			ok = false
 			continue
+		}
+		if key.Deprecated != "" {
+			r.warnf(arg.Key.Span, "key %s of @%s is deprecated: %s", key.Name, name, key.Deprecated)
 		}
 		if arg.Value == nil {
 			if key.Type != TypeBool {

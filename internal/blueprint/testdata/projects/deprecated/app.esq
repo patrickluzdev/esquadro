@@ -1,0 +1,14 @@
+package catalog
+
+app shop {
+  module "github.com/example/shop"
+  blueprint app
+  blueprint "./blueprints/old" {
+    color "blue"
+  }
+}
+
+entity Product {
+  name string required
+  @old(legacy, fresh true)
+}

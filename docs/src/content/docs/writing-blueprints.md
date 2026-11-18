@@ -85,7 +85,7 @@ blueprint billing {
 | `version` | the blueprint's version, `1.2.3` |
 | `requires a, b` | blueprints the app must use too |
 | `optional a, b` | blueprints it works with when the app has them: it comes after them, and its contributions to their slots are dropped without them |
-| `option name type mods` | an option: type `string`, `int`, `number`, `bool`, `name` or `list`; `default(v)` or `required` |
+| `option name type mods` | an option: type `string`, `int`, `number`, `bool`, `name` or `list`; `default(v)` or `required`; `deprecated("use x")` (see below) |
 | `env NAME type mods` | an environment variable the blueprint's code reads, as `config.Config.Name` (see [Environment variables](/esquadro/language/environment/)); a string value may be a template, such as `default("{{.Options.port}}")` |
 | `annotation app\|entity\|field\|relation\|job { key type }` | the keys of `@billing(...)` on that element; key types also `field` and `fields` (names of the entity's fields) |
 | `slot "billing.x"` | a point where other blueprints add code; its name starts with the blueprint's |
@@ -94,6 +94,26 @@ blueprint billing {
 
 `///` comments are the blueprint's documentation: keep them, they are what
 users read.
+
+### Changing without breaking
+
+A project upgrades a blueprint by `esquadro upgrade`, and should not break on
+the way. To rename or replace an option or an annotation key, keep the old
+one for at least one version, marked `deprecated("...")` with what to use
+instead: it still works, and each project using it gets a warning, where it
+uses it, from `esquadro check` and `esquadro gen`.
+
+```esquadro
+option color string default("red") deprecated("use theme, a name: blue, red")
+option theme name default(red)
+
+annotation entity {
+  legacy bool deprecated("use fresh")
+  fresh  bool
+}
+```
+
+Remove it in a later version, and say so in that version's notes.
 
 ## Templates
 

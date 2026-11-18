@@ -1,0 +1,11 @@
+blueprint old {
+  version "0.1.0"
+  /// The color, in its old form.
+  option color string default("red") deprecated("use theme, a name: blue, red")
+  option theme name default(red)
+
+  annotation entity {
+    legacy bool deprecated("use fresh")
+    fresh bool
+  }
+}
