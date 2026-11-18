@@ -351,7 +351,7 @@ func (b *builder) buildEnum(d *dsl.EnumDecl) {
 			continue
 		}
 		bySnake[n.Snake] = v
-		e.Values = append(e.Values, &EnumValue{Names: n, Doc: v.Doc})
+		e.Values = append(e.Values, &EnumValue{Names: n, Doc: v.Doc, Annotations: v.Annotations, Pos: v.Name.Pos})
 	}
 	b.enums[d.Name.Name] = e
 	b.p.Enums = append(b.p.Enums, e)

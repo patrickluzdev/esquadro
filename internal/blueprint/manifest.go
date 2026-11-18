@@ -48,9 +48,11 @@ const (
 	TargetRelation Target = "relation"
 	TargetJob      Target = "job"
 	TargetReport   Target = "report"
+	// TargetValue is a value of an enum.
+	TargetValue Target = "value"
 )
 
-var targets = []Target{TargetApp, TargetEntity, TargetField, TargetRelation, TargetJob, TargetReport}
+var targets = []Target{TargetApp, TargetEntity, TargetField, TargetRelation, TargetJob, TargetReport, TargetValue}
 
 // Manifest is a validated blueprint manifest.
 type Manifest struct {
@@ -360,7 +362,7 @@ func (v *validator) annotation(m *Manifest, d *dsl.AnnotationDecl, once func(str
 			continue
 		}
 		keys[k.Name.Name] = true
-		if (t == TargetApp || t == TargetJob || t == TargetReport) && (k.Type.Name == string(TypeField) || k.Type.Name == string(TypeFields)) {
+		if (t == TargetApp || t == TargetJob || t == TargetReport || t == TargetValue) && (k.Type.Name == string(TypeField) || k.Type.Name == string(TypeFields)) {
 			v.errorf(k.Type.Span, "%s is not available on %s annotations", k.Type.Name, t).
 				Suggestion = "field and fields name fields of an entity; use them on entity, field or relation annotations"
 			continue

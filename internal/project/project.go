@@ -143,6 +143,10 @@ func (e *Enum) Value(name string) *EnumValue {
 type EnumValue struct {
 	Names
 	Doc []string
+	// Annotations are validated later against the blueprints' schemas.
+	Annotations []*dsl.Annotation
+	Ann         Ann
+	Pos         diag.Pos
 }
 
 // Entity is a resolved entity.

@@ -500,8 +500,17 @@ func (p *parser) parseEnum() Decl {
 		case Comma:
 			p.advance()
 		case Name:
-			e.Values = append(e.Values, &EnumValue{Doc: p.takeDoc(), Name: identOf(t)})
+			v := &EnumValue{Doc: p.takeDoc(), Name: identOf(t)}
 			p.advance()
+			for p.tok().Kind == At {
+				a := p.parseAnnotation()
+				if a == nil {
+					p.syncLine()
+					break
+				}
+				v.Annotations = append(v.Annotations, a)
+			}
+			e.Values = append(e.Values, v)
 		default:
 			p.errorf(t, "expected enum value, found %s", t.describe())
 			p.syncLine()

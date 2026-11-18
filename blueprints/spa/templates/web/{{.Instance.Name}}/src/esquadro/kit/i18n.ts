@@ -16,6 +16,8 @@ export function t(key: keyof Messages, vars: Record<string, string | number> = {
 export function format(field: FieldMeta, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—"
   switch (field.kind) {
+    case "enum":
+      return field.labels?.[String(value)] ?? String(value)
     case "bool":
       return value ? t("yes") : t("no")
     case "int":

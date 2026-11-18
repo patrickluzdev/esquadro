@@ -81,6 +81,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 // label of its own: they would show their names, in English.
 func unlabeled(p *project.Project, instance string) diag.List {
 	var diags diag.List
+	warned := map[*project.Enum]bool{}
 	labeled := func(ann project.Ann) bool {
 		label, _ := ann[instance]["label"].(string)
 		return label != ""
@@ -93,6 +94,18 @@ func unlabeled(p *project.Project, instance string) diag.List {
 			if !labeled(f.Ann) {
 				diags.Warnf(f.Pos, f.Pos, "%s.%s has no label in %s, whose locale is not en: it shows %q", e.Raw, f.Raw, instance, Humanize(f.Snake)).
 					Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
+			}
+		}
+		for _, f := range rest.InRequest(e) {
+			if f.Enum == nil || warned[f.Enum] {
+				continue
+			}
+			warned[f.Enum] = true
+			for _, v := range f.Enum.Values {
+				if !labeled(v.Ann) {
+					diags.Warnf(v.Pos, v.Pos, "%s.%s has no label in %s, whose locale is not en: it shows %q", f.Enum.Raw, v.Raw, instance, v.Raw).
+						Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
+				}
 			}
 		}
 		for _, r := range rest.Keys(e) {

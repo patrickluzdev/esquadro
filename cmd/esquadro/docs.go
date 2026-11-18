@@ -158,7 +158,7 @@ func blueprintPage(m *blueprint.Manifest, order int) string {
 	}
 	if len(m.Annotations) > 0 {
 		b.WriteString("\n## Annotations\n\n| Where | Key | Type | |\n|---|---|---|---|\n")
-		for _, t := range []blueprint.Target{blueprint.TargetApp, blueprint.TargetEntity, blueprint.TargetField, blueprint.TargetRelation, blueprint.TargetJob} {
+		for _, t := range []blueprint.Target{blueprint.TargetApp, blueprint.TargetEntity, blueprint.TargetField, blueprint.TargetRelation, blueprint.TargetJob, blueprint.TargetValue} {
 			spec := m.Annotations[t]
 			if spec == nil {
 				continue

@@ -67,8 +67,8 @@ entity Product {
 }
 ```
 
-- `label` names the resource, its fields and its relations in the
-  frontend's language. With a `locale` other than `en`, `esquadro check`
+- `label` names the resource, its fields, its relations and the values of
+  its enums in the frontend's language (`ACTIVE @admin(label "Ativo")`). With a `locale` other than `en`, `esquadro check`
   warns of each field of a resource without one, which would show its name
   in English.
 - `group` puts the resource in a section of the menu, with the other

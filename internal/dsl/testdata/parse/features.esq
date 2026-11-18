@@ -17,7 +17,7 @@ app demo {
 enum Size {
   /// Small one.
   SMALL,
-  MEDIUM,
+  MEDIUM @label(text "Medium") @admin(hidden),
   LARGE
 }
 

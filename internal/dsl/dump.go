@@ -73,6 +73,9 @@ func Dump(f *File) string {
 			for _, v := range d.Values {
 				w(1, "value %s", v.Name.Name)
 				docs(2, v.Doc)
+				for _, a := range v.Annotations {
+					w(2, "%s", dumpAnnotation(a))
+				}
 			}
 		case *PackageDecl:
 			w(0, "package %s @%s", d.Name.Name, pos(d.Span))

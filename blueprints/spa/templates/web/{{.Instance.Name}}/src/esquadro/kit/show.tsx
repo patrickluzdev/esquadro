@@ -23,7 +23,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
   const value = record[field.name]
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.show) return <>{own.show(value, record)}</>
-  if (field.kind === "enum" && value) return <Badge variant="secondary">{String(value)}</Badge>
+  if (field.kind === "enum" && value) return <Badge variant="secondary">{format(field, value)}</Badge>
   if (field.kind === "bool") return <Badge variant={value ? "default" : "outline"}>{format(field, value)}</Badge>
   if (field.kind === "relation" && value) {
     const related = record[field.name.replace(/_id$/, "")] as Rec | undefined

@@ -47,5 +47,6 @@ blueprint spa {
 | entity | `icon` | name | The icon of its menu entry, a Lucide name: tag, users, shopping_cart. |
 | field | `label` | string | What people call the field, in the frontend's language: Price. |
 | relation | `label` | string | What people call the relation, in the frontend's language: Category. |
+| value | `label` | string | What people call a value of an enum, in the frontend's language: Active. |
 
 An annotation is written `@spa(key value)` on the element.

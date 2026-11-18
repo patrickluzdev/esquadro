@@ -27,6 +27,7 @@ func spaProject(t *testing.T, change func(app string) string) (string, int, stri
 	catalog := strings.Replace(read(t, catalogEsq), "  @security(read public, write [user.admin, user.staff])",
 		"  @security(read public, write [user.admin, user.staff])\n  @admin(resource, label \"Produtos\", icon package)", 1)
 	catalog = strings.Replace(catalog, "  name        string  required", "  name        string  required @admin(label \"Nome\")", 1)
+	catalog = strings.Replace(catalog, "  ACTIVE\n", "  ACTIVE @admin(label \"Ativo\")\n", 1)
 	os.WriteFile(catalogEsq, []byte(catalog), 0o644)
 	code, _, errOut := esq(t, "gen", dir)
 	return dir, code, errOut
@@ -53,7 +54,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 			t.Errorf("%s lacks %q:\n%s", path, want, got)
 		}
 	}
-	if gen := read(t, filepath.Join(web, "src/esquadro/resources.gen.ts")); !strings.Contains(gen, `name: { name: "name", label: "Nome"`) || strings.Contains(gen, "categories:") {
+	if gen := read(t, filepath.Join(web, "src/esquadro/resources.gen.ts")); !strings.Contains(gen, `name: { name: "name", label: "Nome"`) || !strings.Contains(gen, `labels: { ACTIVE: "Ativo", INACTIVE: "INACTIVE" }`) || strings.Contains(gen, "categories:") {
 		t.Errorf("resources.gen.ts:\n%s", gen)
 	}
 	if pkg := read(t, filepath.Join(dir, "package.json")); !strings.Contains(pkg, `"web/admin"`) || !strings.Contains(pkg, `"clients/ts"`) {

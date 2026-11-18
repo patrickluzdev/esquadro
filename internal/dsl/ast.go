@@ -148,10 +148,19 @@ type EnumDecl struct {
 	Span
 }
 
-// EnumValue is one value of an enum.
+// EnumValue is one value of an enum, with the annotations after it.
 type EnumValue struct {
-	Doc  []string
-	Name Ident
+	Doc         []string
+	Name        Ident
+	Annotations []*Annotation
+}
+
+// End is where the value ends: after its last annotation.
+func (v *EnumValue) End() diag.Pos {
+	if n := len(v.Annotations); n > 0 {
+		return v.Annotations[n-1].End
+	}
+	return v.Name.End
 }
 
 // EntityDecl is an "entity" block.

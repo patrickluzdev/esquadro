@@ -18,7 +18,7 @@ enum Status{OPEN , CLOSED}
 enum Size {
   /// Small.
   S,M
-  L // large
+  L   @admin(label "Large")// large
 }
 entity Category{}
 entity Product ( plural "products" ) {

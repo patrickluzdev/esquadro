@@ -264,6 +264,11 @@ func (r *resolver) annotations() {
 			}
 		}
 	}
+	for _, en := range r.p.Enums {
+		for _, v := range en.Values {
+			v.Ann = r.annotate(v.Annotations, TargetValue, nil)
+		}
+	}
 	for _, j := range r.p.Jobs {
 		j.Ann = r.annotate(j.Annotations, TargetJob, nil)
 		for _, f := range j.Fields {

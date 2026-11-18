@@ -12,6 +12,8 @@ enum Size @17:1-22:2
   value SMALL
     doc "Small one."
   value MEDIUM
+    @label(text "Medium")
+    @admin(hidden)
   value LARGE
 entity Person @24:1-39:2
   option plural "people"

@@ -279,7 +279,7 @@ func blueprintInfo(b *blueprint.Blueprint) string {
 	}
 	if len(m.Annotations) > 0 {
 		fmt.Fprintf(&s, "Annotations, written @%s(key value):\n", m.Name)
-		for _, t := range []blueprint.Target{blueprint.TargetApp, blueprint.TargetEntity, blueprint.TargetField, blueprint.TargetRelation, blueprint.TargetJob} {
+		for _, t := range []blueprint.Target{blueprint.TargetApp, blueprint.TargetEntity, blueprint.TargetField, blueprint.TargetRelation, blueprint.TargetJob, blueprint.TargetValue} {
 			spec := m.Annotations[t]
 			if spec == nil {
 				continue

@@ -109,7 +109,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
                 <SelectItem value={ALL}>{t("all")}</SelectItem>
                 {(f.values ?? ["true", "false"]).map((v) => (
                   <SelectItem key={v} value={v}>
-                    {f.kind === "bool" ? format(f, v === "true") : v}
+                    {f.kind === "bool" ? format(f, v === "true") : format(f, v)}
                   </SelectItem>
                 ))}
               </SelectContent>

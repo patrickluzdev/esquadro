@@ -58,4 +58,9 @@ blueprint spa {
     /// What people call the relation, in the frontend's language: Category.
     label string
   }
+  annotation value {
+    /// What people call a value of an enum, in the frontend's language:
+    /// Active.
+    label string
+  }
 }

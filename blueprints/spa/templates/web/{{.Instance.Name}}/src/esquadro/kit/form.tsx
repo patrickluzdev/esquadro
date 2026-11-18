@@ -55,7 +55,7 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
         <Choice id={id} field={field} value={str} onChange={onChange} invalid={invalid}>
           {field.values?.map((v) => (
             <SelectItem key={v} value={v}>
-              {v}
+              {field.labels?.[v] ?? v}
             </SelectItem>
           ))}
         </Choice>

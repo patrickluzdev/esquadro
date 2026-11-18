@@ -12,8 +12,9 @@ export interface FieldMeta {
   label: string
   kind: FieldKind
   required: boolean
-  /** An enum's values. */
+  /** An enum's values, and what people call each. */
   values?: readonly string[]
+  labels?: Readonly<Record<string, string>>
   /** A relation's resource, and the field its records are shown by. */
   target?: string
   display?: string

@@ -456,7 +456,8 @@ func (p *printer) enum(out *strings.Builder, d *EnumDecl) {
 	p.docs(out, d.Doc)
 	hasDocs := false
 	for _, v := range d.Values {
-		hasDocs = hasDocs || len(v.Doc) > 0
+		// A value with annotations gets a line of its own, as one with docs.
+		hasDocs = hasDocs || len(v.Doc) > 0 || len(v.Annotations) > 0
 	}
 	innerComments := p.ci < len(p.comments) && p.comments[p.ci].Pos.Offset < d.End.Offset
 	if d.Pos.Line == d.End.Line && !hasDocs && !innerComments {
@@ -485,7 +486,12 @@ func (p *printer) enum(out *strings.Builder, d *EnumDecl) {
 	for _, v := range d.Values {
 		b.before(v.Name.Pos.Offset, v.Name.Pos.Line-len(v.Doc))
 		b.docs(v.Doc)
-		b.lines = append(b.lines, line{text: v.Name.Name, trail: p.trailing(v.Name.End.Offset)})
+		parts := []string{v.Name.Name}
+		for _, a := range v.Annotations {
+			parts = append(parts, annotationString(a))
+		}
+		text := strings.Join(parts, " ")
+		b.lines = append(b.lines, line{text: text, trail: p.trailing(v.End().Offset)})
 		p.lastLine = v.Name.Pos.Line
 	}
 	b.end(d.End.Offset - 1)

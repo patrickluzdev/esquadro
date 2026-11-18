@@ -8,7 +8,9 @@ sidebar:
 ## Annotations
 
 An annotation gives a blueprint a setting for one element: the app, an
-entity, a field, a relation or a [job](/esquadro/language/jobs/). It is named after the blueprint:
+entity, a field, a relation, a [job](/esquadro/language/jobs/) or a value of
+an enum (after it: `ACTIVE @admin(label "Active")`). It is named after the
+blueprint:
 
 ```esquadro
 entity Product {
