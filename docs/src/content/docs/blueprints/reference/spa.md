@@ -46,5 +46,6 @@ blueprint spa {
 | entity | `group` | string | The section of the menu it is in, with the other resources of the same group: "Catalog". |
 | entity | `icon` | name | The icon of its menu entry, a Lucide name: tag, users, shopping_cart. |
 | field | `label` | string | What people call the field, in the frontend's language: Price. |
+| relation | `label` | string | What people call the relation, in the frontend's language: Category. |
 
 An annotation is written `@spa(key value)` on the element.

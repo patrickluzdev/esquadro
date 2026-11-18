@@ -67,6 +67,10 @@ entity Product {
 }
 ```
 
+- `label` names the resource, its fields and its relations in the
+  frontend's language. With a `locale` other than `en`, `esquadro check`
+  warns of each field of a resource without one, which would show its name
+  in English.
 - `group` puts the resource in a section of the menu, with the other
   resources of the same group.
 - The list pages, filters, sorts and searches through the API, with all of it

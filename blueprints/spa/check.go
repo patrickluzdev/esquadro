@@ -1,10 +1,12 @@
 package spa
 
 import (
+	"fmt"
 	"go/token"
 	"slices"
 	"strings"
 
+	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
@@ -65,8 +67,39 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if sidebar, _ := opts["sidebar"].(string); sidebar != "icon" && sidebar != "inset" && sidebar != "dashboard" {
 			diags.Errorf(at("sidebar"), at("sidebar"), "sidebar %s is not icon, inset or dashboard", sidebar)
 		}
+		if locale, _ := opts["locale"].(string); locale != "en" {
+			diags = append(diags, unlabeled(p, name)...)
+		}
 		if set.Get("workspace") == nil {
 			diags.Errorf(ref.Pos, ref.Pos, "spa %s lives in the workspace: add blueprint workspace", name)
+		}
+	}
+	return diags
+}
+
+// unlabeled warns of the fields of a frontend's resources that have no
+// label of its own: they would show their names, in English.
+func unlabeled(p *project.Project, instance string) diag.List {
+	var diags diag.List
+	labeled := func(ann project.Ann) bool {
+		label, _ := ann[instance]["label"].(string)
+		return label != ""
+	}
+	for _, e := range p.Entities {
+		if resource, _ := e.Ann[instance]["resource"].(bool); !resource {
+			continue
+		}
+		for _, f := range rest.InRequest(e) {
+			if !labeled(f.Ann) {
+				diags.Warnf(f.Pos, f.Pos, "%s.%s has no label in %s, whose locale is not en: it shows %q", e.Raw, f.Raw, instance, Humanize(f.Snake)).
+					Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
+			}
+		}
+		for _, r := range rest.Keys(e) {
+			if !labeled(r.Ann) {
+				diags.Warnf(r.Pos, r.Pos, "%s.%s has no label in %s, whose locale is not en: it shows %q", e.Raw, r.Raw, instance, Humanize(r.Snake)).
+					Suggestion = fmt.Sprintf(`@%s(label "...")`, instance)
+			}
 		}
 	}
 	return diags

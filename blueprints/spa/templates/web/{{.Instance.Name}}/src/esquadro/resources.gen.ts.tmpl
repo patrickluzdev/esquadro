@@ -4,6 +4,7 @@
 // relations), filters, sorting and pages. src/resources/<resource>.tsx, which
 // is yours, decides what the screens show.
 import type { Api } from "./api.ts"
+import { t } from "./kit/i18n.ts"
 import { defineMeta } from "./kit/meta.ts"
 
 export const resources = {
@@ -20,10 +21,10 @@ export const resources = {
       {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}]{{end}} },
 {{- end}}
 {{- range $r := keys $e}}
-      {{keyName $r}}: { name: "{{keyName $r}}", label: {{printf "%q" (humanize $r.Snake)}}, kind: "relation", required: {{$r.Required}}, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}" },
+      {{keyName $r}}: { name: "{{keyName $r}}", label: {{printf "%q" (or (index (ann $r) "label") (humanize $r.Snake))}}, kind: "relation", required: {{$r.Required}}, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}" },
 {{- end}}
-      created_at: { name: "created_at", label: "Created at", kind: "datetime", required: false, readOnly: true },
-      updated_at: { name: "updated_at", label: "Updated at", kind: "datetime", required: false, readOnly: true },
+      created_at: { name: "created_at", label: t("createdAt"), kind: "datetime", required: false, readOnly: true },
+      updated_at: { name: "updated_at", label: t("updatedAt"), kind: "datetime", required: false, readOnly: true },
     },
     filters: [{{range $i, $f := apiFilters $e}}{{if $i}}, {{end}}{ param: "{{$f.Param}}", kind: "{{$f.Kind}}" }{{end}}],
     sorts: [{{range $i, $s := sortsOf $e (optionsOf "postgres")}}{{if $i}}, {{end}}"{{$s}}"{{end}}],

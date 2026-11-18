@@ -54,4 +54,8 @@ blueprint spa {
     /// What people call the field, in the frontend's language: Price.
     label string
   }
+  annotation relation {
+    /// What people call the relation, in the frontend's language: Category.
+    label string
+  }
 }
