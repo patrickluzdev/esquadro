@@ -14,6 +14,7 @@ import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { CopyButton } from "./copy.tsx"
+import { Picture } from "./picture.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -66,11 +67,6 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   )
 }
 
-/** The first letters of what a record is called: "Webcam HD" is WH. */
-export function initials(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toLocaleUpperCase() || "#"
-}
 
 /** Back to the resource's list. */
 export function BackToList({ resource }: { resource: Resource }) {
@@ -181,9 +177,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
       <Card className={cn(relations.length === 0 && "max-w-3xl")}>
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-3 pt-2 text-center">
-            <div className="flex size-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
-              {initials(title)}
-            </div>
+            <Picture src={resource.image?.(r)} name={title} size="lg" />
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
               <p className="text-sm text-muted-foreground">{capitalize(meta.singular)}</p>

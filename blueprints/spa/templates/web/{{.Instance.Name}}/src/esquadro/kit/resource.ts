@@ -63,6 +63,11 @@ export interface ResourceDef {
   /** The field a record is called by (in titles and pickers). */
   title?: FieldMeta
   /**
+   * A record's picture, as a URL: beside its name in lists and on its page.
+   * Without one, or when it has none, the first letters of its name.
+   */
+  image?: (record: Rec) => string | null | undefined
+  /**
    * The lists of related records on a record's page. A function, so that
    * two resources can list each other.
    */

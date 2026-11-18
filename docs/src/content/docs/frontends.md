@@ -37,11 +37,23 @@ colors and radii are tokens in `src/theme.css`, and its components are in
 
 - A list is one card: its title and actions, a wide search, Filters opening
   a panel, the table, and numbered pages with how many per page.
-- A form is in cards (the resource's `sections`, or one), with Back, Delete
-  and Save in a bar at the foot of the screen.
-- A record's page is a summary card (its initials, its fields, its actions)
+- A form is in cards (the resource's `sections`, or one), with Delete and
+  Save in a bar at the foot of the screen (and Back, when editing).
+- A record's page is a summary card (its picture, its fields, its actions)
   beside tabs of its related records.
 - The sign-in page is a narrow column on white.
+
+A record's picture sits beside its name in lists and atop its page. Until a
+resource says where it is, it is the first letters of the name; `image`
+gives its URL, and a record with none (or one that fails to load) keeps its
+letters:
+
+```tsx
+export default resource(meta, {
+  // ...
+  image: (r) => r.photo_url as string | null,
+})
+```
 
 ## The layout
 

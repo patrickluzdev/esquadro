@@ -66,6 +66,7 @@ import { PageHeader } from "./page.tsx"
 import { SearchBox, SearchContext } from "./search.tsx"
 import { EmptyState, ErrorState, LoadingBar, NoResultsState, RefreshError, TableSkeleton } from "./states.tsx"
 import { cn } from "@/lib/utils"
+import { Picture } from "./picture.tsx"
 import { columnField, columnOptions } from "./resource.ts"
 import type { Action, Resource } from "./resource.ts"
 import { FieldValue } from "./show.tsx"
@@ -276,6 +277,8 @@ export function ResourceList({
     queryClient.invalidateQueries({ queryKey: [meta.name] })
   }
 
+  // What a record is called, in bold and with its picture: the resource's title, or its first column.
+  const titleColumn = resource.title?.name ?? (tableColumns[0] && columnField(tableColumns[0]).name)
   const columns = useMemo(() => {
     const out = []
     if (selectable) {
@@ -324,12 +327,21 @@ export function ResourceList({
               </Button>
             )
           },
-          cell: ({ row }) =>
-            o.cell ? o.cell(row.original) : o.editable ? (
+          cell: ({ row }) => {
+            const value = o.cell ? o.cell(row.original) : o.editable ? (
               <EditableCell meta={meta} field={f} record={row.original} />
             ) : (
               <FieldValue field={f} record={row.original} />
-            ),
+            )
+            if (f.name !== titleColumn) return value
+            // The column a record is called by carries its picture.
+            return (
+              <div className="flex items-center gap-3">
+                <Picture src={resource.image?.(row.original)} name={String(row.original[f.name] ?? "")} />
+                {value}
+              </div>
+            )
+          },
         }),
       )
     }
@@ -412,7 +424,7 @@ export function ResourceList({
       }),
     )
     return helper.columns(out)
-  }, [resource, selectable, search.sort, meta, actions, scope?.param, canCreate])
+  }, [resource, selectable, search.sort, meta, actions, scope?.param, canCreate, titleColumn])
 
   const table = useTable({
     features,
@@ -508,8 +520,6 @@ export function ResourceList({
     </Button>
   )
   const hideable = table.getAllColumns().filter((c) => c.getCanHide())
-  // What a record is called, in bold: the resource's title, or its first column.
-  const titleColumn = resource.title?.name ?? (tableColumns[0] && columnField(tableColumns[0]).name)
   const width = table.getVisibleLeafColumns().length
   const exportButton = (
     <Button variant="outline" onClick={exportAll} disabled={!page || page.items.length === 0} size={embedded ? "sm" : "default"}>
