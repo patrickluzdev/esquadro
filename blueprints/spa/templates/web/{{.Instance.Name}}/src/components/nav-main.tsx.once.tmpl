@@ -43,7 +43,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
     </Link>
   )
   return (
-    <SidebarGroup className="px-4 group-data-[collapsible=icon]:px-3">
+    <SidebarGroup className="px-4">
       {label && <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</SidebarGroupLabel>}
       <SidebarMenu>
         {items.map((item) =>

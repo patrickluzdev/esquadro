@@ -25,7 +25,7 @@ function Layout() {
       style={
         {
           "--sidebar-width": "18rem",
-          "--sidebar-width-icon": "4.5rem",
+          "--sidebar-width-icon": "5rem",
           "--header-height": "calc(var(--spacing) * 12)",
         } as CSSProperties
       }
@@ -42,7 +42,7 @@ function Layout() {
       <IdleTimeout />
     </SidebarProvider>
 {{- else}}
-    <SidebarProvider defaultOpen={sidebarOpen} style={ { "--sidebar-width": "18rem", "--sidebar-width-icon": "4.5rem" } as CSSProperties }>
+    <SidebarProvider defaultOpen={sidebarOpen} style={ { "--sidebar-width": "18rem", "--sidebar-width-icon": "5rem" } as CSSProperties }>
       <AppSidebar />
       <SidebarInset>
         <SiteHeader />
