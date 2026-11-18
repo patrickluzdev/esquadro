@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -408,6 +408,12 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 	} else {
 		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 	}
+{{- else if eq .Type "money"}}
+	if a, ok := moneyOf(req.{{$g}}.Amount, req.{{$g}}.Currency); ok {
+		{{$x}} = a
+	} else {
+		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+	}
 {{- else if eq .Type "uuid"}}
 	{{$x}} = uuid.UUID(req.{{$g}})
 {{- else if eq .Type "json"}}
@@ -425,6 +431,12 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 {{- if eq .Type "decimal"}}
 		if d, err := decimal.NewFromString(v); err == nil {
 			{{$x}} = d
+		} else {
+			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+		}
+{{- else if eq .Type "money"}}
+		if a, ok := moneyOf(v.Amount, v.Currency); ok {
+			{{$x}} = a
 		} else {
 			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 		}
@@ -476,6 +488,12 @@ func {{.Camel}}ChangesOf(req *apigen.{{$P}}Changes) ({{$P}}Changes, []FieldError
 {{- if eq .Type "decimal"}}
 		if d, err := decimal.NewFromString(v); err == nil {
 			{{$x}} = &d
+		} else {
+			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
+		}
+{{- else if eq .Type "money"}}
+		if a, ok := moneyOf(v.Amount, v.Currency); ok {
+			{{$x}} = &a
 		} else {
 			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 		}
@@ -556,6 +574,10 @@ func {{.Camel}}Answer({{if $pol}}ctx{{else}}_{{end}} context.Context, x {{$P}}) 
 	a.{{$g}} = apigen.NewOptBool({{$x}})
 {{- else if eq .Type "decimal"}}
 	a.{{$g}} = apigen.NewOptString({{$x}}.String())
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() != "" {
+		a.{{$g}} = apigen.NewOptMoney(apigen.Money{Amount: {{$x}}.Number(), Currency: apigen.NewOptString({{$x}}.CurrencyCode())})
+	}
 {{- else if or (eq .Type "time") (eq .Type "date")}}
 {{- if not $req}}
 	if !{{$x}}.IsZero() {
@@ -791,3 +813,13 @@ func problemOf(err error) error {
 	return err
 }
 {{end -}}
+{{- if needsType $m "money"}}
+
+// moneyOf reads an amount as the contract writes it: its currency{{with .App.Currency}}, {{.}}
+// when not sent{{end}}. It is not ok when the amount is no number or the
+// currency is no ISO 4217 code.
+func moneyOf(amount string, code apigen.OptString) (currency.Amount, bool) {
+	a, err := currency.NewAmount(amount, code.Or({{quote .App.Currency}}))
+	return a, err == nil
+}
+{{- end}}

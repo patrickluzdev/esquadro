@@ -185,6 +185,8 @@ func schema(f *project.Field) string {
 		return "{description: Any JSON value.}"
 	case project.TypeEnum:
 		return fmt.Sprintf("{$ref: \"#/components/schemas/%s\"}", enumName(f.Enum))
+	case project.TypeMoney:
+		return `{$ref: "#/components/schemas/Money"}`
 	}
 	return "{type: string}"
 }
@@ -304,6 +306,10 @@ func changeSchema(f *project.Field) string {
 		}
 		return fmt.Sprintf("{type: string, enum: [%s], nullable: true}", strings.Join(values, ", "))
 	}
+	if f.Type == project.TypeMoney {
+		// nullable beside a $ref is ignored: the object, written out.
+		return "{type: object, required: [amount], properties: {amount: {type: string}, currency: {type: string}}, nullable: true}"
+	}
 	s := schema(f)
 	return strings.TrimSuffix(s, "}") + ", nullable: true}"
 }
@@ -376,6 +382,14 @@ func needsType(m *project.Module, t string) bool {
 		for _, f := range e.Fields {
 			if string(f.Type) == t {
 				return true
+			}
+		}
+		// A money field's range filter reads decimals.
+		if t == "decimal" {
+			for _, f := range APIFilters(e) {
+				if f.Go == "decimal.Decimal" {
+					return true
+				}
 			}
 		}
 	}
@@ -478,6 +492,14 @@ func apiSample(f *project.Field, i string) string {
 			return `"` + n + `"`
 		}
 		return n
+	case project.TypeMoney:
+		n := "1"
+		if f.Min != nil {
+			n = f.Min.Text
+		} else if f.Max != nil && f.Max.Value < 1 {
+			n = f.Max.Text
+		}
+		return `apigen.Money{Amount: "` + n + `"}`
 	case project.TypeBool:
 		return "true"
 	case project.TypeTime, project.TypeDate:

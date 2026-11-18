@@ -12,6 +12,19 @@ export type FieldsOf<F, R extends string> = F extends `${R}.${infer K}` ? K : ne
 
 /** T with only the fields asked for, or all of them when none is. */
 export type Selected<T, K> = [K] extends [never] ? T : Pick<T, Extract<Always | K, keyof T>>
+{{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- if $money}}
+
+/**
+ * An exact amount of money and its currency. The amount is a decimal
+ * written as text, "19.90", never a number: no float rounds it. The
+ * currency is an ISO 4217 code{{with .App.Currency}}, {{.}} when a request leaves it out{{end}}.
+ */
+export interface Money {
+  amount: string
+  currency?: string
+}
+{{- end}}
 {{- range .Enums}}
 
 {{- with .Doc}}

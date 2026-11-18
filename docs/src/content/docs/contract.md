@@ -16,6 +16,12 @@ generated or written by hand, builds on:
   `minimum`, `maximum` and `pattern`. A form can check them before sending.
   A `decimal`, which travels as text, carries its bounds as `x-minimum` and
   `x-maximum`, and in its description.
+- **Money** as the schema `Money`: `{"amount": "19.90", "currency": "BRL"}`,
+  the amount as text (up to four places, never a JSON number), the currency
+  an ISO 4217 code, the app's when a request leaves it out. An amount with
+  more places is refused as `too_precise`, a currency that is no code as
+  `invalid_value`; a list filters a money field by its amount
+  (`price_min`, `price_max`).
 - Each list's filters, orders and pages, the fields `fields` may ask for, the
   relations `include` may answer, and every error code.
 - What the person may do: `can` on each record (`update`, `delete`) and on

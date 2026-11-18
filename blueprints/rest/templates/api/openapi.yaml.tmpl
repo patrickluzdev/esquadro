@@ -450,6 +450,16 @@ components:
       properties:
         field: {type: string}
         code: {type: string}
+{{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- if $money}}
+    Money:
+      type: object
+      description: An exact amount of money and its currency.
+      required: [amount]
+      properties:
+        amount: {type: string, description: 'The amount, a decimal number written as a string, e.g. "19.90"; up to four places.'}
+        currency: {type: string, description: 'Its currency, an ISO 4217 code{{with .App.Currency}}; {{.}} when not sent{{end}}.'}
+{{- end}}
 {{- range .Enums}}{{if .Module.Entities}}
     {{enumName .}}:
       type: string

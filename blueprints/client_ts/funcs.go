@@ -112,6 +112,8 @@ func tsType(f *project.Field) string {
 		return "unknown"
 	case project.TypeEnum:
 		return f.Enum.Module.Pascal + f.Enum.Pascal
+	case project.TypeMoney:
+		return "Money"
 	}
 	return "string"
 }
@@ -182,6 +184,15 @@ func sample(f *project.Field, i int) string {
 			n = f.Max.Value
 		}
 		return strconv.Quote(strconv.FormatFloat(n, 'f', 2, 64))
+	case project.TypeMoney:
+		n := float64(i)
+		if f.Min != nil && n < f.Min.Value {
+			n = f.Min.Value
+		}
+		if f.Max != nil && n > f.Max.Value {
+			n = f.Max.Value
+		}
+		return `{ amount: ` + strconv.Quote(strconv.FormatFloat(n, 'f', 2, 64)) + ` }`
 	case project.TypeBool:
 		return "true"
 	case project.TypeTime:
@@ -244,6 +255,15 @@ func checks(f *project.Field, v string, changes bool) string {
 		}
 		if f.Max != nil {
 			line(`else if (typeof %s === "string" && Number(%s) > %s) refuse(%s, "too_large")`, v, v, f.Max.Text, name)
+		}
+	case project.TypeMoney:
+		a := v + "?.amount"
+		line(`if (%s !== undefined && %s !== null && !/^-?\d+(\.\d{1,4})?$/.test(%s)) refuse(%s, /^-?\d+\.\d+$/.test(%s) ? "too_precise" : "invalid_value")`, v, v, a, name, a)
+		if f.Min != nil {
+			line(`else if (typeof %s === "string" && Number(%s) < %s) refuse(%s, "too_small")`, a, a, f.Min.Text, name)
+		}
+		if f.Max != nil {
+			line(`else if (typeof %s === "string" && Number(%s) > %s) refuse(%s, "too_large")`, a, a, f.Max.Text, name)
 		}
 	case project.TypeEnum:
 		line(`if (typeof %s === "string" && (%s as string) !== "" && !(%sValues as readonly string[]).includes(%s)) refuse(%s, "invalid_value")`,
