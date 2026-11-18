@@ -12,6 +12,10 @@ import (
 // resources are the catalog's entities; change rewrites app.esq first.
 func spaProject(t *testing.T, change func(app string) string) (string, int, string) {
 	t.Helper()
+	if testing.Short() {
+		// Generating the api starter runs its hooks, sqlc among them.
+		t.Skip("generates the api starter, which needs sqlc or Docker")
+	}
 	dir := filepath.Join(t.TempDir(), "shop")
 	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
 		t.Fatal(errOut)
