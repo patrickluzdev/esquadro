@@ -43,7 +43,7 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 	for i, a := range p.Actions {
 		target := filepath.Join(projectDir, filepath.FromSlash(a.Path))
 		switch {
-		case a.Change == Create, a.Change == Update, a.Change == Conflict && a.New != nil:
+		case a.Change == Create, a.Change == Update, a.Change == Merge, a.Change == Conflict && a.New != nil:
 			staged := filepath.Join(staging, fmt.Sprintf("%d", i))
 			mode := os.FileMode(0o644)
 			if info, err := os.Stat(target); err == nil {
@@ -55,6 +55,15 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 			moves = append(moves, move{staged, target})
 		case a.Change == Delete, a.Change == Conflict && a.New == nil && a.ByHook == "":
 			deletes = append(deletes, target)
+		}
+		// What a .once file's template wrote, kept as the base its next
+		// changes are merged from.
+		if base := a.base(); base != nil {
+			staged := filepath.Join(staging, fmt.Sprintf("base-%d", i))
+			if err := os.WriteFile(staged, base, 0o644); err != nil {
+				return err
+			}
+			moves = append(moves, move{staged, filepath.Join(projectDir, filepath.FromSlash(basePath(a.Path)))})
 		}
 	}
 
@@ -80,12 +89,16 @@ func Write(projectDir string, p *Plan, force bool, esquadroVersion string, bluep
 			continue // deleted
 		}
 		switch {
-		case a.Change == Keep && a.locked != nil:
+		case (a.Change == Keep || a.Change == Conflict && a.File.Once) && a.locked != nil:
 			lock.Files[a.Path] = *a.locked
 		case a.Change == Keep:
 			// A .once file the user already had before esquadro generated
 			// it: record it as theirs without claiming its content.
 			lock.Files[a.Path] = entry(a, "")
+		case a.File.Once && a.Change != Conflict:
+			// A .once file is locked as its template wrote it, whatever
+			// was merged into it: that is what tells the user's changes.
+			lock.Files[a.Path] = entry(a, Hash(a.File.Content))
 		default:
 			lock.Files[a.Path] = entry(a, Hash(a.New))
 		}
@@ -180,4 +193,24 @@ func TrackHookFiles(projectDir, hook, blueprint string, writes []string, match f
 		return err
 	}
 	return writeAtomic(filepath.Join(projectDir, filepath.FromSlash(LockPath)), lock.encode())
+}
+
+// base is what to keep as the base of a .once file, nil for none: what its
+// template wrote, when the file was written from it now or still holds
+// it.
+func (a Action) base() []byte {
+	if a.File == nil || !a.File.Once {
+		return nil
+	}
+	switch a.Change {
+	case Create, Update, Merge, Unchanged:
+		return a.File.Content
+	case Keep:
+		// The template writes what it wrote last time: a project from
+		// before bases were kept gets its base now.
+		if a.locked != nil && a.locked.Hash == Hash(a.File.Content) {
+			return a.File.Content
+		}
+	}
+	return nil
 }

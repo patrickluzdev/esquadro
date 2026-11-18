@@ -12,7 +12,7 @@ is on disk:
 | you did not touch | updates it, or deletes it when the model no longer needs it |
 | you edited | stops before writing anything, and lists it |
 | marked `.once` (README, Taskfile.yml, translations.go...), as it wrote it | updates it: you never changed it, so it follows its template |
-| marked `.once`, and you changed it | leaves it: it is yours |
+| marked `.once`, and you changed it | merges its template's changes into yours, as `git merge` does |
 | a file of yours, not generated | never looks at it |
 
 ```sh
@@ -26,6 +26,28 @@ Keep your code in files of your own next to the generated ones: a use case in
 `internal/catalog/discount.go`, a route in a file of `cmd/<app>/`. When a
 blueprint has a slot for it, contribute there from a
 [local blueprint](/esquadro/writing-blueprints/).
+
+## Your .once files get esquadro's changes too
+
+A `.once` file is yours, and esquadro still brings its template's changes
+to it: it keeps what the template wrote last time in `esquadro/base/` (as `<file>.base`)
+(commit it), and merges what changed since into your file, line by line.
+
+- Changes in different places: both are kept, and `esquadro gen` lists the
+  file as `merge`.
+- Changes to the same lines: a conflict, marked as git marks them; your
+  editor offers to keep one side, the other or both. `esquadro gen` stops,
+  and `esquadro gen -check` fails, until the markers are gone.
+
+```text
+<<<<<<< yours
+  { to: "/promotions", label: "Promotions" },
+=======
+  { to: "/products", label: t("products") },
+>>>>>>> esquadro
+```
+
+`esquadro gen -dry-run` shows each merge before it is written.
 
 ## Migrations
 

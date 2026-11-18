@@ -22,10 +22,11 @@ const (
 	Delete                  // generated file, untouched, no longer generated
 	Keep                    // the user's file (from a .once template): left alone
 	Conflict                // would overwrite or delete the user's work
+	Merge                   // the user's .once file, with its template's changes merged in
 )
 
 func (c Change) String() string {
-	return [...]string{"unchanged", "create", "update", "delete", "keep", "conflict"}[c]
+	return [...]string{"unchanged", "create", "update", "delete", "keep", "conflict", "merge"}[c]
 }
 
 // Action is the planned change to one file.
@@ -42,6 +43,8 @@ type Action struct {
 	// ByHook names the post-gen hook that wrote the file, for conflicts on
 	// files hooks write: forcing lets the hook overwrite them.
 	ByHook string
+	// Conflicts is how many conflicts a Merge left in New, between markers.
+	Conflicts int
 	// locked is the file's previous lock entry, if any.
 	locked *LockedFile
 }
@@ -81,6 +84,9 @@ const (
 	reasonEditedGone = "edited since esquadro generated it, and is no longer generated"
 	reasonYours      = "yours: generated once, and changed since"
 	reasonUntouched  = "yours, untouched: follows the template"
+	reasonMerged     = "yours: the template's changes merged in"
+	reasonMergedBad  = "yours: the template's changes merged in, with %d conflicts marked to resolve"
+	reasonUnresolved = "yours, with conflicts of a merge still marked: resolve them"
 	reasonNowYours   = "generated before, yours from now on"
 	reasonDeleted    = "yours, and you deleted it: esquadro does not bring it back"
 	reasonHookEdited = "edited since hook %s wrote it"
@@ -115,6 +121,15 @@ func MakePlan(projectDir string, res *compose.Result, lock *Lock) (*Plan, error)
 		case f.Once && old != nil && a.locked != nil && a.locked.Once && a.locked.Hash != "" &&
 			Hash(old) == a.locked.Hash && !bytes.Equal(old, f.Content):
 			a.Change, a.Reason = Update, reasonUntouched
+		// A merge's conflicts not resolved yet: nothing more is merged.
+		case f.Once && old != nil && hasConflictMarkers(old):
+			a.Change, a.Reason, a.New = Conflict, reasonUnresolved, old
+		// A file of the user's they changed: the template's changes since
+		// last time (from the base kept in esquadro/base) merged in.
+		case f.Once && old != nil && a.locked != nil && a.locked.Once && a.locked.Hash != "":
+			if err := a.merge(projectDir, f); err != nil {
+				return nil, err
+			}
 		case f.Once && old != nil:
 			a.Change, a.Reason = Keep, reasonYours
 		case f.Once && a.locked != nil:
@@ -176,4 +191,36 @@ func readIfExists(projectDir, path string) ([]byte, error) {
 		return nil, nil
 	}
 	return data, err
+}
+
+// BaseDir keeps, for each .once file, what its template wrote the last
+// time: the base the template's next changes are merged from.
+const BaseDir = "esquadro/base"
+
+// basePath is where the base of a .once file is kept: under BaseDir, with
+// .base after its name, so that no tool of the project takes it for code
+// (go build ./... would compile a routes.go).
+func basePath(path string) string { return BaseDir + "/" + path + ".base" }
+
+// merge plans a .once file the user changed: kept when its template did not
+// change (or there is no base to merge from), else merged.
+func (a *Action) merge(projectDir string, f *compose.File) error {
+	base, err := readIfExists(projectDir, basePath(f.Path))
+	if err != nil {
+		return err
+	}
+	if base == nil || Hash(base) != a.locked.Hash || bytes.Equal(base, f.Content) {
+		a.Change, a.Reason = Keep, reasonYours
+		return nil
+	}
+	merged, conflicts, ok := Merge3(base, a.Old, f.Content)
+	if !ok {
+		a.Change, a.Reason = Keep, reasonYours
+		return nil
+	}
+	a.Change, a.New, a.Conflicts, a.Reason = Merge, merged, conflicts, reasonMerged
+	if conflicts > 0 {
+		a.Reason = fmt.Sprintf(reasonMergedBad, conflicts)
+	}
+	return nil
 }

@@ -92,7 +92,7 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	printPlan(stdout, plan, *dryRun)
 	if *check {
 		n := plan.Count()
-		if pending := n[workspace.Create] + n[workspace.Update] + n[workspace.Delete] + n[workspace.Conflict]; pending > 0 {
+		if pending := n[workspace.Create] + n[workspace.Update] + n[workspace.Merge] + n[workspace.Delete] + n[workspace.Conflict]; pending > 0 {
 			fmt.Fprintf(stderr, "\nesquadro gen -check: the files are not what the model generates (%s); run esquadro gen\n", count(pending, "change", "changes"))
 			return 1
 		}
@@ -135,6 +135,12 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		}
 		return 1
 	}
+	// A merge that left conflicts: the user resolves them, as with git.
+	for _, a := range plan.Actions {
+		if a.Change == workspace.Merge && a.Conflicts > 0 {
+			fmt.Fprintf(stderr, "esquadro gen: %s: %s between <<<<<<< yours and >>>>>>> esquadro; resolve and remove the markers\n", a.Path, count(a.Conflicts, "conflict", "conflicts"))
+		}
+	}
 	// The files, migrations included, now follow this project: the next
 	// generation compares with it. Saved before the post-gen hooks, which
 	// may commit it; they get the previous project from memory.
@@ -167,6 +173,9 @@ func printPlan(w io.Writer, plan *workspace.Plan, diffs bool) {
 	n := plan.Count()
 	fmt.Fprintf(w, "%d created, %d updated, %d deleted, %d unchanged",
 		n[workspace.Create], n[workspace.Update], n[workspace.Delete], n[workspace.Unchanged])
+	if n[workspace.Merge] > 0 {
+		fmt.Fprintf(w, ", %d merged", n[workspace.Merge])
+	}
 	if n[workspace.Keep] > 0 {
 		fmt.Fprintf(w, ", %d kept", n[workspace.Keep])
 	}
@@ -179,7 +188,7 @@ func printPlan(w io.Writer, plan *workspace.Plan, diffs bool) {
 	}
 	for _, a := range plan.Actions {
 		switch a.Change {
-		case workspace.Update, workspace.Delete, workspace.Conflict:
+		case workspace.Update, workspace.Merge, workspace.Delete, workspace.Conflict:
 			fmt.Fprintln(w)
 			fmt.Fprint(w, workspace.Diff(a.Path, a.Old, a.New))
 		}

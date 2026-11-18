@@ -92,8 +92,11 @@ func TestFirstGenerationCreatesEverything(t *testing.T) {
 		t.Fatalf("lock = %+v", lock)
 	}
 	entries, _ := os.ReadDir(filepath.Join(p.dir, Dir))
-	if len(entries) != 1 || entries[0].Name() != "lock.json" {
+	if len(entries) != 2 || entries[0].Name() != "base" || entries[1].Name() != "lock.json" {
 		t.Fatalf("esquadro/ has leftovers: %v", entries)
+	}
+	if got, _ := p.read(BaseDir + "/README.md.base"); got != "hello" {
+		t.Fatalf("the base of README.md is %q", got)
 	}
 }
 
@@ -121,7 +124,8 @@ func TestOnceFileTheUserChangedIsKept(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.write("README.md", "mine")
-	plan, err := p.gen(false, once("README.md", "v2"))
+	// The template unchanged: nothing to bring, the file stays the user's.
+	plan, err := p.gen(false, once("README.md", "v1"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,12 +283,16 @@ func TestAGeneratedFileThatBecomesTheUsersIsReplacedWhenUntouched(t *testing.T) 
 	if got, _ := p.read("routes.go"); got != "yours" {
 		t.Fatalf("routes.go = %q", got)
 	}
-	// From now on it is the user's.
+	// From now on it is the user's: the template's changes are merged in,
+	// and the lines both changed are a conflict for the user to resolve.
 	p.write("routes.go", "mine")
 	if plan, err = p.gen(false, once("routes.go", "yours, again")); err != nil {
 		t.Fatal(err)
 	}
-	expect(t, plan, "keep routes.go")
+	expect(t, plan, "merge routes.go")
+	if got, _ := p.read("routes.go"); !hasConflictMarkers([]byte(got)) {
+		t.Fatalf("routes.go = %q", got)
+	}
 
 	// Edited while generated: a conflict, not overwritten.
 	q := newProject(t)
@@ -348,5 +356,75 @@ func TestDiff(t *testing.T) {
 	}
 	if got := Diff("f", []byte("x"), []byte("y")); !strings.Contains(got, "-x\n\\ No newline at end of file\n+y\n\\ No newline at end of file\n") {
 		t.Fatalf("missing newline marker:\n%s", got)
+	}
+}
+
+func TestOnceFileTheUserChangedGetsTheTemplatesChangesMerged(t *testing.T) {
+	p := newProject(t)
+	if _, err := p.gen(false, once("menu.ts", "home\nproducts\n\nend\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := p.read(BaseDir + "/menu.ts.base"); got != "home\nproducts\n\nend\n" {
+		t.Fatalf("the base is %q", got)
+	}
+	p.write("menu.ts", "home\nproducts\nmine\n\nend\n")
+	plan, err := p.gen(false, once("menu.ts", "home\nproducts\n\nend\nsettings\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "merge menu.ts")
+	if got, _ := p.read("menu.ts"); got != "home\nproducts\nmine\n\nend\nsettings\n" {
+		t.Fatalf("merged %q", got)
+	}
+	if got, _ := p.read(BaseDir + "/menu.ts.base"); got != "home\nproducts\n\nend\nsettings\n" {
+		t.Fatalf("the base follows the template: %q", got)
+	}
+	// Nothing new from the template: the file stays as merged.
+	if plan, err = p.gen(false, once("menu.ts", "home\nproducts\n\nend\nsettings\n")); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "keep menu.ts")
+}
+
+func TestAMergesConflictIsMarkedAndBlocksUntilResolved(t *testing.T) {
+	p := newProject(t)
+	if _, err := p.gen(false, once("menu.ts", "a\nb\nc\n")); err != nil {
+		t.Fatal(err)
+	}
+	p.write("menu.ts", "a\nmine\nc\n")
+	plan, err := p.gen(false, once("menu.ts", "a\nesquadro\nc\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "merge menu.ts")
+	got, _ := p.read("menu.ts")
+	if !hasConflictMarkers([]byte(got)) {
+		t.Fatalf("no markers in %q", got)
+	}
+	// Unresolved, the next generation stops.
+	if _, err := p.gen(false, once("menu.ts", "a\nesquadro\nc\n")); err == nil {
+		t.Fatal("generated over unresolved markers")
+	}
+	p.write("menu.ts", "a\nmine and esquadro\nc\n")
+	if plan, err = p.gen(false, once("menu.ts", "a\nesquadro\nc\n")); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, plan, "keep menu.ts")
+}
+
+func TestAProjectFromBeforeBasesGetsItsBase(t *testing.T) {
+	p := newProject(t)
+	if _, err := p.gen(false, once("menu.ts", "v1\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(p.dir, "esquadro", "base")); err != nil {
+		t.Fatal(err)
+	}
+	p.write("menu.ts", "v1\nmine\n")
+	if _, err := p.gen(false, once("menu.ts", "v1\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := p.read(BaseDir + "/menu.ts.base"); got != "v1\n" {
+		t.Fatalf("the base is %q", got)
 	}
 }
