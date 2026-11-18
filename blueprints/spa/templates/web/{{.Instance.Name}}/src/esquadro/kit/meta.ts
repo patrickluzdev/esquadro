@@ -31,6 +31,8 @@ export interface FieldMeta {
   /** A number's bounds, as the model says: min(0). */
   min?: number
   max?: number
+  /** Formatted text, as HTML (@rest(html)): a rich text editor. */
+  rich?: boolean
   /** Shown, never edited (created_at). */
   readOnly?: boolean
 }

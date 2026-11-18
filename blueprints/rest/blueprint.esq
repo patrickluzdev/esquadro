@@ -41,6 +41,13 @@ blueprint rest {
     unpaged_max int
   }
 
+  annotation field {
+    /// Formatted text, kept as HTML: only the tags a rich text editor
+    /// makes are kept (paragraphs, bold, italic, headings, lists, links,
+    /// quotes, code), the rest is dropped when it is written; frontends edit
+    /// it with a rich text editor.
+    html bool
+  }
   annotation entity {
     /// How the entity's list pages: cursor, page, both, or [] (none).
     pagination list
@@ -72,6 +79,7 @@ blueprint rest {
   slot "rest.middleware"
 
   go_require "github.com/ogen-go/ogen" "v1.24.0"
+  go_require "github.com/microcosm-cc/bluemonday" "v1.0.27"
 
   hook post-gen "ogen" writes "internal/apigen/**"
 }

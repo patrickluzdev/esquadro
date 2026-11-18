@@ -52,6 +52,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `unpaged_max` | int | The most records its list answers without pagination. |
 | entity | `if_match` | name | optional or required, for the entity: see the if_match option. |
 | entity | `idempotency` | name | optional or required, for creating the entity: see the idempotency option. |
+| field | `html` | bool | Formatted text, kept as HTML: only the tags a rich text editor makes are kept (paragraphs, bold, italic, headings, lists, links, quotes, code), the rest is dropped when it is written; frontends edit it with a rich text editor. |
 
 An annotation is written `@rest(key value)` on the element.
 
@@ -76,3 +77,4 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 ## Go modules
 
 - `github.com/ogen-go/ogen` v1.24.0
+- `github.com/microcosm-cc/bluemonday` v1.0.27

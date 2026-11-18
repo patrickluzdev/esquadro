@@ -1,0 +1,26 @@
+{{- if anyHTML .Entities -}}
+package edge
+
+import "github.com/microcosm-cc/bluemonday"
+
+// richText keeps what a rich text editor makes: paragraphs, line breaks,
+// bold, italic, underline, strikethrough, headings, lists, quotes, code and
+// links (to the web and email, opened apart).
+var richText = func() *bluemonday.Policy {
+	p := bluemonday.NewPolicy()
+	p.AllowElements("p", "br", "strong", "b", "em", "i", "u", "s", "h1", "h2", "h3", "ul", "ol", "li", "blockquote", "code", "pre", "hr")
+	p.AllowAttrs("href").OnElements("a")
+	p.AllowURLSchemes("http", "https", "mailto")
+	p.RequireParseableURLs(true)
+	p.RequireNoFollowOnLinks(true)
+	p.AddTargetBlankToFullyQualifiedLinks(true)
+	return p
+}()
+
+// HTML is formatted text without what a rich text editor does not make:
+// scripts, styles, handlers and links to anything but the web and email
+// are dropped.
+func HTML(s string) string {
+	return richText.Sanitize(s)
+}
+{{end -}}

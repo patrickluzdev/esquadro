@@ -3,6 +3,7 @@
 // required checked before sending, the API's refusals on their fields, a
 // change on the version read (If-Match), a create sent once
 // (Idempotency-Key), and a question before leaving with changes unsaved.
+import { RichTextInput } from "./rich.tsx"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useBlocker, useNavigate, useRouterState, useSearch } from "@tanstack/react-router"
 import { useId, useMemo, useRef, useState } from "react"
@@ -51,6 +52,7 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
   if (own?.input) return <>{own.input(value, onChange)}</>
   const str = value === null || value === undefined ? "" : String(value)
   const id = `field-${field.name}`
+  if (field.rich) return <RichTextInput id={id} value={str} onChange={onChange} invalid={invalid} max={field.max} />
   switch (field.kind) {
     case "bool":
       return <Checkbox id={id} checked={Boolean(value)} onCheckedChange={(c) => onChange(c === true)} aria-invalid={invalid} />

@@ -177,6 +177,20 @@ blueprint's `service_key_choices`, within `service_key_max_days`. The spa's
 `service_keys false` leaves the page out; it is
 `src/pages/_app/service-keys.tsx`, yours.
 
+A `text` field marked `@rest(html)` is formatted text: the form edits it
+with a rich text editor (bold, italic, headings, lists, quotes, code,
+links), the record's page shows it formatted, and lists show it as plain
+text. The API keeps only what such an editor makes, and drops the rest
+(scripts, styles, handlers, `javascript:` links) when it is written, so the
+stored text is safe for any client; the frontend cleans it again when it
+shows it.
+
+```esquadro
+entity Product {
+  description text @rest(html)
+}
+```
+
 With the [audit](/esquadro/audit/) blueprint, an audited record's page has a
 History tab, and Administration an Audit page with every change.
 

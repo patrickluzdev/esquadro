@@ -107,9 +107,18 @@ func TemplateFuncs() template.FuncMap {
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
 		"softDeleted":      store.SoftDeleted,
-		"audited":          audit.Audited,
-		"auditedOf":        audit.AuditedOf,
-		"auditAdmins":      audit.Admins,
+		"html":             HTML,
+		"anyHTML": func(entities []*project.Entity) bool {
+			for _, e := range entities {
+				if slices.ContainsFunc(e.Fields, HTML) {
+					return true
+				}
+			}
+			return false
+		},
+		"audited":     audit.Audited,
+		"auditedOf":   audit.AuditedOf,
+		"auditAdmins": audit.Admins,
 		"links": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {
@@ -621,4 +630,11 @@ func KeyInRequest(entities []*project.Entity, e *project.Entity, r *project.Rela
 	}
 	o, ok := security.OwnerUsed(entities, e)
 	return !(ok && o.Relation == r && security.RulesOf(entities, e, "create").Owner)
+}
+
+// HTML reports whether a field is formatted text, kept as HTML that the
+// API cleans (@rest(html)).
+func HTML(f *project.Field) bool {
+	on, _ := f.Ann["rest"]["html"].(bool)
+	return on
 }

@@ -589,6 +589,8 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 	{{$x}} = []byte(req.{{$g}})
 {{- else if eq .Type "enum"}}
 	{{$x}} = {{.Enum.Pascal}}(req.{{$g}})
+{{- else if html .}}
+	{{$x}} = edge.HTML(req.{{$g}})
 {{- else}}
 	{{$x}} = req.{{$g}}
 {{- end}}
@@ -613,6 +615,8 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 		{{$x}} = uuid.UUID(v)
 {{- else if eq .Type "enum"}}
 		{{$x}} = {{.Enum.Pascal}}(v)
+{{- else if html .}}
+		{{$x}} = edge.HTML(v)
 {{- else}}
 		{{$x}} = v
 {{- end}}
@@ -670,6 +674,8 @@ func {{.Camel}}ChangesOf(req *apigen.{{$P}}Changes) ({{$P}}Changes, []FieldError
 		{{$x}} = new(uuid.UUID(v))
 {{- else if eq .Type "enum"}}
 		{{$x}} = new({{.Enum.Pascal}}(v))
+{{- else if html .}}
+		{{$x}} = new(edge.HTML(v))
 {{- else}}
 		{{$x}} = &v
 {{- end}}

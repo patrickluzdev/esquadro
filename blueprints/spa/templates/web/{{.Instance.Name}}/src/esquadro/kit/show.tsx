@@ -27,6 +27,7 @@ import { useKeys } from "./keys.tsx"
 import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
+import { RichText } from "./rich.tsx"
 import { confirmRemove, removed } from "./trash.tsx"
 import { useSession } from "./auth.tsx"
 import { RecordHistory, seesHistory } from "./history.tsx"
@@ -45,6 +46,7 @@ export function FieldValue({ field, record }: { field: FieldMeta; record: Rec })
     return <RelationValue field={field} id={String(value)} />
   }
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">—</span>
+  if (field.rich) return <RichText html={String(value)} />
   if (field.kind === "text" || field.kind === "textarea") return <Highlight text={format(field, value)} />
   return <>{format(field, value)}</>
 }

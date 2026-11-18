@@ -5,6 +5,7 @@ import type { Messages } from "@/messages.ts"
 import { locale } from "../config.ts"
 import { formatMoney } from "./money.tsx"
 import type { FieldMeta } from "./meta.ts"
+import { plainText } from "./plain.ts"
 
 const words: Messages = messages[locale] ?? messages.en
 
@@ -21,6 +22,7 @@ export function capitalize(text: string): string {
 /** A value of a field, as people read it. */
 export function format(field: FieldMeta, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—"
+  if (field.rich) return plainText(String(value)) || "—"
   switch (field.kind) {
     case "enum":
       return capitalize(field.labels?.[String(value)] ?? String(value))
