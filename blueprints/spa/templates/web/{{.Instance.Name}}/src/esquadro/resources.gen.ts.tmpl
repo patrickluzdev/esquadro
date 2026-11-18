@@ -33,6 +33,9 @@ export const resources = {
 {{- if softDeleted $e}}
     trash: { days: {{or (index (optionsOf "store") "purge_days") 0}} },
 {{- end}}
+{{- if and $.Options.history (audited $e (optionsOf "audit"))}}
+    history: { entity: "{{$e.Plural.Snake}}", who: "{{index (optionsOf "audit") "history"}}" },
+{{- end}}
   }),
 {{- end}}{{end}}
 }

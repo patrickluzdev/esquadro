@@ -2,7 +2,7 @@
 // value is shown (yours too, from src/fields.ts).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Copy, Pencil, Trash2 } from "lucide-react"
+import { Copy, History as HistoryIcon, Pencil, Trash2 } from "lucide-react"
 import { fields as yours } from "@/fields.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,8 @@ import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
 import { confirmRemove, removed } from "./trash.tsx"
+import { useSession } from "./auth.tsx"
+import { RecordHistory, seesHistory } from "./history.tsx"
 
 /** A field's value: your own renderer for its name or kind, or the kit's. */
 export function FieldValue({ field, record }: { field: FieldMeta; record: Rec }) {
@@ -102,6 +104,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const session = useSession()
   const remove = useMutation({
     mutationFn: (r: Rec) => meta.api(api as never).delete(r.id, { ifMatch: r }),
     onSuccess: (_, r) => {
@@ -114,6 +117,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   if (record.isPending) return <DetailSkeleton fields={(resource.show ?? resource.form).length} />
   if (record.isError) return <ErrorState framed error={record.error} onRetry={() => record.refetch()} back={<BackToList resource={resource} />} />
   const r = record.data
+  const history = seesHistory(meta, r, session)
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
   const fields = resource.show ?? resource.form
@@ -221,7 +225,17 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
                 <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
               </TabsTrigger>
             ))}
+            {history && (
+              <TabsTrigger value="history">
+                <HistoryIcon /> {t("history")}
+              </TabsTrigger>
+            )}
           </TabsList>
+          {history && (
+            <TabsContent value="history" className="p-6">
+              <RecordHistory meta={meta} id={r.id} />
+            </TabsContent>
+          )}
           <TabsContent value="details" className="flex flex-col gap-8 p-6">
             {groups.map((g, i) => (
               <section key={g.title ?? i} className="flex flex-col gap-5">

@@ -52,6 +52,12 @@ blueprint spa {
   /// A Service keys page under Administration, for those who administer
   /// them, when the security blueprint declares services.
   option service_keys bool default(true)
+  /// A History tab on the page of each audited record (the audit
+  /// blueprint), for those the audit's history option lets see it.
+  option history bool default(true)
+  /// An Audit page under Administration, every change, for the audit's
+  /// admins.
+  option audit_page bool default(true)
 
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.

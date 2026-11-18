@@ -1,0 +1,25 @@
+{{- $audit := optionsOf "audit"}}
+{{- if and $audit (auditedOf .Entities $audit) .Options.audit_page (uses "security") -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { ShieldX } from "lucide-react"
+import { auditAdmins } from "../../esquadro/accounts.gen.ts"
+import { allowedBy } from "../../esquadro/kit/accounts-admin.tsx"
+import { useSession } from "../../esquadro/kit/auth.tsx"
+import { AuditAdmin } from "../../esquadro/kit/history.tsx"
+import { t } from "../../esquadro/kit/i18n.ts"
+import { StateView } from "../../esquadro/kit/states.tsx"
+
+// Every change of the audited records, for those who administer. Yours,
+// like the other pages.
+export const Route = createFileRoute("/_app/audit")({
+  component: AuditPage,
+})
+
+function AuditPage() {
+  const session = useSession()
+  if (!allowedBy(session, auditAdmins ?? [])) {
+    return <StateView framed tone="warning" icon={<ShieldX />} title={t("forbidden")} description={t("forbiddenPage")} />
+  }
+  return <AuditAdmin />
+}
+{{- end}}

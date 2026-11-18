@@ -91,6 +91,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   pagination: readonly string[]
   /** Deleting puts records in the trash, where they stay days days (0: until emptied). */
   trash?: { days: number }
+  /** Its changes are kept (the audit blueprint): its plural, and who sees a record's history. */
+  history?: { entity: string; who: "update" | "read" | "admins" }
 }
 
 export function defineMeta<const F extends Record<string, FieldMeta>, A>(

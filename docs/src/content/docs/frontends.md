@@ -177,6 +177,9 @@ blueprint's `service_key_choices`, within `service_key_max_days`. The spa's
 `service_keys false` leaves the page out; it is
 `src/pages/_app/service-keys.tsx`, yours.
 
+With the [audit](/esquadro/audit/) blueprint, an audited record's page has a
+History tab, and Administration an Audit page with every change.
+
 The lists of entities with a trash (`@store(soft_delete)`) have a Trash
 button; deleting there can be undone, and the trash restores or deletes for
 good: see [The trash](/esquadro/trash/).

@@ -47,6 +47,16 @@ const all = await api.audit.list({ entity: "products", since: "2026-11-01" })
 
 In your code: `audit.List(ctx, pool, audit.Filter{...}, page, perPage)`.
 
+## In the frontends
+
+A [spa](/esquadro/frontends/) record page of an audited entity has a
+**History** tab, for those the `history` option lets see it: a timeline of
+who did what and when, each field before and after, shown as the page shows
+it (an amount formatted, an enum with its color, a related record by its
+name). Those who administer have **Administration › Audit**: every change,
+filtered by entity, action, period and person (in the URL), each opened to
+its fields. The spa's `history false` and `audit_page false` leave them out.
+
 ## Options
 
 | Option | Default | |

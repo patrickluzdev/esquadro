@@ -41,3 +41,7 @@ export const accountRealms: AccountRealm[] = [
 
 /** Who administers the service keys (realm.role rules); null without a page of them. */
 export const serviceKeyAdmins: string[] | null = {{if and (index $sec "services") .Options.service_keys $admins}}[{{range $i, $w := $admins}}{{if $i}}, {{end}}"{{$w}}"{{end}}]{{else}}null{{end}}
+{{- $audit := optionsOf "audit"}}
+
+/** Who sees every change (realm.role rules); null without an Audit page. */
+export const auditAdmins: string[] | null = {{if and $audit (auditedOf .Entities $audit) .Options.audit_page (uses "security")}}[{{range $i, $w := auditAdmins .Entities $audit}}{{if $i}}, {{end}}"{{$w}}"{{end}}]{{else}}null{{end}}

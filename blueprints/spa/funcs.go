@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/storage"
@@ -30,6 +31,9 @@ func TemplateFuncs() template.FuncMap {
 		"inRequest":   rest.InRequest,
 		"realms":      security.RealmsOf,
 		"softDeleted": store.SoftDeleted,
+		"audited":     audit.Audited,
+		"auditedOf":   audit.AuditedOf,
+		"auditAdmins": audit.Admins,
 		"realmAdmins": security.Admins,
 		"displayOf":   DisplayOf,
 		"titleOf":     TitleOf,

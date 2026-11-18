@@ -3,7 +3,7 @@
 import * as icons from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { t } from "./esquadro/kit/i18n.ts"
-import { accountRealms, serviceKeyAdmins } from "./esquadro/accounts.gen.ts"
+import { accountRealms, auditAdmins, serviceKeyAdmins } from "./esquadro/accounts.gen.ts"
 import { dashboards } from "./esquadro/dashboard.gen.ts"
 import { administers, allowedBy } from "./esquadro/kit/accounts-admin.tsx"
 import { resources } from "./esquadro/resources.gen.ts"
@@ -69,17 +69,19 @@ export const menu: Menu = {
 {{- end}}
 {{- end}}{{end}}
 {{- /* The accounts of the realms this frontend administers, to those who may. */}}
-    ...(accountRealms.length || serviceKeyAdmins
+    ...(accountRealms.length || serviceKeyAdmins || auditAdmins
       ? [
           {
             label: t("administration"),
             icon: icons.ShieldCheck,
-            show: (s: MenuSession | null) => accountRealms.some((r) => administers(s, r)) || allowedBy(s, serviceKeyAdmins ?? []),
+            show: (s: MenuSession | null) =>
+              accountRealms.some((r) => administers(s, r)) || allowedBy(s, serviceKeyAdmins ?? []) || allowedBy(s, auditAdmins ?? []),
             items: [
               ...accountRealms.map((r) => ({ to: `/accounts/${r.slug}`, label: r.label, icon: icons.Users, show: (s: MenuSession | null) => administers(s, r) })),
               ...(serviceKeyAdmins
                 ? [{ to: "/service-keys", label: t("serviceKeys"), icon: icons.KeyRound, show: (s: MenuSession | null) => allowedBy(s, serviceKeyAdmins ?? []) }]
                 : []),
+              ...(auditAdmins ? [{ to: "/audit", label: t("audit"), icon: icons.History, show: (s: MenuSession | null) => allowedBy(s, auditAdmins ?? []) }] : []),
             ],
           },
         ]

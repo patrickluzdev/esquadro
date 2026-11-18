@@ -34,6 +34,8 @@ blueprint spa
 | `radius` | string | `"0.75rem"` | How round the corners are, as CSS: 0.75rem, 0.5rem, 0. |
 | `idle_minutes` | int | `0` | Minutes without use after which the frontend signs out (a warning comes a minute before); 0, never. |
 | `service_keys` | bool | `true` | A Service keys page under Administration, for those who administer them, when the security blueprint declares services. |
+| `history` | bool | `true` | A History tab on the page of each audited record (the audit blueprint), for those the audit's history option lets see it. |
+| `audit_page` | bool | `true` | An Audit page under Administration, every change, for the audit's admins. |
 
 ```esquadro
 blueprint spa {
