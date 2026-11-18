@@ -130,13 +130,29 @@ async function each(records: Rec[], run: (r: Rec) => Promise<unknown> | unknown)
   return { done, failed, error }
 }
 
-export function ResourceList({ resource, description }: { resource: Resource; description?: string }) {
+/**
+ * A resource's list: its page, with its state in the URL; or, with a scope,
+ * the records related to one (a category's products), on that record's
+ * page, with its state in the page.
+ */
+export function ResourceList({
+  resource,
+  description,
+  scope,
+}: {
+  resource: Resource
+  description?: string
+  scope?: { param: string; value: string; label?: string }
+}) {
   const { meta } = resource
-  const search = useSearch({ strict: false }) as ListSearch
+  const embedded = scope !== undefined
+  const urlSearch = useSearch({ strict: false }) as ListSearch
+  const [localSearch, setLocalSearch] = useState<ListSearch>({})
+  const search = embedded ? localSearch : urlSearch
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const paged = meta.pagination.includes("page")
-  const query: Record<string, unknown> = { ...search }
+  const query: Record<string, unknown> = { ...search, ...(scope && { [scope.param]: scope.value }) }
   if (paged) {
     query.page = search.page ?? 1
     query.per_page = PER_PAGE
@@ -151,11 +167,16 @@ export function ResourceList({ resource, description }: { resource: Resource; de
   // A change of the list's state goes to the URL; typing replaces the entry
   // instead of filling the history.
   const set = (changes: Partial<ListSearch>, replace = false) =>
-    navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never, replace })
+    embedded
+      ? setLocalSearch((s) => Object.fromEntries(Object.entries({ ...s, ...changes }).filter(([, v]) => v !== undefined)))
+      : navigate({ to: ".", search: (s: Record<string, unknown>) => ({ ...s, ...changes }) as never, replace })
+  // A scoped list's own key is not a filter, nor a column.
+  const filters = (resource.table.filters ?? []).filter((f) => f.name !== scope?.param)
+  const tableColumns = resource.table.columns.filter((c) => columnField(c).name !== scope?.param)
   // The search counts only where the list has one.
-  const filtering = (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) || (resource.table.filters ?? []).some((f) => search[f.name] !== undefined)
+  const filtering = (resource.table.search !== false && meta.sorts.includes("relevance") && Boolean(search.q)) || filters.some((f) => search[f.name] !== undefined)
   const clearAll = () =>
-    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries((resource.table.filters ?? []).map((f) => [f.name, undefined])) })
+    set({ q: undefined, page: undefined, cursor: undefined, ...Object.fromEntries(filters.map((f) => [f.name, undefined])) })
 
   const page = list.data
   const items = useMemo(() => page?.items ?? [], [page])
@@ -166,7 +187,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
 
   const [rowSelection, setRowSelection] = useState({})
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>(() =>
-    Object.fromEntries(resource.table.columns.filter((c) => columnOptions(c).hidden).map((c) => [columnField(c).name, false])),
+    Object.fromEntries(tableColumns.filter((c) => columnOptions(c).hidden).map((c) => [columnField(c).name, false])),
   )
   // Another page, filter or sorting: nothing selected.
   useEffect(() => setRowSelection({}), [JSON.stringify(search)])
@@ -208,7 +229,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
         }),
       )
     }
-    for (const c of resource.table.columns) {
+    for (const c of tableColumns) {
       const f = columnField(c)
       const o = columnOptions(c)
       const label = o.label ?? f.label
@@ -304,7 +325,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
       }),
     )
     return helper.columns(out)
-  }, [resource, selectable, search.sort, meta, actions])
+  }, [resource, selectable, search.sort, meta, actions, scope?.param])
 
   const table = useTable({
     features,
@@ -328,25 +349,26 @@ export function ResourceList({ resource, description }: { resource: Resource; de
   }
 
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
-  const filters = resource.table.filters ?? []
   const current = search.page ?? 1
+  const create = page?.can.includes("create") && (
+    <Button asChild size={embedded ? "sm" : "default"} variant={embedded ? "outline" : "default"}>
+      <Link to={`/${meta.name}/new` as never} search={(scope ? { [scope.param]: scope.value } : {}) as never}>
+        <Plus /> {t("new")}
+      </Link>
+    </Button>
+  )
   const hideable = table.getAllColumns().filter((c) => c.getCanHide())
   const width = table.getVisibleLeafColumns().length
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={meta.label}
-        description={description}
-        actions={
-          page?.can.includes("create") && (
-            <Button asChild>
-              <Link to={`/${meta.name}/new` as never}>
-                <Plus /> {t("new")}
-              </Link>
-            </Button>
-          )
-        }
-      />
+      {embedded ? (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold tracking-tight">{scope.label ?? meta.label}</h2>
+          {create}
+        </div>
+      ) : (
+        <PageHeader title={meta.label} description={description} actions={create} />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {searchable && (
           <SearchBox
@@ -354,6 +376,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
             busy={list.isFetching}
             placeholder={t("searchIn", { name: meta.label.toLocaleLowerCase() })}
             onSearch={(q) => set({ q: q || undefined, page: undefined, cursor: undefined }, true)}
+            shortcut={!embedded}
           />
         )}
         {filters.map((f) => (
@@ -495,7 +518,7 @@ export function ResourceList({ resource, description }: { resource: Resource; de
       )}
       {!paged && (search.cursor || page?.next) && (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" disabled={!search.cursor} onClick={() => history.back()}>
+          <Button variant="outline" size="sm" disabled={!search.cursor} onClick={() => (embedded ? set({ cursor: undefined }) : history.back())}>
             <ChevronLeft /> {t("previous")}
           </Button>
           <Button variant="outline" size="sm" disabled={!page?.next} onClick={() => set({ cursor: page?.next })}>

@@ -9,8 +9,11 @@
 // selected (bulk):
 //   actions: [{ label: "Approve", icon: Check, bulk: true,
 //               run: (r) => api.request("POST", `/api/v1/{{.Entity.Plural.Kebab}}/${r.id}/approve`) }],
-import { resource } from "../esquadro/kit/resource.ts"
+import { {{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}{{if $rel}} relation,{{end}} resource } from "../esquadro/kit/resource.ts"
 import { resources } from "../esquadro/resources.gen.ts"
+{{- range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}
+import {{$r.Target.Plural.Camel}} from "./{{$r.Target.Plural.Kebab}}.tsx"
+{{- end}}{{end}}
 
 const meta = resources.{{.Entity.Plural.Camel}}
 const f = meta.fields
@@ -25,6 +28,15 @@ export default resource(meta, {
   show: [{{range $i, $f := inRequest .Entity}}{{if $i}}, {{end}}f.{{$f.Snake}}{{end}}{{range $r := keys .Entity}}, f.{{keyName $r}}{{end}}, f.created_at, f.updated_at],
 {{- with inRequest .Entity}}
   title: f.{{(index . 0).Snake}},
+{{- end}}
+{{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}
+{{- if $rel}}
+  // The related records on a record's page.
+  relations: () => [
+{{- range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}
+    relation({{$r.Target.Plural.Camel}}, "{{inverseKey $r}}"),
+{{- end}}{{end}}
+  ],
 {{- end}}
 })
 {{end -}}

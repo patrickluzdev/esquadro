@@ -94,6 +94,12 @@ entity Product {
     alone (`PATCH`) on the version shown (`If-Match`);
   - each record has a menu: View, Edit, your actions, Delete;
   - Columns shows and hides columns (`hidden` starts one hidden).
+- A record's page lists the records of other resources that point at it
+  (a category's products), each with the list's search, filters and actions;
+  its New starts with the record (`?category_id=`). They are the resource's
+  `relations: () => [relation(products, "category_id")]`, written from the
+  model when the API filters by the key.
+- A new record's form starts with the model's defaults.
 - What the person may do (`can`) decides the buttons; the API decides again.
 - Every page has the same states: a skeleton of what comes while it first
   loads; what was there, dimmed under a moving bar, while it loads again;

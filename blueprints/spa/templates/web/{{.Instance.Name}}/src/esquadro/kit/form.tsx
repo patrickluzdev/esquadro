@@ -4,7 +4,7 @@
 // change on the version read (If-Match), a create sent once
 // (Idempotency-Key), and a question before leaving with changes unsaved.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useBlocker, useNavigate } from "@tanstack/react-router"
+import { useBlocker, useNavigate, useSearch } from "@tanstack/react-router"
 import { useMemo, useRef, useState } from "react"
 import { fields as yours } from "@/fields.ts"
 import { Button } from "@/components/ui/button"
@@ -147,10 +147,13 @@ function RelationInput({ id, field, value, onChange, invalid }: InputProps & { i
   )
 }
 
-function initial(fields: FieldMeta[], record?: Rec): Values {
+function initial(fields: FieldMeta[], record?: Rec, given: Record<string, unknown> = {}): Values {
   const out: Values = {}
   for (const f of fields) {
-    if (!f.readOnly) out[f.name] = record ? record[f.name] ?? null : f.kind === "bool" ? false : null
+    if (f.readOnly) continue
+    // A new record takes what the URL gives (?category_id=, from a
+    // category's products).
+    out[f.name] = record ? record[f.name] ?? null : given[f.name] !== undefined ? String(given[f.name]) : f.default ?? (f.kind === "bool" ? false : null)
   }
   return out
 }
@@ -166,7 +169,8 @@ export function ResourceForm({ resource, id }: { resource: Resource; id?: string
 function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const { meta } = resource
   const fields = resource.form.filter((f) => !f.readOnly)
-  const [values, setValues] = useState<Values>(() => initial(fields, record))
+  const given = useSearch({ strict: false }) as Record<string, unknown>
+  const [values, setValues] = useState<Values>(() => initial(fields, record, given))
   const [errors, setErrors] = useState<Record<string, string>>({})
   // A ref, not state: the blocker reads it as it is when leaving, also
   // right after saving.

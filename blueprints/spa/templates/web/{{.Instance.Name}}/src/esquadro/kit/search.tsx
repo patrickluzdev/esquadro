@@ -16,11 +16,14 @@ export function SearchBox({
   onSearch,
   busy,
   placeholder,
+  shortcut = true,
 }: {
   value: string
   onSearch: (q: string) => void
   busy?: boolean
   placeholder?: string
+  /** Reached with "/": the page's own list, not a related one. */
+  shortcut?: boolean
 }) {
   const [text, setText] = useState(value)
   const input = useRef<HTMLInputElement>(null)
@@ -35,6 +38,7 @@ export function SearchBox({
   }, [text])
   // "/" anywhere but in a field: to the search.
   useEffect(() => {
+    if (!shortcut) return
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
       if (e.key !== "/" || e.metaKey || e.ctrlKey || el.closest("input, textarea, select, [contenteditable=true]")) return
@@ -43,7 +47,7 @@ export function SearchBox({
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [])
+  }, [shortcut])
   const clear = () => {
     setText("")
     onSearch("")
@@ -70,7 +74,8 @@ export function SearchBox({
       />
       <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
         {busy && text && <Spinner className="size-3.5 text-muted-foreground" />}
-        {text ? (
+        {text || !shortcut ? (
+          text && (
           <button
             type="button"
             onClick={clear}
@@ -79,6 +84,7 @@ export function SearchBox({
           >
             <X className="size-3.5" />
           </button>
+          )
         ) : (
           <kbd className="pointer-events-none hidden h-5 items-center rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
             /

@@ -14,6 +14,7 @@ import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
+import { ResourceList } from "./list.tsx"
 import { PageHeader } from "./page.tsx"
 import { DetailSkeleton, ErrorState } from "./states.tsx"
 import { Highlight } from "./search.tsx"
@@ -158,6 +159,11 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
           </dl>
         </CardContent>
       </Card>
+      {resource.relations?.().map((rel) => (
+        <section key={`${rel.resource.meta.name}-${rel.param}`} className="flex flex-col gap-3">
+          <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
+        </section>
+      ))}
     </div>
   )
 }

@@ -32,6 +32,19 @@ export interface Action {
   destructive?: boolean
 }
 
+/** Records of another resource that point at this one: a category's products. */
+export interface Relation {
+  resource: Resource
+  /** The other resource's key to this one: category_id. */
+  param: string
+  label?: string
+}
+
+/** A list of related records, on a record's page. */
+export function relation(resource: Resource, param: string, options: { label?: string } = {}): Relation {
+  return { resource, param, ...options }
+}
+
 /** What a resource shows, written in src/resources/<resource>.tsx. */
 export interface ResourceDef {
   table: {
@@ -47,6 +60,11 @@ export interface ResourceDef {
   actions?: Action[]
   /** The field a record is called by (in titles and pickers). */
   title?: FieldMeta
+  /**
+   * The lists of related records on a record's page. A function, so that
+   * two resources can list each other.
+   */
+  relations?: () => Relation[]
 }
 
 export interface Resource extends ResourceDef {

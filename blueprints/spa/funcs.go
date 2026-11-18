@@ -3,6 +3,7 @@
 package spa
 
 import (
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -26,6 +27,9 @@ func TemplateFuncs() template.FuncMap {
 		"displayOf":  DisplayOf,
 		"lucide":     Lucide,
 		"filterable": Filterable,
+		"hasMany":    HasMany,
+		"defaultOf":  DefaultOf,
+		"inverseKey": InverseKey,
 		"add1":       func(n int) int { return n + 1 },
 		"enumValues": func(e *project.Enum) []string {
 			out := make([]string, len(e.Values))
@@ -82,6 +86,33 @@ func Filterable(e *project.Entity, param string) bool {
 		}
 	}
 	return false
+}
+
+// DefaultOf is a field's default in the model as a TypeScript literal, for
+// a new record's form to start with: "ACTIVE", true, 3; empty without one
+// (or when it is now, which the API sets).
+func DefaultOf(f *project.Field) string {
+	d := f.Default
+	if d == nil || d.Kind == project.DefaultNow {
+		return ""
+	}
+	switch Kind(f) {
+	case "bool", "int":
+		return d.Text
+	}
+	return strconv.Quote(d.Text)
+}
+
+// HasMany reports whether a relation is the "many" side of another entity's
+// key (Category's products), whose records a page can list.
+func HasMany(r *project.Relation) bool {
+	return r.Kind == project.OneToMany && r.Inverse != nil
+}
+
+// InverseKey is the key, on the related entity, that points back at the
+// relation's entity: category_id for Category's products.
+func InverseKey(r *project.Relation) string {
+	return rest.KeyName(r.Inverse)
 }
 
 // Lucide is the component of a Lucide icon's name: shopping-cart is

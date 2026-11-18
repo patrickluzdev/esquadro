@@ -18,6 +18,8 @@ export interface FieldMeta {
   /** A relation's resource, and the field its records are shown by. */
   target?: string
   display?: string
+  /** What a new record starts with, as the model says. */
+  default?: string | number | boolean
   /** Shown, never edited (created_at). */
   readOnly?: boolean
 }
