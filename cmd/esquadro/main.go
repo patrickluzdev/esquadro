@@ -32,6 +32,7 @@ func commands() []command {
 		{"lsp", "run the language server for editors", runLSP, false},
 		{"new", "create a project", runNew, false},
 		{"remove", "remove blueprints from the project", runRemove, false},
+		{"upgrade", "show what a newer esquadro changes for the project, then generate it", runUpgrade, false},
 		{"version", "print the esquadro version", runVersion, false},
 		{"docs", "write the reference pages of the documentation site", runDocs, true},
 	}

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/patrickluzdev/esquadro/changes"
 	"github.com/patrickluzdev/esquadro/internal/compose"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
@@ -17,7 +18,13 @@ import (
 )
 
 func runGen(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("gen", flag.ContinueOnError)
+	return generate("gen", args, stdout, stderr)
+}
+
+// generate runs esquadro gen, or esquadro upgrade (cmd), which may generate
+// a project an older release of esquadro generated.
+func generate(cmd string, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "show what would change, with diffs, without writing anything")
 	check := fs.Bool("check", false, "write nothing, and exit with status 1 if the files are not what the model generates (for CI)")
@@ -48,9 +55,15 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		dir = fs.Arg(0)
 	}
 
-	l := loadProject("gen", dir, stderr, *update)
+	l := loadProject(cmd, dir, stderr, *update)
 	if l == nil {
 		return 1
+	}
+	if !versionAllows(cmd, l.lock.Esquadro, version.String(), stderr) {
+		return 1
+	}
+	if cmd == "upgrade" {
+		printChanges(stdout, l.lock.Esquadro, version.String())
 	}
 	trusted, err := trustHooks(l.set, l.lock, *trust, stderr)
 	if err != nil {
@@ -193,4 +206,55 @@ func printPlan(w io.Writer, plan *workspace.Plan, diffs bool) {
 			fmt.Fprint(w, workspace.Diff(a.Path, a.Old, a.New))
 		}
 	}
+}
+
+// versionAllows tells whether this esquadro (running) may generate a
+// project the one in its lock (project) generated last: not one newer than
+// it, and not one older without esquadro upgrade, which shows what changed.
+func versionAllows(cmd, project, running string, stderr io.Writer) bool {
+	switch workspace.CompareVersions(project, running) {
+	case workspace.NewerVersion:
+		if cmd == "upgrade" {
+			return true
+		}
+		fmt.Fprintf(stderr, "esquadro gen: this project was generated with esquadro %s, and this is %s.\n", project, running)
+		fmt.Fprintln(stderr, "Run esquadro upgrade: it shows what changed for the project, then generates it.")
+		return false
+	case workspace.OlderVersion:
+		fmt.Fprintf(stderr, "esquadro %s: this project was generated with esquadro %s, newer than this %s: install esquadro %s or later.\n", cmd, project, running, project)
+		return false
+	case workspace.DevelopmentVersion:
+		fmt.Fprintf(stderr, "esquadro %s: note: the project was generated with esquadro %s, and this is %s.\n", cmd, project, running)
+	}
+	return true
+}
+
+// printChanges shows what each version after the project's changes for it,
+// up to the one running (all of them, from a development build).
+func printChanges(w io.Writer, project, running string) {
+	to := running
+	if !workspace.Released(running) {
+		to = ""
+	}
+	notes := changes.Between(project, to)
+	if len(notes) == 0 {
+		fmt.Fprintf(w, "Nothing changes for the project from esquadro %s to %s.\n\n", orUnknown(project), running)
+		return
+	}
+	fmt.Fprintf(w, "From esquadro %s to %s:\n\n", orUnknown(project), running)
+	for _, n := range notes {
+		fmt.Fprintln(w, strings.TrimSpace(n.Text))
+		fmt.Fprintln(w)
+	}
+}
+
+func orUnknown(v string) string {
+	if v == "" {
+		return "(none)"
+	}
+	return v
+}
+
+func runUpgrade(args []string, stdout, stderr io.Writer) int {
+	return generate("upgrade", args, stdout, stderr)
 }

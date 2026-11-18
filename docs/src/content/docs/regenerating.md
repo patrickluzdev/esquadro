@@ -49,6 +49,23 @@ to it: it keeps what the template wrote last time in `esquadro/base/` (as `<file
 
 `esquadro gen -dry-run` shows each merge before it is written.
 
+## Upgrading esquadro
+
+`esquadro/lock.json` records the esquadro that generated the project last.
+A newer release does not generate it in silence: `esquadro gen` stops and
+asks for `esquadro upgrade`, which shows what each version since changes
+for the project (what breaks, what is new, how to migrate), then generates
+it as `esquadro gen` does, your `.once` files getting the changes merged in.
+An older release than the project's refuses to generate it.
+
+```sh
+esquadro upgrade -dry-run   # the notes, and what would change, writing nothing
+esquadro upgrade            # the notes, then generate
+```
+
+Upgrade in a branch of its own, run the project's tests, and merge it then.
+A build of esquadro's own code (not a release) only notes the difference.
+
 ## Migrations
 
 Each `esquadro gen` that changes the database writes a new migration in

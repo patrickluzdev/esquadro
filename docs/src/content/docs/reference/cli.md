@@ -293,6 +293,31 @@ a blueprint by its name, as esquadro blueprint list shows it.
     	change app.esq only, without generating
 ```
 
+## esquadro upgrade
+
+Show what a newer esquadro changes for the project, then generate it.
+
+```
+Usage: esquadro gen [-dry-run | -check] [-force] [-update] [-trust] [dir]
+
+Generates the project in dir (default: the current directory) from its .esq
+files and blueprints. Generated files you edited are never overwritten
+unless -force is given; if any would be, nothing is written. Blueprints from
+git stay at the commit the lockfile pins until -update; their hooks run
+only once you allow them, for each commit.
+
+  -check
+    	write nothing, and exit with status 1 if the files are not what the model generates (for CI)
+  -dry-run
+    	show what would change, with diffs, without writing anything
+  -force
+    	overwrite or delete generated files you edited
+  -trust
+    	let the hooks of blueprints from git run without asking
+  -update
+    	resolve the versions of blueprints from git again, instead of the commits the lockfile pins
+```
+
 ## esquadro version
 
 Print the esquadro version.
