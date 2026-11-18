@@ -112,7 +112,7 @@ export function Dashboard({
                   widget={w}
                   since={since}
                   tone={i}
-                  active={drawn.length > 1 && w.x ? w === shown : undefined}
+                  active={drawn.length > 1 ? w === shown : undefined}
                   onPick={drawn.length > 1 && w.x ? () => setPicked(w.name) : undefined}
                 />
               ))}
@@ -184,21 +184,35 @@ function StatTile({
     <Tile
       {...(onPick && { type: "button" as const, onClick: onPick, "aria-pressed": active })}
       className={cn(
-        "flex items-start justify-between gap-3 rounded-2xl p-4 text-left transition-[background-color,box-shadow] duration-150",
+        "flex min-w-0 flex-col gap-3 rounded-2xl p-4 text-left transition-[background-color,box-shadow] duration-150",
         active === false ? "hover:bg-card/60" : "bg-card shadow-xs",
         active && "shadow-md",
         onPick && "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
     >
-      <div className="min-w-0">
-        <p className="mb-4 truncate text-sm font-semibold text-muted-foreground">{w.label}</p>
-        <div className="text-3xl font-bold tracking-tight text-foreground tabular-nums">
+      {/* Its name and icon on a line, the number under them, the whole width. */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 truncate pt-1 text-sm font-semibold text-muted-foreground">{w.label}</p>
+        <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
+          <Icon className="size-5" />
+        </div>
+      </div>
+      <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums [overflow-wrap:anywhere] xl:text-3xl">
           {rows.isPending ? (
             <Skeleton className="h-9 w-24" />
           ) : rows.isError ? (
-            <button type="button" className="text-base text-destructive underline-offset-4 hover:underline" title={describe(rows.error)} onClick={() => rows.refetch()}>
+            <span
+              role="button"
+              tabIndex={0}
+              className="text-base text-destructive underline-offset-4 hover:underline"
+              title={describe(rows.error)}
+              onClick={(e) => {
+                e.stopPropagation()
+                rows.refetch()
+              }}
+            >
               {t("retry")}
-            </button>
+            </span>
           ) : (
             yCol?.kind === "money" ? (
               formatTotals(sumMoney(rows.data.map((r) => r[w.y ?? ""])))
@@ -206,10 +220,6 @@ function StatTile({
               format(yCol ?? ({ kind: "decimal" } as FieldMeta), total(rows.data, w.y))
             )
           )}
-        </div>
-      </div>
-      <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
-        <Icon className="size-5" />
       </div>
     </Tile>
   )

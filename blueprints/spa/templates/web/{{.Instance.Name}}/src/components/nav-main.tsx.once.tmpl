@@ -43,7 +43,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
     </Link>
   )
   return (
-    <SidebarGroup className="px-4">
+    <SidebarGroup className="px-4 group-data-[collapsible=icon]:px-3">
       {label && <SidebarGroupLabel className="mb-1 px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</SidebarGroupLabel>}
       <SidebarMenu>
         {items.map((item) =>
@@ -57,10 +57,10 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.label} isActive={item.items.some((i) => active(i.to))} className="h-12 gap-3 rounded-lg px-3 font-semibold text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
+                  <SidebarMenuButton tooltip={item.label} isActive={item.items.some((i) => active(i.to))} className="h-12 gap-3 rounded-lg px-3 font-semibold group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:[&>span]:hidden text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
                     {item.icon && <item.icon />}
                     <span>{item.label}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -85,7 +85,7 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
             </Collapsible>
           ) : (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild tooltip={item.label} isActive={active(item.to)} className="h-12 gap-3 rounded-lg px-3 font-semibold text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
+              <SidebarMenuButton asChild tooltip={item.label} isActive={active(item.to)} className="h-12 gap-3 rounded-lg px-3 font-semibold group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:[&>span]:hidden text-sidebar-foreground hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary [&>svg]:size-[18px]">
                 {link(item)}
               </SidebarMenuButton>
             </SidebarMenuItem>

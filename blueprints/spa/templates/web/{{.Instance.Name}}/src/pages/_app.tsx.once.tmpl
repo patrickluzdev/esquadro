@@ -14,13 +14,18 @@ export const Route = createFileRoute("/_app")({
   component: Layout,
 })
 
+// The sidebar as it was left: open or closed, in the cookie it keeps.
+const sidebarOpen = !document.cookie.split("; ").includes("sidebar_state=false")
+
 function Layout() {
   return (
 {{- if eq $mode "dashboard"}}
     <SidebarProvider
+      defaultOpen={sidebarOpen}
       style={
         {
           "--sidebar-width": "18rem",
+          "--sidebar-width-icon": "4.5rem",
           "--header-height": "calc(var(--spacing) * 12)",
         } as CSSProperties
       }
@@ -37,7 +42,7 @@ function Layout() {
       <IdleTimeout />
     </SidebarProvider>
 {{- else}}
-    <SidebarProvider style={ { "--sidebar-width": "18rem" } as CSSProperties }>
+    <SidebarProvider defaultOpen={sidebarOpen} style={ { "--sidebar-width": "18rem", "--sidebar-width-icon": "4.5rem" } as CSSProperties }>
       <AppSidebar />
       <SidebarInset>
         <SiteHeader />

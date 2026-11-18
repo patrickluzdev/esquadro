@@ -23,12 +23,12 @@ import { t } from "../esquadro/kit/i18n.ts"
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {{if eq $mode "icon"}}collapsible="icon"{{else if eq $mode "inset"}}variant="inset"{{else}}collapsible="offcanvas"{{end}} {...props}>
-      <SidebarHeader className="h-16 justify-center px-6">
+      <SidebarHeader className="h-16 justify-center px-6 group-data-[collapsible=icon]:px-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1!">
               <Link to="/">
-                <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                <div className="flex aspect-square size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
                   {{slice .App.Label 0 1}}
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
