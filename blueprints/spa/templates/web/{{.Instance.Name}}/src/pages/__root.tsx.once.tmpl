@@ -6,6 +6,7 @@ import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/comp
 import { Toaster } from "@/components/ui/sonner"
 import { Confirmer } from "../esquadro/kit/confirm.tsx"
 import { OfflineBanner, SessionSync } from "../esquadro/kit/connection.tsx"
+import { ShortcutsHelp } from "../esquadro/kit/keys.tsx"
 import { t } from "../esquadro/kit/i18n.ts"
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -16,6 +17,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <Confirmer />
       <OfflineBanner />
       <SessionSync />
+      <ShortcutsHelp />
     </>
   ),
   notFoundComponent: () => (

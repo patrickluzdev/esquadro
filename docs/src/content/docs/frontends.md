@@ -46,6 +46,10 @@ ui.shadcn.com/blocks. The header shows where the page is (a breadcrumb), and
 the account's menu has the theme (light, dark or the system's) and signing
 out.
 
+In a list, `j` and `k` (or the arrows) move between records, `Enter` opens
+one, `e` edits it and `x` selects it; on a record, `e` edits and `Esc` goes
+back. `?` lists the shortcuts.
+
 The command palette (Cmd+K, or Ctrl+K, or the header's Search button) goes
 to any page, finds records of every searchable resource at once, creates a
 record of any resource, changes the theme and signs out, all from the

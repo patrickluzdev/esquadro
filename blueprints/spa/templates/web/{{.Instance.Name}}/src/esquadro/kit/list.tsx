@@ -51,6 +51,7 @@ import { EditableCell } from "./cell.tsx"
 import { copy } from "./copy.tsx"
 import { DateRangeFilter } from "./daterange.tsx"
 import { ViewsMenu } from "./views.tsx"
+import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
 import { ask } from "./confirm.tsx"
@@ -421,6 +422,31 @@ export function ResourceList({
     }
   }
 
+  // The keyboard (the page's own list): j and k move, Enter or o opens, e
+  // edits, x selects.
+  const [active, setActive] = useState(-1)
+  useEffect(() => setActive(-1), [JSON.stringify(search)])
+  const rowsShown = table.getRowModel().rows
+  const move = (by: number) => {
+    const next = Math.max(0, Math.min(rowsShown.length - 1, active + by))
+    setActive(next)
+    document.querySelector(`[data-row-index="${next}"]`)?.scrollIntoView({ block: "nearest" })
+  }
+  const at = () => rowsShown[active]
+  useKeys(
+    {
+      j: () => move(1),
+      ArrowDown: () => move(1),
+      k: () => move(-1),
+      ArrowUp: () => move(-1),
+      Enter: () => at() && navigate({ to: `/${meta.name}/${at()!.original.id}` as never }),
+      o: () => at() && navigate({ to: `/${meta.name}/${at()!.original.id}` as never }),
+      e: () => at() && (at()!.original.can ?? []).includes("update") && navigate({ to: `/${meta.name}/${at()!.original.id}/edit` as never }),
+      x: () => selectable && at()?.toggleSelected(),
+    },
+    !embedded && rowsShown.length > 0,
+  )
+
   const searchable = resource.table.search !== false && meta.sorts.includes("relevance")
   const current = search.page ?? 1
   const create = page?.can.includes("create") && (
@@ -563,11 +589,13 @@ export function ResourceList({
           </TableHeader>
           <TableBody>
             {list.isPending && <TableSkeleton columns={width} />}
-            {table.getRowModel().rows.map((row) => (
+            {table.getRowModel().rows.map((row, i) => (
               <TableRow
                 key={row.id}
+                data-row-index={i}
                 data-state={row.getIsSelected() ? "selected" : undefined}
-                className="cursor-pointer"
+                aria-current={i === active || undefined}
+                className={cn("cursor-pointer", i === active && "bg-muted/60 shadow-[inset_3px_0_0_var(--primary)]")}
                 onClick={() => navigate({ to: `/${meta.name}/${row.original.id}` as never })}
               >
                 {row.getVisibleCells().map((cell) => (

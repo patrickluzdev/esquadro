@@ -19,6 +19,7 @@ import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { ResourceList } from "./list.tsx"
 import { PageHeader } from "./page.tsx"
 import { DetailSkeleton, ErrorState } from "./states.tsx"
+import { useKeys } from "./keys.tsx"
 import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
@@ -86,6 +87,12 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const { meta } = resource
   const record = useRecord(resource, id)
   const duplicate = useDuplicate(meta)
+  // The keyboard: e edits, Esc or u goes back to the list.
+  useKeys({
+    e: () => (record.data?.can ?? []).includes("update") && navigate({ to: `/${meta.name}/${id}/edit` as never }),
+    Escape: () => navigate({ to: `/${meta.name}` as never }),
+    u: () => navigate({ to: `/${meta.name}` as never }),
+  })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const remove = useMutation({
