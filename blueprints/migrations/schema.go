@@ -96,6 +96,9 @@ var sqlTypes = map[project.Type]string{
 	project.TypeDecimal: "numeric",
 	// Four places: prices finer than a cent.
 	project.TypeMoney: "numeric(19,4)",
+	// A file field's column holds its file's id: <field>_id.
+	project.TypeFile:  "uuid",
+	project.TypeImage: "uuid",
 	project.TypeBool:  "boolean",
 	project.TypeTime:  "timestamptz",
 	project.TypeDate:  "date",
@@ -136,6 +139,9 @@ func tableName(e project.EntityDescription) string {
 func columnName(f project.FieldDescription) string {
 	if c := annotation(f.Ann, "column"); c != "" {
 		return c
+	}
+	if f.Type == project.TypeFile || f.Type == project.TypeImage {
+		return f.Snake + "_id"
 	}
 	return f.Snake
 }

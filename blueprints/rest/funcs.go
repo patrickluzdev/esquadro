@@ -75,9 +75,19 @@ func TemplateFuncs() template.FuncMap {
 			o, ok := security.OwnerUsed(entities, e)
 			return ok && o.Relation != nil
 		},
-		"keyName":          KeyName,
-		"ogenName":         ogenName,
-		"schema":           schema,
+		"keyName":  KeyName,
+		"ogenName": ogenName,
+		"schema":   schema,
+		"hasFiles": func(entities []*project.Entity) bool {
+			for _, e := range entities {
+				for _, f := range e.Fields {
+					if f.IsFile() {
+						return true
+					}
+				}
+			}
+			return false
+		},
 		"changeSchema":     changeSchema,
 		"writeSchema":      writeSchema,
 		"shortable":        shortable,
@@ -187,6 +197,8 @@ func schema(f *project.Field) string {
 		return fmt.Sprintf("{$ref: \"#/components/schemas/%s\"}", enumName(f.Enum))
 	case project.TypeMoney:
 		return `{$ref: "#/components/schemas/Money"}`
+	case project.TypeFile, project.TypeImage:
+		return `{$ref: "#/components/schemas/StoredFile"}`
 	}
 	return "{type: string}"
 }
@@ -246,6 +258,14 @@ func rules(f *project.Field, indent int) []string {
 // changes): with its model rules, in block style when it has some. Rules
 // apply only to texts and numbers, never to an enum's $ref.
 func writeSchema(f *project.Field, changes bool) string {
+	if f.IsFile() {
+		// Written as the id of a file sent first, read as the file.
+		s := "{type: string, format: uuid, description: 'The id of a file sent by POST /storage/uploads.'"
+		if changes && Clearable(f) {
+			s += ", nullable: true"
+		}
+		return s + "}"
+	}
 	rs := rules(f, 10)
 	if len(rs) == 0 {
 		if changes {

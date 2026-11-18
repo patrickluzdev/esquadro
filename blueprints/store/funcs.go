@@ -84,6 +84,7 @@ func TemplateFuncs() template.FuncMap {
 		"constraint": constraint,
 		"pgIdent":    postgres.Ident,
 		"writable":   writable,
+		"fileFields": fileFieldsOf,
 		"refusals":   refusals,
 		"contains":   strings.Contains,
 		"reportCast": reportCast,
@@ -162,7 +163,21 @@ func pgColumn(f *project.Field) string {
 	if c, ok := f.Ann["postgres"]["column"].(string); ok {
 		return c
 	}
+	if f.IsFile() {
+		return f.Snake + "_id"
+	}
 	return f.Snake
+}
+
+// fileFieldsOf lists an entity's file and image fields.
+func fileFieldsOf(e *project.Entity) []*project.Field {
+	var out []*project.Field
+	for _, f := range e.Fields {
+		if f.IsFile() {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // sqlcModel is the struct sqlc generates for the entity's table: its exact
@@ -218,7 +233,7 @@ func sqlcIn(f *project.Field, expr string) string {
 		return "postgres.Timestamptz(" + expr + ")"
 	case project.TypeDate:
 		return "postgres.Date(" + expr + ")"
-	case project.TypeUUID:
+	case project.TypeUUID, project.TypeFile, project.TypeImage:
 		return "postgres.UUID(" + expr + ")"
 	case project.TypeJSON:
 		return "[]byte(" + expr + ")"
@@ -270,7 +285,7 @@ func sqlcOut(f *project.Field, expr string) string {
 		return expr
 	case project.TypeTime, project.TypeDate:
 		return expr + ".Time"
-	case project.TypeUUID:
+	case project.TypeUUID, project.TypeFile, project.TypeImage:
 		return "postgres.ID(" + expr + ")"
 	case project.TypeJSON:
 		return "json.RawMessage(" + expr + ")"
@@ -410,6 +425,10 @@ func sampleable(e *project.Entity, visiting map[*project.Entity]bool) bool {
 	defer delete(visiting, e)
 	for _, f := range e.Fields {
 		if f.Required && f.Pattern != "" && (f.Type == project.TypeString || f.Type == project.TypeText) {
+			return false
+		}
+		// A required file is one sent first: no value stands for it.
+		if f.Required && f.IsFile() {
 			return false
 		}
 	}

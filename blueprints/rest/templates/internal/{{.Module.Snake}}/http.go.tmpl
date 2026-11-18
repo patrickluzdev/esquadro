@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module))}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -22,12 +22,22 @@ type Includes struct {
 
 // NewHTTP returns the API's operations on m, including other modules'
 // records with include.
-func NewHTTP(m *{{$m.Pascal}}, include Includes) HTTP { return HTTP{ {{- $p}}: m, include: include} }
+func NewHTTP(m *{{$m.Pascal}}, include Includes) HTTP {
+{{- if or (needsType $m "file") (needsType $m "image")}}
+	answerFiles = m.Files
+{{- end}}
+	return HTTP{ {{- $p}}: m, include: include}
+}
 {{- else}}
 type HTTP struct{ {{$p}} *{{$m.Pascal}} }
 
 // NewHTTP returns the API's operations on m.
-func NewHTTP(m *{{$m.Pascal}}) HTTP { return HTTP{ {{$p}}: m} }
+func NewHTTP(m *{{$m.Pascal}}) HTTP {
+{{- if or (needsType $m "file") (needsType $m "image")}}
+	answerFiles = m.Files
+{{- end}}
+	return HTTP{ {{$p}}: m}
+}
 {{- end}}
 {{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
 {{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
@@ -414,7 +424,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 	} else {
 		invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 	}
-{{- else if eq .Type "uuid"}}
+{{- else if or (eq .Type "uuid") (eq .Type "file") (eq .Type "image")}}
 	{{$x}} = uuid.UUID(req.{{$g}})
 {{- else if eq .Type "json"}}
 	{{$x}} = []byte(req.{{$g}})
@@ -440,7 +450,7 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 		} else {
 			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 		}
-{{- else if eq .Type "uuid"}}
+{{- else if or (eq .Type "uuid") (eq .Type "file") (eq .Type "image")}}
 		{{$x}} = uuid.UUID(v)
 {{- else if eq .Type "enum"}}
 		{{$x}} = {{.Enum.Pascal}}(v)
@@ -497,7 +507,7 @@ func {{.Camel}}ChangesOf(req *apigen.{{$P}}Changes) ({{$P}}Changes, []FieldError
 		} else {
 			invalid = append(invalid, FieldError{Field: {{quote .Snake}}, Code: "invalid_value"})
 		}
-{{- else if eq .Type "uuid"}}
+{{- else if or (eq .Type "uuid") (eq .Type "file") (eq .Type "image")}}
 		{{$x}} = new(uuid.UUID(v))
 {{- else if eq .Type "enum"}}
 		{{$x}} = new({{.Enum.Pascal}}(v))
@@ -539,7 +549,8 @@ func refuse{{$P}}(n New{{$P}}, unread []FieldError) error {
 
 // {{.Camel}}Answer writes a {{$P}} as the contract does, with what the
 // request of ctx may do with it.
-func {{.Camel}}Answer({{if $pol}}ctx{{else}}_{{end}} context.Context, x {{$P}}) apigen.{{$P}} {
+{{- $hasFiles := false}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$hasFiles = true}}{{end}}{{end}}
+func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Context, x {{$P}}) apigen.{{$P}} {
 	a := apigen.{{$P}}{
 		ID:        ogenuuid.UUID(x.ID),
 		Version:   x.Version,
@@ -577,6 +588,10 @@ func {{.Camel}}Answer({{if $pol}}ctx{{else}}_{{end}} context.Context, x {{$P}}) 
 {{- else if eq .Type "money"}}
 	if {{$x}}.CurrencyCode() != "" {
 		a.{{$g}} = apigen.NewOptMoney(apigen.Money{Amount: {{$x}}.Number(), Currency: apigen.NewOptString({{$x}}.CurrencyCode())})
+	}
+{{- else if or (eq .Type "file") (eq .Type "image")}}
+	if f, ok := fileAnswer(ctx, {{$x}}); ok {
+		a.{{$g}} = apigen.NewOptStoredFile(f)
 	}
 {{- else if or (eq .Type "time") (eq .Type "date")}}
 {{- if not $req}}
@@ -813,6 +828,30 @@ func problemOf(err error) error {
 	return err
 }
 {{end -}}
+{{- if or (needsType $m "file") (needsType $m "image")}}
+
+// answerFiles keeps the files of the module's records, for the answers.
+var answerFiles *storage.Store
+
+// fileAnswer is a record's file as the contract writes it: its name, size
+// and type, and a signed link to read it, which expires. A file it cannot
+// read is left out.
+func fileAnswer(ctx context.Context, id uuid.UUID) (apigen.StoredFile, bool) {
+	if answerFiles == nil || id == uuid.Nil() {
+		return apigen.StoredFile{}, false
+	}
+	found, err := answerFiles.Files(ctx, []uuid.UUID{id})
+	f, ok := found[id]
+	if err != nil || !ok {
+		return apigen.StoredFile{}, false
+	}
+	link, err := answerFiles.URL(ctx, f)
+	if err != nil {
+		return apigen.StoredFile{}, false
+	}
+	return apigen.StoredFile{ID: ogenuuid.UUID(f.ID), Name: f.Name, Size: f.Size, ContentType: f.ContentType, URL: link}, true
+}
+{{- end}}
 {{- if needsType $m "money"}}
 
 // moneyOf reads an amount as the contract writes it: its currency{{with .App.Currency}}, {{.}}

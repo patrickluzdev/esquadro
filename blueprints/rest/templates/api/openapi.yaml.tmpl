@@ -452,6 +452,19 @@ components:
         code: {type: string}
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- $files := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$files = true}}{{end}}{{end}}{{end}}
+{{- if $files}}
+    StoredFile:
+      type: object
+      description: A file a record keeps, with a signed link to read it, which expires.
+      required: [id, name, size, content_type, url]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string, description: The name it was sent with.}
+        size: {type: integer, format: int64, description: In bytes.}
+        content_type: {type: string}
+        url: {type: string, description: A signed link to read it; it expires.}
+{{- end}}
 {{- if $money}}
     Money:
       type: object

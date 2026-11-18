@@ -22,6 +22,7 @@ blueprint storage
 
 | Option | Type | Default | |
 |---|---|---|---|
+| `drivers` | list | `["s3"]` | The stores the app can open besides a folder: s3 (S3, R2, MinIO and what speaks it), gcs (Google Cloud Storage) and azure (Azure Blob Storage). Each brings its SDK into the binary. |
 | `local` | name | `"disk"` | disk (a folder of the project) or minio (a MinIO in compose.yaml): the store in development. |
 | `local_dir` | string | `"storage"` | The folder of a disk store in development, out of git. |
 | `image_types` | list | `["png", "jpeg", "webp", "gif", "avif"]` | The formats an image field takes, and its largest size; a field's @storage(types, max) overrides them. |
@@ -37,7 +38,7 @@ blueprint storage
 
 ```esquadro
 blueprint storage {
-  local "disk"
+  drivers ["s3"]
 }
 ```
 
@@ -62,6 +63,10 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | field | `attachment` | bool | Always downloaded, under its name; the default but for images. |
 
 An annotation is written `@storage(key value)` on the element.
+
+## Hooks
+
+- `post-gen` ignore, edits `.gitignore`
 
 ## Go modules
 

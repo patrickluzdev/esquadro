@@ -26,6 +26,10 @@ blueprint storage {
   env STORAGE_PREFIX string default("")
   go_require "gocloud.dev" "v0.48.2"
 
+  /// The stores the app can open besides a folder: s3 (S3, R2, MinIO and
+  /// what speaks it), gcs (Google Cloud Storage) and azure (Azure Blob
+  /// Storage). Each brings its SDK into the binary.
+  option drivers list default(["s3"])
   /// disk (a folder of the project) or minio (a MinIO in compose.yaml):
   /// the store in development.
   option local name default(disk)
@@ -49,6 +53,8 @@ blueprint storage {
   option key_layout name default(entity)
   /// Read a file's first bytes to check its real format before it is used.
   option check_content bool default(true)
+
+  hook post-gen "ignore" edits [".gitignore"]
 
   annotation field {
     /// The largest file of the field: 5MB, 500KB.

@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1) -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -11,6 +11,37 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
 	}
+{{- if $files}}
+	// The record and its files, together: the files it had, then the new.
+	var updated {{$e.Pascal}}
+	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+		before, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Err{{$e.Pascal}}NotFound
+		}
+		if err != nil {
+			return err
+		}
+		stored := {{$e.Camel}}Of(before)
+		params := update{{$e.Pascal}}Params(id, n)
+		params.IfVersion = postgres.Version(version)
+		row, err := q.Update{{$e.Pascal}}(ctx, params)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
+		}
+		if err != nil {
+			return {{$e.Camel}}Refusal(err)
+		}
+		updated = {{$e.Camel}}Of(row)
+		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}}))
+	})
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+	return updated, nil
+}
+{{- else}}
 {{- if $ws}}
 	params := update{{$e.Pascal}}Params(id, n)
 	params.IfVersion = postgres.Version(version)
@@ -26,3 +57,4 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	}
 	return {{$e.Camel}}Of(row), nil
 }
+{{- end}}

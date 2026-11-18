@@ -1,0 +1,4 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	// A folder store's signed links, to send and read files.
+	d.storage.Routes(mux)
+{{- end}}

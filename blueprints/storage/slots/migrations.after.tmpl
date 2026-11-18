@@ -1,0 +1,6 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	// The storage table, as this version of esquadro has it.
+	if err := storagemigrations.Apply(ctx, db); err != nil {
+		return err
+	}
+{{- end}}

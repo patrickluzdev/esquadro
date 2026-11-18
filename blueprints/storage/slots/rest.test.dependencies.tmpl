@@ -1,0 +1,11 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	// The files in a folder of the test's own.
+	files, err := storage.Open(context.Background(), storage.Config{URL: "file://" + t.TempDir(), Secret: "the test's secret"}, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.storage = files
+{{- range .Modules}}{{if or .Entities .Reports}}
+	d.{{.Camel}}.Files = files
+{{- end}}{{end}}
+{{- end}}

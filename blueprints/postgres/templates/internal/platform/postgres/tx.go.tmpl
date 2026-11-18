@@ -29,6 +29,23 @@ func TxOf(ctx context.Context) (pgx.Tx, bool) {
 	return tx, ok
 }
 
+// InTx runs fn in the transaction of ctx, when it has one; else in a new
+// transaction of db, committed when fn succeeds and rolled back when not.
+func InTx(ctx context.Context, db DB, fn func(context.Context) error) error {
+	if _, ok := TxOf(ctx); ok {
+		return fn(ctx)
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(WithTx(ctx, tx)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // Querier is what a use case runs its queries on: the transaction of ctx,
 // or db.
 func Querier(ctx context.Context, db DB) DB {

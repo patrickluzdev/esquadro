@@ -39,6 +39,7 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("branching", "setup"):  branching.Setup,
 	hook.Key("env", "files"):        env.Files,
 	hook.Key("workspace", "ignore"): bpworkspace.Ignore,
+	hook.Key("storage", "ignore"):   storage.Ignore,
 }
 
 func init() {
@@ -62,6 +63,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"jobs":      jobs.TemplateFuncs(),
 	"security":  security.TemplateFuncs(),
 	"spa":       spa.TemplateFuncs(),
+	"storage":   storage.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

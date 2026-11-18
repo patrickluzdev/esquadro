@@ -1,0 +1,3 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	"{{.App.Module}}/internal/platform/storage"
+{{- end}}

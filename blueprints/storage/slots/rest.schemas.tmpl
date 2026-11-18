@@ -1,0 +1,20 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+    UploadRequest:
+      type: object
+      required: [entity, field, name, content_type, size]
+      properties:
+        entity: {type: string, description: "The entity's plural: products."}
+        field: {type: string, description: "The file or image field: photo."}
+        name: {type: string, description: The file's name.}
+        content_type: {type: string, description: Its MIME type.}
+        size: {type: integer, format: int64, description: In bytes.}
+    Upload:
+      type: object
+      required: [id, url, method, headers, expires_at]
+      properties:
+        id: {type: string, format: uuid, description: What the record's field takes.}
+        url: {type: string}
+        method: {type: string, enum: [PUT]}
+        headers: {type: object, additionalProperties: {type: string}}
+        expires_at: {type: string, format: date-time}
+{{- end}}

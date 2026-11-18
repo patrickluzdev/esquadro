@@ -1,0 +1,7 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	d.storage, err = storage.Open(ctx, storage.Config{URL: d.config.StorageURL, Secret: d.config.StorageSecret, Prefix: d.config.StoragePrefix}, d.pool)
+	if err != nil {
+		release()
+		return d, nil, err
+	}
+{{- end}}

@@ -1,0 +1,26 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+  /storage/uploads:
+    post:
+      tags: [storage]
+      operationId: createUpload
+      summary: Ask where to send a file
+      description: |
+        The file is checked against its field's rules (its size and format),
+        then sent with a PUT of its bytes to url, with headers, before
+        expires_at. A record uses it by id in the field it was asked for; the
+        app then checks its size and its real format. One never used is
+        deleted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/UploadRequest"}
+      responses:
+        "201":
+          description: Where to send it.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Upload"}
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}

@@ -1,11 +1,37 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" (and $files "errors") "uuid" (and $files "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Delete{{$e.Pascal}} deletes the {{lower $e.Label}} with the given id, unless
 // other records still point at it. With a version (not 0), only that
 // version: Err{{$e.Pascal}}Changed when someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
+{{- if $files}}
+	// The record, and then its files, released together.
+	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+		before, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Err{{$e.Pascal}}NotFound
+		}
+		if err != nil {
+			return err
+		}
+		stored := {{$e.Camel}}Of(before)
+		deleted, err := q.Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
+		if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
+			return Err{{$e.Pascal}}InUse
+		}
+		if err != nil {
+			return err
+		}
+		if deleted == 0 {
+			return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
+		}
+		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil)
+	})
+}
+{{- else}}
 	deleted, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 	if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
 		return Err{{$e.Pascal}}InUse
@@ -18,3 +44,4 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	}
 	return nil
 }
+{{- end}}

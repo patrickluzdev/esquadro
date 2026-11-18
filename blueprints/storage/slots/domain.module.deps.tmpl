@@ -1,0 +1,4 @@
+{{- if fileFields .Entities (optionsOf "storage")}}
+	// Files keeps the files of the file and image fields.
+	Files *storage.Store
+{{- end}}

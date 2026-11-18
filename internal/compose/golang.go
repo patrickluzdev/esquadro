@@ -20,17 +20,22 @@ var goTypes = map[project.Type]string{
 	project.TypeInt64:   "int64",
 	project.TypeDecimal: "decimal.Decimal",
 	project.TypeMoney:   "currency.Amount",
-	project.TypeBool:    "bool",
-	project.TypeTime:    "time.Time",
-	project.TypeDate:    "time.Time",
-	project.TypeUUID:    "uuid.UUID",
-	project.TypeJSON:    "json.RawMessage",
+	// A file field holds its file's id.
+	project.TypeFile:  "uuid.UUID",
+	project.TypeImage: "uuid.UUID",
+	project.TypeBool:  "bool",
+	project.TypeTime:  "time.Time",
+	project.TypeDate:  "time.Time",
+	project.TypeUUID:  "uuid.UUID",
+	project.TypeJSON:  "json.RawMessage",
 }
 
 // goImportOf is the import each Go type needs.
 var goImportOf = map[project.Type]string{
 	project.TypeDecimal: "github.com/shopspring/decimal",
 	project.TypeMoney:   "github.com/bojanz/currency",
+	project.TypeFile:    "uuid",
+	project.TypeImage:   "uuid",
 	project.TypeTime:    "time",
 	project.TypeDate:    "time",
 	project.TypeJSON:    "encoding/json",

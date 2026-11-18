@@ -52,6 +52,34 @@ func update{{$e.Pascal}}Params(id uuid.UUID, n New{{$e.Pascal}}) sqlgen.Update{{
 }
 {{- end}}
 
+{{- with fileFields $e}}
+
+// {{$e.Camel}}Files keeps the files of the {{lower $e.Label}} id in step with it, in the
+// transaction of ctx: the files it gains (after) are checked and attached,
+// those it loses (before) released; a file refused is a field refused.
+func ({{lower (slice $e.Module.Camel 0 1)}} *{{$e.Module.Pascal}}) {{$e.Camel}}Files(ctx context.Context, id uuid.UUID, before, after map[string]uuid.UUID) error {
+	refused, err := {{lower (slice $e.Module.Camel 0 1)}}.Files.Sync(ctx, {{quote $e.Plural.Snake}}, id, before, after)
+	if err != nil {
+		return err
+	}
+	if len(refused) == 0 {
+		return nil
+	}
+	invalid := &InvalidFields{}
+	for _, field := range []string{ {{- range $i, $f := .}}{{if $i}}, {{end}}{{quote $f.Snake}}{{end -}} } {
+		if code, ok := refused[field]; ok {
+			invalid.Fields = append(invalid.Fields, FieldError{Field: field, Code: code})
+		}
+	}
+	return invalid
+}
+
+// {{$e.Camel}}FileIDs are the ids of the files of a {{lower $e.Label}}, by field.
+func {{$e.Camel}}FileIDs({{range $i, $f := .}}{{if $i}}, {{end}}{{$f.Camel}}{{end}} uuid.UUID) map[string]uuid.UUID {
+	return map[string]uuid.UUID{ {{- range $i, $f := .}}{{if $i}}, {{end}}{{quote $f.Snake}}: {{$f.Camel}}{{end -}} }
+}
+{{- end}}
+
 // {{$e.Camel}}Refusal turns a constraint of {{$e.Plural.Snake}} the database
 // enforced into the field it concerns; other errors pass through.
 func {{$e.Camel}}Refusal(err error) error {

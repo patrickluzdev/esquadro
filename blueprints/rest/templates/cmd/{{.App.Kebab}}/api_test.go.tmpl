@@ -1,7 +1,7 @@
 {{- if and .Entities (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (modulePaths .App.Module .Modules true)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and (hasFiles .Entities) (printf "%s/internal/platform/storage" .App.Module)) (modulePaths .App.Module .Modules true)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {

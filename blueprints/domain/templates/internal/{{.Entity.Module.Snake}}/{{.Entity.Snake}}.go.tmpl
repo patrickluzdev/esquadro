@@ -130,7 +130,7 @@ func (n New{{$e.Pascal}}) Validate() error {
 	if {{$x}} == "" {
 		refuse({{quote .Snake}}, "required")
 	}
-{{- else if eq .Type "uuid"}}
+{{- else if or (eq .Type "uuid") (eq .Type "file") (eq .Type "image")}}
 	if {{$x}} == uuid.Nil() {
 		refuse({{quote .Snake}}, "required")
 	}
