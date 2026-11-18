@@ -231,6 +231,25 @@ shop security key list
 shop security key revoke studio
 ```
 
+Those who administer them do the same through the API, and in a
+[frontend](/esquadro/frontends/)'s Service keys page:
+
+| Route | What |
+|---|---|
+| `GET <prefix>/service-keys` | the keys, newest first: name, roles, prefix, status (`active`, `expired`, `revoked`), created, expires, last used; never the key |
+| `POST <prefix>/service-keys` | create one: `{name, roles, days}`; the answer's `key` is the only time it is shown |
+| `DELETE <prefix>/service-keys/{id}` | revoke it, at once |
+| `GET <prefix>/service-roles` | the service roles, what each may do as the rules say, how many active keys have each, and the lifetimes offered |
+
+All of it is the `security` blueprint's options:
+
+| Option | Default | |
+|---|---|---|
+| `service_admins` | `[]` | who administers the keys (`[user.admin]`); empty, those who administer the first realm's accounts |
+| `service_key_days` | `365` | how long a new key lasts unless told otherwise; `0` is until revoked |
+| `service_key_max_days` | `0` | the most a key may last (more is refused, and so is until revoked); `0` is no limit |
+| `service_key_choices` | `[30, 90, 365]` | the lifetimes a frontend offers, those within the limit |
+
 The service sends it as `Authorization: Bearer sk_...`, and goes through the
 same policies as people: what `service.reader` may do, the key may; the rest
 answers `403`. An unknown, expired or revoked key answers `401`. A key is

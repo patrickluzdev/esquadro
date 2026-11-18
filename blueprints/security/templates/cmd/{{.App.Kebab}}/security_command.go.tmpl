@@ -34,7 +34,7 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
   cleanup                          delete expired sessions, links and keys
   rotate-keys                      a new JWT signing key
 {{- if .Options.services}}
-  key create <name> -role r [-role r]... [-days n]
+  key create <name> -role r [-role r]... [-days n]  ({{.Options.service_key_days}} days by default; 0 until revoked)
                                    a service key, shown once (roles: {{range $i, $r := .Options.services}}{{if $i}}, {{end}}{{$r}}{{end}})
   key list                         the service keys, never the keys themselves
   key revoke <name>                revoke a service key, at once
@@ -224,7 +224,7 @@ func serviceKeyCommand(ctx context.Context, d dependencies, args []string) error
 		fs := flag.NewFlagSet("key create", flag.ContinueOnError)
 		var roles roleList
 		fs.Var(&roles, "role", "a role of the key (repeat for more)")
-		days := fs.Int("days", 0, "days the key lasts; 0 is until revoked")
+		days := fs.Int("days", security.ServiceKeyDays, "days the key lasts; 0 is until revoked")
 		if len(args) < 2 {
 			return errors.New(securityUsage)
 		}

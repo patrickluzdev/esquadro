@@ -19,6 +19,7 @@ func TemplateFuncs() template.FuncMap {
 		"rulesOf":       RulesOf,
 		"realmDisplay":  Display,
 		"realmAdmins":   Admins,
+		"serviceAccess": ServiceAccess,
 		"whosOf":        WhosOf,
 		"allowed":       Allowed,
 		"listScope":     ListScope,

@@ -4,6 +4,9 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
 {{- range realms .Entities}}
   - name: {{.Name}}
 {{- end}}
+{{- if .Options.services}}
+  - name: service-keys
+{{- end}}
 {{- end}}
 {{- define "identity-paths"}}{{$p := .Options.path}}
 {{- range $r := realms .Entities}}
@@ -417,8 +420,100 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
         default: {$ref: "#/components/responses/Problem"}
 {{- end}}
 {{- end}}
+{{- if .Options.services}}
+  {{$p}}/service-keys:
+    get:
+      tags: [service-keys]
+      summary: The service keys, newest first; never the keys themselves
+      responses:
+        "200":
+          description: The keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ServiceKey"}}
+        default: {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [service-keys]
+      summary: Create a service key
+      description: |
+        Answers the key itself, the only time it is shown: only its hash is
+        kept. `days` defaults to {{.Options.service_key_days}}; 0 is until revoked.
+        Codes: `name_taken` (409); `invalid_fields` (422): `name`, `roles`, `days` (`too_long`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, roles]
+              properties:
+                name: {type: string}
+                roles: {type: array, items: {type: string, enum: [{{join ", " (strs .Options.services)}}]}}
+                days: {type: integer, minimum: 0}
+      responses:
+        "201":
+          description: The key, with `key` this once.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: "#/components/schemas/ServiceKey"}
+                  - {type: object, properties: {key: {type: string}}}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/service-keys/{id}:
+    delete:
+      tags: [service-keys]
+      summary: Revoke a service key, at once
+      description: "Codes: `not_found` (404); `already_revoked` (409)."
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: Revoked.}
+        default: {$ref: "#/components/responses/Problem"}
+  {{$p}}/service-roles:
+    get:
+      tags: [service-keys]
+      summary: The service roles, what each may do, how many active keys have each, and the lifetimes offered
+      responses:
+        "200":
+          description: The roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: {type: string}
+                        permissions: {type: array, items: {type: string}}
+                        keys: {type: integer}
+                  days: {type: integer, description: The lifetime of a new key by default; 0 is until revoked.}
+                  max_days: {type: integer, description: The most a key may last; 0 is no limit.}
+                  choices: {type: array, items: {type: integer}}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
 {{- end}}
 {{- define "identity-schemas"}}
+{{- if .Options.services}}
+    ServiceKey:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        roles: {type: array, items: {type: string}}
+        prefix: {type: string, description: "The key's first characters, to tell it apart: sk_abc123."}
+        status: {type: string, enum: [active, expired, revoked]}
+        created_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time, nullable: true}
+        last_used_at: {type: string, format: date-time, nullable: true}
+        revoked_at: {type: string, format: date-time, nullable: true}
+{{- end}}
     IdentityAccount:
       type: object
       properties:

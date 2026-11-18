@@ -66,8 +66,14 @@ func (s *Security) accountRoutes(mux *http.ServeMux, base string, realm Realm) {
 // administrator is who administers the realm's accounts in the request:
 // 401 for no one, 403 for someone the realm's rules do not let in.
 func (s *Security) administrator(w http.ResponseWriter, r *http.Request, realm Realm) (Principal, bool) {
+	return s.allowedBy(w, r, realm.Admins)
+}
+
+// allowedBy is who in the request one of the realm.role rules lets in: 401
+// for no one, 403 for someone they do not.
+func (s *Security) allowedBy(w http.ResponseWriter, r *http.Request, rules []string) (Principal, bool) {
 	ctx := r.Context()
-	for _, rule := range realm.Admins {
+	for _, rule := range rules {
 		name, role, hasRole := strings.Cut(rule, ".")
 		if p, ok := PrincipalIn(ctx, name); ok && (!hasRole || slices.Contains(p.Roles, role)) {
 			return p, true
@@ -342,8 +348,7 @@ func (s *Security) inviteAccount(realm Realm) http.HandlerFunc {
 			s.fail(w, r, err)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
-		writeJSON(w, a)
+		writeJSONStatus(w, http.StatusCreated, a)
 	}
 }
 

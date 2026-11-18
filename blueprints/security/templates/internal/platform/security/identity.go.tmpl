@@ -87,6 +87,9 @@ func (s *Security) Routes(mux *http.ServeMux, prefix string, realms []Realm) {
 		mux.HandleFunc("DELETE "+base, s.deleteAccount(r))
 		s.accountRoutes(mux, base, r)
 	}
+{{- if .Options.services}}
+	s.serviceKeyRoutes(mux, prefix, realms)
+{{- end}}
 }
 
 // credentials are an email and a password, as a request sends them.
@@ -604,9 +607,14 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return json.NewDecoder(r.Body).Decode(v) == nil
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
+func writeJSON(w http.ResponseWriter, v any) { writeJSONStatus(w, http.StatusOK, v) }
+
+// writeJSONStatus answers v with a status other than 200: its headers go
+// before it.
+func writeJSONStatus(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
 

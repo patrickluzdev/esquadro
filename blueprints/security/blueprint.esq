@@ -45,6 +45,18 @@ blueprint security {
   /// with <app> security key create <name> --role <role>; it goes in
   /// Authorization: Bearer sk_...
   option services list default([])
+  /// Who administers the service keys, from the API and the frontends, as
+  /// realm.role rules (e.g. [user.admin]); empty, those who administer the
+  /// accounts of the first realm.
+  option service_admins list default([])
+  /// Days a new service key lasts unless told otherwise; 0 is until revoked.
+  option service_key_days int default(365)
+  /// The most days a service key may last; 0 is no limit. With a limit, a
+  /// key that never expires is refused.
+  option service_key_max_days int default(0)
+  /// The lifetimes, in days, a frontend offers for a new key (those within
+  /// service_key_max_days), besides until revoked when there is no limit.
+  option service_key_choices list default([30, 90, 365])
   /// Send Strict-Transport-Security, behind HTTPS only. <APP>_HSTS
   /// overrides it.
   option hsts bool default(false)

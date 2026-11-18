@@ -8,12 +8,15 @@ import (
 	"encoding/base32"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/edge"
 )
 
 // ServiceRealm is the realm of service keys: rules name their roles as
@@ -24,38 +27,90 @@ const ServiceRealm = "service"
 // them.
 var ServiceRoles = []string{ {{- range $i, $r := .Options.services}}{{if $i}}, {{end}}{{printf "%q" $r}}{{end -}} }
 
+// ServiceAdmins are who administer the service keys, as realm.role rules;
+// empty, those who administer the accounts of the first realm.
+var ServiceAdmins = []string{ {{- range $i, $r := .Options.service_admins}}{{if $i}}, {{end}}{{printf "%q" $r}}{{end -}} }
+
+// ServiceKeyDays is how long a new key lasts unless told otherwise, and
+// ServiceKeyMaxDays the most it may (0: no limit, and then a key may last
+// until revoked). ServiceKeyChoices are the lifetimes frontends offer.
+const (
+	ServiceKeyDays    = {{.Options.service_key_days}}
+	ServiceKeyMaxDays = {{.Options.service_key_max_days}}
+)
+
+var ServiceKeyChoices = []int{ {{- range $i, $d := .Options.service_key_choices}}{{if $i}}, {{end}}{{$d}}{{end -}} }
+
+// serviceAccess is what each service role may do, as the model's rules say.
+var serviceAccess = map[string][]string{
+{{- range .Options.services}}
+	{{printf "%q" .}}: {{goElems (serviceAccess $.Entities .)}},
+{{- end}}
+}
+
 // ServiceKeyPrefix starts every service key.
 const ServiceKeyPrefix = "sk_"
 
 // ServiceKey is a key of a service, as it is listed: never the key itself.
 type ServiceKey struct {
-	ID         uuid.UUID
-	Name       string
-	Roles      []string
-	Prefix     string
-	CreatedAt  time.Time
-	ExpiresAt  *time.Time
-	LastUsedAt *time.Time
-	RevokedAt  *time.Time
+	ID         uuid.UUID  `json:"id"`
+	Name       string     `json:"name"`
+	Roles      []string   `json:"roles"`
+	Prefix     string     `json:"prefix"`
+	CreatedAt  time.Time  `json:"created_at"`
+	ExpiresAt  *time.Time `json:"expires_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+	// Status is active, expired or revoked.
+	Status string `json:"status"`
 }
 
-// ErrServiceKeyExists is the error for a name another key already has.
-var ErrServiceKeyExists = errors.New("security: a service key has that name")
+// status is whether k works now: active, expired or revoked.
+func (k ServiceKey) status(now time.Time) string {
+	switch {
+	case k.RevokedAt != nil:
+		return "revoked"
+	case k.ExpiresAt != nil && !k.ExpiresAt.After(now):
+		return "expired"
+	}
+	return "active"
+}
+
+// The refusals of the service keys' administration.
+var (
+	// ErrServiceKeyExists is the error for a name another key already has.
+	ErrServiceKeyExists = &edge.Problem{Status: http.StatusConflict, Code: "name_taken", Title: "A service key has that name already."}
+	// ErrServiceKeyTooLong is the error for a key that would last longer
+	// than ServiceKeyMaxDays.
+	ErrServiceKeyTooLong = &edge.Problem{Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "A service key may not last that long.",
+		Errors: []edge.FieldProblem{ {Field: "days", Code: "too_long"} }}
+	// ErrNoSuchServiceKey is the error for a key that is not there.
+	ErrNoSuchServiceKey = &edge.Problem{Status: http.StatusNotFound, Code: "not_found", Title: "There is no such service key."}
+	// ErrServiceKeyRevoked is the error for revoking a key twice.
+	ErrServiceKeyRevoked = &edge.Problem{Status: http.StatusConflict, Code: "already_revoked", Title: "The service key was revoked already."}
+	unknownServiceRole   = &edge.Problem{Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "A role is not one of the service roles.",
+		Errors: []edge.FieldProblem{ {Field: "roles", Code: "invalid_value"} }}
+	noServiceKeyName = &edge.Problem{Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "A service key needs a name.",
+		Errors: []edge.FieldProblem{ {Field: "name", Code: "required"} }}
+)
 
 // CreateServiceKey creates a key named name with roles, valid until
 // expires (never with a zero time), and answers it: the only time it is
 // seen, for only its hash is kept.
 func (s *Security) CreateServiceKey(ctx context.Context, name string, roles []string, expires time.Time) (string, error) {
 	if strings.TrimSpace(name) == "" {
-		return "", errors.New("security: a service key needs a name")
+		return "", noServiceKeyName
 	}
 	if len(roles) == 0 {
-		return "", fmt.Errorf("security: a service key needs a role: %s", strings.Join(ServiceRoles, ", "))
+		return "", unknownServiceRole
 	}
 	for _, r := range roles {
 		if !slices.Contains(ServiceRoles, r) {
-			return "", fmt.Errorf("security: %s is not a service role: %s", r, strings.Join(ServiceRoles, ", "))
+			return "", unknownServiceRole
 		}
+	}
+	if ServiceKeyMaxDays > 0 && (expires.IsZero() || expires.After(s.now().AddDate(0, 0, ServiceKeyMaxDays).Add(time.Minute))) {
+		return "", ErrServiceKeyTooLong
 	}
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
@@ -87,6 +142,7 @@ func (s *Security) ServiceKeys(ctx context.Context) ([]ServiceKey, error) {
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (ServiceKey, error) {
 		var k ServiceKey
 		err := row.Scan(&k.ID, &k.Name, &k.Roles, &k.Prefix, &k.CreatedAt, &k.ExpiresAt, &k.LastUsedAt, &k.RevokedAt)
+		k.Status = k.status(s.now())
 		return k, err
 	})
 }
@@ -101,6 +157,144 @@ func (s *Security) RevokeServiceKey(ctx context.Context, name string) error {
 		return fmt.Errorf("security: no service key %s, or it was revoked already", name)
 	}
 	return nil
+}
+
+// RevokeServiceKeyByID revokes the key with the given id, at once.
+func (s *Security) RevokeServiceKeyByID(ctx context.Context, id uuid.UUID) error {
+	var revoked *time.Time
+	err := s.db.QueryRow(ctx, `SELECT revoked_at FROM {{$keys}} WHERE id = $1`, id).Scan(&revoked)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return ErrNoSuchServiceKey
+	case err != nil:
+		return fmt.Errorf("security: revoke service key: %w", err)
+	case revoked != nil:
+		return ErrServiceKeyRevoked
+	}
+	if _, err := s.db.Exec(ctx, `UPDATE {{$keys}} SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, id); err != nil {
+		return fmt.Errorf("security: revoke service key: %w", err)
+	}
+	return nil
+}
+
+// serviceKeyRoutes administers the service keys from the API, for
+// ServiceAdmins (or those who administer the first realm's accounts):
+// <prefix>/service-keys (list, create), <prefix>/service-keys/{id}
+// (revoke) and <prefix>/service-roles.
+func (s *Security) serviceKeyRoutes(mux *http.ServeMux, prefix string, realms []Realm) {
+	admins := ServiceAdmins
+	if len(admins) == 0 && len(realms) > 0 {
+		admins = realms[0].Admins
+	}
+	if len(admins) == 0 {
+		return
+	}
+	mux.HandleFunc("GET "+prefix+"/service-keys", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.allowedBy(w, r, admins); !ok {
+			return
+		}
+		keys, err := s.ServiceKeys(r.Context())
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, map[string]any{"items": keys})
+	})
+	mux.HandleFunc("POST "+prefix+"/service-keys", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.allowedBy(w, r, admins)
+		if !ok {
+			return
+		}
+		in := struct {
+			Name  string   `json:"name"`
+			Roles []string `json:"roles"`
+			Days  *int     `json:"days"`
+		}{}
+		if !decode(w, r, &in) {
+			edge.Write(w, r, ErrBadRequest)
+			return
+		}
+		days := ServiceKeyDays
+		if in.Days != nil {
+			days = *in.Days
+		}
+		if days < 0 {
+			edge.Write(w, r, ErrServiceKeyTooLong)
+			return
+		}
+		var expires time.Time
+		if days > 0 {
+			expires = s.now().AddDate(0, 0, days)
+		}
+		name := strings.TrimSpace(in.Name)
+		key, err := s.CreateServiceKey(ctx, name, in.Roles, expires)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "service_key_created", ServiceRealm, p.ID.String(), true)
+		keys, err := s.ServiceKeys(ctx)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		for _, k := range keys {
+			if k.Name == name {
+				// The key itself, this once: only its hash is kept.
+				writeJSONStatus(w, http.StatusCreated, struct {
+					ServiceKey
+					Key string `json:"key"`
+				}{k, key})
+				return
+			}
+		}
+		s.fail(w, r, errors.New("security: the service key just created is not there"))
+	})
+	mux.HandleFunc("DELETE "+prefix+"/service-keys/{id}", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		p, ok := s.allowedBy(w, r, admins)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			edge.Write(w, r, ErrNoSuchServiceKey)
+			return
+		}
+		if err := s.RevokeServiceKeyByID(ctx, id); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "service_key_revoked", ServiceRealm, p.ID.String(), true)
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET "+prefix+"/service-roles", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := s.allowedBy(w, r, admins); !ok {
+			return
+		}
+		keys, err := s.ServiceKeys(r.Context())
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		type roleInfo struct {
+			Name        string   `json:"name"`
+			Permissions []string `json:"permissions"`
+			Keys        int      `json:"keys"`
+		}
+		out := []roleInfo{}
+		for _, role := range ServiceRoles {
+			n := 0
+			for _, k := range keys {
+				if k.Status == "active" && slices.Contains(k.Roles, role) {
+					n++
+				}
+			}
+			out = append(out, roleInfo{Name: role, Permissions: serviceAccess[role], Keys: n})
+		}
+		writeJSON(w, map[string]any{"items": out, "days": ServiceKeyDays, "max_days": ServiceKeyMaxDays, "choices": ServiceKeyChoices})
+	})
 }
 
 // service is the principal of a service key: valid, not expired, not

@@ -15,7 +15,7 @@ import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}A
 import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
 {{- end}}
 {{- if $realms}}
-import { {{range $i, $r := $realms}}{{if $i}}, {{end}}{{$r.Entity.Camel}}Identity{{end}} } from "./identity.ts"
+import { {{range $i, $r := $realms}}{{if $i}}, {{end}}{{$r.Entity.Camel}}Identity{{end}}{{if index (optionsOf "security") "services"}}, serviceKeys{{end}} } from "./identity.ts"
 {{- end}}
 
 export * from "./runtime.ts"
@@ -29,7 +29,7 @@ export * from "./uploads.ts"
 export * from "./reports.ts"
 {{- end}}
 {{- if $realms}}
-export type { Credentials, Device, Session } from "./identity.ts"
+export type { Credentials, Device, Session{{if index (optionsOf "security") "services"}}, ServiceKey, ServiceRole{{end}} } from "./identity.ts"
 {{- end}}
 
 /**
@@ -59,6 +59,10 @@ export function createClient(options: ClientOptions) {
     identity: {
 {{- range $realms}}
       {{.Entity.Camel}}: {{.Entity.Camel}}Identity(t, cookie),
+{{- end}}
+{{- if index (optionsOf "security") "services"}}
+      /** The service keys, for those who administer them. */
+      serviceKeys: serviceKeys(t),
 {{- end}}
     },
 {{- end}}

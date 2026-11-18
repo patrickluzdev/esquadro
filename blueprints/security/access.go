@@ -127,3 +127,25 @@ func OwnerUsed(entities []*project.Entity, e *project.Entity) (Owner, bool) {
 	}
 	return Owner{}, false
 }
+
+// ServiceAccess is what a service key with role may do, entity by entity,
+// as the rules say: "products: read, create". A rule that lets in anyone
+// (public) is left out: it is no grant of the role's.
+func ServiceAccess(entities []*project.Entity, role string) []string {
+	out := []string{}
+	for _, e := range entities {
+		var ops []string
+		for _, op := range []string{"read", "create", "update", "delete"} {
+			for _, rule := range Access(entities, e, op) {
+				if rule == "service" || rule == "service."+role {
+					ops = append(ops, op)
+					break
+				}
+			}
+		}
+		if len(ops) > 0 {
+			out = append(out, e.Plural.Snake+": "+strings.Join(ops, ", "))
+		}
+	}
+	return out
+}

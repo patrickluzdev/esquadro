@@ -2,6 +2,7 @@
 package security
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,49 @@ func TestServiceKeys(t *testing.T) {
 	}
 	if code := call(key); code != http.StatusUnauthorized {
 		t.Fatalf("a revoked key: %d", code)
+	}
+}
+
+// TestAdministeringServiceKeys creates, lists and revokes keys through the
+// API, as the team's admin, and sees the key shown only once.
+func TestAdministeringServiceKeys(t *testing.T) {
+	defer func(a []string) { ServiceAdmins = a }(ServiceAdmins)
+	ServiceAdmins = []string{"team.admin"}
+	f, team := adminFlow(t)
+	boss := f.as("boss@example.com")
+	role := ServiceRoles[0]
+	f.expect(f.call("GET", "/identity/service-keys", nil), 401, "unauthorized")
+	if _, err := f.s.CreateAccount(t.Context(), team, "ana@example.com", password, json.RawMessage(`{"name":"Ana"}`), "member"); err != nil {
+		t.Fatal(err)
+	}
+	f.expect(f.call("GET", "/identity/service-keys", nil, f.as("ana@example.com")...), 403, "forbidden")
+
+	f.expect(f.call("POST", "/identity/service-keys", map[string]any{"name": "x", "roles": []string{"no-such-role"}}, boss...), 422, "invalid_fields")
+	f.expect(f.call("POST", "/identity/service-keys", map[string]any{"name": " ", "roles": []string{role}}, boss...), 422, "invalid_fields")
+	created := f.call("POST", "/identity/service-keys", map[string]any{"name": "studio", "roles": []string{role}, "days": 30}, boss...)
+	f.expect(created, 201, "")
+	key := created.str("key")
+	if !strings.HasPrefix(key, ServiceKeyPrefix) || created.str("status") != "active" || created.str("expires_at") == "" {
+		t.Fatalf("created: %v", created.body)
+	}
+	f.expect(f.call("POST", "/identity/service-keys", map[string]any{"name": "studio", "roles": []string{role}}, boss...), 409, "name_taken")
+
+	list := f.call("GET", "/identity/service-keys", nil, boss...)
+	f.expect(list, 200, "")
+	if strings.Contains(list.raw, key) || !strings.Contains(list.raw, `"studio"`) {
+		t.Fatalf("the list shows the key, or misses it: %s", list.raw)
+	}
+	roles := f.call("GET", "/identity/service-roles", nil, boss...)
+	f.expect(roles, 200, "")
+	if !strings.Contains(roles.raw, `"keys":1`) {
+		t.Fatalf("roles: %s", roles.raw)
+	}
+
+	id := created.str("id")
+	f.expect(f.call("DELETE", "/identity/service-keys/"+id, nil, boss...), 204, "")
+	f.expect(f.call("DELETE", "/identity/service-keys/"+id, nil, boss...), 409, "already_revoked")
+	if !strings.Contains(f.call("GET", "/identity/service-keys", nil, boss...).raw, `"status":"revoked"`) {
+		t.Fatal("a revoked key leaves the list")
 	}
 }
 {{end -}}

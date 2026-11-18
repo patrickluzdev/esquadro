@@ -155,6 +155,46 @@ function realm(t: Transport, path: string, cookie: boolean) {
     },
   }
 }
+{{- $services := index (optionsOf "security") "services"}}
+{{- if $services}}
+
+/** A service key, as it is listed: never the key itself. */
+export interface ServiceKey {
+  id: string
+  name: string
+  roles: string[]
+  /** Its first characters, to tell it apart: sk_abc123. */
+  prefix: string
+  status: "active" | "expired" | "revoked"
+  created_at: string
+  expires_at: string | null
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+/** A service role: what it may do, and how many active keys have it. */
+export interface ServiceRole {
+  name: string
+  permissions: string[]
+  keys: number
+}
+
+/** The service keys, for those who administer them. */
+export function serviceKeys(t: Transport) {
+  return {
+    list: async () => (await t.request<{ items: ServiceKey[] }>("GET", "{{$p}}/service-keys")).items,
+    /** Creates one; the answer's key is shown this once. days: 0 is until revoked. */
+    create: (key: { name: string; roles: string[]; days?: number }) =>
+      t.request<ServiceKey & { key: string }>("POST", "{{$p}}/service-keys", { body: key }),
+    revoke: async (id: string) => {
+      await t.request("DELETE", `{{$p}}/service-keys/${encodeURIComponent(id)}`)
+    },
+    /** The roles, and the lifetimes a new key may have (days; max_days 0: no limit). */
+    roles: () =>
+      t.request<{ items: ServiceRole[]; days: number; max_days: number; choices: number[] }>("GET", "{{$p}}/service-roles"),
+  }
+}
+{{- end}}
 {{range $r := realms .Entities}}
 /** The routes of the {{$r.Name}} realm. */
 export function {{$r.Entity.Camel}}Identity(t: Transport, cookie: boolean) {

@@ -24,6 +24,10 @@ blueprint security
 |---|---|---|---|
 | `path` | string | `"/identity"` | The prefix of the identity routes: /identity/&lt;realm>/sign-in. |
 | `services` | list | `[]` | The roles of service keys, for what is no person (a system, a script, a partner): the rules name them as service.&lt;role>, e.g. @security(read [user.admin, service.reader]). An admin creates a key with &lt;app> security key create &lt;name> --role &lt;role>; it goes in Authorization: Bearer sk_... |
+| `service_admins` | list | `[]` | Who administers the service keys, from the API and the frontends, as realm.role rules (e.g. [user.admin]); empty, those who administer the accounts of the first realm. |
+| `service_key_days` | int | `365` | Days a new service key lasts unless told otherwise; 0 is until revoked. |
+| `service_key_max_days` | int | `0` | The most days a service key may last; 0 is no limit. With a limit, a key that never expires is refused. |
+| `service_key_choices` | list | `[30, 90, 365]` | The lifetimes, in days, a frontend offers for a new key (those within service_key_max_days), besides until revoked when there is no limit. |
 | `hsts` | bool | `false` | Send Strict-Transport-Security, behind HTTPS only. &lt;APP>_HSTS overrides it. |
 | `public_url` | string | `"http://localhost:8080"` | The address of the app, for the links of emails and the OAuth callbacks. |
 | `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link. |
