@@ -1,0 +1,10 @@
+package catalog
+
+app shop {
+  module "github.com/example/shop"
+  blueprint platform
+}
+
+entity Product {
+  price money required
+}

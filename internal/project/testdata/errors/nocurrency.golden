@@ -1,0 +1,7 @@
+nocurrency.esq:9:9: error: money needs the app's currency
+  |
+9 |   price money required
+  |         ^^^^^
+  = help: add it to the app block, e.g. currency BRL
+
+1 error

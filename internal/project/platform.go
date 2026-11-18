@@ -63,7 +63,7 @@ func (p *Project) Server(name string) *Server {
 var (
 	hostedSettings = []string{"image", "domains", "port", "worker", "database"}
 	serverSettings = []string{"host"}
-	appSettings    = []string{"module", "blueprint", "env"}
+	appSettings    = []string{"module", "currency", "blueprint", "env"}
 
 	domainName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$`)
 	imageName  = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*(\.[a-z0-9]+)*(:[0-9]+)?(/[a-z0-9]+([._-]+[a-z0-9]+)*)+$`)

@@ -11,6 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/bojanz/currency"
+
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/dsl"
 )
@@ -252,7 +254,17 @@ func (b *builder) declare(name dsl.Ident, d dsl.Decl) {
 func (b *builder) buildApp(d *dsl.AppDecl) *App {
 	app := &App{Names: b.names(d.Name), Doc: d.Doc, Annotations: d.Annotations, Pos: d.Pos}
 	if d.Kind() == "app" {
+		var currencyAt *dsl.Setting
 		for _, s := range d.Settings {
+			if s.Key.Name == "currency" {
+				if currencyAt != nil {
+					b.errorf(s.Key.Span, "currency is already set at line %d", currencyAt.Pos.Line)
+					continue
+				}
+				currencyAt = s
+				b.setCurrency(app, s)
+				continue
+			}
 			b.errorf(s.Key.Span, "unknown app setting %q", s.Key.Name).Suggestion = didYouMean(s.Key.Name, appSettings)
 		}
 	}
@@ -566,9 +578,13 @@ func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 		if s := didYouMean(typ, cands); s != "" {
 			e.Suggestion = s
 		} else {
-			e.Suggestion = "built-in types are string, text, int, int64, decimal, bool, time, date, uuid and json"
+			e.Suggestion = "built-in types are string, text, int, int64, decimal, money, bool, time, date, uuid and json"
 		}
 		return nil
+	}
+	if f.Type == TypeMoney && b.p.App != nil && b.p.App.Currency == "" && b.p.Kind == KindApp {
+		b.errorf(d.Type.Span, "money needs the app's currency").
+			Suggestion = "add it to the app block, e.g. currency BRL"
 	}
 
 	seen := map[string]*dsl.Modifier{}
@@ -586,6 +602,11 @@ func (b *builder) buildField(mod *Module, d *dsl.Field, entity bool) *Field {
 				f.Required = true
 			}
 		case "unique":
+			if f.Type == TypeMoney {
+				b.errorf(m.Name.Span, "unique is not allowed on money fields").
+					Suggestion = "an amount is rarely an identity; make another field unique"
+				continue
+			}
 			if b.noArgs(m) {
 				f.Unique = true
 			}
@@ -657,6 +678,24 @@ func (b *builder) oneArg(m *dsl.Modifier, example string) (dsl.Value, bool) {
 	return m.Args[0], true
 }
 
+// setCurrency sets the app's currency: "currency BRL", an ISO 4217 code.
+func (b *builder) setCurrency(app *App, s *dsl.Setting) {
+	if s.Value == nil || (s.Value.Kind != dsl.IdentValue && s.Value.Kind != dsl.StringValue) {
+		b.errorf(s.Key.Span, "currency needs an ISO 4217 code").Suggestion = "e.g. currency BRL"
+		return
+	}
+	code := s.Value.Text
+	if !currency.IsValid(code) {
+		e := b.errorf(s.Value.Span, "%q is not an ISO 4217 currency code", code)
+		e.Suggestion = "e.g. currency BRL, currency USD, currency EUR"
+		if up := strings.ToUpper(code); up != code && currency.IsValid(up) {
+			e.Suggestion = "currency " + up
+		}
+		return
+	}
+	app.Currency = code
+}
+
 func (f *Field) setBound(b *builder, m *dsl.Modifier) {
 	name := m.Name.Name
 	v, ok := b.oneArg(m, name+"(3)")
@@ -669,10 +708,10 @@ func (f *Field) setBound(b *builder, m *dsl.Modifier) {
 		integer = true
 	case TypeInt, TypeInt64:
 		integer = true
-	case TypeDecimal:
+	case TypeDecimal, TypeMoney:
 	default:
 		b.errorf(m.Name.Span, "%s is not allowed on %s fields", name, f.typeName()).
-			Suggestion = "min and max apply to string, text, int, int64 and decimal"
+			Suggestion = "min and max apply to string, text, int, int64, decimal and money"
 		return
 	}
 	if v.Kind != dsl.NumberValue {
@@ -759,9 +798,10 @@ func (b *builder) setDefault(f *Field, m *dsl.Modifier) {
 			bad("a string with valid JSON", `"{}"`)
 			return
 		}
-	case TypeInt, TypeInt64, TypeDecimal:
-		if v.Kind != dsl.NumberValue || (f.Type != TypeDecimal && strings.Contains(v.Text, ".")) {
-			if f.Type == TypeDecimal {
+	case TypeInt, TypeInt64, TypeDecimal, TypeMoney:
+		exact := f.Type == TypeDecimal || f.Type == TypeMoney
+		if v.Kind != dsl.NumberValue || (!exact && strings.Contains(v.Text, ".")) {
+			if exact {
 				bad("a number", "0")
 			} else {
 				bad("a whole number", "0")

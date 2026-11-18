@@ -35,6 +35,7 @@ type ReportDescription struct {
 type AppDescription struct {
 	Names
 	Module     string                 `json:"module"`
+	Currency   string                 `json:"currency,omitempty"`
 	Blueprints []BlueprintDescription `json:"blueprints"`
 	Ann        Ann                    `json:"ann,omitempty"`
 }
@@ -105,7 +106,7 @@ type RelationDescription struct {
 // Describe returns the project as plain data.
 func (p *Project) Describe() Description {
 	d := Description{
-		App:      AppDescription{Names: p.App.Names, Module: p.App.Module, Ann: p.App.Ann, Blueprints: []BlueprintDescription{}},
+		App:      AppDescription{Names: p.App.Names, Module: p.App.Module, Currency: p.App.Currency, Ann: p.App.Ann, Blueprints: []BlueprintDescription{}},
 		Modules:  []Names{},
 		Enums:    []EnumDescription{},
 		Entities: []EntityDescription{},

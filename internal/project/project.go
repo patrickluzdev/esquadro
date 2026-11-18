@@ -72,8 +72,11 @@ func (p *Project) Enum(name string) *Enum {
 // App is the "app" block.
 type App struct {
 	Names
-	Doc        []string
-	Module     string
+	Doc    []string
+	Module string
+	// Currency is the app's currency (ISO 4217: BRL), the one of its money
+	// unless a value says another; empty when the app sets none.
+	Currency   string
 	Blueprints []*BlueprintRef
 	// Annotations are validated later against the blueprints' schemas.
 	Annotations []*dsl.Annotation
@@ -220,16 +223,19 @@ const (
 	TypeInt     Type = "int"
 	TypeInt64   Type = "int64"
 	TypeDecimal Type = "decimal"
-	TypeBool    Type = "bool"
-	TypeTime    Type = "time"
-	TypeDate    Type = "date"
-	TypeUUID    Type = "uuid"
-	TypeJSON    Type = "json"
-	TypeEnum    Type = "enum"
+	// TypeMoney is an exact amount with its currency (ISO 4217): stored as
+	// both, the currency the app's by default.
+	TypeMoney Type = "money"
+	TypeBool  Type = "bool"
+	TypeTime  Type = "time"
+	TypeDate  Type = "date"
+	TypeUUID  Type = "uuid"
+	TypeJSON  Type = "json"
+	TypeEnum  Type = "enum"
 )
 
 var builtinTypes = []Type{
-	TypeString, TypeText, TypeInt, TypeInt64, TypeDecimal,
+	TypeString, TypeText, TypeInt, TypeInt64, TypeDecimal, TypeMoney,
 	TypeBool, TypeTime, TypeDate, TypeUUID, TypeJSON,
 }
 

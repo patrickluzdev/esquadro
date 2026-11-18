@@ -19,7 +19,7 @@ modifiers.esq:14:10: error: min is not allowed on bool fields
    |
 14 |   d bool min(1)
    |          ^^^
-   = help: min and max apply to string, text, int, int64 and decimal
+   = help: min and max apply to string, text, int, int64, decimal and money
 
 modifiers.esq:15:9: error: min (10) is greater than max (5)
    |

@@ -1,0 +1,15 @@
+package catalog
+
+app shop {
+  module "github.com/example/shop"
+  currency brl
+  currency USD
+  blueprint platform
+}
+
+entity Product {
+  price   money required min(0) max("a")
+  deposit money unique
+  fee     money default(1.5)
+  tax     money pattern("x")
+}

@@ -33,12 +33,37 @@ Every entity also has an `id` (a UUID v7, which sorts by creation time),
 | `int` | `int` | `integer` |
 | `int64` | `int64` | `bigint` |
 | `decimal` | `decimal.Decimal` | `numeric` |
+| `money` | `currency.Amount` | `numeric(19,4)` and a `char(3)` currency |
 | `bool` | `bool` | `boolean` |
 | `time` | `time.Time` | `timestamptz` |
 | `date` | `time.Time` | `date` |
 | `uuid` | `uuid.UUID` | `uuid` |
 | `json` | `json.RawMessage` | `jsonb` |
 | an enum | its Go type | a Postgres enum |
+
+## Money
+
+A `money` field is an exact amount and its currency (an ISO 4217 code).
+Its currency is the app's, set once in the app block, unless a value comes
+with another:
+
+```esquadro
+app shop {
+  module "github.com/you/shop"
+  currency BRL
+}
+
+entity Product {
+  price money required min(0)
+}
+```
+
+It is stored as two columns, `price` (`numeric(19,4)`: four places, for
+prices finer than a cent) and `price_currency`, and travels in the API as
+`{"amount": "19.90", "currency": "BRL"}`, the amount always written as
+text, never as a JSON number. In Go it is a
+[`currency.Amount`](https://pkg.go.dev/github.com/bojanz/currency). `min`,
+`max` and `default` apply to the amount; a money field cannot be `unique`.
 
 ## Rules
 

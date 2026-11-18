@@ -1,0 +1,53 @@
+money.esq:5:12: error: "brl" is not an ISO 4217 currency code
+  |
+5 |   currency brl
+  |            ^^^
+  = help: currency BRL
+
+money.esq:6:3: error: currency is already set at line 5
+  |
+6 |   currency USD
+  |   ^^^^^^^^
+
+money.esq:11:11: error: money needs the app's currency
+   |
+11 |   price   money required min(0) max("a")
+   |           ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:11:37: error: max must be a number
+   |
+11 |   price   money required min(0) max("a")
+   |                                     ^^^
+
+money.esq:12:11: error: money needs the app's currency
+   |
+12 |   deposit money unique
+   |           ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:12:17: error: unique is not allowed on money fields
+   |
+12 |   deposit money unique
+   |                 ^^^^^^
+   = help: an amount is rarely an identity; make another field unique
+
+money.esq:13:11: error: money needs the app's currency
+   |
+13 |   fee     money default(1.5)
+   |           ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:14:11: error: money needs the app's currency
+   |
+14 |   tax     money pattern("x")
+   |           ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:14:17: error: pattern is not allowed on money fields
+   |
+14 |   tax     money pattern("x")
+   |                 ^^^^^^^
+   = help: pattern applies to string and text
+
+9 errors
