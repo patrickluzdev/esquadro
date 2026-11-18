@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { api } from "../api.ts"
+import { locale } from "../config.ts"
 import { widgets as declared } from "../dashboard.gen.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -66,10 +67,15 @@ export function Dashboard({
   description?: string
 }) {
   const [period, setPeriod] = useState("30d")
+  const [picked, setPicked] = useState<string>()
   const since = periods().find((p) => p.key === period)?.since
   const timed = widgets.some((w) => w.since)
   const stats = widgets.filter((w) => w.kind === "stat")
   const others = widgets.filter((w) => w.kind !== "stat")
+  // A number over a column (its x: a day) is drawn under the numbers, the
+  // one picked; a number without one is only its total.
+  const drawn = stats.filter((w) => w.x)
+  const shown = drawn.find((w) => w.name === picked) ?? drawn[0]
   const picker = timed && (
     <div className="flex items-center gap-2">
       <span className="text-sm font-semibold text-muted-foreground">{t("period")}:</span>
@@ -99,9 +105,17 @@ export function Dashboard({
             {/* The numbers, side by side in a tray, as many as fit. */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 rounded-2xl bg-muted p-3">
               {stats.map((w, i) => (
-                <StatTile key={w.name} widget={w} since={since} tone={i} />
+                <StatTile
+                  key={w.name}
+                  widget={w}
+                  since={since}
+                  tone={i}
+                  active={drawn.length > 1 && w.x ? w === shown : undefined}
+                  onPick={drawn.length > 1 && w.x ? () => setPicked(w.name) : undefined}
+                />
               ))}
             </div>
+            {shown && <StatChart widget={shown} since={since} />}
           </CardContent>
         </Card>
       )}
@@ -142,13 +156,38 @@ function useRows(w: Widget, since?: Date) {
   })
 }
 
-/** A number: its name, its icon in a colored circle, the number. */
-function StatTile({ widget: w, since, tone }: { widget: Widget; since?: Date; tone: number }) {
+/**
+ * A number: its name, its icon in a colored circle, the number. Among
+ * numbers drawn over time, the one drawn is raised, and a click draws
+ * another.
+ */
+function StatTile({
+  widget: w,
+  since,
+  tone,
+  active,
+  onPick,
+}: {
+  widget: Widget
+  since?: Date
+  tone: number
+  active?: boolean
+  onPick?: () => void
+}) {
   const rows = useRows(w, since)
   const yCol = w.columns.find((c) => c.name === w.y)
   const Icon = iconOf(w.icon)
+  const Tile = onPick ? "button" : "div"
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl bg-card p-4 shadow-xs">
+    <Tile
+      {...(onPick && { type: "button" as const, onClick: onPick, "aria-pressed": active })}
+      className={cn(
+        "flex items-start justify-between gap-3 rounded-2xl p-4 text-left transition-[background-color,box-shadow] duration-150",
+        active === false ? "hover:bg-card/60" : "bg-card shadow-xs",
+        active && "shadow-md",
+        onPick && "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
       <div className="min-w-0">
         <p className="mb-4 truncate text-sm font-semibold text-muted-foreground">{w.label}</p>
         <div className="text-3xl font-bold tracking-tight text-foreground tabular-nums">
@@ -166,6 +205,20 @@ function StatTile({ widget: w, since, tone }: { widget: Widget; since?: Date; to
       <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", TONES[tone % TONES.length])}>
         <Icon className="size-5" />
       </div>
+    </Tile>
+  )
+}
+
+/** The number picked, drawn over its x: the same rows as its total. */
+function StatChart({ widget: w, since }: { widget: Widget; since?: Date }) {
+  const rows = useRows(w, since)
+  const x = w.columns.find((c) => c.name === w.x)
+  const y = w.columns.find((c) => c.name === w.y)
+  if (rows.isPending) return <Skeleton className="mt-6 h-64 w-full" />
+  if (!rows.data || rows.data.length === 0) return <p className="py-10 text-center text-sm text-muted-foreground">{rows.isError ? describe(rows.error) : t("noData")}</p>
+  return (
+    <div className="mt-6">
+      <LineChart rows={named(rows.data, x)} x={w.x!} y={w.y!} label={y?.label} />
     </div>
   )
 }
@@ -211,6 +264,10 @@ export function total(rows: Row[] | undefined, y?: string): number {
   return (rows ?? []).reduce((sum, r) => sum + (Number(r[y ?? ""]) || 0), 0)
 }
 
+/** A chart's scale, short: 1,4 mil. */
+const scale = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
+const tick = (v: number) => scale.format(v)
+
 function chartRows(rows: Row[], x: string, y: string) {
   return rows.map((r) => ({ ...r, [x]: capitalize(String(r[x] ?? "—")), [y]: Number(r[y]) || 0 }))
 }
@@ -220,10 +277,10 @@ export function BarsChart({ rows, x, y, label }: { rows: Row[]; x: string; y: st
   const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">
-      <BarChart data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: -12 } }>
+      <BarChart data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: 0 } }>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
-        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={48} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} tickFormatter={tick} />
         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
         <Bar dataKey={y} fill={`var(--color-${y})`} radius={[8, 8, 0, 0]} maxBarSize={48} />
       </BarChart>
@@ -236,10 +293,10 @@ export function LineChart({ rows, x, y, label }: { rows: Row[]; x: string; y: st
   const config = { [y]: { label: label ?? y, color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">
-      <Lines data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: -12, right: 8 } }>
+      <Lines data={chartRows(rows, x, y)} accessibilityLayer margin={ { left: 0, right: 8 } }>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={x} tickLine={false} axisLine={false} tickMargin={10} />
-        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={48} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} tickFormatter={tick} />
         <ChartTooltip content={<ChartTooltipContent />} />
         <Line dataKey={y} type="monotone" stroke={`var(--color-${y})`} strokeWidth={3} dot={false} activeDot={ { r: 5 } } />
       </Lines>

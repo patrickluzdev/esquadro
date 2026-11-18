@@ -65,7 +65,8 @@ blueprint spa {
     /// The report on the frontend's dashboard (its first page): stat (a
     /// number, the y column summed), bar, line or table.
     widget name
-    /// The column of the names, along the chart: category, day.
+    /// The column of the names, along the chart: category, day. On a
+    /// number, the column it is drawn over in the overview: day.
     x name
     /// The column of the numbers: products, total.
     y name

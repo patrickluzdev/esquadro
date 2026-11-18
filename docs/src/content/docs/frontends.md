@@ -91,7 +91,18 @@ The first page shows the reports marked as widgets: a number, bars, a line
 or a table, for a period (today, the last 7 or 30 days, all time) that
 fills the report's time parameter, chosen at the right of its title. The
 numbers sit side by side in an overview, each with its icon (`icon`) in a
-colored circle; the charts and tables, each in a card, below them.
+colored circle; the charts and tables, each in a card, below them. A number
+with an `x` (a day) is also drawn over it, under the numbers: a click on
+another number with one draws that one instead.
+
+```esquadro
+report SalesPerDay {
+  day   string  required
+  total decimal required @admin(label "Sales")
+  since time    param
+  @admin(widget stat, x day, y total, icon dollar_sign, since since)
+}
+```
 
 ```esquadro
 report ProductsByCategory {
