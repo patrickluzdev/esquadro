@@ -12,12 +12,14 @@ import { t } from "./i18n.ts"
 import { toast } from "./toast.tsx"
 
 const channelName = `esquadro:${base}:session`
+// This tab: the channel answers its own messages too, which it skips.
+const tab = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())
 
 /** Tells the other tabs the session changed. */
 export function announceSession(event: "signed-in" | "signed-out") {
   try {
     const channel = new BroadcastChannel(channelName)
-    channel.postMessage(event)
+    channel.postMessage({ event, tab })
     channel.close()
   } catch {
     // Without BroadcastChannel: each tab finds out on its next request.
@@ -74,12 +76,13 @@ export function SessionSync() {
     } catch {
       return
     }
-    channel.onmessage = (e: MessageEvent) => {
-      if (e.data === "signed-out") {
+    channel.onmessage = (e: MessageEvent<{ event: string; tab: string }>) => {
+      if (e.data?.tab === tab) return
+      if (e.data?.event === "signed-out") {
         queryClient.setQueryData(sessionQuery.queryKey, null)
         queryClient.clear()
         navigate({ to: "/login", search: { redirect: undefined } })
-      } else if (e.data === "signed-in") {
+      } else if (e.data?.event === "signed-in") {
         queryClient.invalidateQueries({ queryKey: sessionQuery.queryKey })
       }
     }
