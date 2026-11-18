@@ -31,3 +31,4 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 ## Go modules
 
 - `github.com/shopspring/decimal` v1.4.0
+- `github.com/bojanz/currency` v1.5.1
