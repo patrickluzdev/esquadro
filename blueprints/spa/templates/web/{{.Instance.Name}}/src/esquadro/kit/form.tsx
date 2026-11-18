@@ -3,6 +3,7 @@
 // required checked before sending, the API's refusals on their fields, a
 // change on the version read (If-Match), a create sent once
 // (Idempotency-Key), and a question before leaving with changes unsaved.
+import { DateInput, DateTimeInput } from "./datetime.tsx"
 import { ManyInput, useLinked } from "./many.tsx"
 import { RichTextInput } from "./rich.tsx"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -97,17 +98,9 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
     case "money":
       return <MoneyInput id={id} value={value} onChange={onChange} invalid={invalid} negative={field.min === undefined || field.min < 0} />
     case "date":
-      return <Input id={id} type="date" value={str.slice(0, 10)} onChange={(e) => onChange(e.target.value || null)} aria-invalid={invalid} />
+      return <DateInput id={id} value={str} onChange={onChange} invalid={invalid} />
     case "datetime":
-      return (
-        <Input
-          id={id}
-          type="datetime-local"
-          value={str ? str.slice(0, 16) : ""}
-          onChange={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
-          aria-invalid={invalid}
-        />
-      )
+      return <DateTimeInput id={id} value={str} onChange={onChange} invalid={invalid} />
   }
   return <Input id={id} value={str} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)} aria-invalid={invalid} />
 }

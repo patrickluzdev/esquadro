@@ -177,6 +177,11 @@ blueprint's `service_key_choices`, within `service_key_max_days`. The spa's
 `service_keys false` leaves the page out; it is
 `src/pages/_app/service-keys.tsx`, yours.
 
+Dates and times are picked in a calendar, in the frontend's language,
+with Today and Clear (and Now and the hours and minutes, for a time); a
+many-to-many relation is a field of chips with a search (see
+[Related records](/esquadro/related-records/)).
+
 A `text` field marked `@rest(html)` is formatted text: the form edits it
 with a rich text editor (bold, italic, headings, lists, quotes, code,
 links), the record's page shows it formatted, and lists show it as plain
