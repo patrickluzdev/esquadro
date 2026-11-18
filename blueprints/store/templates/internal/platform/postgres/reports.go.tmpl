@@ -1,14 +1,19 @@
 {{- if .Reports -}}
+{{- $money := false}}{{range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end -}}
 package postgres
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
+{{- if $money}}
+	"strings"
+{{- end}}
 	"time"
 	"uuid"
 
-	"github.com/jackc/pgx/v5/pgtype"
+{{if $money}}	"github.com/bojanz/currency"
+{{end}}	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
 
@@ -124,4 +129,24 @@ func UUIDOf(v any) (uuid.UUID, bool, error) {
 func notA(v any, what string) error {
 	return fmt.Errorf("%T is not %s: cast the column to its type in the report's SQL (::text, ::bigint, ::numeric, ::timestamptz)", v, what)
 }
+{{- if $money}}
+
+// MoneyOf reads a money column: its amount, and beside it its currency
+// (the column <name>_currency). It is NULL when either is.
+func MoneyOf(amount, code any) (currency.Amount, bool, error) {
+	d, ok, err := DecimalOf(amount)
+	if err != nil || !ok {
+		return currency.Amount{}, false, err
+	}
+	c, ok, err := TextOf(code)
+	if err != nil || !ok {
+		return currency.Amount{}, false, err
+	}
+	a, err := currency.NewAmount(d.String(), strings.TrimSpace(c))
+	if err != nil {
+		return currency.Amount{}, false, fmt.Errorf("%q is no ISO 4217 currency: %w", c, err)
+	}
+	return a, true, nil
+}
+{{- end}}
 {{end -}}

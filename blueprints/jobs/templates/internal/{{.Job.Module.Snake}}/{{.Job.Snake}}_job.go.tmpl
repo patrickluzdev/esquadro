@@ -77,7 +77,7 @@ var {{$j.Camel}}{{.Pascal}}Pattern = regexp.MustCompile({{rawQuote .Pattern}})
 {{- $checks := false}}
 {{- range $j.Fields}}
 {{- if and .Required (not (or (eq .Type "int") (eq .Type "int64") (eq .Type "decimal") (eq .Type "bool")))}}{{$checks = true}}{{end}}
-{{- if or .Min .Max .Pattern (eq .Type "enum")}}{{$checks = true}}{{end}}
+{{- if or .Min .Max .Pattern (eq .Type "enum") (eq .Type "money")}}{{$checks = true}}{{end}}
 {{- end}}
 {{- if not $checks}}
 // Validate checks the arguments: no rule is declared for them.
@@ -103,6 +103,10 @@ func (a {{$j.Pascal}}Args) Validate() error {
 	}
 {{- else if eq .Type "json"}}
 	if len({{$x}}) == 0 {
+		refuse({{quote .Snake}}, "required")
+	}
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() == "" {
 		refuse({{quote .Snake}}, "required")
 	}
 {{- end}}
@@ -145,6 +149,22 @@ func (a {{$j.Pascal}}Args) Validate() error {
 		refuse({{quote .Snake}}, "too_large")
 	}
 {{- end}}
+{{- else if eq .Type "money"}}
+	if {{$x}}.CurrencyCode() != "" {
+		if !moneyFits({{$x}}) {
+			refuse({{quote .Snake}}, "too_precise")
+		}
+{{- if .Min}}
+		if moneyCmp({{$x}}, {{quote .Min.Text}}) < 0 {
+			refuse({{quote .Snake}}, "too_small")
+		}
+{{- end}}
+{{- if .Max}}
+		if moneyCmp({{$x}}, {{quote .Max.Text}}) > 0 {
+			refuse({{quote .Snake}}, "too_large")
+		}
+{{- end}}
+	}
 {{- else if eq .Type "enum"}}
 	if {{$x}} != "" && !{{$x}}.Valid() {
 		refuse({{quote .Snake}}, "invalid_value")

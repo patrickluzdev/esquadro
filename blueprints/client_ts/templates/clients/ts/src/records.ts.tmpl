@@ -13,6 +13,7 @@ export type FieldsOf<F, R extends string> = F extends `${R}.${infer K}` ? K : ne
 /** T with only the fields asked for, or all of them when none is. */
 export type Selected<T, K> = [K] extends [never] ? T : Pick<T, Extract<Always | K, keyof T>>
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- if $money}}
 
 /**

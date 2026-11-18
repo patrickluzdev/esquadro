@@ -77,19 +77,21 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return postgres.Ident(o.Relation.Snake + "_id")
 		},
-		"keyField":      func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
-		"keyIn":         keyIn,
-		"keyOut":        keyOut,
-		"needs":         needs,
-		"constraint":    constraint,
-		"pgIdent":       postgres.Ident,
-		"writable":      writable,
-		"refusals":      refusals,
-		"contains":      strings.Contains,
-		"reportCast":    reportCast,
-		"reportImports": reportImports,
-		"reportParam":   reportParam,
-		"reportSample":  reportSample,
+		"keyField":   func(r *project.Relation) string { return names(r.Snake + "_id").Pascal },
+		"keyIn":      keyIn,
+		"keyOut":     keyOut,
+		"needs":      needs,
+		"constraint": constraint,
+		"pgIdent":    postgres.Ident,
+		"writable":   writable,
+		"refusals":   refusals,
+		"contains":   strings.Contains,
+		"reportCast": reportCast,
+		// The currency the SQL esquadro writes first gives a money column.
+		"reportCurrency": func() string { return "'XXX'" },
+		"reportImports":  reportImports,
+		"reportParam":    reportParam,
+		"reportSample":   reportSample,
 		"reportRead": func(f *project.Field) string {
 			r, _ := reportReader(f)
 			return r
@@ -618,7 +620,7 @@ func reportCast(f *project.Field) string {
 	switch f.Type {
 	case project.TypeInt, project.TypeInt64:
 		return "bigint"
-	case project.TypeDecimal:
+	case project.TypeDecimal, project.TypeMoney:
 		return "numeric"
 	case project.TypeBool:
 		return "boolean"
@@ -685,6 +687,8 @@ func reportReader(f *project.Field) (reader, convert string) {
 		return "postgres.IntOf", "%s"
 	case project.TypeDecimal:
 		return "postgres.DecimalOf", "%s"
+	case project.TypeMoney:
+		return "postgres.MoneyOf", "%s"
 	case project.TypeBool:
 		return "postgres.BoolOf", "%s"
 	case project.TypeTime, project.TypeDate:
@@ -701,7 +705,7 @@ func reportReader(f *project.Field) (reader, convert string) {
 // writes first.
 func reportSample(f *project.Field) string {
 	switch f.Type {
-	case project.TypeInt, project.TypeInt64, project.TypeDecimal:
+	case project.TypeInt, project.TypeInt64, project.TypeDecimal, project.TypeMoney:
 		return "0"
 	case project.TypeBool:
 		return "false"
@@ -731,6 +735,8 @@ func reportImports(r *project.Report) []string {
 			add("uuid")
 		case project.TypeDecimal:
 			add("github.com/shopspring/decimal")
+		case project.TypeMoney:
+			add("github.com/bojanz/currency")
 		}
 	}
 	for _, f := range r.Params {

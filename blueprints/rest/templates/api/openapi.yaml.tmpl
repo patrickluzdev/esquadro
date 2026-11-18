@@ -451,6 +451,7 @@ components:
         field: {type: string}
         code: {type: string}
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
+{{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- if $money}}
     Money:
       type: object

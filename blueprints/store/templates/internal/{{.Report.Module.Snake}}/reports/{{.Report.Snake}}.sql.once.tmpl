@@ -11,6 +11,9 @@
 SELECT
 {{- range $i, $c := $r.Columns}}{{if $i}},{{end}}
   {{reportSample $c}}::{{reportCast $c}} AS {{$c.Snake}}
+{{- if eq $c.Type "money"}},
+  {{reportCurrency}}::text AS {{$c.Snake}}_currency
+{{- end}}
 {{- end}}
 WHERE false -- no rows until the report is written
 {{- range $r.Params}}

@@ -463,6 +463,11 @@ func (b *builder) buildReport(d *dsl.ReportDecl) {
 				Suggestion = "select the values the report shows, each in a column"
 			continue
 		}
+		if param && fld.Type == TypeMoney {
+			b.errorf(dsl.Span{Pos: fld.Pos, End: nameEnd(fld.Pos, fld.Raw)}, "a report's parameter cannot be money").
+				Suggestion = "take the amount as a decimal parameter, and its currency as a string"
+			continue
+		}
 		if param {
 			r.Params = append(r.Params, fld)
 		} else {

@@ -36,6 +36,8 @@ func TemplateFuncs() template.FuncMap {
 				return "1"
 			case project.TypeDecimal:
 				return `"1"`
+			case project.TypeMoney:
+				return `{ amount: "1", currency: "USD" }`
 			case project.TypeBool:
 				return "true"
 			case project.TypeTime:

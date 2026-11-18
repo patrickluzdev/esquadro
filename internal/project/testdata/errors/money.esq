@@ -18,3 +18,8 @@ entity Order {
   total          money
   total_currency string
 }
+
+report Sales {
+  total money required
+  above money param
+}

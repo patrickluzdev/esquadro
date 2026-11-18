@@ -12,6 +12,10 @@ import (
 // parameter; nullable for a column that may be NULL. An enum is text, as
 // its values belong to the report's module.
 func ReportSchema(f *project.Field, nullable bool) string {
+	if f.Type == project.TypeMoney {
+		// A $ref takes no nullable: a NULL amount is left out.
+		return `{$ref: "#/components/schemas/Money"}`
+	}
 	s := ""
 	switch f.Type {
 	case project.TypeInt:
@@ -63,6 +67,8 @@ func ReportOut(f *project.Field, x string) string {
 		return "string(" + x + ")"
 	case project.TypeDecimal:
 		return x + ".String()"
+	case project.TypeMoney:
+		return "apigen.Money{Amount: " + x + ".Number(), Currency: apigen.NewOptString(" + x + ".CurrencyCode())}"
 	case project.TypeUUID:
 		return "ogenuuid.UUID(" + x + ")"
 	}

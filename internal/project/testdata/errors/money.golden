@@ -62,4 +62,22 @@ money.esq:19:3: error: field total_currency clashes with the currency column tot
    |   ^^^^^^^^^^^^^^
    = help: remove it: the money field already stores its currency
 
-11 errors
+money.esq:23:9: error: money needs the app's currency
+   |
+23 |   total money required
+   |         ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+money.esq:24:3: error: a report's parameter cannot be money
+   |
+24 |   above money param
+   |   ^^^^^
+   = help: take the amount as a decimal parameter, and its currency as a string
+
+money.esq:24:9: error: money needs the app's currency
+   |
+24 |   above money param
+   |         ^^^^^
+   = help: add it to the app block, e.g. currency BRL
+
+14 errors

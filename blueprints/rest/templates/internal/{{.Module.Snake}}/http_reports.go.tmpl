@@ -50,8 +50,10 @@ func (h Reports) Report{{$r.Pascal}}(ctx context.Context{{if $r.Params}}, params
 {{- else}}
 		if row.{{.Pascal}} != nil {
 			a.{{$g}}.SetTo({{reportOut . (printf "(*row.%s)" .Pascal)}})
+{{- if ne .Type "money"}}
 		} else {
 			a.{{$g}}.SetToNull()
+{{- end}}
 		}
 {{- end}}
 {{- end}}

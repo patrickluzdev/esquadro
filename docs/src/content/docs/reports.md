@@ -60,6 +60,11 @@ LIMIT sqlc.arg(row_limit);
 - Keep the `-- name:` line, and a column for each declared one, **cast to
   its type** (`::bigint` for `int`, `::numeric` for `decimal`,
   `::timestamptz` for `time`, `::text` for text).
+- A `money` column is two: its amount (`::numeric`) and its currency
+  (`::text`, named `<column>_currency`). Group by the currency, so that
+  amounts of two currencies are never added up:
+  `sum(price)::numeric AS total, price_currency::text AS total_currency ...
+  GROUP BY price_currency`. A parameter cannot be money.
 - Parameters are `sqlc.arg(name)::type` when required, `sqlc.narg(name)::type`
   when not: they are values, never pasted into the SQL.
 - **Keep `LIMIT sqlc.arg(row_limit)`**: it caps the rows. Past the cap the
