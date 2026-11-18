@@ -6,11 +6,14 @@ import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { requireSession } from "../esquadro/kit/auth.tsx"
 import { IdleTimeout } from "../esquadro/kit/idle.tsx"
+import { ScreenLoader } from "../esquadro/kit/states.tsx"
 
 // The signed-in pages: every file under _app/ needs a session (and a role
 // let in), and is framed by the sidebar (src/components/app-sidebar.tsx).
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
+  // The session on its way, the first time: the ring, on the whole screen.
+  pendingComponent: ScreenLoader,
   component: Layout,
 })
 

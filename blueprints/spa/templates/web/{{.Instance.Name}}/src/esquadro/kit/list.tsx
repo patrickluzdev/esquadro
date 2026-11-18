@@ -726,7 +726,18 @@ export function ResourceList({
           ))}
       </div>
       {paged && page && page.items.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          {/* Where the page is among all: 11–20 of 57. */}
+          {page.total !== undefined && (
+            <p className="text-muted-foreground">
+              {t("showing", {
+                from: (current - 1) * (Number(search.per) || PER_PAGE) + 1,
+                to: (current - 1) * (Number(search.per) || PER_PAGE) + page.items.length,
+                total: page.total,
+              })}
+            </p>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon-sm" disabled={current <= 1} onClick={() => set({ page: current - 1 })} aria-label={t("previous")}>
               <ChevronLeft />
@@ -771,6 +782,7 @@ export function ResourceList({
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
       )}
       {!paged && (search.cursor || page?.next) && (

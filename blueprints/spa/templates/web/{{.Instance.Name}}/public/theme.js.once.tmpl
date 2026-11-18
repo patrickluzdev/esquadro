@@ -1,0 +1,11 @@
+// The theme chosen (or the system's), before anything is drawn: no flash
+// of light in a dark panel. A file of its own, as the panel's CSP runs no
+// inline script. Yours to change.
+try {
+  var theme = localStorage.getItem("theme") || "system"
+  if (theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) {
+    document.documentElement.classList.add("dark")
+  }
+} catch (e) {
+  // Storage refused (a private window): the light theme until the panel starts.
+}

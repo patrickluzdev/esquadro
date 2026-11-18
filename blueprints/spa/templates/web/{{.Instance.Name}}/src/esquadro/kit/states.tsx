@@ -179,38 +179,67 @@ export function TableSkeleton({ columns, rows = 5 }: { columns: number; rows?: n
   )
 }
 
-/** A form, loading. */
+/** A form, loading: its cards, the details at the left and a side card. */
 export function FormSkeleton({ fields = 4 }: { fields?: number }) {
   return (
-    <div className="flex max-w-2xl flex-col gap-6" role="status" aria-label={t("loading")}>
+    <div className="flex flex-col gap-6" role="status" aria-label={t("loading")}>
       <Skeleton className="h-8 w-56" />
-      <Card>
-        <CardContent className="flex flex-col gap-6">
-          {Array.from({ length: fields }, (_, i) => (
-            <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-9 w-full" />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <Card>
+          <CardContent className="flex flex-col gap-6">
+            <Skeleton className="h-5 w-32" />
+            {Array.from({ length: fields }, (_, i) => (
+              <div key={i} className="flex flex-col gap-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex flex-col gap-6">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-12 w-full rounded-lg" />
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
 
-/** A record's page, loading. */
+/** A record's page, loading: the profile card and the tabs beside it. */
 export function DetailSkeleton({ fields = 6 }: { fields?: number }) {
   return (
-    <div className="flex flex-col gap-6" role="status" aria-label={t("loading")}>
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <Skeleton className="h-9 w-40" />
-      </div>
+    <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]" role="status" aria-label={t("loading")}>
       <Card>
-        <CardContent className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+        <CardContent className="flex flex-col gap-6">
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <Skeleton className="size-20 rounded-2xl" />
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-5 w-36" />
+            </div>
+          ))}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="py-0">
+        <div className="flex gap-6 border-b border-border px-6 pt-4 pb-3">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-24" />
+        </div>
+        <CardContent className="grid gap-x-8 gap-y-6 p-6 sm:grid-cols-2">
           {Array.from({ length: fields }, (_, i) => (
             <div key={i} className="flex flex-col gap-2">
               <Skeleton className="h-4 w-20" />
@@ -219,6 +248,41 @@ export function DetailSkeleton({ fields = 6 }: { fields?: number }) {
           ))}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+/** A ring turning in the primary color, on its track: what loads. */
+export function Loader({ size = 40, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      role="status"
+      aria-label={t("loading")}
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      className={cn("animate-spin text-primary", className)}
+    >
+      <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" strokeWidth="4" className="opacity-15" />
+      <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="30 200" />
+    </svg>
+  )
+}
+
+/** A page whose code or data is on its way: the ring, amid the content. */
+export function PageLoader() {
+  return (
+    <div className="flex min-h-[60svh] flex-1 items-center justify-center animate-in fade-in-0">
+      <Loader />
+    </div>
+  )
+}
+
+/** The whole screen loading (the session, the panel's frame): the ring in the middle. */
+export function ScreenLoader() {
+  return (
+    <div className="flex min-h-svh items-center justify-center bg-background animate-in fade-in-0">
+      <Loader />
     </div>
   )
 }

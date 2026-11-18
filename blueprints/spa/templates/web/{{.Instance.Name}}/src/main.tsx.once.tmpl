@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client"
 import { isApiError } from "@api"
 import { base } from "./esquadro/config.ts"
 import { sessionQuery } from "./esquadro/kit/auth.tsx"
+import { PageLoader } from "./esquadro/kit/states.tsx"
 import { routeTree } from "./esquadro/routeTree.gen.ts"
 import "./theme.css"
 
@@ -25,6 +26,11 @@ const router = createRouter({
   context: { queryClient },
   defaultPreload: "intent",
   scrollRestoration: true,
+  // A page on its way (its code, what it loads first): the ring, after a
+  // moment, and for long enough not to flicker.
+  defaultPendingComponent: PageLoader,
+  defaultPendingMs: 150,
+  defaultPendingMinMs: 300,
 })
 
 // A session that ends while the frontend is open: back to the sign-in page,
