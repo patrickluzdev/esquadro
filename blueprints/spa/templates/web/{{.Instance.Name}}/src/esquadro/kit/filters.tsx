@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Check, ChevronsUpDown, Filter, ListFilter as ListFilterIcon, Minus, X } from "lucide-react"
 import { Fragment, useEffect, useState } from "react"
+import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -420,11 +421,14 @@ export function ActiveFilters({
   values,
   onChange,
   onOpen,
+  children,
 }: {
   filters: FieldMeta[]
   values: FilterValues
   onChange: (changes: FilterValues) => void
   onOpen?: () => void
+  /** After Clear all: Save filter. */
+  children?: ReactNode
 }) {
   const set = filters.filter((f) => isActive(f, values))
   if (set.length === 0) return null
@@ -436,6 +440,7 @@ export function ActiveFilters({
       <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => onChange(cleared(filters))}>
         {t("clearAll")}
       </Button>
+      {children}
     </div>
   )
 }

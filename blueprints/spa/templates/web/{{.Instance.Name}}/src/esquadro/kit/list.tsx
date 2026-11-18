@@ -53,7 +53,7 @@ import { EditableCell } from "./cell.tsx"
 import { copy } from "./copy.tsx"
 import { filterLayout } from "../config.ts"
 import { ActiveFilters, BarFilter, cleared, ColumnFilter, FilterPanel, FilterTabs, isActive } from "./filters.tsx"
-import { ViewsMenu } from "./views.tsx"
+import { SavedFiltersMenu, SaveFilterButton, useViews } from "./views.tsx"
 import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
@@ -505,6 +505,9 @@ export function ResourceList({
 
   const [density, setDensity] = useDensity()
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // Saved filters: the lists of a page, not the ones on a record's page.
+  const saved = useViews(meta)
+  const saveButton = !embedded && <SaveFilterButton views={saved.views} search={search} onSave={(name) => saved.save(name, search)} />
   const layout = resource.table.filterLayout ?? filterLayout
   const values = search as Record<string, string | undefined>
   const setFilters = (changes: Record<string, string | undefined>) => set({ ...changes, page: undefined, cursor: undefined })
@@ -567,11 +570,14 @@ export function ResourceList({
             <FilterPanel filters={filters} values={values} onApply={setFilters} layout={layout} open={filtersOpen} onOpenChange={setFiltersOpen} />
           ))}
         {layout === "bar" && filters.some((f) => isActive(f, values)) && (
-          <Button variant="ghost" onClick={() => setFilters(cleared(filters))}>
-            <X /> {t("clearFilters")}
-          </Button>
+          <>
+            <Button variant="ghost" onClick={() => setFilters(cleared(filters))}>
+              <X /> {t("clearFilters")}
+            </Button>
+            {saveButton}
+          </>
         )}
-        {!embedded && <ViewsMenu meta={meta} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} />}
+        {!embedded && <SavedFiltersMenu views={saved.views} search={search} onApply={(s) => navigate({ to: ".", search: s as never })} onRemove={saved.remove} />}
         {(hideable.length > 1 || !embedded) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -605,7 +611,11 @@ export function ResourceList({
           </DropdownMenu>
         )}
       </div>
-      {layout !== "bar" && <ActiveFilters filters={filters} values={values} onChange={setFilters} onOpen={() => setFiltersOpen(true)} />}
+      {layout !== "bar" && (
+        <ActiveFilters filters={filters} values={values} onChange={setFilters} onOpen={() => setFiltersOpen(true)}>
+          {saveButton}
+        </ActiveFilters>
+      )}
       {tabsField && (
         <FilterTabs
           field={tabsField}
