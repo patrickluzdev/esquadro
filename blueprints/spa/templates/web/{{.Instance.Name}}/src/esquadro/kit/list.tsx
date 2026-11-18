@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns3,
+  Copy,
   Download,
   Eye,
   MoreHorizontal,
@@ -47,6 +48,7 @@ import { api } from "../api.ts"
 import { toast as sonner } from "sonner"
 import { EditableCell } from "./cell.tsx"
 import { DateRangeFilter } from "./daterange.tsx"
+import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
@@ -199,6 +201,8 @@ export function ResourceList({
 
   const page = list.data
   const items = useMemo(() => page?.items ?? [], [page])
+  const canCreate = page?.can.includes("create") ?? false
+  const duplicate = useDuplicate(meta)
   const actions = resource.actions ?? []
   const bulkActions = actions.filter((a) => a.bulk)
   const canDeleteAny = items.some((r) => (r.can ?? []).includes("delete"))
@@ -309,6 +313,11 @@ export function ResourceList({
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  {canCreate && (
+                    <DropdownMenuItem onClick={() => duplicate(r)}>
+                      <Copy /> {t("duplicate")}
+                    </DropdownMenuItem>
+                  )}
                   {own.length > 0 && <DropdownMenuSeparator />}
                   {own.map((a) => (
                     <DropdownMenuItem key={a.label} variant={a.destructive ? "destructive" : "default"} onClick={() => runOne(a, r)}>
@@ -344,7 +353,7 @@ export function ResourceList({
       }),
     )
     return helper.columns(out)
-  }, [resource, selectable, search.sort, meta, actions, scope?.param])
+  }, [resource, selectable, search.sort, meta, actions, scope?.param, canCreate])
 
   const table = useTable({
     features,

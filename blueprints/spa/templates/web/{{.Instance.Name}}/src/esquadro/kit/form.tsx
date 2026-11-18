@@ -4,7 +4,7 @@
 // change on the version read (If-Match), a create sent once
 // (Idempotency-Key), and a question before leaving with changes unsaved.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useBlocker, useNavigate, useSearch } from "@tanstack/react-router"
+import { useBlocker, useNavigate, useRouterState, useSearch } from "@tanstack/react-router"
 import { useMemo, useRef, useState } from "react"
 import { fields as yours } from "@/fields.ts"
 import { Button } from "@/components/ui/button"
@@ -153,7 +153,7 @@ function initial(fields: FieldMeta[], record?: Rec, given: Record<string, unknow
     if (f.readOnly) continue
     // A new record takes what the URL gives (?category_id=, from a
     // category's products).
-    out[f.name] = record ? record[f.name] ?? null : given[f.name] !== undefined ? String(given[f.name]) : f.default ?? (f.kind === "bool" ? false : null)
+    out[f.name] = record ? record[f.name] ?? null : given[f.name] !== undefined ? given[f.name] : f.default ?? (f.kind === "bool" ? false : null)
   }
   return out
 }
@@ -169,8 +169,11 @@ export function ResourceForm({ resource, id }: { resource: Resource; id?: string
 function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const { meta } = resource
   const fields = resource.form.filter((f) => !f.readOnly)
+  // A new record starts with what the URL gives (?category_id=), or with a
+  // copy of another (Duplicate).
   const given = useSearch({ strict: false }) as Record<string, unknown>
-  const [values, setValues] = useState<Values>(() => initial(fields, record, given))
+  const copy = useRouterState({ select: (s) => (s.location.state as { copy?: Record<string, unknown> }).copy })
+  const [values, setValues] = useState<Values>(() => initial(fields, record, { ...copy, ...given }))
   const [errors, setErrors] = useState<Record<string, string>>({})
   // A ref, not state: the blocker reads it as it is when leaving, also
   // right after saving.

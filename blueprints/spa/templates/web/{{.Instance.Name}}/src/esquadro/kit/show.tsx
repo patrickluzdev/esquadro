@@ -2,7 +2,7 @@
 // value is shown (yours too, from src/fields.ts).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Pencil, Trash2 } from "lucide-react"
+import { Copy, Pencil, Trash2 } from "lucide-react"
 import { fields as yours } from "@/fields.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
+import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
@@ -83,6 +84,7 @@ export function useRecord(resource: Resource, id: string | undefined) {
 export function ResourceShow({ resource, id }: { resource: Resource; id: string }) {
   const { meta } = resource
   const record = useRecord(resource, id)
+  const duplicate = useDuplicate(meta)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const remove = useMutation({
@@ -126,6 +128,9 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
                   {a.label}
                 </Button>
               ))}
+            <Button variant="outline" onClick={() => duplicate(r)}>
+              <Copy /> {t("duplicate")}
+            </Button>
             {can.includes("update") && (
               <Button variant="outline" asChild>
                 <Link to={`/${meta.name}/${r.id}/edit` as never}>
