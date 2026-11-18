@@ -68,3 +68,42 @@ func TestForTakesKindsOfProject(t *testing.T) {
 		}
 	}
 }
+
+func TestABlueprintUsedByNamedInstances(t *testing.T) {
+	fsys := fstest.MapFS{
+		"spa/blueprint.esq": {Data: []byte("blueprint spa {\n  version \"1.0.0\"\n  instances\n  option domain string default(\"\")\n  annotation entity {\n    resource bool\n  }\n}\n")},
+		"git/blueprint.esq": {Data: []byte("blueprint git {\n  version \"1.0.0\"\n}\n")},
+	}
+	src := "app shop {\n  module \"example.com/shop\"\n  blueprint spa admin {\n    domain \"admin.shop.com\"\n  }\n  blueprint spa portal\n}\n\npackage catalog\n"
+	src = "package catalog\n\n" + strings.Replace(src, "\n\npackage catalog\n", "\n", 1) +
+		"\nentity Product {\n  name string\n  @admin(resource)\n  @portal(resource)\n}\n"
+	set, diags := loadSources(t, &Loader{Builtin: fsys}, src)
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	admin, portal := set.Get("admin"), set.Get("portal")
+	if admin == nil || portal == nil || admin.Kind != "spa" || admin.Key != "spa" || admin.Manifest.Name != "admin" {
+		t.Fatalf("instances: %+v %+v", admin, portal)
+	}
+	if set.Options["admin"]["domain"] != "admin.shop.com" || set.Options["portal"]["domain"] != "" {
+		t.Fatalf("options: %v", set.Options)
+	}
+
+	for src, want := range map[string]string{
+		"app shop {\n  module \"example.com/shop\"\n  blueprint spa\n}\n":                              "is used by named instances",
+		"app shop {\n  module \"example.com/shop\"\n  blueprint git main\n}\n":                         "has no instances",
+		"app shop {\n  module \"example.com/shop\"\n  blueprint spa admin\n  blueprint spa admin\n}\n": "already used",
+	} {
+		p, pd := project.Load(project.Source{Name: "app.esq", Src: []byte(src)})
+		if pd.HasErrors() {
+			if !strings.Contains(fmt.Sprint(pd), want) {
+				t.Errorf("%q: %v", want, pd)
+			}
+			continue
+		}
+		_, d := Resolve(p, &Loader{Builtin: fsys})
+		if !strings.Contains(fmt.Sprint(d), want) {
+			t.Errorf("%q: %v", want, d)
+		}
+	}
+}

@@ -30,7 +30,11 @@ func Dump(f *File) string {
 				w(1, "module %s", dumpValue(*d.Module))
 			}
 			for _, bp := range d.Blueprints {
-				w(1, "blueprint %s @%s", dumpValue(bp.Ref), pos(bp.Span))
+				if bp.Instance != nil {
+					w(1, "blueprint %s %s @%s", dumpValue(bp.Ref), bp.Instance.Name, pos(bp.Span))
+				} else {
+					w(1, "blueprint %s @%s", dumpValue(bp.Ref), pos(bp.Span))
+				}
 				for _, o := range bp.Options {
 					w(2, "option %s %s", o.Key.Name, dumpValue(o.Value))
 				}

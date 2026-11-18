@@ -97,10 +97,15 @@ const (
 // BlueprintRef is a blueprint used by the app. Options are kept as written;
 // they are validated later against the blueprint's manifest.
 type BlueprintRef struct {
-	Ref     string
-	Source  SourceKind
-	Options []*dsl.Option
-	Pos     diag.Pos
+	Ref string
+	// Instance is the instance's name, for a blueprint used by name
+	// (blueprint spa admin): it stands for the blueprint in options,
+	// annotations (@admin) and templates. Empty otherwise.
+	Instance     string
+	InstanceSpan dsl.Span
+	Source       SourceKind
+	Options      []*dsl.Option
+	Pos          diag.Pos
 	// RefSpan is the span of the name or path, for error messages.
 	RefSpan dsl.Span
 	// Name and Values are filled when blueprints are resolved: the name the

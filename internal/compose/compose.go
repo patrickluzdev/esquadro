@@ -130,10 +130,20 @@ type Data struct {
 	// Relation is set in templates rendered per relation: each side of
 	// every relation, with Entity and Module those of its side.
 	Relation *project.Relation
+	// Instance is, for a blueprint used by named instances (blueprint spa
+	// admin), the instance whose templates run: its files go under its name.
+	Instance *Instance
 	// Options are the options of the blueprint whose template is running.
 	Options map[string]any
 	// Blueprint is the name of the blueprint whose template is running.
 	Blueprint string
+}
+
+// Instance is a named instance of a blueprint: Name is the instance's
+// (admin), Kind the blueprint's (spa).
+type Instance struct {
+	Name, Kind string
+	Options    map[string]any
 }
 
 // Compose renders every blueprint of the set. Diagnostics point at template
@@ -399,6 +409,17 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		// nil when the app does not use it: a blueprint that works on
 		// another one's data reads its settings.
 		"optionsOf": func(name string) map[string]any { return c.set.Options[name] },
+		// instances are the instances of a blueprint used by name (spa):
+		// what other blueprints serve or build for each.
+		"instances": func(kind string) []*Instance {
+			var out []*Instance
+			for _, b := range c.set.Blueprints {
+				if b.Kind == kind {
+					out = append(out, &Instance{Name: b.Manifest.Name, Kind: b.Kind, Options: c.set.Options[b.Manifest.Name]})
+				}
+			}
+			return out
+		},
 		// uses reports whether the app uses a blueprint, for what a
 		// template writes only alongside it.
 		"uses": func(name string) bool {
@@ -590,6 +611,9 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 		App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
 		Servers: c.p.Servers, Hosted: c.p.Hosted, Env: c.env, Environments: c.set.Environments,
 		Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name,
+	}
+	if bp.Kind != "" {
+		whole.Instance = &Instance{Name: bp.Manifest.Name, Kind: bp.Kind, Options: c.set.Options[bp.Manifest.Name]}
 	}
 	var datas []Data
 	switch {

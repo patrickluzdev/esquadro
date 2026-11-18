@@ -10,7 +10,7 @@ import (
 
 var (
 	topKeywords      = []string{"package", "app", "platform", "server", "enum", "entity", "job", "report", "blueprint"}
-	manifestSettings = []string{"version", "for", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
+	manifestSettings = []string{"version", "for", "instances", "requires", "optional", "option", "env", "annotation", "slot", "go_require", "hook"}
 )
 
 // Parse parses a .esq file. It always returns a File, possibly partial, plus
@@ -358,6 +358,12 @@ func (p *parser) parseAppItem(app *AppDecl) bool {
 		}
 		p.advance()
 		ref := &BlueprintRef{Ref: tokenValue(r), Pos: t.Pos, End: r.End}
+		// An instance's name: blueprint spa admin.
+		if n := p.tok(); n.Kind == Name {
+			p.advance()
+			ref.Instance = &Ident{Name: n.Text, Pos: n.Pos, End: n.End}
+			ref.End = n.End
+		}
 		if p.tok().Kind == LBrace {
 			open := p.advance()
 			ref.End = p.parseBlock(open, "blueprint options", func() bool {
@@ -807,6 +813,9 @@ func (p *parser) parseManifestItem() ManifestItem {
 			return nil
 		}
 		return &VersionItem{Version: v, Pos: t.Pos, End: v.End}
+	case "instances":
+		// The blueprint is used by named instances: blueprint spa admin.
+		return &DependsItem{Keyword: identOf(t), Pos: t.Pos, End: t.End}
 	case "requires", "optional", "for":
 		it := &DependsItem{Keyword: identOf(t)}
 		what := "blueprint name"

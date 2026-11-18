@@ -127,12 +127,16 @@ type ModuleItem struct {
 	Span
 }
 
-// BlueprintRef is a "blueprint <name-or-path> { options }" line in the app.
+// BlueprintRef is a "blueprint <name-or-path> [instance] { options }" line
+// in the app.
 type BlueprintRef struct {
 	// Ref is a name (IdentValue) for built-in blueprints or a string for a
 	// local path or git source.
-	Ref     Value
-	Options []*Option
+	Ref Value
+	// Instance is the name of the instance, for a blueprint used more than
+	// once (blueprint spa admin); nil otherwise.
+	Instance *Ident
+	Options  []*Option
 	Span
 }
 

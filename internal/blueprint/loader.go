@@ -30,6 +30,9 @@ type Blueprint struct {
 	// Source and Commit are, for a blueprint from git, the source as the
 	// app writes it and the commit used.
 	Source, Commit string
+	// Kind is the manifest's own name, for a blueprint used by instances,
+	// whose Manifest is the instance's (named after it); empty otherwise.
+	Kind string
 	// Key names the blueprint's Go code built into esquadro: its hooks,
 	// template helpers and checks. It is the manifest's name, prefixed with
 	// platform/ for a built-in blueprint of the platform catalog, whose
@@ -56,6 +59,9 @@ type Loader struct {
 	HasBuiltinHook func(blueprint, path string) bool
 	// Git fetches blueprints from git; without it, they are refused.
 	Git *Git
+	// Browsing loads blueprints to describe them (blueprint list, info,
+	// docs), not for a project: one used by instances loads without a name.
+	Browsing bool
 	// Overlay holds manifests to read instead of the disk, by absolute
 	// path: those open, maybe unsaved, in an editor.
 	Overlay map[string][]byte
@@ -252,6 +258,23 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	if key == "" {
 		key = m.Name
 	}
+	var kind string
+	switch {
+	case m.Instances && ref.Instance == "" && !l.Browsing:
+		errAtRef("blueprint %s is used by named instances: blueprint %s <name>", m.Name, m.Name).
+			Suggestion = "e.g. blueprint " + m.Name + " admin"
+		return nil, diags
+	case !m.Instances && ref.Instance != "":
+		diags.Errorf(ref.InstanceSpan.Pos, ref.InstanceSpan.End, "blueprint %s has no instances: write it without a name", m.Name)
+		return nil, diags
+	case m.Instances && ref.Instance != "":
+		// The instance stands for the blueprint: its options, annotations
+		// (@admin) and templates are the instance's.
+		kind = m.Name
+		named := *m
+		named.Name = ref.Instance
+		m = &named
+	}
 	for _, h := range m.Hooks {
 		if ref.Source == project.SourceBuiltin && l.HasBuiltinHook != nil {
 			if !l.HasBuiltinHook(key, h.Path) {
@@ -266,7 +289,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location, Dir: dir, Source: source, Commit: commit, Key: key}, diags
+	return &Blueprint{Manifest: m, FS: fsys, Ref: ref, Location: location, Dir: dir, Source: source, Commit: commit, Key: key, Kind: kind}, diags
 }
 
 func joinNames(names []string) string {

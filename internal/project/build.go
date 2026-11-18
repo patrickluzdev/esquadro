@@ -291,6 +291,9 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 	seen := map[string]*BlueprintRef{}
 	for _, r := range d.Blueprints {
 		ref := &BlueprintRef{Ref: r.Ref.Text, Options: r.Options, Pos: r.Pos, RefSpan: r.Ref.Span}
+		if r.Instance != nil {
+			ref.Instance, ref.InstanceSpan = r.Instance.Name, r.Instance.Span
+		}
 		switch {
 		case r.Ref.Kind == dsl.IdentValue:
 			ref.Source = SourceBuiltin
@@ -304,11 +307,12 @@ func (b *builder) buildApp(d *dsl.AppDecl) *App {
 				`; local ones start with "./"`
 			continue
 		}
-		if prev, ok := seen[ref.Ref]; ok {
-			b.errorf(r.Ref.Span, "blueprint %s is already used at line %d", ref.Ref, prev.Pos.Line)
+		key := ref.Ref + " " + ref.Instance
+		if prev, ok := seen[key]; ok {
+			b.errorf(r.Ref.Span, "blueprint %s is already used at line %d", strings.TrimSpace(key), prev.Pos.Line)
 			continue
 		}
-		seen[ref.Ref] = ref
+		seen[key] = ref
 		keys := map[string]*dsl.Option{}
 		for _, o := range r.Options {
 			if prev, ok := keys[o.Key.Name]; ok {

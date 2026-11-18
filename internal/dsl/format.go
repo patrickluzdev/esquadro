@@ -416,6 +416,9 @@ func (p *printer) envBlock(e *EnvBlock) string {
 
 func (p *printer) blueprintRef(r *BlueprintRef) string {
 	head := "blueprint " + valueString(r.Ref)
+	if r.Instance != nil {
+		head += " " + r.Instance.Name
+	}
 	innerComments := p.ci < len(p.comments) && p.comments[p.ci].Pos.Offset < r.End.Offset
 	if len(r.Options) == 0 && !innerComments {
 		// An empty "{ }" is dropped.
@@ -667,7 +670,7 @@ func (p *printer) blueprint(out *strings.Builder, d *BlueprintDecl) {
 			for i, n := range it.Names {
 				names[i] = n.Name
 			}
-			l.text = it.Keyword.Name + " " + strings.Join(names, ", ")
+			l.text = strings.TrimSpace(it.Keyword.Name + " " + strings.Join(names, ", "))
 		case *OptionDecl:
 			l.cells = []string{"option " + it.Name.Name, it.Type.Name, modifiersString(it.Modifiers, nil)}
 			l.kind = optionDeclRow

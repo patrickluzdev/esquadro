@@ -80,7 +80,8 @@ func isProject(dir string) bool {
 // builtinLoader loads built-in blueprints, outside a project.
 func builtinLoader() *blueprint.Loader {
 	return &blueprint.Loader{
-		Builtin: blueprints.FS,
+		Builtin:  blueprints.FS,
+		Browsing: true,
 		HasBuiltinHook: func(bp, path string) bool {
 			return builtinHooks[hook.Key(bp, path)] != nil
 		},

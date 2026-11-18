@@ -60,6 +60,9 @@ type Manifest struct {
 	// For are the kinds of project the blueprint is made for: app unless
 	// the manifest says otherwise.
 	For []project.Kind
+	// Instances is set when the blueprint is used by named instances
+	// (blueprint spa admin), each with its options and annotations.
+	Instances bool
 	// Requires are the blueprints this one needs: an app without them is an
 	// error.
 	Requires []Dep
@@ -234,6 +237,10 @@ func (v *validator) manifest(f *dsl.File) *Manifest {
 			}
 			m.Version = it.Version.Text
 		case *dsl.DependsItem:
+			if it.Keyword.Name == "instances" {
+				m.Instances = true
+				continue
+			}
 			if it.Keyword.Name == "for" {
 				if !once("for", it.Span) {
 					continue
