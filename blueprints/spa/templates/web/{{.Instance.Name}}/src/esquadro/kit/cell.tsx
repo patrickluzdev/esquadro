@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner"
 import { api } from "../api.ts"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
-import { t } from "./i18n.ts"
+import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { FieldValue } from "./show.tsx"
 import { toast } from "./toast.tsx"
@@ -62,10 +62,10 @@ export function EditableCell({ meta, field, record }: { meta: ResourceMeta; fiel
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
-            {!field.required && <SelectItem value={NONE}>{t("none")}</SelectItem>}
+            {!field.required && <SelectItem value={NONE}>{capitalize(t("none"))}</SelectItem>}
             {field.values?.map((v) => (
               <SelectItem key={v} value={v}>
-                {field.labels?.[v] ?? v}
+                {format(field, v)}
               </SelectItem>
             ))}
           </SelectContent>

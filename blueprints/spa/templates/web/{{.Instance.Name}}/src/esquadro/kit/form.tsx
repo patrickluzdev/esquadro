@@ -20,7 +20,7 @@ import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
-import { t } from "./i18n.ts"
+import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
@@ -55,7 +55,7 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
         <Choice id={id} field={field} value={str} onChange={onChange} invalid={invalid}>
           {field.values?.map((v) => (
             <SelectItem key={v} value={v}>
-              {field.labels?.[v] ?? v}
+              {format(field, v)}
             </SelectItem>
           ))}
         </Choice>
@@ -108,7 +108,7 @@ function Choice({
         <SelectValue placeholder="—" />
       </SelectTrigger>
       <SelectContent position="popper">
-        {!field.required && <SelectItem value={NONE}>{t("none")}</SelectItem>}
+        {!field.required && <SelectItem value={NONE}>{capitalize(t("none"))}</SelectItem>}
         {children}
       </SelectContent>
     </Select>
@@ -129,7 +129,7 @@ function RelationInput({ id, field, value, onChange, invalid }: InputProps & { i
     <Choice id={id} field={field} value={value} onChange={onChange} invalid={invalid}>
       {options.data?.items.map((r: Rec) => (
         <SelectItem key={r.id} value={r.id}>
-          {String(r[field.display ?? "id"] ?? r.id)}
+          {capitalize(String(r[field.display ?? "id"] ?? r.id))}
         </SelectItem>
       ))}
     </Choice>

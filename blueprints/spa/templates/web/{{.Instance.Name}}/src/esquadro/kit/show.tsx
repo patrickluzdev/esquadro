@@ -12,7 +12,7 @@ import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
-import { format, t } from "./i18n.ts"
+import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
@@ -46,13 +46,14 @@ function RelationValue({ field, id }: { field: FieldMeta; id: string }) {
   if (related.isPending && target) return <Skeleton className="inline-block h-4 w-24 align-middle" />
   const shown = related.data?.[field.display ?? "id"]
   if (shown === undefined || shown === null) return <span className="text-muted-foreground">{id.slice(0, 8)}</span>
+  const text = capitalize(String(shown))
   return (
     <Link
       to={`/${target.name}/${id}` as never}
       className="font-medium underline-offset-4 hover:underline"
       onClick={(e) => e.stopPropagation()}
     >
-      {String(shown)}
+      {text}
     </Link>
   )
 }
@@ -96,7 +97,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
     <div className="flex flex-col gap-6">
       <PageHeader
         title={title}
-        description={meta.singular}
+        description={capitalize(meta.singular)}
         actions={
           <>
             {resource.actions

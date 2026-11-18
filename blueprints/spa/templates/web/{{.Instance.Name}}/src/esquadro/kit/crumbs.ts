@@ -5,7 +5,7 @@ import { menu, isGroup } from "@/menu.ts"
 import type { MenuItem } from "@/menu.ts"
 import { base } from "../config.ts"
 import { resources } from "../resources.gen.ts"
-import { t } from "./i18n.ts"
+import { capitalize, t } from "./i18n.ts"
 import type { ResourceMeta } from "./meta.ts"
 
 export interface Crumb {
@@ -29,7 +29,7 @@ export function crumbsOf(pathname: string): Crumb[] {
   out.push({ label: meta?.label ?? page?.label ?? parts[0], to: `/${parts[0]}` })
   if (parts[1] === "new") out.push({ label: t("new") })
   else if (parts[1]) {
-    out.push({ label: meta?.singular ?? parts[1], to: `/${parts[0]}/${parts[1]}` })
+    out.push({ label: capitalize(meta?.singular ?? parts[1]), to: `/${parts[0]}/${parts[1]}` })
     if (parts[2] === "edit") out.push({ label: t("edit") })
   }
   return out

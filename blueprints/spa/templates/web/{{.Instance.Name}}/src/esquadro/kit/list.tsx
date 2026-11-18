@@ -51,7 +51,7 @@ import { api } from "../api.ts"
 import { EditableCell } from "./cell.tsx"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
-import { format, t } from "./i18n.ts"
+import { capitalize, format, t } from "./i18n.ts"
 import type { Rec } from "./meta.ts"
 import { PageHeader } from "./page.tsx"
 import { columnField, columnOptions } from "./resource.ts"
@@ -337,10 +337,10 @@ export function ResourceList({ resource, description }: { resource: Resource; de
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper">
-              <SelectItem value={ALL}>{t("all")}</SelectItem>
+              <SelectItem value={ALL}>{capitalize(t("all"))}</SelectItem>
               {(f.values ?? ["true", "false"]).map((v) => (
                 <SelectItem key={v} value={v}>
-                  {f.kind === "bool" ? format(f, v === "true") : format(f, v)}
+                  {capitalize(f.kind === "bool" ? format(f, v === "true") : format(f, v))}
                 </SelectItem>
               ))}
             </SelectContent>

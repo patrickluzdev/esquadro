@@ -12,12 +12,17 @@ export function t(key: keyof Messages, vars: Record<string, string | number> = {
   return words[key].replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""))
 }
 
+/** A text with its first letter capital, as options and labels are shown. */
+export function capitalize(text: string): string {
+  return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1)
+}
+
 /** A value of a field, as people read it. */
 export function format(field: FieldMeta, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—"
   switch (field.kind) {
     case "enum":
-      return field.labels?.[String(value)] ?? String(value)
+      return capitalize(field.labels?.[String(value)] ?? String(value))
     case "bool":
       return value ? t("yes") : t("no")
     case "int":
