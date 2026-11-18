@@ -2,6 +2,7 @@
 // sidebar-08): pages, and groups that open and close. Yours to change.
 import { Link, useRouterState } from "@tanstack/react-router"
 import { ChevronRight } from "lucide-react"
+import { useEffect, useState } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   SidebarGroup,
@@ -30,6 +31,11 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
   const active = useActive()
   const { isMobile, setOpenMobile } = useSidebar()
   const close = () => isMobile && setOpenMobile(false)
+  // A group is open while one of its pages is shown, unless you close it;
+  // going to one of its pages opens it again.
+  const [opened, setOpened] = useState<Record<string, boolean>>({})
+  const path = useRouterState({ select: (s) => s.location.pathname })
+  useEffect(() => setOpened({}), [path])
   const link = (item: MenuItem) => (
     <Link to={item.to as never} onClick={close}>
       {item.icon && <item.icon />}
@@ -42,7 +48,13 @@ export function NavMain({ items, label }: { items: Menu["main"]; label?: string 
       <SidebarMenu>
         {items.map((item) =>
           isGroup(item) ? (
-            <Collapsible key={item.label} asChild defaultOpen={item.items.some((i) => active(i.to))} className="group/collapsible">
+            <Collapsible
+              key={item.label}
+              asChild
+              open={opened[item.label] ?? item.items.some((i) => active(i.to))}
+              onOpenChange={(o) => setOpened((all) => ({ ...all, [item.label]: o }))}
+              className="group/collapsible"
+            >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip={item.label}>

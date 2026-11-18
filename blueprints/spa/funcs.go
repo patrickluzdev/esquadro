@@ -25,6 +25,7 @@ func TemplateFuncs() template.FuncMap {
 		"inRequest":  rest.InRequest,
 		"realms":     security.RealmsOf,
 		"displayOf":  DisplayOf,
+		"titleOf":    TitleOf,
 		"lucide":     Lucide,
 		"filterable": Filterable,
 		"hasMany":    HasMany,
@@ -128,6 +129,17 @@ func Lucide(name any) string {
 		b.WriteString(part[1:])
 	}
 	return b.String()
+}
+
+// TitleOf is the field an entity's records are called by: its first text
+// field, or id.
+func TitleOf(e *project.Entity) string {
+	for _, f := range e.Fields {
+		if !f.Implicit && (f.Type == project.TypeString || f.Type == project.TypeText) {
+			return f.Snake
+		}
+	}
+	return "id"
 }
 
 // DisplayOf is the field a relation's target is shown by: the one it

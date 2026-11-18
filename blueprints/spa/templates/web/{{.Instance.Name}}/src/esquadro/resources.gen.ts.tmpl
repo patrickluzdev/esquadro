@@ -15,6 +15,7 @@ export const resources = {
     singular: {{printf "%q" (or (index $a "singular") (humanize $e.Snake))}},
     menu: {{printf "%q" (or (index $a "menu") (index $a "label") (humanize $e.Plural.Snake))}},
     icon: {{printf "%q" (or (index $a "icon") "circle")}},
+    title: "{{titleOf $e}}",
     api: (api: Api) => api.{{$e.Plural.Camel}} as unknown as import("./kit/meta.ts").RecordsApi,
     fields: {
 {{- range $f := inRequest $e}}{{$fa := ann $f}}

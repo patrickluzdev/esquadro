@@ -46,6 +46,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 		"src/resources/products.tsx":        "export default resource(meta, {",
 		"src/pages/_app/products/index.tsx": `createFileRoute("/_app/products/")`,
 		"src/menu.ts":                       "icons.Package",
+		"src/components/site-header.tsx":    "<CommandPalette />",
 		"src/resources/categories.tsx":      `relation(products, "category_id")`,
 		"src/components/app-sidebar.tsx":    `collapsible="icon"`,
 		"src/components/ui/select.tsx":      "SelectPrimitive",

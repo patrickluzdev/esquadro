@@ -46,6 +46,11 @@ ui.shadcn.com/blocks. The header shows where the page is (a breadcrumb), and
 the account's menu has the theme (light, dark or the system's) and signing
 out.
 
+The command palette (Cmd+K, or Ctrl+K, or the header's Search button) goes
+to any page, finds records of every searchable resource at once, creates a
+record of any resource, changes the theme and signs out, all from the
+keyboard.
+
 ## Sign-in
 
 Every page under `src/pages/_app` needs a session of the realm (`auth`, the

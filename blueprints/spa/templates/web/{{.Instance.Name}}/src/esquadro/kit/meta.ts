@@ -61,6 +61,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   singular: string
   menu: string
   icon: string
+  /** The field a record is called by: name. */
+  title: string
   api: (api: never) => RecordsApi
   fields: F
   filters: readonly FilterMeta[]
