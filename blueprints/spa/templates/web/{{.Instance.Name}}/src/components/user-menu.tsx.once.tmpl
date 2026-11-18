@@ -1,44 +1,29 @@
 // The account, at the right of the header: its avatar opens who is signed
-// in, the account's page, the theme and signing out. Yours to change: a
-// profile page, settings.
+// in, the account's settings and signing out. Yours to change: add a link
+// (a profile, an activity log) to links.
 import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { KeyRound, LogOut, Mail, Monitor, MonitorSmartphone, Moon, Palette, Sun } from "lucide-react"
+import { LogOut, Settings } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { panel } from "../esquadro/config.ts"
 import { signOut, useSession } from "../esquadro/kit/auth.tsx"
 import { t } from "../esquadro/kit/i18n.ts"
 
-/**
- * The menu's links: each section of the account page, by its key
- * (?section=). Add yours (a profile, notifications) here and to the page.
- */
-const links: { label: string; icon: LucideIcon; section: string }[] = [
-  { label: t("password"), icon: KeyRound, section: "password" },
-  { label: t("devices"), icon: MonitorSmartphone, section: "devices" },
-  { label: t("email"), icon: Mail, section: "email" },
-]
+/** The menu's links, under who is signed in. */
+const links: { label: string; icon: LucideIcon; to: string }[] = [{ label: t("accountSettings"), icon: Settings, to: "/account" }]
 
 export function UserMenu() {
   const session = useSession()
-  const { theme, setTheme } = useTheme()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const name = t("account")
@@ -64,35 +49,14 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          {links.map((l) => (
-            <DropdownMenuItem key={l.section} asChild className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground">
-              <Link to="/account" search={ { section: l.section } as never }>
-                <l.icon />
-                {l.label}
-              </Link>
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground">
-              <Palette className="size-4 text-muted-foreground" />
-              {t("theme")}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="rounded-xl p-1.5">
-              <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
-                <DropdownMenuRadioItem value="light" className="gap-3 font-semibold">
-                  <Sun /> {t("light")}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="dark" className="gap-3 font-semibold">
-                  <Moon /> {t("dark")}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="system" className="gap-3 font-semibold">
-                  <Monitor /> {t("system")}
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
+        {links.map((l) => (
+          <DropdownMenuItem key={l.to} asChild className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground">
+            <Link to={l.to as never}>
+              <l.icon />
+              {l.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="h-10 gap-3 rounded-lg px-2 font-semibold text-sidebar-foreground"

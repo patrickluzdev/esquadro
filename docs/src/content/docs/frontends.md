@@ -322,9 +322,9 @@ layout's (sidebar, header, account menu) in `src/components`: all yours to
 change. `npx shadcn add <component>` adds more.
 
 The account menu, at the right of the header (`src/components/user-menu.tsx`),
-links to each section of the account page, by its key (`?section=devices`),
-and holds the theme and signing out: add a link there with each section you
-add to the page.
+shows who is signed in, links to the account's settings and signs out; add
+your links (a profile, an activity log) to its `links`. The account page's
+sections (password, devices, email, theme) are in `src/pages/_app/account.tsx`.
 
 ### Pages of your own
 

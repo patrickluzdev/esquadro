@@ -4,7 +4,8 @@
 import { isApiError } from "@api"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { LogOut, Monitor, Smartphone } from "lucide-react"
+import { LogOut, Monitor, Moon, Smartphone, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 import { api } from "../api.ts"
 import { base, realmKey } from "../config.ts"
 import { signOut } from "./auth.tsx"
@@ -240,6 +242,47 @@ export function EmailCard() {
           </Button>
         </CardFooter>
       </form>
+    </Card>
+  )
+}
+
+/** The theme, light, dark or the system's, kept in this browser. */
+export function ThemeCard() {
+  const { theme, setTheme } = useTheme()
+  const options = [
+    { value: "light", label: t("light"), icon: Sun },
+    { value: "dark", label: t("dark"), icon: Moon },
+    { value: "system", label: t("system"), icon: Monitor },
+  ]
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("theme")}</CardTitle>
+        <CardDescription>{t("themeHint")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div role="radiogroup" aria-label={t("theme")} className="grid gap-3 sm:grid-cols-3">
+          {options.map((o) => {
+            const chosen = (theme ?? "system") === o.value
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={chosen}
+                onClick={() => setTheme(o.value)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border-2 border-border p-4 text-left text-sm font-semibold transition-colors hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  chosen && "border-primary bg-primary/5 text-primary",
+                )}
+              >
+                <o.icon className="size-5" />
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+      </CardContent>
     </Card>
   )
 }
