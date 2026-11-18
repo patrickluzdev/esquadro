@@ -1,0 +1,4 @@
+  seed:
+    desc: "Put the data of seeds/*.yaml in the database (task seed -- --fresh to start over)"
+    cmds:
+      - go run ./cmd/{{.App.Kebab}} seed {{"{{.CLI_ARGS}}"}}

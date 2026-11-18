@@ -1,0 +1,581 @@
+package seed
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"math"
+	"math/rand/v2"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+	"uuid"
+
+	"{{.App.Module}}/internal/platform/postgres"
+
+	"go.yaml.in/yaml/v3"
+)
+
+// rule makes a field's value for the i-th record.
+type rule func(i int) any
+
+// generator makes the records of a block: a rule per field.
+type generator struct {
+	rules map[string]rule
+	order []string
+}
+
+// fill gives a row the values of the i-th record.
+func (g *generator) fill(r *Row, i int) error {
+	for _, name := range g.order {
+		if v := g.rules[name](i); v != nil {
+			r.values[name] = v
+		}
+	}
+	return nil
+}
+
+// generator reads a block's rules, and makes one for each field it does
+// not name, by its type and its name.
+func (s *run) generator(ctx context.Context, file string, b *block) (*generator, error) {
+	e := b.entity
+	rng := s.rng(e.List)
+	w := wordsOf(s.o.Locale)
+	g := &generator{rules: map[string]rule{}}
+	for name, node := range b.fields {
+		if name != "created_at" && name != "updated_at" && e.field(name) == nil {
+			return nil, fmt.Errorf("%s:%d: %s has no field %s (%s)", file, node.Line, e.List, name, strings.Join(e.names(), ", "))
+		}
+	}
+	for _, f := range e.Fields {
+		if f.Kind == File {
+			continue
+		}
+		node, named := b.fields[f.Name]
+		if !named {
+			node, named = b.fields[f.Name+"_id"]
+		}
+		var r rule
+		var err error
+		if named {
+			r, err = s.ruleOf(ctx, file, e, f, node, rng, w)
+		} else {
+			r, err = s.defaultRule(ctx, e, f, rng, w)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if r != nil {
+			g.rules[f.Name] = r
+			g.order = append(g.order, f.Name)
+		}
+	}
+	for _, name := range []string{"created_at", "updated_at"} {
+		if node, ok := b.fields[name]; ok {
+			r, err := s.ruleOf(ctx, file, e, Field{Name: name, Kind: Time}, node, rng, w)
+			if err != nil {
+				return nil, err
+			}
+			g.rules[name] = r
+			g.order = append(g.order, name)
+		}
+	}
+	return g, nil
+}
+
+// ruleOf reads a field's rule: a value for every record, or a mapping of
+// what to make.
+func (s *run) ruleOf(ctx context.Context, file string, e *Entity, f Field, node *yaml.Node, rng *rand.Rand, w words) (rule, error) {
+	bad := func(format string, args ...any) error {
+		return fmt.Errorf("%s:%d: %s.%s: %s", file, node.Line, e.List, f.Name, fmt.Sprintf(format, args...))
+	}
+	if node.Kind == yaml.ScalarNode {
+		var v any
+		if err := node.Decode(&v); err != nil {
+			return nil, bad("%v", err)
+		}
+		if text, ok := v.(string); ok && f.Kind == Relation && strings.HasPrefix(text, "$") {
+			id, ok := s.refs[f.Target][text[1:]]
+			if !ok {
+				return nil, bad("%s is no alias of %s declared before", text, f.Target)
+			}
+			return func(int) any { return id.String() }, nil
+		}
+		return func(int) any { return v }, nil
+	}
+	if node.Kind != yaml.MappingNode {
+		return nil, bad("a value, or a rule: { pick: [...] }, { int: 1..10 }, { past: 90d }")
+	}
+	spec := map[string]*yaml.Node{}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		spec[node.Content[i].Value] = node.Content[i+1]
+	}
+	var base rule
+	var err error
+	for key, v := range spec {
+		switch key {
+		case "null", "trend":
+			continue
+		case "sequence":
+			base, err = sequence(v.Value)
+		case "pick":
+			base, err = pick(v, rng)
+		case "one_of":
+			var list []any
+			if err = v.Decode(&list); err == nil && len(list) == 0 {
+				err = fmt.Errorf("one_of needs values")
+			}
+			base = func(int) any { return list[rng.IntN(len(list))] }
+		case "int":
+			base, err = intRange(v.Value, rng)
+		case "decimal":
+			base, err = decimalRange(v.Value, rng)
+		case "money":
+			var amount rule
+			amount, err = decimalRange(v.Value, rng)
+			base = func(i int) any { return map[string]any{"amount": amount(i), "currency": s.o.Currency} }
+		case "past", "future":
+			var d time.Duration
+			d, err = duration(v.Value)
+			trend := ""
+			if t, ok := spec["trend"]; ok {
+				trend = t.Value
+			}
+			base = moments(key == "past", d, trend, rng)
+		case "between":
+			var bounds []string
+			if err = v.Decode(&bounds); err == nil && len(bounds) != 2 {
+				err = fmt.Errorf("between needs two dates")
+			}
+			if err == nil {
+				base, err = between(bounds[0], bounds[1], rng)
+			}
+		case "any":
+			if f.Kind != Relation {
+				err = fmt.Errorf("any is for a relation")
+			} else {
+				base, err = s.anyOf(ctx, f.Target, rng)
+			}
+		case "name":
+			base = func(int) any { return w.person(rng) }
+		case "email":
+			base = func(i int) any { return w.email(rng, i) }
+		case "sentence":
+			base = func(int) any { return w.sentence(rng, 6+rng.IntN(8)) }
+		case "words":
+			n, _ := strconv.Atoi(v.Value)
+			base = func(int) any { return w.sentence(rng, max(1, n)) }
+		default:
+			return nil, bad("%s is no rule (sequence, pick, one_of, int, decimal, money, past, future, between, any, name, email, sentence, words, null, trend)", key)
+		}
+		if err != nil {
+			return nil, bad("%v", err)
+		}
+	}
+	if base == nil {
+		return nil, bad("which rule? { pick: [...] }, { int: 1..10 }, { past: 90d }")
+	}
+	if f.Kind == Relation {
+		// A relation's values may be aliases ($home), picked or listed.
+		for _, v := range listed(spec) {
+			if text, ok := v.(string); ok && strings.HasPrefix(text, "$") {
+				if _, ok := s.refs[f.Target][text[1:]]; !ok {
+					return nil, bad("%s is no alias of %s declared before", text, f.Target)
+				}
+			}
+		}
+		inner := base
+		base = func(i int) any {
+			v := inner(i)
+			if text, ok := v.(string); ok && strings.HasPrefix(text, "$") {
+				return s.refs[f.Target][text[1:]].String()
+			}
+			return v
+		}
+	}
+	if n, ok := spec["null"]; ok {
+		chance, err := strconv.ParseFloat(n.Value, 64)
+		if err != nil || chance < 0 || chance > 1 {
+			return nil, bad("null is a chance of being empty, 0 to 1: null: 0.2")
+		}
+		inner := base
+		base = func(i int) any {
+			if rng.Float64() < chance {
+				return nil
+			}
+			return inner(i)
+		}
+	}
+	return base, nil
+}
+
+// defaultRule makes a field's value by its type and its name, when the
+// block does not say: optional ones are empty now and then.
+func (s *run) defaultRule(ctx context.Context, e *Entity, f Field, rng *rand.Rand, w words) (rule, error) {
+	if f.Name == "created_at" || f.Name == "updated_at" {
+		return nil, nil
+	}
+	var r rule
+	name := strings.ToLower(f.Name)
+	switch f.Kind {
+	case Enum:
+		r = func(int) any { return f.Values[rng.IntN(len(f.Values))] }
+	case Relation:
+		var err error
+		if r, err = s.anyOf(ctx, f.Target, rng); err != nil {
+			return nil, err
+		}
+	case Bool:
+		r = func(int) any { return rng.IntN(2) == 0 }
+	case Int, Int64:
+		lo, hi := bounds(f, 1, 100)
+		r = func(int) any { return int64(lo) + rng.Int64N(int64(hi-lo)+1) }
+	case Decimal:
+		lo, hi := bounds(f, 0, 1000)
+		r = func(int) any { return strconv.FormatFloat(lo+rng.Float64()*(hi-lo), 'f', 2, 64) }
+	case Money:
+		lo, hi := bounds(f, 10, 500)
+		r = func(int) any {
+			return map[string]any{"amount": strconv.FormatFloat(lo+rng.Float64()*(hi-lo), 'f', 2, 64), "currency": s.o.Currency}
+		}
+	case Time, Date:
+		r = moments(true, 30*24*time.Hour, "", rng)
+	case UUID:
+		r = func(int) any { return uuid.NewV4().String() }
+	case JSON:
+		r = func(int) any { return map[string]any{} }
+	default:
+		r = func(i int) any { return w.text(name, e.List, rng, i) }
+		if f.Unique {
+			inner := r
+			r = func(i int) any { return fmt.Sprintf("%v %d", inner(i), i+1) }
+		}
+		if f.Max != nil {
+			inner, limit := r, int(*f.Max)
+			r = func(i int) any { return cut(fmt.Sprint(inner(i)), limit) }
+		}
+	}
+	if !f.Required && f.Kind != Relation {
+		inner := r
+		r = func(i int) any {
+			if rng.IntN(5) == 0 {
+				return nil
+			}
+			return inner(i)
+		}
+	}
+	return r, nil
+}
+
+// anyOf picks among a list's records: those there when the block starts.
+func (s *run) anyOf(ctx context.Context, list string, rng *rand.Rand) (rule, error) {
+	e := s.byList[list]
+	if e == nil {
+		return nil, fmt.Errorf("no list %s", list)
+	}
+	rows, err := postgres.Querier(ctx, s.db).Query(ctx, "SELECT id::text FROM "+quote(e.Table)+" ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return func(int) any {
+		if len(ids) == 0 {
+			return nil
+		}
+		return ids[rng.IntN(len(ids))]
+	}, nil
+}
+
+func bounds(f Field, lo, hi float64) (float64, float64) {
+	if f.Min != nil {
+		lo = *f.Min
+		if f.Max == nil && hi < lo {
+			hi = lo + 100
+		}
+	}
+	if f.Max != nil {
+		hi = *f.Max
+	}
+	return lo, max(lo, hi)
+}
+
+var padded = regexp.MustCompile(`\{n(?::(\d+))?\}`)
+
+// sequence numbers the records: "#{n:5}" is #00001, #00002…
+func sequence(pattern string) (rule, error) {
+	if !padded.MatchString(pattern) {
+		return nil, fmt.Errorf(`a sequence has {n} where the number goes: "#{n:5}"`)
+	}
+	return func(i int) any {
+		return padded.ReplaceAllStringFunc(pattern, func(m string) string {
+			width, _ := strconv.Atoi(padded.FindStringSubmatch(m)[1])
+			return fmt.Sprintf("%0*d", width, i+1)
+		})
+	}, nil
+}
+
+// pick chooses among values, by weight: { PAID: 4, FAILED: 1 }, or evenly: [A, B].
+func pick(node *yaml.Node, rng *rand.Rand) (rule, error) {
+	var values []any
+	var weights []float64
+	switch node.Kind {
+	case yaml.SequenceNode:
+		if err := node.Decode(&values); err != nil {
+			return nil, err
+		}
+		for range values {
+			weights = append(weights, 1)
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			w, err := strconv.ParseFloat(node.Content[i+1].Value, 64)
+			if err != nil || w < 0 {
+				return nil, fmt.Errorf("a weight is a number: %s: 3", node.Content[i].Value)
+			}
+			values = append(values, node.Content[i].Value)
+			weights = append(weights, w)
+		}
+	default:
+		return nil, fmt.Errorf("pick is a list, or values and their weights")
+	}
+	total := 0.0
+	for _, w := range weights {
+		total += w
+	}
+	if len(values) == 0 || total == 0 {
+		return nil, fmt.Errorf("pick needs values")
+	}
+	return func(int) any {
+		x := rng.Float64() * total
+		for i, w := range weights {
+			if x < w {
+				return values[i]
+			}
+			x -= w
+		}
+		return values[len(values)-1]
+	}, nil
+}
+
+func span(text string) (float64, float64, int, error) {
+	a, b, ok := strings.Cut(text, "..")
+	lo, err1 := strconv.ParseFloat(strings.TrimSpace(a), 64)
+	hi, err2 := strconv.ParseFloat(strings.TrimSpace(b), 64)
+	if !ok || err1 != nil || err2 != nil || hi < lo {
+		return 0, 0, 0, fmt.Errorf("a range is from..to: 10..500")
+	}
+	places := 0
+	for _, part := range []string{a, b} {
+		if _, frac, ok := strings.Cut(strings.TrimSpace(part), "."); ok {
+			places = max(places, len(frac))
+		}
+	}
+	return lo, hi, places, nil
+}
+
+func intRange(text string, rng *rand.Rand) (rule, error) {
+	lo, hi, _, err := span(text)
+	if err != nil {
+		return nil, err
+	}
+	return func(int) any { return int64(lo) + rng.Int64N(int64(hi-lo)+1) }, nil
+}
+
+func decimalRange(text string, rng *rand.Rand) (rule, error) {
+	lo, hi, places, err := span(text)
+	if err != nil {
+		return nil, err
+	}
+	places = max(places, 2)
+	return func(int) any { return strconv.FormatFloat(lo+rng.Float64()*(hi-lo), 'f', places, 64) }, nil
+}
+
+// duration reads 90d, 12h, 4w, 30m.
+func duration(text string) (time.Duration, error) {
+	text = strings.TrimSpace(text)
+	if len(text) < 2 {
+		return 0, fmt.Errorf("a span is a number and d, w, h or m: 90d")
+	}
+	n, err := strconv.ParseFloat(text[:len(text)-1], 64)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("a span is a number and d, w, h or m: 90d")
+	}
+	unit := map[byte]time.Duration{'d': 24 * time.Hour, 'w': 7 * 24 * time.Hour, 'h': time.Hour, 'm': time.Minute}[text[len(text)-1]]
+	if unit == 0 {
+		return 0, fmt.Errorf("a span is a number and d, w, h or m: 90d")
+	}
+	return time.Duration(n * float64(unit)), nil
+}
+
+// moments are times within d of now, in the past or the future; up puts
+// more of them near now, down more far from it.
+func moments(past bool, d time.Duration, trend string, rng *rand.Rand) rule {
+	now := time.Now().UTC().Truncate(time.Second)
+	return func(int) any {
+		u := rng.Float64()
+		switch trend {
+		case "up":
+			u = math.Pow(u, 1.8)
+		case "down":
+			u = 1 - math.Pow(u, 1.8)
+		}
+		offset := time.Duration(u * float64(d))
+		if past {
+			return now.Add(-offset).Format(time.RFC3339)
+		}
+		return now.Add(offset).Format(time.RFC3339)
+	}
+}
+
+func between(from, to string, rng *rand.Rand) (rule, error) {
+	parse := func(s string) (time.Time, error) {
+		for _, layout := range []string{time.RFC3339, time.DateOnly} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("%s is not a date: 2026-10-01", s)
+	}
+	a, err := parse(from)
+	if err != nil {
+		return nil, err
+	}
+	b, err := parse(to)
+	if err != nil {
+		return nil, err
+	}
+	if b.Before(a) {
+		return nil, fmt.Errorf("between's second date comes first")
+	}
+	return func(int) any { return a.Add(time.Duration(rng.Float64() * float64(b.Sub(a)))).Format(time.RFC3339) }, nil
+}
+
+func cut(s string, limit int) string {
+	if limit <= 0 {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return strings.TrimSpace(string(runes[:limit]))
+}
+
+// yamlToJSON writes a value read from YAML as JSON.
+func yamlToJSON(v any) ([]byte, error) { return json.Marshal(normalize(v)) }
+
+func normalize(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := map[string]any{}
+		for k, val := range x {
+			out[k] = normalize(val)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, val := range x {
+			out[i] = normalize(val)
+		}
+		return out
+	}
+	return v
+}
+
+// text makes a text field's value by its name: a person's name, an email,
+// a city, a sentence; a word, otherwise.
+func (w words) text(name, list string, rng *rand.Rand, i int) any {
+	switch {
+	case strings.Contains(name, "email"):
+		return w.email(rng, i)
+	case name == "name" && slices.Contains([]string{"users", "people", "customers", "buyers", "clients", "members", "employees", "contacts", "authors"}, list):
+		return w.person(rng)
+	case name == "name" || name == "title" || name == "label":
+		return capitalize(w.sentence(rng, 1+rng.IntN(3)))
+	case strings.Contains(name, "description") || strings.Contains(name, "body") || strings.Contains(name, "notes") || strings.Contains(name, "summary"):
+		return w.sentence(rng, 8+rng.IntN(12))
+	case strings.Contains(name, "country"):
+		return w.countries[rng.IntN(len(w.countries))]
+	case strings.Contains(name, "city"):
+		return w.cities[rng.IntN(len(w.cities))]
+	case strings.Contains(name, "company"):
+		return w.companies[rng.IntN(len(w.companies))]
+	case strings.Contains(name, "phone"):
+		return fmt.Sprintf("+55 11 9%04d-%04d", rng.IntN(10000), rng.IntN(10000))
+	case strings.Contains(name, "url") || strings.Contains(name, "site"):
+		return fmt.Sprintf("https://example.com/%s-%d", w.nouns[rng.IntN(len(w.nouns))], i+1)
+	case strings.Contains(name, "code") || strings.Contains(name, "number") || strings.Contains(name, "sku") || strings.Contains(name, "slug"):
+		return fmt.Sprintf("%s-%05d", strings.ToUpper(name[:min(3, len(name))]), i+1)
+	}
+	return capitalize(w.sentence(rng, 1+rng.IntN(2)))
+}
+
+func (w words) person(rng *rand.Rand) string {
+	return w.first[rng.IntN(len(w.first))] + " " + w.last[rng.IntN(len(w.last))]
+}
+
+func (w words) email(rng *rand.Rand, i int) string {
+	first := strings.ToLower(unaccent(w.first[rng.IntN(len(w.first))]))
+	last := strings.ToLower(unaccent(w.last[rng.IntN(len(w.last))]))
+	return fmt.Sprintf("%s.%s%d@example.com", first, last, i+1)
+}
+
+func (w words) sentence(rng *rand.Rand, n int) string {
+	out := make([]string, n)
+	for i := range out {
+		if i%2 == 0 {
+			out[i] = w.nouns[rng.IntN(len(w.nouns))]
+		} else {
+			out[i] = w.adjectives[rng.IntN(len(w.adjectives))]
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
+var unaccenter = strings.NewReplacer("á", "a", "à", "a", "â", "a", "ã", "a", "é", "e", "ê", "e", "í", "i", "ó", "o", "ô", "o", "õ", "o", "ú", "u", "ç", "c", "Á", "A", "É", "E", "Í", "I", "Ó", "O", "Ú", "U", "Ç", "C")
+
+func unaccent(s string) string { return unaccenter.Replace(s) }
+
+// listed are the values a pick or a one_of names, to check them first.
+func listed(spec map[string]*yaml.Node) []any {
+	var out []any
+	for _, key := range []string{"pick", "one_of"} {
+		node, ok := spec[key]
+		if !ok {
+			continue
+		}
+		switch node.Kind {
+		case yaml.SequenceNode:
+			var values []any
+			if node.Decode(&values) == nil {
+				out = append(out, values...)
+			}
+		case yaml.MappingNode:
+			for i := 0; i < len(node.Content); i += 2 {
+				out = append(out, node.Content[i].Value)
+			}
+		}
+	}
+	return out
+}

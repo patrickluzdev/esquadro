@@ -1,0 +1,88 @@
+package seed
+
+import (
+	"math/rand/v2"
+	"testing"
+	"time"
+
+	"go.yaml.in/yaml/v3"
+)
+
+func TestSequencePadsTheNumber(t *testing.T) {
+	r, err := sequence("#{n:5}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r(0); got != "#00001" {
+		t.Fatalf("got %v", got)
+	}
+	if _, err := sequence("no number"); err == nil {
+		t.Fatal("a sequence without {n} was taken")
+	}
+}
+
+func TestDurationsAndRanges(t *testing.T) {
+	if d, err := duration("90d"); err != nil || d != 90*24*time.Hour {
+		t.Fatalf("90d: %v %v", d, err)
+	}
+	if _, err := duration("soon"); err == nil {
+		t.Fatal("a bad span was taken")
+	}
+	lo, hi, places, err := span("10.5..500")
+	if err != nil || lo != 10.5 || hi != 500 || places != 1 {
+		t.Fatalf("span: %v %v %v %v", lo, hi, places, err)
+	}
+	if _, _, _, err := span("500..10"); err == nil {
+		t.Fatal("a range going down was taken")
+	}
+}
+
+func TestTheSameSeedMakesTheSameValues(t *testing.T) {
+	s := &run{o: Options{Seed: 7}}
+	a, _ := intRange("1..1000", s.rng("orders"))
+	b, _ := intRange("1..1000", s.rng("orders"))
+	for i := range 20 {
+		if a(i) != b(i) {
+			t.Fatal("two runs with the same seed differ")
+		}
+	}
+}
+
+func TestPickFollowsTheWeights(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	var r rule
+	node := mapping(map[string]string{"A": "9", "B": "1"})
+	r, err := pick(node, rng)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for i := range 1000 {
+		if r(i) == "A" {
+			n++
+		}
+	}
+	if n < 850 || n > 950 {
+		t.Fatalf("A was picked %d times in 1000, with weight 9 of 10", n)
+	}
+}
+
+func TestIDsAreStable(t *testing.T) {
+	s := &run{o: Options{App: "shop"}}
+	if s.id("categories/$home") != s.id("categories/$home") || s.id("categories/$home") == s.id("categories/$garden") {
+		t.Fatal("ids are not one per key")
+	}
+	if v := s.id("x")[6] >> 4; v != 5 {
+		t.Fatalf("version %d, want 5", v)
+	}
+}
+
+func mapping(m map[string]string) *yaml.Node {
+	n := &yaml.Node{Kind: yaml.MappingNode}
+	for _, k := range []string{"A", "B"} {
+		if v, ok := m[k]; ok {
+			n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, &yaml.Node{Kind: yaml.ScalarNode, Value: v})
+		}
+	}
+	return n
+}

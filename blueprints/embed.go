@@ -32,6 +32,7 @@ import "embed"
 //go:embed security/blueprint.esq all:security/templates security/slots security/partials
 //go:embed mail/blueprint.esq all:mail/templates mail/slots all:mail/files
 //go:embed storage/blueprint.esq all:storage/templates storage/slots
+//go:embed seed/blueprint.esq all:seed/templates seed/slots
 //go:embed client_ts/blueprint.esq all:client_ts/templates client_ts/slots
 //go:embed git/blueprint.esq
 //go:embed deploy/blueprint.esq deploy/slots

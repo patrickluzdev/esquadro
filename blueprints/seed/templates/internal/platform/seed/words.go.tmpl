@@ -1,0 +1,30 @@
+package seed
+
+// words are what generated texts are made of, in a language.
+type words struct {
+	first, last, nouns, adjectives, countries, cities, companies []string
+}
+
+// wordsOf are the words of a locale: pt_br, or English.
+func wordsOf(locale string) words {
+	if locale == "pt_br" {
+		return words{
+			first:      []string{"Ana", "Bruno", "Carla", "Diego", "Elisa", "Fábio", "Gabriela", "Hugo", "Iara", "João", "Karen", "Lucas", "Marina", "Nina", "Otávio", "Paula", "Rafael", "Sofia", "Tiago", "Vitória"},
+			last:       []string{"Silva", "Souza", "Lima", "Costa", "Rocha", "Alves", "Melo", "Dias", "Ribeiro", "Gomes", "Santos", "Oliveira", "Pereira", "Carvalho", "Martins"},
+			nouns:      []string{"mesa", "cadeira", "luz", "caminho", "rio", "jardim", "livro", "janela", "ponte", "nuvem", "pedra", "mapa", "folha", "porta", "estrela", "campo", "cidade", "sala", "vento", "trilha"},
+			adjectives: []string{"azul", "rápido", "claro", "novo", "simples", "forte", "leve", "antigo", "grande", "calmo", "verde", "firme", "macio", "alto", "vivo"},
+			countries:  []string{"Brasil", "Brasil", "Brasil", "Portugal", "Argentina", "Chile", "Uruguai", "Estados Unidos", "Espanha", "México"},
+			cities:     []string{"São Paulo", "Rio de Janeiro", "Belo Horizonte", "Curitiba", "Porto Alegre", "Recife", "Salvador", "Fortaleza", "Florianópolis", "Goiânia"},
+			companies:  []string{"Aurora Ltda.", "Horizonte S.A.", "Pinheiro & Filhos", "Vale Verde", "Nova Rota", "Ponto Certo", "Grupo Atlântico", "Casa Forte"},
+		}
+	}
+	return words{
+		first:      []string{"Alice", "Ben", "Chloe", "Daniel", "Emma", "Felix", "Grace", "Henry", "Isla", "Jack", "Kate", "Liam", "Mia", "Noah", "Olivia", "Paul", "Ruby", "Sam", "Tara", "Victor"},
+		last:       []string{"Smith", "Johnson", "Brown", "Taylor", "Miller", "Davis", "Wilson", "Moore", "Clark", "Hall", "Young", "King", "Wright", "Green", "Baker"},
+		nouns:      []string{"table", "chair", "light", "path", "river", "garden", "book", "window", "bridge", "cloud", "stone", "map", "leaf", "door", "star", "field", "city", "room", "wind", "trail"},
+		adjectives: []string{"blue", "quick", "bright", "new", "simple", "strong", "light", "old", "big", "calm", "green", "firm", "soft", "tall", "lively"},
+		countries:  []string{"United States", "United States", "United Kingdom", "Canada", "Germany", "France", "Brazil", "Australia", "Spain", "Japan"},
+		cities:     []string{"New York", "London", "Toronto", "Berlin", "Paris", "Sydney", "Madrid", "Tokyo", "Chicago", "Boston"},
+		companies:  []string{"Acme Inc.", "Northwind", "Blue Harbor", "Summit Co.", "Bright Path", "Oak & Sons", "Atlas Group", "Pine Labs"},
+	}
+}
