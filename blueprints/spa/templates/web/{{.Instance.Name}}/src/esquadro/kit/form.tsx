@@ -239,15 +239,15 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
       }}
     >
       <PageHeader title={record ? t("editing", { name: meta.singular }) : t("creating", { name: meta.singular })} />
-      <div className="flex max-w-4xl flex-col gap-6">
+      <div className="flex max-w-[1080px] flex-col gap-4">
         {sections.map((section) => (
           <Card key={section.title}>
-            <CardHeader>
+            <CardHeader className="gap-1">
               <CardTitle>{section.title}</CardTitle>
               {section.description && <CardDescription>{section.description}</CardDescription>}
             </CardHeader>
             <CardContent>
-              <FieldGroup className="grid gap-5 sm:grid-cols-2">
+              <FieldGroup className="gap-7">
                 {section.fields
                   .filter((f) => !f.readOnly)
                   .map((f) => {
@@ -265,7 +265,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                       />
                     )
                     const label = (
-                      <FieldLabel htmlFor={`field-${f.name}`}>
+                      <FieldLabel htmlFor={`field-${f.name}`} className="font-semibold text-muted-foreground">
                         {f.label}
                         {f.required && f.kind !== "bool" && <span className="text-destructive">*</span>}
                       </FieldLabel>
@@ -275,7 +275,6 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                         key={f.name}
                         orientation={f.kind === "bool" ? "horizontal" : "vertical"}
                         data-invalid={error !== undefined || undefined}
-                        className={cn(f.kind === "textarea" && "sm:col-span-2")}
                       >
                         {f.kind === "bool" ? (
                           <>
@@ -298,7 +297,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
         ))}
       </div>
       {/* The form's actions, fixed at the foot of the screen. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-auto -mb-4 flex items-center justify-between gap-2 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm lg:-mx-8 lg:-mb-8 lg:px-8">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-auto -mb-6 flex items-center justify-between gap-2 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-sm lg:-mx-8 lg:px-8">
         <Button type="button" variant="ghost" onClick={() => history.back()}>
           <ArrowLeft /> {t("back")}
         </Button>

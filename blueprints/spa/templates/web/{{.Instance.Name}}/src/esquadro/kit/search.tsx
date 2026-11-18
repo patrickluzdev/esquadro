@@ -58,11 +58,10 @@ export function SearchBox({
   }
   return (
     <div className={wide ? "relative w-full" : "relative w-full sm:w-72"}>
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={input}
         type="search"
-        className="pr-14 pl-8 [&::-webkit-search-cancel-button]:hidden"
+        className="pr-12 [&::-webkit-search-cancel-button]:hidden"
         placeholder={placeholder ?? t("search")}
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -75,7 +74,7 @@ export function SearchBox({
         }}
         aria-label={placeholder ?? t("search")}
       />
-      <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+      <div className="absolute top-1/2 right-3.5 flex -translate-y-1/2 items-center gap-1">
         {busy && text && <Spinner className="size-3.5 text-muted-foreground" />}
         {text || !shortcut ? (
           text && (
@@ -89,9 +88,7 @@ export function SearchBox({
           </button>
           )
         ) : (
-          <kbd className="pointer-events-none hidden h-5 items-center rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
-            /
-          </kbd>
+          <Search className="pointer-events-none size-[18px] text-muted-foreground" />
         )}
       </div>
     </div>

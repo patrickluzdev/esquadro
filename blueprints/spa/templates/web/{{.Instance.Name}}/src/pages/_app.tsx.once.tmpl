@@ -20,7 +20,7 @@ function Layout() {
     <SidebarProvider
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--sidebar-width": "18rem",
           "--header-height": "calc(var(--spacing) * 12)",
         } as CSSProperties
       }
@@ -28,18 +28,18 @@ function Layout() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <div className="@container/main mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 lg:p-8">
+        <div className="@container/main mx-auto flex w-full max-w-[1536px] flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
           <Outlet />
         </div>
       </SidebarInset>
       <IdleTimeout />
     </SidebarProvider>
 {{- else}}
-    <SidebarProvider style={ {} as CSSProperties }>
+    <SidebarProvider style={ { "--sidebar-width": "18rem" } as CSSProperties }>
       <AppSidebar />
       <SidebarInset>
         <SiteHeader />
-        <div className="@container/main mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 lg:p-8">
+        <div className="@container/main mx-auto flex w-full max-w-[1536px] flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
           <Outlet />
         </div>
       </SidebarInset>

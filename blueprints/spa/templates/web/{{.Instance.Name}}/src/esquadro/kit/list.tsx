@@ -508,6 +508,8 @@ export function ResourceList({
     </Button>
   )
   const hideable = table.getAllColumns().filter((c) => c.getCanHide())
+  // What a record is called, in bold: the resource's title, or its first column.
+  const titleColumn = resource.title?.name ?? (tableColumns[0] && columnField(tableColumns[0]).name)
   const width = table.getVisibleLeafColumns().length
   const exportButton = (
     <Button variant="outline" onClick={exportAll} disabled={!page || page.items.length === 0} size={embedded ? "sm" : "default"}>
@@ -516,7 +518,7 @@ export function ResourceList({
   )
   const activeFilters = filters.filter((f) => filterKeys(f).some((k) => search[k] !== undefined)).length
   return (
-    <div className="flex flex-col gap-5 rounded-2xl bg-card p-5">
+    <div className={cn("flex flex-col gap-4", !embedded && "rounded-xl border border-border bg-card p-5")}>
       {embedded ? (
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-bold tracking-tight">{scope.label ?? meta.label}</h2>
@@ -551,7 +553,7 @@ export function ResourceList({
           </div>
         )}
         {filters.length > 0 && (
-          <Button variant={showFilters || activeFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
+          <Button variant="outline" className={cn((showFilters || activeFilters > 0) && "border-primary text-primary")} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
             <ListFilterIcon /> {t("filters")}
             {activeFilters > 0 && <span className="rounded-md bg-primary px-1.5 text-xs text-primary-foreground">{activeFilters}</span>}
           </Button>
@@ -591,7 +593,7 @@ export function ResourceList({
         )}
       </div>
       {(showFilters || activeFilters > 0) && filters.length > 0 && (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 p-3 animate-in fade-in-0 slide-in-from-top-1">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3 animate-in fade-in-0 slide-in-from-top-1">
         {filters.map((f) =>
           isDate(f) ? (
             <DateRangeFilter
@@ -618,7 +620,7 @@ export function ResourceList({
       </div>
       )}
       {selected.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm animate-in fade-in-0 slide-in-from-top-1">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 text-sm animate-in fade-in-0 slide-in-from-top-1">
           <span className="font-medium">{t("selected", { count: selected.length })}</span>
           <Button variant="ghost" size="sm" onClick={() => setRowSelection({})}>
             <X /> {t("clearSelection")}
@@ -657,7 +659,7 @@ export function ResourceList({
         </div>
       )}
       {list.isError && page && <RefreshError error={list.error} onRetry={() => list.refetch()} />}
-      <div className="relative -mx-5 overflow-x-auto border-t border-border">
+      <div className="relative overflow-x-auto">
         <LoadingBar active={list.isFetching && !list.isPending} />
         <SearchContext value={search.q ?? ""}>
         <Table
@@ -667,7 +669,7 @@ export function ResourceList({
             density === "compact" && "[&_td]:py-1 [&_th]:h-8",
           )}
         >
-          <TableHeader className="[&_th:first-child]:pl-5 [&_th:last-child]:pr-5">
+          <TableHeader>
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => (
@@ -686,11 +688,11 @@ export function ResourceList({
                 data-row-index={i}
                 data-state={row.getIsSelected() ? "selected" : undefined}
                 aria-current={i === active || undefined}
-                className={cn("cursor-pointer [&>td:first-child]:pl-5 [&>td:last-child]:pr-5", i === active && "bg-muted/60 shadow-[inset_3px_0_0_var(--primary)]")}
+                className={cn("cursor-pointer", i === active && "bg-muted/60 shadow-[inset_3px_0_0_var(--primary)]")}
                 onClick={() => navigate({ to: `/${meta.name}/${row.original.id}` as never })}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className={cn(cell.column.id === titleColumn && "font-bold text-foreground")}>
                     <FlexRender cell={cell} />
                   </TableCell>
                 ))}

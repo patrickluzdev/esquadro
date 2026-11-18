@@ -25,16 +25,16 @@ import { t } from "../esquadro/kit/i18n.ts"
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {{if eq $mode "icon"}}collapsible="icon"{{else if eq $mode "inset"}}variant="inset"{{else}}collapsible="offcanvas"{{end}} {...props}>
-      <SidebarHeader className="h-16 justify-center">
+      <SidebarHeader className="h-16 justify-center px-6">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/">
-                <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
+                <div className="flex aspect-square size-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
                   {{slice .App.Label 0 1}}
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-lg font-bold text-foreground">{{.App.Label}}</span>
+                  <span className="truncate text-xl font-bold text-foreground">{{.App.Label}}</span>
                   <span className="truncate text-xs text-muted-foreground">{{humanize .Instance.Name}}</span>
                 </div>
               </Link>
