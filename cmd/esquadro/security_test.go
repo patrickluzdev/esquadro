@@ -216,3 +216,39 @@ func TestSecurityNeedsMail(t *testing.T) {
 		t.Fatalf("exit %d\n%s", code, errOut)
 	}
 }
+
+func TestSecurityServiceRoles(t *testing.T) {
+	people := `package accounts
+
+entity User {
+  name string required
+  @security(principal, roles [admin])
+}
+
+entity Note {
+  text string
+  @security(read [user, service.reader], write [user.admin, service.writer, service])
+}
+`
+	withServices := "  blueprint security {\n    services [reader]\n  }\n"
+	dir := securityProject(t, people, "")
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "  blueprint security\n", withServices, 1)), 0o644)
+	code, _, errOut := esq(t, "check", dir)
+	if code != 1 || !strings.Contains(errOut, "write: writer is not a role of service, whose roles are reader") || strings.Contains(errOut, "reader is not") || !strings.Contains(errOut, "1 error") {
+		t.Fatalf("exit %d\n%s", code, errOut)
+	}
+
+	// service.<role> needs services; and a realm of people named service
+	// would take its place.
+	dir = securityProject(t, strings.Replace(people, ", service.writer, service]", "]", 1), "")
+	if code, _, errOut := esq(t, "check", dir); code != 1 || !strings.Contains(errOut, "service.reader is not public, owner, nor a realm") {
+		t.Fatalf("without services: exit %d\n%s", code, errOut)
+	}
+	dir = securityProject(t, "package accounts\n\nentity Service {\n  name string\n  @security(principal)\n}\n", "")
+	appEsq = filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "  blueprint security\n", withServices, 1)), 0o644)
+	if code, _, errOut := esq(t, "check", dir); code != 1 || !strings.Contains(errOut, "service is the realm of the service keys") {
+		t.Fatalf("a realm named service: exit %d\n%s", code, errOut)
+	}
+}

@@ -39,6 +39,10 @@ type Realm struct {
 	Blocklist                string
 }
 
+// ServiceRealm is the realm of the service keys: rules name their roles
+// as service.<role>.
+const ServiceRealm = "service"
+
 // Realms are the entities of the project marked @security(principal), with
 // their settings and defaults.
 func Realms(p *project.Project) []*Realm { return RealmsOf(p.Entities) }
@@ -123,7 +127,18 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 
 	realms := Realms(p)
 	byName := map[string]*Realm{}
+	if services := names(set.Options["security"]["services"]); len(services) > 0 {
+		// The service keys' roles, which rules name as service.<role>.
+		byName[ServiceRealm] = &Realm{Name: ServiceRealm, Roles: services}
+		if ref := securityRef(p); len(realms) == 0 && ref != nil {
+			diags.Errorf(ref.Pos, ref.Pos, "services needs a realm: service keys are created by the app's admins, who sign in to one").
+				Suggestion = "mark the entity of the people who sign in @security(principal)"
+		}
+	}
 	for _, r := range realms {
+		if r.Name == ServiceRealm && byName[ServiceRealm] != nil {
+			errorf(r.Entity, "principal", "%s is the realm of the service keys: rename the entity, or leave services out", ServiceRealm)
+		}
 		byName[r.Name] = r
 		a := r.Entity.Ann["security"]
 		one(r.Entity, "signup", r.Signup, Signups)

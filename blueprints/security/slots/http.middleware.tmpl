@@ -1,4 +1,4 @@
 		edge.Secure(d.config.HSTS),
 {{- if realms .Entities}}
-		d.security.Authenticate([]string{ {{- range $i, $r := realms .Entities}}{{if $i}}, {{end}}"{{$r.Name}}"{{end -}} }, d.config.CORSOrigins),
+		d.security.Authenticate([]string{ {{- range $i, $r := realms .Entities}}{{if $i}}, {{end}}"{{$r.Name}}"{{end}}{{if index (optionsOf "security") "services"}}, "service"{{end -}} }, d.config.CORSOrigins),
 {{- end}}

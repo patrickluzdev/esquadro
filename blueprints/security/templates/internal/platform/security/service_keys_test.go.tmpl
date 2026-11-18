@@ -1,0 +1,72 @@
+{{- if and (realms .Entities) .Options.services (uses "testcontainers") -}}
+package security
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+// TestServiceKeys creates a key, signs a request in with it, and sees an
+// expired and a revoked key refused.
+func TestServiceKeys(t *testing.T) {
+	ctx := t.Context()
+	s, _ := testSecurity(t)
+	role := ServiceRoles[0]
+	if _, err := s.CreateServiceKey(ctx, "x", []string{"no-such-role"}, time.Time{}); err == nil {
+		t.Fatal("a key with a role the model does not declare")
+	}
+	key, err := s.CreateServiceKey(ctx, "partner", []string{role}, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(key, ServiceKeyPrefix) || len(key) < 40 {
+		t.Fatalf("key %q", key)
+	}
+	if _, err := s.CreateServiceKey(ctx, "partner", []string{role}, time.Time{}); !errors.Is(err, ErrServiceKeyExists) {
+		t.Fatalf("the same name twice: %v", err)
+	}
+
+	// The key signs a request in, as the service with its roles.
+	var who Principal
+	h := s.Authenticate([]string{ServiceRealm}, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		who, _ = PrincipalIn(r.Context(), ServiceRealm)
+	}))
+	call := func(token string) int {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		who = Principal{}
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if code := call(key); code != http.StatusOK || who.Realm != ServiceRealm || len(who.Roles) != 1 || who.Roles[0] != role {
+		t.Fatalf("%d, signed in as %+v", code, who)
+	}
+	keys, err := s.ServiceKeys(ctx)
+	if err != nil || len(keys) != 1 || keys[0].LastUsedAt == nil || strings.Contains(key, keys[0].Prefix+"x") {
+		t.Fatalf("listed %+v (%v)", keys, err)
+	}
+
+	// Not a key, an expired one, a revoked one: 401.
+	if code := call(ServiceKeyPrefix + "nope"); code != http.StatusUnauthorized {
+		t.Fatalf("an unknown key: %d", code)
+	}
+	old, err := s.CreateServiceKey(ctx, "old", []string{role}, time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := call(old); code != http.StatusUnauthorized {
+		t.Fatalf("an expired key: %d", code)
+	}
+	if err := s.RevokeServiceKey(ctx, "partner"); err != nil {
+		t.Fatal(err)
+	}
+	if code := call(key); code != http.StatusUnauthorized {
+		t.Fatalf("a revoked key: %d", code)
+	}
+}
+{{end -}}

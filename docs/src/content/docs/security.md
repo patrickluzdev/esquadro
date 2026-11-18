@@ -199,6 +199,44 @@ deletes expired sessions and links, and rotates the JWT signing key every
 [worker](/esquadro/blueprints/reference/worker/) does it; without either, run
 `<app> security cleanup` on a schedule.
 
+## Service keys
+
+Not everything that calls the API is a person: a system that reads your
+data, a script, a partner. Give it a **service key**: an identity of the
+app, with roles the model declares, which the rules name as
+`service.<role>`.
+
+```esquadro
+app shop {
+  blueprint security {
+    services [reader, importer]
+  }
+}
+
+entity Product {
+  @security(read [public], write [user.admin, service.importer])
+}
+
+report SalesByDay {
+  @security(read [user.admin, service.reader])
+}
+```
+
+An admin creates a key with the app's command; it is shown once, and only
+its hash is kept:
+
+```sh
+shop security key create studio -role reader [-days 365]
+shop security key list
+shop security key revoke studio
+```
+
+The service sends it as `Authorization: Bearer sk_...`, and goes through the
+same policies as people: what `service.reader` may do, the key may; the rest
+answers `403`. An unknown, expired or revoked key answers `401`. A key is
+not the owner of records, so `owner` never lets one in. The TypeScript
+client takes it as its `token`, on a server.
+
 ## Commands
 
 ```sh

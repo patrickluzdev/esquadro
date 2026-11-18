@@ -13,6 +13,9 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+{{- if .Options.services}}
+	"time"
+{{- end}}
 
 	"{{.App.Module}}/internal/platform/edge"
 	"{{.App.Module}}/internal/platform/security"
@@ -28,6 +31,12 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
   delete <realm> <email>           delete an account and its principal
   cleanup                          delete expired sessions, links and keys
   rotate-keys                      a new JWT signing key
+{{- if .Options.services}}
+  key create <name> -role r [-role r]... [-days n]
+                                   a service key, shown once (roles: {{range $i, $r := .Options.services}}{{if $i}}, {{end}}{{$r}}{{end}})
+  key list                         the service keys, never the keys themselves
+  key revoke <name>                revoke a service key, at once
+{{- end}}
 
 realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
@@ -58,6 +67,10 @@ func securityCommand(ctx context.Context, args []string) error {
 		return nil
 	case "create":
 		return createAccount(ctx, d, args, os.Stdin)
+{{- if .Options.services}}
+	case "key":
+		return serviceKeyCommand(ctx, d, args)
+{{- end}}
 	}
 	if len(args) < 2 {
 		return errors.New(securityUsage)
@@ -188,4 +201,74 @@ type roleList []string
 
 func (r *roleList) String() string     { return strings.Join(*r, ",") }
 func (r *roleList) Set(v string) error { *r = append(*r, v); return nil }
+{{- if .Options.services}}
+
+// serviceKeyCommand runs {{.App.Kebab}} security key <command>.
+func serviceKeyCommand(ctx context.Context, d dependencies, args []string) error {
+	if len(args) == 0 {
+		return errors.New(securityUsage)
+	}
+	switch args[0] {
+	case "create":
+		fs := flag.NewFlagSet("key create", flag.ContinueOnError)
+		var roles roleList
+		fs.Var(&roles, "role", "a role of the key (repeat for more)")
+		days := fs.Int("days", 0, "days the key lasts; 0 is until revoked")
+		if len(args) < 2 {
+			return errors.New(securityUsage)
+		}
+		name := args[1]
+		if err := fs.Parse(args[2:]); err != nil {
+			return err
+		}
+		var expires time.Time
+		if *days > 0 {
+			expires = time.Now().AddDate(0, 0, *days)
+		}
+		key, err := d.security.CreateServiceKey(ctx, name, roles, expires)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "service key %s (%s): copy it now, it is not shown again\n", name, strings.Join(roles, ", "))
+		fmt.Println(key)
+		return nil
+	case "list":
+		keys, err := d.security.ServiceKeys(ctx)
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "NAME\tROLES\tKEY\tCREATED\tEXPIRES\tLAST USED\tSTATUS")
+		for _, k := range keys {
+			status := "active"
+			switch {
+			case k.RevokedAt != nil:
+				status = "revoked"
+			case k.ExpiresAt != nil && k.ExpiresAt.Before(time.Now()):
+				status = "expired"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s...\t%s\t%s\t%s\t%s\n", k.Name, strings.Join(k.Roles, ","), k.Prefix,
+				k.CreatedAt.Format(time.DateOnly), dateOr(k.ExpiresAt, "never"), dateOr(k.LastUsedAt, "never"), status)
+		}
+		return w.Flush()
+	case "revoke":
+		if len(args) != 2 {
+			return errors.New(securityUsage)
+		}
+		if err := d.security.RevokeServiceKey(ctx, args[1]); err != nil {
+			return err
+		}
+		fmt.Printf("revoked %s\n", args[1])
+		return nil
+	}
+	return errors.New(securityUsage)
+}
+
+func dateOr(t *time.Time, none string) string {
+	if t == nil {
+		return none
+	}
+	return t.Format("2006-01-02 15:04")
+}
+{{- end}}
 {{end -}}

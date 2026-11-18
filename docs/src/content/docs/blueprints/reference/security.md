@@ -23,6 +23,7 @@ blueprint security
 | Option | Type | Default | |
 |---|---|---|---|
 | `path` | string | `"/identity"` | The prefix of the identity routes: /identity/&lt;realm>/sign-in. |
+| `services` | list | `[]` | The roles of service keys, for what is no person (a system, a script, a partner): the rules name them as service.&lt;role>, e.g. @security(read [user.admin, service.reader]). An admin creates a key with &lt;app> security key create &lt;name> --role &lt;role>; it goes in Authorization: Bearer sk_... |
 | `hsts` | bool | `false` | Send Strict-Transport-Security, behind HTTPS only. &lt;APP>_HSTS overrides it. |
 | `public_url` | string | `"http://localhost:8080"` | The address of the app, for the links of emails and the OAuth callbacks. |
 | `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link. |

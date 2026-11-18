@@ -39,6 +39,12 @@ blueprint security {
 
   /// The prefix of the identity routes: /identity/<realm>/sign-in.
   option path string default("/identity")
+  /// The roles of service keys, for what is no person (a system, a script,
+  /// a partner): the rules name them as service.<role>, e.g.
+  /// @security(read [user.admin, service.reader]). An admin creates a key
+  /// with <app> security key create <name> --role <role>; it goes in
+  /// Authorization: Bearer sk_...
+  option services list default([])
   /// Send Strict-Transport-Security, behind HTTPS only. <APP>_HSTS
   /// overrides it.
   option hsts bool default(false)

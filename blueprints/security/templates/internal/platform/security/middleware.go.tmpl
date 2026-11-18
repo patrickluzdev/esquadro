@@ -74,9 +74,17 @@ func (s *Security) Authenticate(realms []string, origins []string) edge.Middlewa
 	}
 }
 
-// bearer is the principal of a bearer token: a JWT of one of the realms, or
-// a session token.
+// bearer is the principal of a bearer token: a JWT of one of the realms, a
+// session token{{if .Options.services}}, or a service key{{end}}.
 func (s *Security) bearer(ctx context.Context, token string, realms []string) (Principal, error) {
+{{- if .Options.services}}
+	if strings.HasPrefix(token, ServiceKeyPrefix) {
+		if !slices.Contains(realms, ServiceRealm) {
+			return Principal{}, ErrBadToken
+		}
+		return s.service(ctx, token)
+	}
+{{- end}}
 	if strings.Count(token, ".") == 2 {
 		for _, realm := range realms {
 			if p, err := s.VerifyToken(ctx, token, realm); err == nil {

@@ -40,8 +40,16 @@ type Who struct {
 // WhosOf are the kinds of requests the tests of e's policy ask as: no one;
 // for each realm, without roles and with each role; and, for the owner's
 // realm, the owner and someone else.
-func WhosOf(entities []*project.Entity, e *project.Entity) []Who {
+//
+// services are the service keys' roles, from the blueprint's services
+// option: a service with each role asks too.
+func WhosOf(entities []*project.Entity, e *project.Entity, services ...any) []Who {
 	out := []Who{{Name: "no one"}}
+	for _, s := range services {
+		for _, role := range names(s) {
+			out = append(out, Who{Name: ServiceRealm + "." + role, Realm: ServiceRealm, Roles: []string{role}})
+		}
+	}
 	owner, hasOwner := OwnerUsed(entities, e)
 	for _, r := range RealmsOf(entities) {
 		out = append(out, Who{Name: r.Name, Realm: r.Name})

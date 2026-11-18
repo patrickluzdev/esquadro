@@ -33,6 +33,9 @@ var everyone = []security.Principal{
 {{- range realms .Entities}}
 	{ID: uuid.NewV7(), Realm: "{{.Name}}", Roles: {{goStrings .Roles}}, OwnsAll: true},
 {{- end}}
+{{- with .Options.services}}
+	{ID: uuid.NewV7(), Realm: security.ServiceRealm, Roles: {{goStrings .}}},
+{{- end}}
 }
 
 // principalOf is the principal X-Test-Principal names: "user" (no roles),

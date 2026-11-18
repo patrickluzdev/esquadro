@@ -76,7 +76,7 @@ func TestAPIAccess(t *testing.T) {
 		policy := {{$m.Snake}}.{{$P}}Policy{}
 		url := srv.URL + "/api/v1/{{$e.Plural.Kebab}}"
 		for _, who := range []string{
-{{- range whosOf $.Entities $e}}
+{{- range whosOf $.Entities $e (index (optionsOf "security") "services")}}
 {{- if .Owns}} "{{.Realm}}@" + stored.{{$own}}.String(),
 {{- else if .Realm}} {{printf "%q" .Name}},
 {{- else}} "nobody",

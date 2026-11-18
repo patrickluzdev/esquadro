@@ -1,0 +1,129 @@
+{{- if and (realms .Entities) .Options.services -}}
+{{- $keys := securityTable "service_keys" (optionsOf "postgres") -}}
+package security
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base32"
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// ServiceRealm is the realm of service keys: rules name their roles as
+// service.<role>.
+const ServiceRealm = "service"
+
+// ServiceRoles are the roles a service key may have, as the model declares
+// them.
+var ServiceRoles = []string{ {{- range $i, $r := .Options.services}}{{if $i}}, {{end}}{{printf "%q" $r}}{{end -}} }
+
+// ServiceKeyPrefix starts every service key.
+const ServiceKeyPrefix = "sk_"
+
+// ServiceKey is a key of a service, as it is listed: never the key itself.
+type ServiceKey struct {
+	ID         uuid.UUID
+	Name       string
+	Roles      []string
+	Prefix     string
+	CreatedAt  time.Time
+	ExpiresAt  *time.Time
+	LastUsedAt *time.Time
+	RevokedAt  *time.Time
+}
+
+// ErrServiceKeyExists is the error for a name another key already has.
+var ErrServiceKeyExists = errors.New("security: a service key has that name")
+
+// CreateServiceKey creates a key named name with roles, valid until
+// expires (never with a zero time), and answers it: the only time it is
+// seen, for only its hash is kept.
+func (s *Security) CreateServiceKey(ctx context.Context, name string, roles []string, expires time.Time) (string, error) {
+	if strings.TrimSpace(name) == "" {
+		return "", errors.New("security: a service key needs a name")
+	}
+	if len(roles) == 0 {
+		return "", fmt.Errorf("security: a service key needs a role: %s", strings.Join(ServiceRoles, ", "))
+	}
+	for _, r := range roles {
+		if !slices.Contains(ServiceRoles, r) {
+			return "", fmt.Errorf("security: %s is not a service role: %s", r, strings.Join(ServiceRoles, ", "))
+		}
+	}
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return "", err
+	}
+	key := ServiceKeyPrefix + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secret))
+	var exp *time.Time
+	if !expires.IsZero() {
+		exp = &expires
+	}
+	_, err := s.db.Exec(ctx, `INSERT INTO {{$keys}} (id, name, roles, key_hash, prefix, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`, uuid.NewV7(), name, roles, hashToken(key), key[:len(ServiceKeyPrefix)+6], exp)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			return "", ErrServiceKeyExists
+		}
+		return "", fmt.Errorf("security: create service key: %w", err)
+	}
+	return key, nil
+}
+
+// ServiceKeys lists the keys, newest first.
+func (s *Security) ServiceKeys(ctx context.Context) ([]ServiceKey, error) {
+	rows, err := s.db.Query(ctx, `SELECT id, name, roles, prefix, created_at, expires_at, last_used_at, revoked_at
+		FROM {{$keys}} ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("security: service keys: %w", err)
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (ServiceKey, error) {
+		var k ServiceKey
+		err := row.Scan(&k.ID, &k.Name, &k.Roles, &k.Prefix, &k.CreatedAt, &k.ExpiresAt, &k.LastUsedAt, &k.RevokedAt)
+		return k, err
+	})
+}
+
+// RevokeServiceKey revokes the key named name, at once.
+func (s *Security) RevokeServiceKey(ctx context.Context, name string) error {
+	tag, err := s.db.Exec(ctx, `UPDATE {{$keys}} SET revoked_at = now() WHERE name = $1 AND revoked_at IS NULL`, name)
+	if err != nil {
+		return fmt.Errorf("security: revoke service key: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("security: no service key %s, or it was revoked already", name)
+	}
+	return nil
+}
+
+// service is the principal of a service key: valid, not expired, not
+// revoked. Its last use is kept, at most once a minute, so that a busy key
+// does not write on every request.
+func (s *Security) service(ctx context.Context, key string) (Principal, error) {
+	var p Principal
+	var lastUsed *time.Time
+	err := s.db.QueryRow(ctx, `SELECT id, roles, last_used_at FROM {{$keys}}
+		WHERE key_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
+		hashToken(key)).Scan(&p.ID, &p.Roles, &lastUsed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Principal{}, ErrBadToken
+	}
+	if err != nil {
+		return Principal{}, fmt.Errorf("security: service key: %w", err)
+	}
+	if now := s.now(); lastUsed == nil || now.Sub(*lastUsed) > time.Minute {
+		if _, err := s.db.Exec(ctx, `UPDATE {{$keys}} SET last_used_at = $2 WHERE id = $1`, p.ID, now); err != nil {
+			s.logger.WarnContext(ctx, "service key: last use", "error", err.Error())
+		}
+	}
+	p.Realm = ServiceRealm
+	return p, nil
+}
+{{end -}}

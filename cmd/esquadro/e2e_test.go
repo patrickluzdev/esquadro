@@ -122,12 +122,14 @@ func TestLifecycle(t *testing.T) {
 	catalog += "\n/// Who makes a product.\nentity Brand {\n  name string required\n}\n"
 	// A record with an owner: each customer's own reviews.
 	// A report, whose SQL esquadro writes first and the test then writes.
-	catalog += "\n/// Products per brand.\nreport ProductsByBrand {\n  brand    string required\n  products int    required\n  @security(read user)\n}\n"
+	catalog += "\n/// Products per brand.\nreport ProductsByBrand {\n  brand    string required\n  products int    required\n  @security(read [user, service.reader])\n}\n"
 	catalog += "\n/// What a customer thinks of a product.\nentity Review {\n  text     string required\n  customer > Customer required\n  product  > Product required\n  @security(read [owner, user], create owner, update owner, delete [owner, user.admin])\n}\n"
 	e.write(filepath.Join(dir, "esquadro", "catalog.esq"), catalog)
 	// The TypeScript client too: go test runs its tests against the API.
 	appEsq := filepath.Join(dir, "esquadro", "app.esq")
 	e.write(appEsq, strings.Replace(e.read(appEsq), "  blueprint api_docs\n", "  blueprint api_docs\n  blueprint client_ts {\n    scope \"acme\"\n  }\n", 1))
+	// Service keys: a reader, which the report lets in.
+	e.write(appEsq, strings.Replace(e.read(appEsq), "  blueprint security\n", "  blueprint security {\n    services [reader]\n  }\n", 1))
 	e.esquadro(0, "gen", dir)
 	if !strings.Contains(e.read(filepath.Join(dir, "clients", "ts", "package.json")), `"@acme/shop-client"`) {
 		t.Fatal("no TypeScript client")
@@ -198,6 +200,7 @@ LIMIT sqlc.arg(row_limit);
 	e.ownerScenario(added["id"].(string))
 	e.safeWrites(added, category["id"].(string), brand["id"].(string))
 	e.report()
+	e.serviceKeys(db)
 
 	// 6. Its own tests pass on the new model.
 	e.run(nil, "go", "test", "./...")
@@ -345,6 +348,28 @@ func (e *lifecycle) report() {
 	if !found {
 		e.t.Fatalf("the report: %v", rows)
 	}
+}
+
+// serviceKeys creates a service key with the app's command, and uses it:
+// the report lets service.reader in, the catalog's changes do not, and a
+// revoked key is refused.
+func (e *lifecycle) serviceKeys(db []string) {
+	e.t.Helper()
+	create := exec.Command("go", "run", "./cmd/shop", "security", "key", "create", "studio", "-role", "reader")
+	create.Dir, create.Env = e.dir, append(os.Environ(), db...)
+	out, err := create.Output()
+	key := strings.TrimSpace(string(out))
+	if err != nil || !strings.HasPrefix(key, "sk_") {
+		e.t.Fatalf("security key create: %v\n%s", err, out)
+	}
+	asKey := map[string]string{"Authorization": "Bearer " + key}
+	e.request("GET", "/api/v1/reports/products-by-brand", "", asKey, 200)
+	e.request("POST", "/api/v1/categories", `{"name":"Y"}`, asKey, 403)
+	if list := e.run(db, "go", "run", "./cmd/shop", "security", "key", "list"); !strings.Contains(list, "studio") || strings.Contains(list, key) {
+		e.t.Fatalf("security key list:\n%s", list)
+	}
+	e.run(db, "go", "run", "./cmd/shop", "security", "key", "revoke", "studio")
+	e.request("GET", "/api/v1/reports/products-by-brand", "", asKey, 401)
 }
 
 // safeWrites checks If-Match and Idempotency-Key through the running
