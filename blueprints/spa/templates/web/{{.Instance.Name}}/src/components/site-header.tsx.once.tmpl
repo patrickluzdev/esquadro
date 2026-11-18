@@ -31,10 +31,14 @@ export function SiteHeader() {
                 <BreadcrumbItem className={i < crumbs.length - 1 ? "hidden md:block" : undefined}>
                   {c.to && i < crumbs.length - 1 ? (
                     <BreadcrumbLink asChild>
-                      <Link to={c.to as never}>{c.label}</Link>
+                      <Link to={c.to as never} title={c.label} className="block max-w-48 truncate">
+                        {c.label}
+                      </Link>
                     </BreadcrumbLink>
                   ) : (
-                    <BreadcrumbPage>{c.label}</BreadcrumbPage>
+                    <BreadcrumbPage title={c.label} className="block max-w-64 truncate">
+                      {c.label}
+                    </BreadcrumbPage>
                   )}
                 </BreadcrumbItem>
               </Fragment>
