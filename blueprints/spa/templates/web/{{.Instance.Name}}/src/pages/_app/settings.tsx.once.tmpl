@@ -5,14 +5,14 @@ import { t } from "../../esquadro/kit/i18n.ts"
 import { PageHeader } from "../../esquadro/kit/page.tsx"
 import { Settings } from "../../esquadro/kit/settings.tsx"
 
-// The account of whoever signed in: yours to change. Each section is in the
-// menu at the left; add your own (a profile, notifications) to the list.
-export const Route = createFileRoute("/_app/account")({ staticData: { title: t("account") }, component: Account })
+// The settings of whoever signed in, all in one place: each section is in
+// the menu at the left; add your own (a profile, notifications) to the list.
+export const Route = createFileRoute("/_app/settings")({ staticData: { title: t("settings") }, component: SettingsPage })
 
-function Account() {
+function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t("account")} description={t("accountHint")} />
+      <PageHeader title={t("settings")} description={t("settingsHint")} />
       <Settings
         sections={[
           { key: "password", label: t("password"), icon: KeyRound, content: <PasswordCard /> },

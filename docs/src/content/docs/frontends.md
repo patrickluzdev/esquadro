@@ -130,9 +130,9 @@ With `idle_minutes`, the frontend signs out after that long without use
 (in any of its tabs), warning a minute before, and comes back to the page
 after signing in again.
 
-The account page (from the account's menu) changes the password, lists the
-devices signed in and signs out of one or of all the others, and changes the
-email with a link to the new one. What changes an account needs a recent
+The settings page (`/settings`, from the account's menu) changes the
+password, lists the devices signed in and signs out of one or of all the
+others, changes the email with a link to the new one, and picks the theme. What changes an account needs a recent
 sign-in: when it is old, the page offers to sign in again and comes back.
 
 ## Resources
@@ -322,22 +322,23 @@ layout's (sidebar, header, account menu) in `src/components`: all yours to
 change. `npx shadcn add <component>` adds more.
 
 The account menu, at the right of the header (`src/components/user-menu.tsx`),
-shows who is signed in, links to the account's settings and signs out; add
-your links (a profile, an activity log) to its `links`. The account page's
-sections (password, devices, email, theme) are in `src/pages/_app/account.tsx`.
+shows who is signed in, links to the settings and signs out; add
+your links (a profile, an activity log) to its `links`. The settings page's
+sections (password, devices, email, theme) are in `src/pages/_app/settings.tsx`
+(`/settings`): the place for every setting, each in a section of its own.
 
 ### Pages of your own
 
 A file in `src/pages/_app/` is a page behind the sign-in. The kit's parts
 are yours to use there: `PageHeader`, `Dashboard`, the charts, and
 `Settings`, sections in a menu at the left, the one chosen kept in the URL,
-which the account page is made of. `ask` asks before acting, with an icon
+which the settings page is made of. `ask` asks before acting, with an icon
 of its `kind` (`info`, `success`, `warning`, `danger`; `destructive` is a
 danger), a `description` and the button's name
 (`await ask("Archive it?", { kind: "warning", description: "…", confirm: "Archive" })`),
 and `toast` tells what happened (`toast("Archived")`, `toast(text, "error")`).
 
-The account page is made of:
+The settings page is made of:
 
 ```tsx
 <Settings

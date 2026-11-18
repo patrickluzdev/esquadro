@@ -3,7 +3,7 @@
 // the theme, sign out; all from the keyboard.
 import { useQueries, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { LogOut, Monitor, Moon, Plus, Search, Sun } from "lucide-react"
+import { LogOut, Monitor, Moon, Plus, Search, Settings, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -176,6 +176,9 @@ export function CommandPalette() {
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading={t("account")}>
+          <CommandItem value={t("settings")} onSelect={() => run(() => navigate({ to: "/settings" as never }))}>
+            <Settings /> {t("settings")}
+          </CommandItem>
           <CommandItem
             value={t("signOut")}
             onSelect={() =>

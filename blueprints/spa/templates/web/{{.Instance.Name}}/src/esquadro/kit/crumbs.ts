@@ -21,7 +21,7 @@ function pages(): MenuItem[] {
 }
 
 // A page of yours names itself in the breadcrumb with its route's
-// staticData: createFileRoute("/_app/account")({ staticData: { title: "Account" }, ... }).
+// staticData: createFileRoute("/_app/settings")({ staticData: { title: "Settings" }, ... }).
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
     title?: string
