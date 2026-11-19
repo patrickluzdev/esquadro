@@ -39,9 +39,12 @@ blueprint store {
 | entity | `single` | bool | One record only, which always exists, with its defaults until someone changes it: read and changed, never listed, created or deleted (settings the team tunes without a deploy). |
 | entity | `import` | bool | Records may be imported in a batch (a CSV in the admin panel): all or none, each through the rules of a create. |
 | entity | `import_by` | name | Imported by this field, unique and required: a row with the value of a record updates it, others are created (import_by external_id). |
+| entity | `order` | list | An order of its lists worked out by an SQL expression over its columns, a name and the expression: order [hot, "temperature / power(extract(epoch from now() - created_at) / 3600 + 2, 1.5)"]. sort=hot lists the largest first, -hot the smallest; a list in it pages by number only. More orders go on in pairs. |
 | field | `filter` | bool | Lists may filter by it: by value, by range (numbers and dates), or by a list of values (enums). |
 | field | `sort` | bool | Lists may be ordered by it; only a required field, so that pages keep every record. |
 | field | `search` | bool | Lists may search its text (q). |
+| field | `sum` | name | The sum of a field of the records of a one-to-many relation, kept by the store in the transaction of every change of one of them: sum votes.value. Read only: creates and changes leave it out. |
+| field | `count` | name | How many records a one-to-many relation has, kept as a sum is: count comments. |
 | relation | `filter` | bool | Lists may filter by the related record's id. |
 
 An annotation is written `@store(key value)` on the element.
