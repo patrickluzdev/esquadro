@@ -41,6 +41,8 @@ interface Account {
   changePassword(change: { current_password?: string; new_password: string }): Promise<void>
   changeEmail(change: { email: string; redirect?: string }): Promise<void>
   confirmEmail(token: string): Promise<void>
+  /** Confirms the email with the token of the link sent on signing up, or again by an administrator. */
+  verifyEmail(token: string): Promise<void>
 }
 
 export const account = () => api.identity[realmKey] as unknown as Account

@@ -21,7 +21,7 @@ import { locale } from "../config.ts"
 import { seen } from "./accounts-admin.tsx"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
-import { capitalize, t } from "./i18n.ts"
+import { roleLabel, t } from "./i18n.ts"
 import { PageHeader } from "./page.tsx"
 import { ErrorState } from "./states.tsx"
 import { toast } from "./toast.tsx"
@@ -54,7 +54,6 @@ const STATUS: Record<Status, { dot: string; text: string }> = {
   revoked: { dot: "bg-neutral-400", text: "text-muted-foreground" },
 }
 
-const roleLabel = (r: string) => capitalize(r.replaceAll("_", " "))
 const day = (at: string) => new Date(at).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })
 
 /** The service keys: their roles in cards, the keys, a new one, revoking. */

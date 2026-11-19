@@ -17,14 +17,58 @@ const own = yours as Record<string, Record<string, string>>
 // The frontend's words in English, then in the locale, then the project's.
 const words: Record<string, string> = { ...defaults.en, ...defaults[locale], ...own.en, ...own[locale] }
 
-/** A word of the frontend, with {name} replaced. */
+/**
+ * The number a word's form follows: its {count}, or else its only number
+ * ({days}); none with no number, or with more than one ({done}, {failed}).
+ */
+function countOf(vars: Record<string, string | number>): number | undefined {
+  if (typeof vars.count === "number") return vars.count
+  const numbers = Object.values(vars).filter((v) => typeof v === "number")
+  return numbers.length === 1 ? (numbers[0] as number) : undefined
+}
+
+/**
+ * The text of key in a table of words, in the form lang gives the count of
+ * vars: key_one for one ("{count} account"), key_zero for none when there
+ * is one, key otherwise ("{count} accounts"), with each {name} replaced. As
+ * in English, 0 takes key's form in every language ("0 contas"), and so
+ * does a form of the language the words leave out (key_few, key_many).
+ */
+export function wordIn(table: Record<string, string>, lang: string, key: string, vars: Record<string, string | number> = {}): string {
+  let text = table[key]
+  const n = countOf(vars)
+  if (n !== undefined) {
+    const form = n === 0 ? (table[`${key}_zero`] === undefined ? "other" : "zero") : new Intl.PluralRules(lang).select(n)
+    text = table[`${key}_${form}`] ?? text
+  }
+  return (text ?? key).replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""))
+}
+
+/**
+ * A word of the frontend, with each {name} replaced, in the form of its
+ * {count}: t("accountsCount", { count: 1 }) is accountsCount_one.
+ */
 export function t(key: Word, vars: Record<string, string | number> = {}): string {
-  return (words[key] ?? key).replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""))
+  return wordIn(words, locale, key, vars)
 }
 
 /** A text with its first letter capital, as options and labels are shown. */
 export function capitalize(text: string): string {
   return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1)
+}
+
+/**
+ * What people call a role (of a realm, or of the service keys): the word
+ * role_<name> (role_admin: "Administração"), which src/messages.ts gives
+ * the project's own roles, or else its name, capitalized: Order desk.
+ */
+export function roleLabel(role: string): string {
+  return roleLabelIn(words, role)
+}
+
+/** roleLabel in a table of words. */
+export function roleLabelIn(table: Record<string, string>, role: string): string {
+  return table[`role_${role}`] ?? capitalize(role.replaceAll("_", " "))
 }
 
 /** A value of a field, as people read it. */

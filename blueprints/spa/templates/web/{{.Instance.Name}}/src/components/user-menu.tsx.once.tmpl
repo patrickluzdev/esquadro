@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { panel } from "../esquadro/config.ts"
 import { signOut, useSession } from "../esquadro/kit/auth.tsx"
-import { t } from "../esquadro/kit/i18n.ts"
+import { roleLabel, t } from "../esquadro/kit/i18n.ts"
 
 /** The menu's links, under who is signed in. */
 const links: { label: string; icon: LucideIcon; to: string }[] = [{ label: t("settings"), icon: Settings, to: "/settings" }]
@@ -27,7 +27,7 @@ export function UserMenu() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const name = t("account")
-  const roles = session?.roles.join(", ") ?? ""
+  const roles = session?.roles.map(roleLabel).join(", ") ?? ""
   const initials = (roles || name).slice(0, 2).toUpperCase()
   return (
     <DropdownMenu>

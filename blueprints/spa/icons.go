@@ -19,7 +19,7 @@ var KitIcons = []string{
 	"File", "FileQuestion", "FileUp", "Filter", "Hash", "Heading2",
 	"Heading3", "History", "House", "ImagePlus", "Inbox", "Info",
 	"Italic", "KeyRound", "LayoutDashboard", "Link2", "List", "ListChecks",
-	"ListFilter", "ListOrdered", "Loader2", "LogOut", "Mail", "MailPlus",
+	"ListFilter", "ListOrdered", "Loader2", "LogOut", "Mail", "MailCheck", "MailPlus",
 	"Minus", "Monitor", "MonitorSmartphone", "Moon", "MoreHorizontal", "OctagonX",
 	"Palette", "PanelLeft", "Pencil", "Plus", "Quote", "Redo2",
 	"RefreshCw", "RotateCcw", "RotateCw", "Rows3", "Search", "SearchX",

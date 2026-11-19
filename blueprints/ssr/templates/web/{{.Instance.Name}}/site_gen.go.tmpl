@@ -677,11 +677,22 @@ func schema(v map[string]any) string {
 
 // T is the site's word for key in its language, with each {name} of the
 // text replaced: T("count", "count", "3"). Yours (messages.go) win over
-// esquadro's; a key neither has is answered as it is.
+// esquadro's; a key neither has is answered as it is. With a count of 1,
+// the word's form for one, key_one ("{count} found"), when it has one: of
+// yours, or of esquadro's when you did not change the word.
 func T(key string, args ...string) string {
 	text, ok := ownWords[key]
 	if !ok {
 		text, ok = words[key]
+	}
+	if countIsOne(args) {
+		if one, found := ownWords[key+"_one"]; found {
+			text, ok = one, true
+		} else if _, changed := ownWords[key]; !changed {
+			if one, found := words[key+"_one"]; found {
+				text, ok = one, true
+			}
+		}
 	}
 	if !ok {
 		return key
@@ -690,6 +701,16 @@ func T(key string, args ...string) string {
 		text = strings.ReplaceAll(text, "{"+args[i]+"}", args[i+1])
 	}
 	return text
+}
+
+// countIsOne reports whether the {count} of T's args is 1.
+func countIsOne(args []string) bool {
+	for i := 0; i+1 < len(args); i += 2 {
+		if args[i] == "count" {
+			return args[i+1] == "1"
+		}
+	}
+	return false
 }
 
 // words are esquadro's: those every frontend shares, then the site's own.

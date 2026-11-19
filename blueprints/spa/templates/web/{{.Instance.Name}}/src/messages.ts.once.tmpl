@@ -3,13 +3,17 @@
 // comes from src/esquadro/kit/messages.ts, the frontend's own, which
 // esquadro keeps up to date. The locale option of blueprint spa
 // {{.Instance.Name}} chooses the language; add one as one more entry.
+// A role is called by role_<name> (role_admin), or else by its name; a
+// word with a {count} takes its _one form for one (myWord_one).
 import type { Words } from "./esquadro/kit/messages.ts"
 
 export const messages = {
   en: {
     // signIn: "Log in",
+    // role_order_desk: "Order desk",
   },
   "pt-BR": {
     // signIn: "Acessar",
+    // role_order_desk: "Balcão de pedidos",
   },
 } satisfies Record<string, Words>

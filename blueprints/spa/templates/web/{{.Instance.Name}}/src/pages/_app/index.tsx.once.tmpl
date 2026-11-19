@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useSession } from "../../esquadro/kit/auth.tsx"
 import { Dashboard } from "../../esquadro/kit/dashboard.tsx"
-import { t } from "../../esquadro/kit/i18n.ts"
+import { roleLabel, t } from "../../esquadro/kit/i18n.ts"
 
 // The first page after signing in: yours. The dashboard shows the reports
 // marked @{{.Instance.Name}}(widget ...), under this title, with the period
@@ -12,6 +12,6 @@ export const Route = createFileRoute("/_app/")({ component: Home })
 function Home() {
   const session = useSession()
   return (
-    <Dashboard title={t("welcome")} description={session?.roles.join(", ")} />
+    <Dashboard title={t("welcome")} description={session?.roles.map(roleLabel).join(", ")} />
   )
 }

@@ -15,6 +15,7 @@
   "shareOnWhatsApp": "Send on WhatsApp",
   "linkCopied": "Link copied.",
   "count": "{count} found",
+  "count_one": "{count} found",
   "pageTitle": "{title} · {site}",
   "skipToContent": "Skip to the content",
   "notFoundTitle": "Page not found",

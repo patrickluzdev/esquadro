@@ -276,10 +276,20 @@ with their permissions (as the model declares them); the accounts, with
 their roles, status (active, invited, email not confirmed, disabled) and
 when they were last seen, searched and filtered in the URL; Invite, which
 emails a link to choose the password (opening the reset page greeted,
-`?invite=1`); and, on each, Change roles, Send the invitation again, Sign
-out everywhere, Disable and Delete, never on one's own account. Its page
-is `src/pages/_app/accounts/$slug.tsx`, yours; the entity's
-`@<frontend>(label, singular)` names it.
+`?invite=1`); and, on each, Change roles, Send the invitation again (or,
+for an email not confirmed, Send the confirmation again, which opens
+`/confirm-email?verify=1`), Sign out everywhere, Disable and Delete, never
+on one's own account. An email sent a short while ago may not be sent again
+yet ([the limits](/esquadro/security/#administering-accounts)): its action is
+disabled, saying when it may. Its page is `src/pages/_app/accounts/$slug.tsx`,
+yours; the entity's `@<frontend>(label, singular)` names it.
+
+A role is called by its word, `role_<name>`, wherever the panel shows it
+(the team's page, its filters and dialogs, the service keys, the account's
+menu): the kit's words name the common ones (`admin` is Admin, or
+Administração in pt_br; `manager`, `staff`, `operator`, `editor`, `support`,
+`member`, `viewer`), and `src/messages.ts` the project's own, which are
+otherwise their name, capitalized (`order_desk`, Order desk).
 
 The settings page (`/settings`, from the account's menu) changes the
 password, lists the devices signed in and signs out of one or of all the
@@ -647,10 +657,16 @@ changes merged in (see [Regenerating safely](/esquadro/regenerating/)).
 ```ts
 // src/messages.ts: change the kit's words, and add your own
 export const messages = {
-  en: { signIn: "Log in", promoQueue: "Offers queue" },
-  "pt-BR": { signIn: "Acessar", promoQueue: "Fila de ofertas" },
+  en: { signIn: "Log in", promoQueue: "Offers queue", role_order_desk: "Order desk" },
+  "pt-BR": { signIn: "Acessar", promoQueue: "Fila de ofertas", role_order_desk: "Balcão" },
 } satisfies Record<string, Words>
 ```
+
+A word with a `{count}` (or a single number of another name, `{days}`) has
+a form for one besides, its key with `_one`: `t("accountsCount", { count: 1 })`
+is `accountsCount_one`, "1 conta", and 2 is "2 contas". Zero takes the plain
+form in every language ("0 contas"), unless the word has a `_zero` one. The
+site's `T` does the same, with `count_one` ("1 encontrado").
 
 ## Sites rendered on the server
 

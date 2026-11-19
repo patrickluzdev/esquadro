@@ -188,6 +188,8 @@ func TestSSRDrawsItsIconsAndYours(t *testing.T) {
 	own := "var ownIcons = map[string]string{\n\t\"share-2\":      `<path d=\"M1 1h2\"/>`,\n\t\"chevron-left\": \"\",\n\t\"mine\":         `<svg id=\"mine\"></svg>`,\n}"
 	os.WriteFile(icons, []byte(strings.Replace(read(t, icons), "var ownIcons = map[string]string{}", own, 1)), 0o644)
 	os.WriteFile(filepath.Join(site, "icons_own_test.go"), []byte(read(t, filepath.Join("testdata", "ssr", "icons_own_test.go.txt"))), 0o644)
+	// And its words count: 1 encontrado, 2 encontrados.
+	os.WriteFile(filepath.Join(site, "words_own_test.go"), []byte(read(t, filepath.Join("testdata", "ssr", "words_own_test.go.txt"))), 0o644)
 	test := exec.Command("go", "test", "./web/shop/")
 	test.Dir = dir
 	if out, err := test.CombinedOutput(); err != nil {

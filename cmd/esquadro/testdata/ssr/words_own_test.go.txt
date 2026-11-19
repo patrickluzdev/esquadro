@@ -1,0 +1,16 @@
+package shop
+
+import "testing"
+
+// The site's words count: one found, two found, in pt_br, as
+// TestSSRDrawsItsIconsAndYours writes it beside icons.go.
+func TestCountWords(t *testing.T) {
+	for count, want := range map[string]string{"1": "1 encontrado", "2": "2 encontrados", "0": "0 encontrados", "1.234": "1.234 encontrados"} {
+		if got := T("count", "count", count); got != want {
+			t.Errorf("T(count, %s) = %q, want %q", count, got, want)
+		}
+	}
+	if got := T("pageTitle", "title", "1", "site", "Loja"); got != "1 · Loja" {
+		t.Errorf("pageTitle: %q", got)
+	}
+}

@@ -9,12 +9,21 @@ import { account } from "../account.tsx"
 import { describe } from "../errors.ts"
 import { t } from "../i18n.ts"
 
-// The page the email change's link opens, with its ?token.
-export const confirmEmailSearch = (s: Record<string, unknown>) => ({ token: typeof s.token === "string" ? s.token : "" })
+// The page the links about the email open, with their ?token: the email
+// change's, and, with ?verify=1, the confirmation of the email (sent again
+// from the accounts' page).
+export const confirmEmailSearch = (s: Record<string, unknown>) => ({
+  token: typeof s.token === "string" ? s.token : "",
+  verify: s.verify === 1 || s.verify === "1" || s.verify === true,
+})
 
 export function ConfirmEmailPage() {
-  const { token } = useSearch({ strict: false }) as ReturnType<typeof confirmEmailSearch>
-  const confirm = useQuery({ queryKey: ["confirm-email", token], queryFn: () => account().confirmEmail(token).then(() => true), retry: false })
+  const { token, verify } = useSearch({ strict: false }) as ReturnType<typeof confirmEmailSearch>
+  const confirm = useQuery({
+    queryKey: ["confirm-email", token, verify],
+    queryFn: () => (verify ? account().verifyEmail(token) : account().confirmEmail(token)).then(() => true),
+    retry: false,
+  })
   if (confirm.isPending) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-card">
@@ -22,11 +31,13 @@ export function ConfirmEmailPage() {
       </div>
     )
   }
+  const done = verify ? t("emailVerified") : t("emailConfirmed")
+  const failed = verify ? t("emailNotVerified") : t("emailNotConfirmed")
   return (
     <AuthFrame
       tone={confirm.isError ? "error" : "success"}
-      title={confirm.isError ? t("emailNotConfirmed") : t("emailConfirmed")}
-      hint={confirm.isError ? describe(confirm.error) : t("emailConfirmedHint")}
+      title={confirm.isError ? failed : done}
+      hint={confirm.isError ? describe(confirm.error) : verify ? t("emailVerifiedHint") : t("emailConfirmedHint")}
     >
       <Button asChild size="lg" className="w-full">
         <Link to="/">{t("goHome")}</Link>
