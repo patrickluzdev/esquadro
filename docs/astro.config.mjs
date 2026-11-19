@@ -29,7 +29,7 @@ export default defineConfig({
             { label: "For platforms", items: [{ autogenerate: { directory: "blueprints/platform" } }] },
           ],
         },
-        { label: "Guides", items: ["regenerating", "contract", "typescript-client", "frontends", "lists", "related-records", "reports", "safe-writes", "business-rules", "trash", "settings", "importing", "totals", "integrations", "short-links", "audit", "notifications", "security", "email", "files", "seeds", "observability", "deploying", "production", "branching", "writing-blueprints", "editors"] },
+        { label: "Guides", items: ["regenerating", "contract", "typescript-client", "frontends", "lists", "related-records", "reports", "safe-writes", "business-rules", "trash", "settings", "importing", "totals", "flows", "integrations", "short-links", "audit", "notifications", "security", "email", "files", "seeds", "observability", "deploying", "production", "branching", "writing-blueprints", "editors"] },
         { label: "Reference", items: ["reference/cli", "license"] },
       ],
     }),
