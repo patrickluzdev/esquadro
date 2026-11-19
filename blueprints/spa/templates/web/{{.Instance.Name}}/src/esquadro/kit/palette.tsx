@@ -98,7 +98,7 @@ export function CommandPalette() {
   }, [open])
 
   const all = Object.values(resources as unknown as Record<string, ResourceMeta>)
-  const searchable = all.filter((r) => r.sorts.includes("relevance"))
+  const searchable = all.filter((r) => !r.single && r.sorts.includes("relevance"))
   const found = useQueries({
     queries: searchable.map((r) => ({
       queryKey: [r.name, "palette", q],

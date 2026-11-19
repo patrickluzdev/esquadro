@@ -31,6 +31,7 @@ func TemplateFuncs() template.FuncMap {
 		"inRequest":   rest.InRequest,
 		"realms":      security.RealmsOf,
 		"softDeleted": store.SoftDeleted,
+		"single":      store.Single,
 		"idLinks":     store.IDLinks,
 		"richText":    rest.HTML,
 		"audited":     audit.Audited,

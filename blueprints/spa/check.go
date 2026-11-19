@@ -43,6 +43,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 			diags = append(diags, unlabeled(p, name)...)
 		}
 		diags = append(diags, widgets(p, name)...)
+		diags = append(diags, ownPages(p, name)...)
 		if idle, _ := opts["idle_minutes"].(int64); idle != 0 && idle < 2 {
 			diags.Errorf(at("idle_minutes"), at("idle_minutes"), "idle_minutes %d is too short: at least 2, a minute of warning and one of use, or 0 for never", idle)
 		}
@@ -197,4 +198,24 @@ func strs(v any) []string {
 		return out
 	}
 	return nil
+}
+
+// OwnPages are the pages of the frontend itself, at the first part of a
+// path: a resource there would be hidden by them.
+var OwnPages = []string{"settings", "audit", "notifications", "service-keys", "accounts", "dashboards",
+	"login", "forbidden", "confirm-email", "forgot-password", "reset-password"}
+
+// ownPages refuses a resource of the frontend whose path is one of its own
+// pages'.
+func ownPages(p *project.Project, instance string) diag.List {
+	var diags diag.List
+	for _, e := range p.Entities {
+		if on, _ := e.Ann[instance]["resource"].(bool); !on {
+			continue
+		}
+		if slices.Contains(OwnPages, e.Plural.Kebab) {
+			diags.Errorf(e.Pos, e.Pos, "%s is a resource of %s at /%s, a page of the frontend itself: give the entity another name (Site%s, App%s)", e.Raw, instance, e.Plural.Kebab, e.Pascal, e.Pascal)
+		}
+	}
+	return diags
 }

@@ -1,4 +1,15 @@
 {{- $a := ann .Entity}}{{if index $a "resource" -}}
+{{- if single .Entity -}}
+import { createFileRoute } from "@tanstack/react-router"
+import { ResourceForm } from "../../../esquadro/kit/form.tsx"
+import { singleId } from "../../../esquadro/kit/meta.ts"
+import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"
+
+// The {{lower .Entity.Label}}: one record only, so its page is its form.
+export const Route = createFileRoute("/_app/{{.Entity.Plural.Kebab}}/")({
+  component: () => <ResourceForm resource={resource} id={singleId} />,
+})
+{{- else -}}
 import { createFileRoute } from "@tanstack/react-router"
 import { listSearch, ResourceList } from "../../../esquadro/kit/list.tsx"
 import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"
@@ -7,4 +18,5 @@ export const Route = createFileRoute("/_app/{{.Entity.Plural.Kebab}}/")({
   validateSearch: listSearch,
   component: () => <ResourceList resource={resource} />,
 })
+{{- end}}
 {{end -}}

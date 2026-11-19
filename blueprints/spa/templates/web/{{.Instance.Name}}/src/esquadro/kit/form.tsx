@@ -23,6 +23,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
+import { useSession } from "./auth.tsx"
 import { ask } from "./confirm.tsx"
 import { FileInput, isStoredFile } from "./files.tsx"
 import { MoneyInput } from "./money.tsx"
@@ -32,6 +33,7 @@ import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageFoot, PageHeader } from "./page.tsx"
 import type { Resource } from "./resource.ts"
+import { RecordHistory, seesHistory } from "./history.tsx"
 import { BackToList, useRecord } from "./show.tsx"
 import { ErrorState, FormSkeleton } from "./states.tsx"
 import { toast } from "./toast.tsx"
@@ -218,6 +220,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
   const formId = useId()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const session = useSession()
   useBlocker({
     shouldBlockFn: async () => dirty.current && !(await ask(t("unsaved"))),
     enableBeforeUnload: () => dirty.current,
@@ -246,7 +249,8 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
       dirty.current = false
       toast(t("saved"))
       queryClient.invalidateQueries({ queryKey: [meta.name] })
-      navigate({ to: `/${meta.name}/${saved.id}` as never })
+      // A single resource's page is its form: it stays, with what was saved.
+      if (!meta.single) navigate({ to: `/${meta.name}/${saved.id}` as never })
     },
     onError: (e) => {
       const refused = e instanceof MissingFields ? e.fields : fieldErrors(e)
@@ -275,7 +279,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
         save.mutate()
       }}
     >
-      <PageHeader title={record ? t("editing", { name: meta.singular }) : t("creating", { name: meta.singular })} />
+      <PageHeader title={meta.single ? meta.label : record ? t("editing", { name: meta.singular }) : t("creating", { name: meta.singular })} />
       {(() => {
         const card = (section: FormSection) => (
               <Card key={section.title}>
@@ -340,19 +344,30 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
           <div className={cn("grid items-start gap-4", side.length > 0 && main.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_380px]" : "max-w-[1080px]")}>
             <div className="flex min-w-0 flex-col gap-4">{(main.length > 0 ? main : side).map(card)}</div>
             {side.length > 0 && main.length > 0 && <div className="flex min-w-0 flex-col gap-4">{side.map(card)}</div>}
+            {/* A single resource has no page of its own: its history is here. */}
+            {meta.single && record && seesHistory(meta, record, session) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("history")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RecordHistory meta={meta} id={record.id} />
+                </CardContent>
+              </Card>
+            )}
           </div>
         )
       })()}
       {/* The form's actions, fixed at the foot of the screen. */}
       <PageFoot>
         {/* Editing goes back to the record; creating has only its actions. */}
-        {record && (
+        {record && !meta.single && (
           <Button type="button" variant="ghost" onClick={() => history.back()}>
             <ArrowLeft /> {t("back")}
           </Button>
         )}
         <div className="ml-auto flex gap-2">
-          {record && (record.can ?? []).includes("delete") && (
+          {record && !meta.single && (record.can ?? []).includes("delete") && (
             <Button
               type="button"
               variant="destructive-outline"

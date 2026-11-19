@@ -5,7 +5,8 @@
 // is yours, decides what the screens show.
 import type { Api } from "./api.ts"
 import { t } from "./kit/i18n.ts"
-import { defineMeta } from "./kit/meta.ts"
+{{- $single := false}}{{range .Entities}}{{if and (index (ann .) "resource") (single .)}}{{$single = true}}{{end}}{{end}}
+import { defineMeta{{if $single}}, singleRecords{{end}} } from "./kit/meta.ts"
 
 export const resources = {
 {{- range $e := .Entities}}{{$a := ann $e}}{{if index $a "resource"}}
@@ -16,7 +17,12 @@ export const resources = {
     menu: {{printf "%q" (or (index $a "menu") (index $a "label") (humanize $e.Plural.Snake))}},
     icon: {{printf "%q" (or (index $a "icon") "circle")}},
     title: "{{titleOf $e}}",
+{{- if single $e}}
+    api: (api: Api) => singleRecords(api.{{$e.Camel}}),
+    single: true,
+{{- else}}
     api: (api: Api) => api.{{$e.Plural.Camel}} as unknown as import("./kit/meta.ts").RecordsApi,
+{{- end}}
     fields: {
 {{- range $f := inRequest $e}}{{$fa := ann $f}}
       {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{if richText $f}}, rich: true{{with $f.Max}}, max: {{.Text}}{{end}}{{end}}{{with defaultOf $f}}, default: {{.}}{{end}}{{with $f.Min}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, min: {{.Text}}{{end}}{{end}}{{with $f.Max}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, max: {{.Text}}{{end}}{{end}}{{fileMeta $e $f (optionsOf "storage")}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }, colors: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: "{{enumColor $v (ann $v)}}"{{end}} }{{end}} },

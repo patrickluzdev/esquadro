@@ -1,4 +1,4 @@
-{{- $a := ann .Entity}}{{if index $a "resource" -}}
+{{- $a := ann .Entity}}{{if and (index $a "resource") (not (single .Entity)) -}}
 import { createFileRoute } from "@tanstack/react-router"
 import { ResourceShow } from "../../../esquadro/kit/show.tsx"
 import resource from "../../../resources/{{.Entity.Plural.Kebab}}.tsx"

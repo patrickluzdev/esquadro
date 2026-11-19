@@ -97,6 +97,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   trash?: { days: number }
   /** Its changes are kept (the audit blueprint): its plural, and who sees a record's history. */
   history?: { entity: string; who: "update" | "read" | "admins" }
+  /** One record only (@store(single)): its page is its form, with no list. */
+  single?: boolean
 }
 
 export function defineMeta<const F extends Record<string, FieldMeta>, A>(
@@ -104,3 +106,34 @@ export function defineMeta<const F extends Record<string, FieldMeta>, A>(
 ): ResourceMeta<F> {
   return meta as unknown as ResourceMeta<F>
 }
+
+/** The id of the one record of a single resource. */
+export const singleId = "00000000-0000-0000-0000-000000000001"
+
+/** The operations of a single entity, as the API client has them. */
+interface SingleApi {
+  get(selection?: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<Rec>
+  update(record: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
+  patch(changes: Record<string, unknown>, options?: { ifMatch?: number | { version: number } }): Promise<Rec>
+  history?(query: object, options: object): Promise<unknown>
+}
+
+/**
+ * A single entity's operations as those of a resource's records, so that
+ * its form reads and saves it as any other: the id is its one record's.
+ * It has no list, create or delete.
+ */
+export function singleRecords(one: unknown): RecordsApi {
+  const s = one as SingleApi
+  const none = () => Promise.reject(new Error("a single resource has one record only"))
+  return {
+    list: none,
+    get: (_id, selection, options) => s.get(selection, options),
+    create: none,
+    update: (_id, record, options) => s.update(record, options),
+    patch: (_id, changes, options) => s.patch(changes, options),
+    delete: none,
+    ...(s.history && { history: (_id: string, query: object, options: object) => s.history!(query, options) }),
+  } as RecordsApi
+}
+
