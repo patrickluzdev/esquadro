@@ -1,0 +1,26 @@
+{{- if realms .Entities -}}
+package security
+
+import "testing"
+
+// A link of an email begins with the app's address; in development, a
+// page of a panel opens where task dev serves it.
+func TestLinksOpenWhereThePageIs(t *testing.T) {
+	s := &Security{cfg: Config{PublicURL: "https://shop.example/", DevServers: map[string]string{"/admin": "http://localhost:5173"}}}
+	for _, c := range []struct {
+		dev               bool
+		redirect, want string
+	}{
+		{false, "/admin/reset-password", "https://shop.example/admin/reset-password?token=t"},
+		{true, "/admin/reset-password", "http://localhost:5173/admin/reset-password?token=t"},
+		{true, "/administration/x", "https://shop.example/administration/x?token=t"},
+		{true, "/shop/nova-senha", "https://shop.example/shop/nova-senha?token=t"},
+		{true, "https://other.example/x", "https://other.example/x?token=t"},
+	} {
+		s.cfg.Development = c.dev
+		if got := s.link(c.redirect, "t"); got != c.want {
+			t.Errorf("development %v, %s: %s, want %s", c.dev, c.redirect, got, c.want)
+		}
+	}
+}
+{{- end}}

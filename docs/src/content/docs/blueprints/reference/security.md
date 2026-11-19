@@ -29,7 +29,7 @@ blueprint security
 | `service_key_max_days` | int | `0` | The most days a service key may last; 0 is no limit. With a limit, a key that never expires is refused. |
 | `service_key_choices` | list | `[30, 90, 365]` | The lifetimes, in days, a frontend offers for a new key (those within service_key_max_days), besides until revoked when there is no limit. |
 | `hsts` | bool | `false` | Send Strict-Transport-Security, behind HTTPS only. &lt;APP>_HSTS overrides it. |
-| `public_url` | string | `"http://localhost:8080"` | The address of the app, for the links of emails and the OAuth callbacks. |
+| `public_url` | string | `"http://localhost:8080"` | The address of the app in development, for the links of emails and the OAuth callbacks; PUBLIC_URL gives it in the other environments. |
 | `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link. |
 | `session_days` | int | `7` | Days a session lasts without being used to renew it. |
 | `session_idle_hours` | int | `24` | Hours of inactivity that end a session. |
@@ -41,6 +41,8 @@ blueprint security
 | `verify_email_hours` | int | `24` | Hours an email verification link works, and minutes a password reset link does. |
 | `password_reset_minutes` | int | `60` |  |
 | `invite_days` | int | `7` | Days an invitation's link works: an account made by an administrator (from the frontend, or &lt;app> security invite), to choose its password. |
+| `resend_minutes` | int | `5` | Minutes before an invitation or an email's confirmation may be sent again to an account, and how many times a day at most (the first one counts); 0 is no limit. A request sooner is answered 429 too_soon. |
+| `resend_per_day` | int | `5` |  |
 | `password_min` | int | `12` | The shortest password. NIST asks for 15 when the password is the only factor. |
 | `password_max` | int | `128` |  |
 | `password_blocklist` | name | `"none"` | none, lists (the passwords of password_lists, and those made of a sequence, a repetition, the app's name or the person's email) or pwned (all that, and Pwned Passwords). |
@@ -67,6 +69,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 |---|---|---|---|
 | `SECURITY_SECRET` | string, secret, required outside development | generated in development | Signs CSRF tokens and encrypts the JWT signing keys; esquadro generates one for development. |
 | `SECURITY_PEPPER` | string, secret, required outside development | - | With the pepper option, the key every password hash is mixed with; kept out of the database. Changing it means resetting every password. |
+| `PUBLIC_URL` | string, required outside development | development: the public_url option | The app's address, which the links of emails and the providers' callbacks begin with: https://shop.com. In development, public_url. |
 | `<APP>_HSTS` | bool | the hsts option | Send Strict-Transport-Security, behind HTTPS only. |
 | `SECURITY_GOOGLE_CLIENT_ID` | string, required outside development | - | The OAuth client of the app at Google (console.cloud.google.com, APIs & Services, Credentials), for the realms that sign in with Google; its redirect URI is &lt;public_url>&lt;path>/&lt;realm>/oauth/google/callback. |
 | `SECURITY_GOOGLE_CLIENT_SECRET` | string, secret, required outside development | - |  |

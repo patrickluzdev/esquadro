@@ -46,15 +46,14 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
 realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
 // resetPage is the page of a frontend that sets a password: its path on
-// the app's domain, and where task dev serves it in development, when that
-// is another server (a panel's Vite).
-type resetPage struct{ path, dev string }
+// the app's domain.
+type resetPage struct{ path string }
 
 // resetPages are the pages that set a password, by realm: those of the
 // frontend that signs it in.
 var resetPages = map[string]resetPage{
 {{- range $realm, $page := resetPages .Entities frontends}}
-	{{quote $realm}}: {path: {{quote $page.Path}}{{with $page.Dev}}, dev: {{quote .}}{{end}}},
+	{{quote $realm}}: {path: {{quote $page.Path}}},
 {{- end}}
 }
 
@@ -215,18 +214,13 @@ func resetAccount(ctx context.Context, d dependencies, realm string, id uuid.UUI
 }
 
 // printResetLink prints a link that sets the password of the account id,
-// on redirect; in development, also where task dev serves that page.
+// on redirect: in development, where task dev serves that page.
 func printResetLink(ctx context.Context, d dependencies, realm string, id uuid.UUID, redirect string) error {
 	link, expires, err := d.security.ResetLink(ctx, realm, id, redirect)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("its password is set at %s\nuntil %s\n", link, expires.Local().Format("2006-01-02 15:04"))
-	if page := resetPages[realm]; d.config.Env == "development" && page.dev != "" && strings.HasPrefix(redirect, page.path) {
-		if i := strings.Index(link, redirect); i >= 0 {
-			fmt.Printf("in development, task dev serves it at %s\n", page.dev+link[i:])
-		}
-	}
 	return nil
 }
 

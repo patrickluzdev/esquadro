@@ -206,7 +206,7 @@ Passwords follow NIST SP 800-63B and the OWASP Password Storage Cheat Sheet:
 ## Google and GitHub
 
 Add `google` or `github` to a realm's `providers`, and register the app at the
-provider with the redirect URI `<public_url>/identity/<realm>/oauth/<provider>/callback`.
+provider with the redirect URI `<PUBLIC_URL>/identity/<realm>/oauth/<provider>/callback`.
 Its client id and secret go in `SECURITY_GOOGLE_CLIENT_ID` and
 `SECURITY_GOOGLE_CLIENT_SECRET` (or `SECURITY_GITHUB_...`), which exist only
 when a realm uses the provider.
@@ -343,13 +343,18 @@ go run ./cmd/shop security cleanup
 go run ./cmd/shop security rotate-keys
 ```
 
+The links of emails and of these commands begin with `PUBLIC_URL`, the
+app's address in each environment (`https://shop.com`; required outside
+development, where it is the `public_url` option, `http://localhost:8080`).
+In development, a link to a page of a panel opens where `task dev` serves
+it (`http://localhost:5173/admin/...`).
+
 `create` prints a link that sets the password; with `-password-stdin` it reads
 the password instead, never from the arguments. `reset` prints a new link
 for an account that has one already, or lost it. The link, and `invite`'s,
 opens the page that sets a password of the realm's frontend
 (`/admin/reset-password` of a panel, `/nova-senha` of a site in pt_br), or
-the page `-redirect` names. In development a panel's link is also printed
-at the address `task dev` serves it from (`http://localhost:5173/admin/...`).
+the page `-redirect` names.
 
 ## Tests
 

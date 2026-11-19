@@ -19,6 +19,9 @@ blueprint security {
   /// With the pepper option, the key every password hash is mixed with;
   /// kept out of the database. Changing it means resetting every password.
   env SECURITY_PEPPER string secret required when("{{if and (realms .Entities) .Options.pepper}}true{{end}}")
+  /// The app's address, which the links of emails and the providers'
+  /// callbacks begin with: https://shop.com. In development, public_url.
+  env PUBLIC_URL string required development("{{.Options.public_url}}") when("{{if realms .Entities}}true{{end}}")
   /// Send Strict-Transport-Security, behind HTTPS only.
   env HSTS bool prefixed field(HSTS) default("{{.Options.hsts}}")
   /// The OAuth client of the app at Google (console.cloud.google.com, APIs &
@@ -60,7 +63,8 @@ blueprint security {
   /// Send Strict-Transport-Security, behind HTTPS only. <APP>_HSTS
   /// overrides it.
   option hsts bool default(false)
-  /// The address of the app, for the links of emails and the OAuth callbacks.
+  /// The address of the app in development, for the links of emails and
+  /// the OAuth callbacks; PUBLIC_URL gives it in the other environments.
   option public_url string default("http://localhost:8080")
   /// Where the app may send people back to after sign-in or an email link.
   option redirect_urls list default([])

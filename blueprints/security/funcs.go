@@ -15,6 +15,7 @@ func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"securityTable": Table,
 		"resetPages":    ResetPages,
+		"devServers":    DevServers,
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
@@ -114,9 +115,8 @@ func Admins(entities []*project.Entity, e *project.Entity) []string {
 }
 
 // ResetPageOf is a realm's page that sets a password: its path on the app's
-// domain, and the server task dev serves it from in development, when that
-// is another (a panel's Vite).
-type ResetPageOf struct{ Path, Dev string }
+// domain.
+type ResetPageOf struct{ Path string }
 
 // DevServer is where task dev serves a panel by default: Vite's address.
 const DevServer = "http://localhost:5173"
@@ -173,11 +173,31 @@ func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[s
 			continue
 		}
 		if page := ResetPage(f.Kind, f.Name, f.Options); page != "" {
-			r := ResetPageOf{Path: page}
-			if f.Kind == "spa" {
-				r.Dev = DevServer
-			}
-			out[realm] = r
+			out[realm] = ResetPageOf{Path: page}
+		}
+	}
+	return out
+}
+
+// DevServers are where task dev serves the app's panels in development, by
+// their path on the app's domain: /admin, http://localhost:5173. A panel on
+// a domain of its own has none.
+func DevServers(frontends []*compose.Instance) map[string]string {
+	out := map[string]string{}
+	for _, f := range frontends {
+		if f.Kind != "spa" {
+			continue
+		}
+		if domain, _ := f.Options["domain"].(string); domain != "" {
+			continue
+		}
+		path, _ := f.Options["path"].(string)
+		if path == "" {
+			path = "/" + f.Name
+		}
+		path = strings.TrimSuffix(path, "/")
+		if _, ok := out[path]; !ok {
+			out[path] = DevServer
 		}
 	}
 	return out

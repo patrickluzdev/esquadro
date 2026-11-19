@@ -101,9 +101,22 @@ func (s *Security) verification(ctx context.Context, q Querier, realm, purpose, 
 // app's paths or of RedirectURLs, with the token.
 func (s *Security) link(redirect, token string) string {
 	if strings.HasPrefix(redirect, "/") {
-		redirect = strings.TrimSuffix(s.cfg.PublicURL, "/") + redirect
+		redirect = s.base(redirect) + redirect
 	}
 	return withQuery(redirect, "token", token)
+}
+
+// base is the address a path of the app is at: PublicURL, or in
+// development the server task dev serves its panel from.
+func (s *Security) base(path string) string {
+	if s.cfg.Development {
+		for prefix, server := range s.cfg.DevServers {
+			if path == prefix || strings.HasPrefix(path, prefix+"/") {
+				return strings.TrimSuffix(server, "/")
+			}
+		}
+	}
+	return strings.TrimSuffix(s.cfg.PublicURL, "/")
 }
 
 // emailRequest is a request that sends an email: to whom, and the page of

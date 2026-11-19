@@ -10,14 +10,22 @@
 		Secret: d.config.SecuritySecret,{{if .Options.pepper}} Pepper: d.config.SecurityPepper,{{end}}
 		SessionDays: {{.Options.session_days}}, SessionIdleHours: {{.Options.session_idle_hours}}, SessionMaxDays: {{.Options.session_max_days}},
 		KeepIP: {{.Options.session_ip}}, KeepUserAgent: {{.Options.session_user_agent}},
-		TokenMinutes: {{.Options.token_minutes}}, Issuer: {{printf "%q" .Options.public_url}},
+		TokenMinutes: {{.Options.token_minutes}}, Issuer: d.config.PublicURL,
 		Argon2MemoryKiB: {{.Options.argon2_memory_kib}}, Argon2Iterations: {{.Options.argon2_iterations}}, Argon2Parallelism: {{.Options.argon2_parallelism}},
 		LockoutAttempts: {{.Options.lockout_attempts}}, LockoutMinutes: {{.Options.lockout_minutes}},
 		LimitAttempts: d.config.Env != "{{index .Environments 0}}",
 {{- with strs .Options.password_lists}}
 		PasswordLists: {{goStrings .}},
 {{- end}}
-		PublicURL: {{printf "%q" .Options.public_url}},
+		PublicURL: d.config.PublicURL,
+{{- with devServers frontends}}
+		DevServers: map[string]string{
+{{- range $path, $server := .}}
+			{{quote $path}}: {{quote $server}},
+{{- end}}
+		},
+		Development: d.config.Env == "{{index $.Environments 0}}",
+{{- end}}
 		Mailer: securityMail{d.mail},
 		VerifyEmailHours: {{.Options.verify_email_hours}}, PasswordResetMinutes: {{.Options.password_reset_minutes}}, InviteDays: {{.Options.invite_days}},
 		ResendMinutes: {{.Options.resend_minutes}}, ResendPerDay: {{.Options.resend_per_day}},

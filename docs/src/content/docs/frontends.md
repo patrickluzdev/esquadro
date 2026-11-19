@@ -750,8 +750,8 @@ What the reader may not see is not found, and stays out of the sitemap.
 realm has, signing up when it is `signup open`, the forgotten password,
 the email confirmed and an account page (signing out, deleting the
 account). Their forms call the app's identity routes. With sign-in by
-Google or GitHub and the site on a domain of its own, set the security
-blueprint's `public_url` to the site's address.
+Google or GitHub and the site on a domain of its own, set `PUBLIC_URL` to
+the site's address.
 
 **The site's own pages** ("Join our groups", "About") go in `routes.go`,
 each a templ component of yours inside `Layout`.

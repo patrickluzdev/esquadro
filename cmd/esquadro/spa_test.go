@@ -82,7 +82,7 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 	if gen := read(t, filepath.Join(web, "src/esquadro/resources.gen.ts")); !strings.Contains(gen, `name: { name: "name", label: "Nome"`) || !strings.Contains(gen, `labels: { ACTIVE: "Ativo", INACTIVE: "INACTIVE" }`) || !strings.Contains(gen, `default: "ACTIVE"`) || !strings.Contains(gen, "categories:") {
 		t.Errorf("resources.gen.ts:\n%s", gen)
 	}
-	if cmd := read(t, filepath.Join(dir, "cmd", "shop", "security_command.go")); !strings.Contains(cmd, `"user": {path: "/admin/reset-password", dev: "http://localhost:5173"},`) {
+	if cmd := read(t, filepath.Join(dir, "cmd", "shop", "security_command.go")); !strings.Contains(cmd, `"user": {path: "/admin/reset-password"},`) {
 		t.Error("a password's link does not open the panel's page by default")
 	}
 	if pkg := read(t, filepath.Join(dir, "package.json")); !strings.Contains(pkg, `"web/admin"`) || !strings.Contains(pkg, `"clients/ts"`) {
