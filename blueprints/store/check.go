@@ -19,6 +19,7 @@ var SearchLanguages = []string{"simple", "arabic", "armenian", "basque", "catala
 // required fields that can be ordered, and the search language.
 func Check(p *project.Project, set *blueprint.Set) diag.List {
 	var diags diag.List
+	checkSingle(p, &diags)
 	for _, e := range p.Entities {
 		for _, f := range e.Fields {
 			a := f.Ann["store"]

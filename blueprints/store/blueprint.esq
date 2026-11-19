@@ -23,6 +23,10 @@ blueprint store {
     /// Deleting a record puts it in the trash (deleted_at), from which it
     /// may be restored or deleted for good; reads and lists leave it out.
     soft_delete bool
+    /// One record only, which always exists, with its defaults until
+    /// someone changes it: read and changed, never listed, created or
+    /// deleted (settings the team tunes without a deploy).
+    single bool
   }
   annotation field {
     /// Lists may filter by it: by value, by range (numbers and dates), or

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -34,6 +35,9 @@ func Check(p *project.Project, _ *blueprint.Set) diag.List {
 	slices.Sort(files)
 	lists := map[string]*project.Entity{}
 	for _, e := range p.Entities {
+		if store.Single(e) {
+			continue // its one record has its defaults: no seed
+		}
 		lists[e.Plural.Snake] = e
 	}
 	aliases := map[string]map[string]bool{}

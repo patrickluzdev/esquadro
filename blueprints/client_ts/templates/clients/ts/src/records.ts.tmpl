@@ -163,6 +163,23 @@ export interface {{$P}}Query<F extends {{$P}}Field, I extends {{$P}}Include> ext
 {{- end}}
 }
 
+{{- if single $e}}
+
+/** The operations on the {{lower .Label}}: there is always one. */
+export interface {{$P}}Api {
+  /** The {{lower .Label}}, with its defaults until someone changes it. */
+  get<F extends {{$P}}Field = {{$P}}Field>(selection?: { fields?: F[] }, options?: ReadOptions): Promise<{{$P}}Of<F, never>>
+  /** Replaces it by record; with ifMatch, only the version read. */
+  update(record: New{{$P}}, options?: ChangeOptions): Promise<{{$P}}>
+  /** Changes only the fields sent; with ifMatch, only the version read. */
+  patch(changes: {{$P}}Changes, options?: ChangeOptions): Promise<{{$P}}>
+{{- if audited $e (optionsOf "audit")}}
+  /** Its changes, the newest first: who, when, each field before and after. */
+  history(query?: { page?: number; per_page?: number }, options?: ReadOptions): Promise<AuditPage>
+{{- end}}
+}
+{{- else}}
+
 /** The operations on {{lower .Plural.Label}}. */
 export interface {{.Plural.Pascal}}Api {
   /** A page of {{lower .Plural.Label}}, as query asks. */
@@ -197,5 +214,6 @@ export interface {{.Plural.Pascal}}Api {
   }
 {{- end}}
 }
+{{- end}}
 {{- end}}
 {{end -}}

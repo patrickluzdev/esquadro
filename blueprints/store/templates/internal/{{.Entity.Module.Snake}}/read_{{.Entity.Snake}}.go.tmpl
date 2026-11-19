@@ -1,5 +1,30 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
+{{- if single $e}}
+
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+// {{$e.Camel}}ID is the id of the one {{lower $e.Label}}.
+var {{$e.Camel}}ID = uuid.MustParse({{quote singleID}})
+
+// Read{{$e.Pascal}} returns the {{lower $e.Label}}: there is always one, with the
+// defaults declared for it until someone changes it.
+func ({{$r}} *{{$m.Pascal}}) Read{{$e.Pascal}}(ctx context.Context) ({{$e.Pascal}}, error) {
+	row, err := ensure{{$e.Pascal}}(ctx, sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)))
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+	return {{$e.Camel}}Of(row), nil
+}
+
+// ensure{{$e.Pascal}} reads the stored {{lower $e.Label}}, storing it first, with its
+// defaults, the first time it is read.
+func ensure{{$e.Pascal}}(ctx context.Context, q *sqlgen.Queries) (sqlgen.{{sqlcModel $e (optionsOf "postgres")}}, error) {
+	if err := q.Ensure{{$e.Pascal}}(ctx, postgres.UUID({{$e.Camel}}ID)); err != nil {
+		return sqlgen.{{sqlcModel $e (optionsOf "postgres")}}{}, err
+	}
+	return q.Get{{$e.Pascal}}(ctx, postgres.UUID({{$e.Camel}}ID))
+}
+{{- else}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Read{{$e.Pascal}} returns the {{lower $e.Label}} with the given id.
@@ -13,3 +38,4 @@ func ({{$r}} *{{$m.Pascal}}) Read{{$e.Pascal}}(ctx context.Context, id uuid.UUID
 	}
 	return {{$e.Camel}}Of(row), nil
 }
+{{- end}}

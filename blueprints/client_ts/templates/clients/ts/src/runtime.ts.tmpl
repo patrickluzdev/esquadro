@@ -244,6 +244,19 @@ export interface ChangeOptions {
 
 // The operations of an entity's records, untyped: each entity's interface
 // types them.
+/** The operations on an entity with one record only, at path. */
+export function single(t: Transport, path: string, history = false): unknown {
+  return {
+    get: (query: Query = {}, o: ReadOptions = {}) => t.request("GET", path, { query, signal: o.signal }),
+    update: (record: unknown, o: ChangeOptions = {}) => t.request("PUT", path, { body: record, ifMatch: o.ifMatch }),
+    patch: (changes: unknown, o: ChangeOptions = {}) => t.request("PATCH", path, { body: changes, ifMatch: o.ifMatch }),
+    ...(history && {
+      history: (query: Query = {}, o: ReadOptions = {}) =>
+        t.request<AuditPage>("GET", `${path}/history`, { query, signal: o.signal }),
+    }),
+  }
+}
+
 export function records(t: Transport, path: string, pagination: readonly string[], trash = false, history = false): unknown {
   const one = (id: string) => `${path}/${encodeURIComponent(id)}`
   const list = (query: Query = {}, o: ReadOptions = {}) => t.request<Page<unknown>>("GET", path, { query, signal: o.signal })

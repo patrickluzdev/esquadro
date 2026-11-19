@@ -4,13 +4,14 @@
 // {{.App.Label}} API: createClient, the records' types and the model's rules.
 
 {{- $m2m := false}}{{range .Entities}}{{if manyToMany .}}{{$m2m = true}}{{end}}{{end}}
-import { {{if $m2m}}links, {{end}}records, Transport } from "./runtime.ts"
+{{- $one := false}}{{$many := false}}{{range .Entities}}{{if single .}}{{$one = true}}{{else}}{{$many = true}}{{end}}{{end}}
+import { {{if $m2m}}links, {{end}}{{if $many}}records, {{end}}{{if $one}}single, {{end}}Transport } from "./runtime.ts"
 {{- $hasFiles := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$hasFiles = true}}{{end}}{{end}}{{end}}
 {{- if $hasFiles}}
 import { uploads } from "./uploads.ts"
 {{- end}}
 import type { {{if and (auditedOf .Entities (optionsOf "audit")) (uses "security")}}AuditPage, {{end}}ClientOptions, {{if uses "notifications"}}NoticePage, {{end}}ReadOptions, RequestOptions } from "./runtime.ts"
-import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{.Plural.Pascal}}Api{{end}} } from "./records.ts"
+import type { {{range $i, $e := .Entities}}{{if $i}}, {{end}}{{if single $e}}{{.Pascal}}{{else}}{{.Plural.Pascal}}{{end}}Api{{end}} } from "./records.ts"
 {{- if .Reports}}
 import type { {{range $i, $r := .Reports}}{{if $i}}, {{end}}{{.Pascal}}Params, {{.Pascal}}Row{{end}} } from "./reports.ts"
 {{- end}}
@@ -48,11 +49,15 @@ export function createClient(options: ClientOptions) {
   return {
 {{- range $e := .Entities}}
 {{- $pag := paginationOf $e (optionsOf "rest")}}
+{{- if single $e}}
+    {{.Camel}}: single(t, "/api/v1/{{.Kebab}}"{{if audited $e (optionsOf "audit")}}, true{{end}}) as {{.Pascal}}Api,
+{{- else}}
     {{.Plural.Camel}}: {{if manyToMany $e}}Object.assign(records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as object, {
 {{- range manyToMany $e}}
       {{.Camel}}: links(t, "/api/v1/{{$e.Plural.Kebab}}", "{{.Kebab}}"),
 {{- end}}
     }) as {{.Plural.Pascal}}Api{{else}}records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as {{.Plural.Pascal}}Api{{end}},
+{{- end}}
 {{- end}}
 {{- if $realms}}
     /** Signing up and in, the session and the account, by realm. */

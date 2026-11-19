@@ -39,8 +39,9 @@ func NewHTTP(m *{{$m.Pascal}}) HTTP {
 	return HTTP{ {{$p}}: m}
 }
 {{- end}}
-{{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}
+{{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}{{$idArg := printf ", uuid.UUID(params.%s)" $id}}{{if single $e}}{{$idArg = ""}}{{end}}
 {{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
+{{- if not (single $e)}}
 
 func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.Create{{$P}}Params) (*apigen.{{$P}}, error) {
 	n, unread := new{{$P}}Of(req)
@@ -63,12 +64,13 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.
 	answer := {{.Camel}}Answer(ctx, created)
 	return &answer, nil
 }
+{{- end}}
 
 func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*apigen.{{$P}}, error) {
 {{- if $pol}}
-	found, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	found, err := h.readable{{$P}}(ctx{{$idArg}})
 {{- else}}
-	found, err := h.{{$p}}.Read{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	found, err := h.{{$p}}.Read{{$P}}(ctx{{$idArg}})
 {{- end}}
 	if err != nil {
 		return nil, problemOf(err)
@@ -85,6 +87,7 @@ func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*ap
 	{{.Camel}}Only(&answer, params.Fields)
 	return &answer, nil
 }
+{{- if not (single $e)}}
 
 func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
 {{- $pag := paginationOf $e (optionsOf "rest")}}
@@ -216,10 +219,11 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- end}}
 	return &answer, nil
 }
+{{- end}}
 
 func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params apigen.Update{{$P}}Params) (*apigen.{{$P}}, error) {
 {{- if $pol}}
-	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	stored, err := h.readable{{$P}}(ctx{{$idArg}})
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -240,7 +244,7 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 	if err != nil {
 		return nil, err
 	}
-	updated, err := h.{{$p}}.Update{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, n)
+	updated, err := h.{{$p}}.Update{{$P}}(ctx{{$idArg}}, version, n)
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -251,7 +255,7 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 
 func (h HTTP) Patch{{$P}}(ctx context.Context, req *apigen.{{$P}}Changes, params apigen.Patch{{$P}}Params) (*apigen.{{$P}}, error) {
 {{- if $pol}}
-	if _, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if _, err := h.readable{{$P}}(ctx{{$idArg}}); err != nil {
 		return nil, problemOf(err)
 	}
 {{- end}}
@@ -276,9 +280,9 @@ func (h HTTP) Patch{{$P}}(ctx context.Context, req *apigen.{{$P}}Changes, params
 		}
 		return nil
 	}
-	updated, err := h.{{$p}}.Patch{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, c, guard)
+	updated, err := h.{{$p}}.Patch{{$P}}(ctx{{$idArg}}, version, c, guard)
 {{- else}}
-	updated, err := h.{{$p}}.Patch{{$P}}(ctx, uuid.UUID(params.{{$id}}), version, c, nil)
+	updated, err := h.{{$p}}.Patch{{$P}}(ctx{{$idArg}}, version, c, nil)
 {{- end}}
 	if err != nil {
 		return nil, problemOf(err)
@@ -287,10 +291,11 @@ func (h HTTP) Patch{{$P}}(ctx context.Context, req *apigen.{{$P}}Changes, params
 	answer := {{.Camel}}Answer(ctx, updated)
 	return &answer, nil
 }
+{{- if not (single $e)}}
 
 func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params) error {
 {{- if $pol}}
-	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	stored, err := h.readable{{$P}}(ctx{{$idArg}})
 	if err != nil {
 		return problemOf(err)
 	}
@@ -302,17 +307,18 @@ func (h HTTP) Delete{{$P}}(ctx context.Context, params apigen.Delete{{$P}}Params
 	if err != nil {
 		return err
 	}
-	return problemOf(h.{{$p}}.Delete{{$P}}(ctx, uuid.UUID(params.{{$id}}), version))
+	return problemOf(h.{{$p}}.Delete{{$P}}(ctx{{$idArg}}, version))
 }
+{{- end}}
 {{- if softDeleted $e}}{{$own := ownerColumn $.Entities $e}}
 
 func (h HTTP) Restore{{$P}}(ctx context.Context, params apigen.Restore{{$P}}Params) (*apigen.{{$P}}, error) {
 {{- if $pol}}
-	if err := h.deleted{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if err := h.deleted{{$P}}(ctx{{$idArg}}); err != nil {
 		return nil, problemOf(err)
 	}
 {{- end}}
-	restored, err := h.{{$p}}.Restore{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	restored, err := h.{{$p}}.Restore{{$P}}(ctx{{$idArg}})
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -323,11 +329,11 @@ func (h HTTP) Restore{{$P}}(ctx context.Context, params apigen.Restore{{$P}}Para
 
 func (h HTTP) Purge{{$P}}(ctx context.Context, params apigen.Purge{{$P}}Params) error {
 {{- if $pol}}
-	if err := h.deleted{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if err := h.deleted{{$P}}(ctx{{$idArg}}); err != nil {
 		return problemOf(err)
 	}
 {{- end}}
-	return problemOf(h.{{$p}}.Purge{{$P}}(ctx, uuid.UUID(params.{{$id}})))
+	return problemOf(h.{{$p}}.Purge{{$P}}(ctx{{$idArg}}))
 }
 
 func (h HTTP) ListDeleted{{.Plural.Pascal}}(ctx context.Context, params apigen.ListDeleted{{.Plural.Pascal}}Params) (*apigen.{{$P}}Page, error) {
@@ -436,7 +442,7 @@ func (h HTTP) trashOf{{.Plural.Pascal}}(ctx context.Context) (uuid.UUID, error) 
 
 func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Params) (*apigen.AuditPage, error) {
 {{- if $pol}}
-	stored, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}}))
+	stored, err := h.readable{{$P}}(ctx{{$idArg}})
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -452,11 +458,11 @@ func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Para
 	_ = stored
 {{- end}}
 {{- else}}
-	if _, err := h.{{$p}}.Read{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if _, err := h.{{$p}}.Read{{$P}}(ctx{{$idArg}}); err != nil {
 		return nil, problemOf(err)
 	}
 {{- end}}
-	page, err := audit.List(ctx, h.{{$p}}.Pool, audit.Filter{Entity: {{quote .Plural.Snake}}, RecordID: uuid.UUID(params.{{$id}})}, params.Page.Or(1), params.PerPage.Or(25))
+	page, err := audit.List(ctx, h.{{$p}}.Pool, audit.Filter{Entity: {{quote .Plural.Snake}}, RecordID: {{if single $e}}{{$e.Camel}}ID{{else}}uuid.UUID(params.{{$id}}){{end}}}, params.Page.Or(1), params.PerPage.Or(25))
 	if err != nil {
 		return nil, err
 	}
@@ -468,8 +474,8 @@ func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Para
 // readable{{$P}} is the {{lower .Label}} id, when the request of ctx may read it;
 // else, as if it did not exist{{if not (publicRead $.Entities $e)}}, and unauthorized to a request no one signed
 // in to, so that it does not learn which ids exist{{end}}.
-func (h HTTP) readable{{$P}}(ctx context.Context, id uuid.UUID) ({{$P}}, error) {
-	found, err := h.{{$p}}.Read{{$P}}(ctx, id)
+func (h HTTP) readable{{$P}}(ctx context.Context{{if not (single $e)}}, id uuid.UUID{{end}}) ({{$P}}, error) {
+	found, err := h.{{$p}}.Read{{$P}}(ctx{{if not (single $e)}}, id{{end}})
 	if err == nil && !({{$P}}Policy{}).Read(ctx, found) {
 		err = Err{{$P}}NotFound
 	}
@@ -489,11 +495,11 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 		return nil, err
 	}
 {{- if $pol}}
-	if _, err := h.readable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if _, err := h.readable{{$P}}(ctx{{$idArg}}); err != nil {
 		return nil, problemOf(err)
 	}
 {{- end}}
-	page, err := h.{{$p}}.List{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), after, params.Limit.Or(25))
+	page, err := h.{{$p}}.List{{$P}}{{$R}}(ctx{{$idArg}}, after, params.Limit.Or(25))
 	if err != nil {
 		return nil, problemOf(err)
 	}
@@ -523,7 +529,7 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 
 func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{$R}}Params) error {
 {{- if $pol}}
-	if err := h.updatable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if err := h.updatable{{$P}}(ctx{{$idArg}}); err != nil {
 		return problemOf(err)
 	}
 {{- end}}
@@ -531,12 +537,12 @@ func (h HTTP) AddTo{{$P}}{{$R}}(ctx context.Context, params apigen.AddTo{{$P}}{{
 	if err != nil {
 		return err
 	}
-	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), version, uuid.UUID(params.{{$o}})))
+	return problemOf(h.{{$p}}.AddTo{{$P}}{{$R}}(ctx{{$idArg}}, version, uuid.UUID(params.{{$o}})))
 }
 
 func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFrom{{$P}}{{$R}}Params) error {
 {{- if $pol}}
-	if err := h.updatable{{$P}}(ctx, uuid.UUID(params.{{$id}})); err != nil {
+	if err := h.updatable{{$P}}(ctx{{$idArg}}); err != nil {
 		return problemOf(err)
 	}
 {{- end}}
@@ -544,7 +550,7 @@ func (h HTTP) RemoveFrom{{$P}}{{$R}}(ctx context.Context, params apigen.RemoveFr
 	if err != nil {
 		return err
 	}
-	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx, uuid.UUID(params.{{$id}}), version, uuid.UUID(params.{{$o}})))
+	return problemOf(h.{{$p}}.RemoveFrom{{$P}}{{$R}}(ctx{{$idArg}}, version, uuid.UUID(params.{{$o}})))
 }
 {{- end}}
 {{- end}}
@@ -816,6 +822,7 @@ func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Contex
 {{- end}}
 	return a
 }
+{{- if not (single $e)}}
 
 // Include{{.Plural.Pascal}} reads {{lower .Plural.Label}} by id for an include, from this module
 // or another: only those the request may read, with only the fields
@@ -844,6 +851,7 @@ func Include{{.Plural.Pascal}}(m *{{$m.Pascal}}) func(context.Context, []uuid.UU
 		return out, nil
 	}
 }
+{{- end}}
 {{- if includable $e}}
 
 // {{.Camel}}Included adds to the answers of xs the related records include

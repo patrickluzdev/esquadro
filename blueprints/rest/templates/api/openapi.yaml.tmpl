@@ -40,7 +40,8 @@ tags:
 {{.}}
 {{- end}}
 paths:
-{{- range .Entities}}{{$e := .}}{{$id := printf "%sId" .Camel}}
+{{- range .Entities}}{{$e := .}}{{$id := printf "%sId" .Camel}}{{$a := "a"}}{{if single $e}}{{$a = "the"}}{{end}}
+{{- if not (single $e)}}
   /api/v1/{{.Plural.Kebab}}:
     get:
       operationId: list{{.Plural.Pascal}}
@@ -149,15 +150,20 @@ paths:
                 $ref: "#/components/schemas/{{.Pascal}}"
         default:
           $ref: "#/components/responses/Problem"
+{{- end}}
+{{- if single $e}}
+  /api/v1/{{.Kebab}}:
+{{- else}}
   /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}:
     parameters:
       - name: {{$id}}
         in: path
         required: true
         schema: {type: string, format: uuid}
+{{- end}}
     get:
       operationId: get{{.Pascal}}
-      summary: {{quote (printf "Read a %s" (lower .Label))}}
+      summary: {{quote (printf "Read %s %s" $a (lower .Label))}}
       description: |
         Codes: `not_found` (404).
 {{- with accessLine $.Entities $e "read"}}
@@ -192,7 +198,7 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: update{{.Pascal}}
-      summary: {{quote (printf "Change a %s" (lower .Label))}}
+      summary: {{quote (printf "Change %s %s" $a (lower .Label))}}
       description: |
         Replaces the {{lower .Label}} by the one sent, so a field left out is
         cleared or takes its default.
@@ -220,7 +226,7 @@ paths:
           $ref: "#/components/responses/Problem"
     patch:
       operationId: patch{{.Pascal}}
-      summary: {{quote (printf "Change some fields of a %s" (lower .Label))}}
+      summary: {{quote (printf "Change some fields of %s %s" $a (lower .Label))}}
       description: |
         Changes only the fields sent: one left out stays as it is, and null
         empties one that may be empty. Without If-Match, a change someone else
@@ -247,6 +253,7 @@ paths:
                 $ref: "#/components/schemas/{{.Pascal}}"
         default:
           $ref: "#/components/responses/Problem"
+{{- if not (single $e)}}
     delete:
       operationId: delete{{.Pascal}}
       summary: {{quote (printf "Delete a %s" (lower .Label))}}
@@ -263,16 +270,21 @@ paths:
           description: {{if softDeleted $e}}In the trash.{{else}}Deleted.{{end}}
         default:
           $ref: "#/components/responses/Problem"
+{{- end}}
 {{- if audited $e (optionsOf "audit")}}
+{{- if single $e}}
+  /api/v1/{{.Kebab}}/history:
+{{- else}}
   /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/history:
     parameters:
       - name: {{$id}}
         in: path
         required: true
         schema: {type: string, format: uuid}
+{{- end}}
     get:
       operationId: history{{.Pascal}}
-      summary: {{quote (printf "The history of a %s" (lower .Label))}}
+      summary: {{quote (printf "The history of %s %s" $a (lower .Label))}}
       description: |
         Its changes, the newest first: who, when, and each field before and
         after (a secret one only that it changed). By page, `page` from 1 and

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"text/template"
 
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -33,7 +34,8 @@ func Keys(e *project.Entity) []*project.Relation {
 
 // Ordered are the entities, each after the ones it points at (when it
 // can), in the model's order otherwise: the order a seed creates them in,
-// and deletes them backwards.
+// and deletes them backwards. A single entity is left out: its one record
+// has its defaults.
 func Ordered(entities []*project.Entity) []*project.Entity {
 	var out []*project.Entity
 	placed := map[*project.Entity]bool{}
@@ -54,7 +56,9 @@ func Ordered(entities []*project.Entity) []*project.Entity {
 		out = append(out, e)
 	}
 	for _, e := range entities {
-		place(e)
+		if !store.Single(e) {
+			place(e)
+		}
 	}
 	return out
 }

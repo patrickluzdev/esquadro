@@ -120,6 +120,8 @@ func TemplateFuncs() template.FuncMap {
 		"initialisms":     project.Initialisms,
 		"link":            link,
 		"softDeleted":     SoftDeleted,
+		"single":          Single,
+		"singleID":        func() string { return SingleID },
 		"dependents":      Dependents,
 		"trashedParents":  TrashedParents,
 		"onDelete":        OnDelete,

@@ -1,7 +1,16 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "errors" "uuid"}}
+{{importBlock "context" "errors" (and (not (single $e)) "uuid")}}
+{{- if single $e}}
+// Patch{{$e.Pascal}} changes only what changes sets of the {{lower $e.Label}}, once the
+// whole {{lower $e.Label}} passes the rules declared for it. With a version (not 0),
+// only that version is changed: Err{{$e.Pascal}}Changed when someone changed it
+// since. Without one, a change someone makes meanwhile is kept: changes
+// apply to it again. guard, when not nil, sees each attempt and may adjust
+// n or refuse it.
+func ({{$r}} *{{$m.Pascal}}) Patch{{$e.Pascal}}(ctx context.Context, version int, changes {{$e.Pascal}}Changes, guard func(stored {{$e.Pascal}}, n *New{{$e.Pascal}}) error) ({{$e.Pascal}}, error) {
+{{- else}}
 // Patch{{$e.Pascal}} changes only what changes sets of the {{lower $e.Label}} with the given
 // id, once the whole {{lower $e.Label}} passes the rules declared for {{$e.Plural.Snake}}.
 // With a version (not 0), only that version is changed: Err{{$e.Pascal}}Changed
@@ -9,8 +18,9 @@ package {{$m.Snake}}
 // meanwhile is kept: changes apply to it again. guard, when not nil, sees
 // each attempt and may adjust n or refuse it.
 func ({{$r}} *{{$m.Pascal}}) Patch{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int, changes {{$e.Pascal}}Changes, guard func(stored {{$e.Pascal}}, n *New{{$e.Pascal}}) error) ({{$e.Pascal}}, error) {
+{{- end}}
 	for attempt := 1; ; attempt++ {
-		stored, err := {{$r}}.Read{{$e.Pascal}}(ctx, id)
+		stored, err := {{$r}}.Read{{$e.Pascal}}(ctx{{if not (single $e)}}, id{{end}})
 		if err != nil {
 			return {{$e.Pascal}}{}, err
 		}
@@ -26,7 +36,7 @@ func ({{$r}} *{{$m.Pascal}}) Patch{{$e.Pascal}}(ctx context.Context, id uuid.UUI
 		if changes.Empty() {
 			return stored, nil
 		}
-		updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, id, stored.Version, n)
+		updated, err := {{$r}}.Update{{$e.Pascal}}(ctx{{if not (single $e)}}, id{{end}}, stored.Version, n)
 		if errors.Is(err, Err{{$e.Pascal}}Changed) && version == 0 && attempt < 3 {
 			continue
 		}

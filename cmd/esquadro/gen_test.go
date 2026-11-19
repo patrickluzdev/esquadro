@@ -357,3 +357,25 @@ func TestCheckUniqueJobs(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckSingleEntities(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":       {"entity Settings {\n  daily_limit int required default(20)\n  note string\n  @store(single)\n}\n", ""},
+		"default":  {"entity Settings {\n  daily_limit int required\n  @store(single)\n}\n", "Settings.daily_limit is required in a single entity: give it a default"},
+		"trash":    {"entity Settings {\n  note string\n  @store(single, soft_delete)\n}\n", "Settings is single and soft_delete"},
+		"relation": {"entity Settings {\n  category > Category\n  @store(single)\n}\n", "Settings is single and has the relation category"},
+		"pointed":  {"entity Settings {\n  note string\n  @store(single)\n}\n\nentity Note {\n  settings > Settings\n}\n", "Note.settings points at Settings, which is single"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

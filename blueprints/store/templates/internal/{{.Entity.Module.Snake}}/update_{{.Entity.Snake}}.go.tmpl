@@ -1,13 +1,22 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "update"}}{{end}}{{$links := idLinks $e}}{{$tx := true -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "errors" (and (not (single $e)) "uuid") "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{- if single $e}}
+// Update{{$e.Pascal}} replaces the {{lower $e.Label}} by n, with its defaults, once it
+// passes the rules declared for it and those of {{$e.Snake}}_rules.go, in the
+// same transaction. With a version (not 0), only that version is replaced:
+// Err{{$e.Pascal}}Changed when someone changed it since.
+func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, version int, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
+	id := {{$e.Camel}}ID
+{{- else}}
 // Update{{$e.Pascal}} replaces the {{lower $e.Label}} with the given id by n, with
 // its defaults, once it passes the rules declared for {{$e.Plural.Snake}} and those
 // of {{$e.Snake}}_rules.go, in the same transaction. With a
 // version (not 0), only that version is replaced: Err{{$e.Pascal}}Changed when
 // someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
+{{- end}}
 	n = n.WithDefaults()
 	if err := n.Validate(); err != nil {
 		return {{$e.Pascal}}{}, err
@@ -22,7 +31,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	var updated {{$e.Pascal}}
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
 		q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+{{- if single $e}}
+		before, err := ensure{{$e.Pascal}}(ctx, q)
+{{- else}}
 		before, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+{{- end}}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Err{{$e.Pascal}}NotFound
 		}

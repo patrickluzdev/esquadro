@@ -1,4 +1,5 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1) -}}
+{{- if not (single $e) -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -36,3 +37,4 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Pascal}}{{.Pascal}}Of(ctx context.Context,
 	return linked, more, nil
 }
 {{- end}}{{end}}
+{{- end}}

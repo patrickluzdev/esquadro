@@ -319,6 +319,56 @@ func TestAPI{{$P}}{{$R}}(t *testing.T) {
 }
 {{- end}}{{end}}
 {{- end}}
+{{- range .Entities}}{{if singleAPI .}}{{$P := .Pascal}}
+
+// TestAPI{{$P}} reads the {{lower .Label}} before anyone saved it, changes it whole
+// and by PATCH, refuses an old version, and has no list, create or delete.
+func TestAPI{{$P}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := c.Get{{$P}}(ctx, apigen.Get{{$P}}Params{})
+	if err != nil || first.Version != 1 {
+		t.Fatalf("read before anyone saved it: %+v, %v", first, err)
+	}
+	const i = 1
+	updated, err := c.Update{{$P}}(ctx, &apigen.New{{$P}}{
+{{- range inRequest .}}{{if .Required}}
+		{{ogenName (jsonName .)}}: {{apiSample . "i"}},
+{{- end}}{{end}}
+	}, apigen.Update{{$P}}Params{IfMatch: apigen.NewOptString(`"1"`)})
+	if err != nil || updated.ID != first.ID || updated.Version != 2 {
+		t.Fatalf("update: %+v, %v", updated, err)
+	}
+	same, err := c.Patch{{$P}}(ctx, &apigen.{{$P}}Changes{}, apigen.Patch{{$P}}Params{IfMatch: apigen.NewOptString(`"2"`)})
+	if err != nil || same.Version != 2 {
+		t.Fatalf("nothing to change: %+v, %v", same, err)
+	}
+	_, err = c.Patch{{$P}}(ctx, &apigen.{{$P}}Changes{}, apigen.Patch{{$P}}Params{IfMatch: apigen.NewOptString(`"1"`)})
+	if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != 412 {
+		t.Fatalf("an old version: %v, want 412", err)
+	}
+	for _, method := range []string{http.MethodPost, http.MethodDelete} {
+		req, err := http.NewRequestWithContext(ctx, method, srv.URL+"/api/v1/{{.Kebab}}", strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		res, err := testClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s /{{.Kebab}}: %d, want 405", method, res.StatusCode)
+		}
+	}
+}
+{{- end}}{{end}}
 {{- $first := ""}}{{range .Entities}}{{if and (not $first) (canSampleAPI .)}}{{$first = .Pascal}}{{end}}{{end}}
 {{- range .Entities}}{{if eq .Pascal $first}}
 

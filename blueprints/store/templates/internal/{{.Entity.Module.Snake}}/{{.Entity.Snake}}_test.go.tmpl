@@ -9,6 +9,118 @@ func Test{{$e.Pascal}}UseCases(t *testing.T) {
 	t.Skip("esquadro cannot write a valid New{{$e.Pascal}}: a required field has a pattern, or a required relation needs such a record. " +
 		"Write the tests of {{$e.Plural.Snake}} by hand.")
 }
+{{- else if single $e}}
+
+{{- $texts := textFields $e}}{{$audited := audited $e (optionsOf "audit")}}
+{{importBlock "context" "errors" (and $audited "strings") "testing" "uuid" (and $audited (printf "%s/internal/platform/audit" .App.Module)) (and $texts "reflect") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+// given{{$e.Pascal}} returns a valid New{{$e.Pascal}}; i tells values apart. Change
+// the values freely: esquadro wrote them from the rules in the .esq file.
+func given{{$e.Pascal}}(t *testing.T, i int) {{$p}}.New{{$e.Pascal}} {
+	t.Helper()
+	return {{$p}}.New{{$e.Pascal}}{
+{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{with sample $f $p "i"}}
+		{{$f.Pascal}}: {{.}},
+{{- end}}{{end}}{{end}}
+	}
+}
+
+// TestRead{{$e.Pascal}} reads the {{lower $e.Label}} before anyone saved it: there is
+// one, with its defaults, and always the same one.
+func TestRead{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	first, err := {{$r}}.Read{{$e.Pascal}}(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == uuid.Nil() || first.Version != 1 {
+		t.Fatalf("read %+v", first)
+	}
+	again, err := {{$r}}.Read{{$e.Pascal}}(ctx)
+	if err != nil || again.ID != first.ID || again.Version != first.Version {
+		t.Fatalf("read again %+v, %v; first %+v", again, err, first)
+	}
+}
+
+// TestUpdate{{$e.Pascal}} saves the {{lower $e.Label}}, before it was ever read and
+// after, and refuses a version that is no longer its own.
+func TestUpdate{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, 0, given{{$e.Pascal}}(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := {{$r}}.Read{{$e.Pascal}}(ctx)
+	if err != nil || read.ID != updated.ID || read.Version != updated.Version {
+		t.Fatalf("read %+v, %v; updated %+v", read, err, updated)
+	}
+	again, err := {{$r}}.Update{{$e.Pascal}}(ctx, updated.Version, given{{$e.Pascal}}(t, 2))
+	if err != nil || again.ID != updated.ID || again.Version != updated.Version+1 {
+		t.Fatalf("updated again %+v, %v", again, err)
+	}
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, updated.Version, given{{$e.Pascal}}(t, 3)); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}Changed) {
+		t.Fatalf("updating an old version: %v", err)
+	}
+}
+{{- if $texts}}{{$f := index $texts 0}}
+
+// TestPatch{{$e.Pascal}} changes one field of the {{lower $e.Label}} and keeps the rest.
+func TestPatch{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	stored, err := {{$r}}.Read{{$e.Pascal}}(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := given{{$e.Pascal}}(t, 2)
+	patched, err := {{$r}}.Patch{{$e.Pascal}}(ctx, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &other.{{$f.Pascal}}}, nil)
+	if err != nil || patched.{{$f.Pascal}} != other.{{$f.Pascal}} || patched.Version != stored.Version+1 {
+		t.Fatalf("patch: %+v, %v", patched, err)
+	}
+	keep := {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &stored.{{$f.Pascal}}}
+	if got, want := keep.Apply(patched), keep.Apply(stored); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the other fields changed: %+v, want %+v", got, want)
+	}
+	if _, err := {{$r}}.Patch{{$e.Pascal}}(ctx, stored.Version, keep, nil); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}Changed) {
+		t.Fatalf("patching an old version: %v", err)
+	}
+}
+{{- end}}
+{{- if $audited}}
+
+func TestAudit{{$e.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := audit.AsSystem(context.Background(), "test")
+	pool := postgrestest.Fresh(t)
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: pool})
+
+	updated, err := {{$r}}.Update{{$e.Pascal}}(ctx, 0, given{{$e.Pascal}}(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, 0, given{{$e.Pascal}}(t, 2)); err != nil {
+		t.Fatal(err)
+	}
+	page, err := audit.List(ctx, pool, audit.Filter{Entity: {{quote $e.Plural.Snake}}, RecordID: updated.ID}, 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actions []string
+	for _, c := range page.Items {
+		actions = append(actions, c.Action)
+	}
+	if strings.Join(actions, ",") != "update,update" {
+		t.Fatalf("kept %v", actions)
+	}
+}
+{{- end}}
 {{- else}}
 
 {{- $texts := textFields $e}}

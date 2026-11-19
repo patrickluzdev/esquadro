@@ -1,4 +1,5 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "delete"}}{{end}}{{$tx := true -}}
+{{- if not (single $e) -}}
 package {{$m.Snake}}
 {{if softDeleted $e}}
 {{importBlock "context" "time" "uuid" (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -87,5 +88,6 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 	}
 	return nil
 }
+{{- end}}
 {{- end}}
 {{- end}}

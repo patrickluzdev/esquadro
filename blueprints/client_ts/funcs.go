@@ -65,6 +65,7 @@ func TemplateFuncs() template.FuncMap {
 		"tsPattern":   tsPattern,
 		"enumName":    func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
 		"softDeleted": store.SoftDeleted,
+		"single":      store.Single,
 		"idLinks":     store.IDLinks,
 		"audited":     audit.Audited,
 		"auditedOf":   audit.AuditedOf,
@@ -160,6 +161,9 @@ func tsPattern(f *project.Field) string {
 // sampleable reports whether the generated tests can write an e: no
 // required relation, and no required field with a pattern.
 func sampleable(e *project.Entity) bool {
+	if store.Single(e) {
+		return false // it has no create
+	}
 	for _, r := range rest.Keys(e) {
 		if r.Required {
 			return false

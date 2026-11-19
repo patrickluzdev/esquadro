@@ -1,4 +1,5 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "create"}}{{end}}{{$links := idLinks $e}}{{$tx := true -}}
+{{- if not (single $e) -}}
 package {{$m.Snake}}
 
 {{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -74,4 +75,5 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	}
 	return {{$e.Camel}}Of(row), nil
 }
+{{- end}}
 {{- end}}

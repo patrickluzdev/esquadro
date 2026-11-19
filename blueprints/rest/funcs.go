@@ -102,11 +102,13 @@ func TemplateFuncs() template.FuncMap {
 		"needsType":        needsType,
 		"apiFieldNames":    apiFieldNames,
 		"canSampleAPI":     canSampleAPI,
+		"singleAPI":        singleAPI,
 		"apiParents":       apiParents,
 		"apiSample":        apiSample,
 		"apiSampleImports": apiSampleImports,
 		"modulePaths":      modulePaths,
 		"softDeleted":      store.SoftDeleted,
+		"single":           store.Single,
 		"idLinks":          store.IDLinks,
 		"html":             HTML,
 		"anyHTML": func(entities []*project.Entity) bool {
@@ -460,10 +462,19 @@ func apiFieldNames(m *project.Module) []FieldName {
 
 // ---- test data ----
 
-// canSampleAPI reports whether esquadro can write a valid request for an
-// entity: not when a required field has a pattern, nor when a required
-// relation of its module needs such a record or loops back.
-func canSampleAPI(e *project.Entity) bool { return sampleableAPI(e, map[*project.Entity]bool{}) }
+// canSampleAPI reports whether esquadro can write a valid request to
+// create a record of an entity: not when a required field has a pattern,
+// nor when a required relation of its module needs such a record or loops
+// back, nor for a single entity, which has no create.
+func canSampleAPI(e *project.Entity) bool {
+	return !store.Single(e) && sampleableAPI(e, map[*project.Entity]bool{})
+}
+
+// singleAPI reports whether an entity is single and esquadro can write a
+// valid request to change it, for its test.
+func singleAPI(e *project.Entity) bool {
+	return store.Single(e) && sampleableAPI(e, map[*project.Entity]bool{})
+}
 
 func sampleableAPI(e *project.Entity, visiting map[*project.Entity]bool) bool {
 	if visiting[e] {

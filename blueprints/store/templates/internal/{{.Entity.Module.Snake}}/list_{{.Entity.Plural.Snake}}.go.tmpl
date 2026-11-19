@@ -1,5 +1,6 @@
 {{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$pg := optionsOf "postgres"}}
 {{- $fs := listFilters $e}}{{$ss := listSorts $e $pg}}{{$search := searchFields $e}}{{$own := ownerColumn .Entities $e -}}
+{{- if not (single $e) -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "github.com/jackc/pgx/v5/pgtype" (listImports .Entities $e $pg) (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -170,6 +171,7 @@ func {{$e.Camel}}PageOf(rows []sqlgen.{{sqlcModel $e $pg}}, size int, cursor fun
 	}
 	return page
 }
+{{- end}}
 {{- define "filters"}}
 {{- if .own}}
 			OwnerID: postgres.UUID(q.Owner),

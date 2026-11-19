@@ -9,6 +9,11 @@ RETURNING *;
 
 -- name: Get{{$e.Pascal}} :one
 SELECT * FROM {{$t}} WHERE id = @id{{$live}};
+{{- if single $e}}
+
+-- name: Ensure{{$e.Pascal}} :exec
+INSERT INTO {{$t}} (id) VALUES (@id) ON CONFLICT (id) DO NOTHING;
+{{- end}}
 
 -- name: Get{{$e.Plural.Pascal}}ByIDs :many
 SELECT * FROM {{$t}} WHERE id = ANY(@ids::uuid[]){{$live}};
