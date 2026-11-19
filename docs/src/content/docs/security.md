@@ -315,7 +315,8 @@ blueprint's `invitation` template, saying who invited.
 
 ```sh
 go run ./cmd/shop security create user ana@example.com name=Ana -role admin
-go run ./cmd/shop security invite user bia@example.com name=Bia -role staff -redirect /admin/reset-password
+go run ./cmd/shop security invite user bia@example.com name=Bia -role staff
+go run ./cmd/shop security reset user ana@example.com
 go run ./cmd/shop security grant user ana@example.com staff
 go run ./cmd/shop security revoke user ana@example.com admin
 go run ./cmd/shop security sessions user ana@example.com
@@ -325,7 +326,12 @@ go run ./cmd/shop security rotate-keys
 ```
 
 `create` prints a link that sets the password; with `-password-stdin` it reads
-the password instead, never from the arguments.
+the password instead, never from the arguments. `reset` prints a new link
+for an account that has one already, or lost it. The link, and `invite`'s,
+opens the page that sets a password of the realm's frontend
+(`/admin/reset-password` of a panel, `/nova-senha` of a site in pt_br), or
+the page `-redirect` names. In development a panel's link is also printed
+at the address `task dev` serves it from (`http://localhost:5173/admin/...`).
 
 ## Tests
 

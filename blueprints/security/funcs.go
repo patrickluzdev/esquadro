@@ -113,6 +113,14 @@ func Admins(entities []*project.Entity, e *project.Entity) []string {
 	return out
 }
 
+// ResetPageOf is a realm's page that sets a password: its path on the app's
+// domain, and the server task dev serves it from in development, when that
+// is another (a panel's Vite).
+type ResetPageOf struct{ Path, Dev string }
+
+// DevServer is where task dev serves a panel by default: Vite's address.
+const DevServer = "http://localhost:5173"
+
 // PanelResetPage is the page of a panel (spa) that sets a password.
 const PanelResetPage = "reset-password"
 
@@ -150,12 +158,12 @@ func ResetPage(kind, name string, opts map[string]any) string {
 // ResetPages are the pages that set a password, by realm: those of the
 // first frontend that signs each realm in (its auth, or the first realm),
 // on the app's domain.
-func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[string]string {
+func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[string]ResetPageOf {
 	realms := RealmsOf(entities)
 	if len(realms) == 0 {
 		return nil
 	}
-	out := map[string]string{}
+	out := map[string]ResetPageOf{}
 	for _, f := range frontends {
 		realm, _ := f.Options["auth"].(string)
 		if realm == "" {
@@ -165,7 +173,11 @@ func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[s
 			continue
 		}
 		if page := ResetPage(f.Kind, f.Name, f.Options); page != "" {
-			out[realm] = page
+			r := ResetPageOf{Path: page}
+			if f.Kind == "spa" {
+				r.Dev = DevServer
+			}
+			out[realm] = r
 		}
 	}
 	return out

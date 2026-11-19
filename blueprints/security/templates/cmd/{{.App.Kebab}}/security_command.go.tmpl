@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"uuid"
 {{- if .Options.services}}
 	"time"
 {{- end}}
@@ -30,6 +31,8 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
   grant <realm> <email> <role>     give a role
   revoke <realm> <email> <role>    take a role away
   sessions <realm> <email>         the open sessions of an account
+  reset <realm> <email> [-redirect /path]
+                                   a link to set the password of an account
   delete <realm> <email>           delete an account and its principal
   cleanup                          delete expired sessions, links and keys
   rotate-keys                      a new JWT signing key
@@ -42,15 +45,20 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
 
 realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
-// securityCommand runs {{.App.Kebab}} security <command>.
+// resetPage is the page of a frontend that sets a password: its path on
+// the app's domain, and where task dev serves it in development, when that
+// is another server (a panel's Vite).
+type resetPage struct{ path, dev string }
+
 // resetPages are the pages that set a password, by realm: those of the
-// frontend that signs it in, on the app's domain.
-var resetPages = map[string]string{
+// frontend that signs it in.
+var resetPages = map[string]resetPage{
 {{- range $realm, $page := resetPages .Entities frontends}}
-	{{quote $realm}}: {{quote $page}},
+	{{quote $realm}}: {path: {{quote $page.Path}}{{with $page.Dev}}, dev: {{quote .}}{{end}}},
 {{- end}}
 }
 
+// securityCommand runs {{.App.Kebab}} security <command>.
 func securityCommand(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return errors.New(securityUsage)
@@ -116,6 +124,8 @@ func securityCommand(ctx context.Context, args []string) error {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.ID, s.CreatedAt.Format("2006-01-02 15:04"), s.LastSeenAt.Format("2006-01-02 15:04"), s.IPAddress, s.UserAgent)
 		}
 		return w.Flush()
+	case command == "reset":
+		return resetAccount(ctx, d, realm.Name, id, args[2:])
 	case command == "delete" && len(args) == 2:
 		return d.security.DeleteAccount(ctx, realm, id)
 	}
@@ -136,11 +146,7 @@ func createAccount(ctx context.Context, d dependencies, args []string, stdin io.
 	var roles roleList
 	fs.Var(&roles, "role", "a role of the account; repeat it for more")
 	fromStdin := fs.Bool("password-stdin", false, "read the password from stdin, instead of answering a link to set it")
-	page := resetPages[realm.Name]
-	if page == "" {
-		page = "/"
-	}
-	redirect := fs.String("redirect", page, "the page of the app the link opens, which sets the password")
+	redirect := fs.String("redirect", resetPathOf(realm.Name), "the page of the app the link opens, which sets the password")
 	// Fields come before the flags: name=Ana -role admin.
 	fields := map[string]any{}
 	rest := args[2:]
@@ -186,11 +192,41 @@ func createAccount(ctx context.Context, d dependencies, args []string, stdin io.
 	if password != "" {
 		return nil
 	}
-	link, expires, err := d.security.ResetLink(ctx, realm.Name, id, *redirect)
+	return printResetLink(ctx, d, realm.Name, id, *redirect)
+}
+
+// resetPathOf is the page a realm's links open: its frontend's, or /.
+func resetPathOf(realm string) string {
+	if p := resetPages[realm].path; p != "" {
+		return p
+	}
+	return "/"
+}
+
+// resetAccount runs security reset: a new link to set an account's
+// password, for one who lost it or never chose it.
+func resetAccount(ctx context.Context, d dependencies, realm string, id uuid.UUID, args []string) error {
+	fs := flag.NewFlagSet("security reset", flag.ContinueOnError)
+	redirect := fs.String("redirect", resetPathOf(realm), "the page of the app the link opens, which sets the password")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return printResetLink(ctx, d, realm, id, *redirect)
+}
+
+// printResetLink prints a link that sets the password of the account id,
+// on redirect; in development, also where task dev serves that page.
+func printResetLink(ctx context.Context, d dependencies, realm string, id uuid.UUID, redirect string) error {
+	link, expires, err := d.security.ResetLink(ctx, realm, id, redirect)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("its password is set at %s\nuntil %s\n", link, expires.Local().Format("2006-01-02 15:04"))
+	if page := resetPages[realm]; d.config.Env == "development" && page.dev != "" && strings.HasPrefix(redirect, page.path) {
+		if i := strings.Index(link, redirect); i >= 0 {
+			fmt.Printf("in development, task dev serves it at %s\n", page.dev+link[i:])
+		}
+	}
 	return nil
 }
 
