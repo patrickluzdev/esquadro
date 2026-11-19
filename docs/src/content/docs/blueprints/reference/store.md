@@ -37,6 +37,8 @@ blueprint store {
 |---|---|---|---|
 | entity | `soft_delete` | bool | Deleting a record puts it in the trash (deleted_at), from which it may be restored or deleted for good; reads and lists leave it out. |
 | entity | `single` | bool | One record only, which always exists, with its defaults until someone changes it: read and changed, never listed, created or deleted (settings the team tunes without a deploy). |
+| entity | `import` | bool | Records may be imported in a batch (a CSV in the admin panel): all or none, each through the rules of a create. |
+| entity | `import_by` | name | Imported by this field, unique and required: a row with the value of a record updates it, others are created (import_by external_id). |
 | field | `filter` | bool | Lists may filter by it: by value, by range (numbers and dates), or by a list of values (enums). |
 | field | `sort` | bool | Lists may be ordered by it; only a required field, so that pages keep every record. |
 | field | `search` | bool | Lists may search its text (q). |
