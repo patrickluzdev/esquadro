@@ -1,0 +1,14 @@
+{{- /* The text of every email: its "content", then, with a brand (or an
+address), the footer. Yours to change, or delete for the text alone. */ -}}
+{{template "content" .}}
+{{- if branded}}
+
+--
+{{app}}
+{{block "why" .}}{{word "why"}}{{end}}
+{{- end}}
+{{- with address}}
+{{if not branded}}
+--
+{{end}}{{.}}
+{{- end}}

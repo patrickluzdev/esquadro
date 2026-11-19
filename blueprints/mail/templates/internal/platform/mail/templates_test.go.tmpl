@@ -39,6 +39,59 @@ func TestTemplates(t *testing.T) {
 	}
 }
 
+// The layouts wrap the emails and are none: a name with _ is not one.
+func TestLayoutsAreNoEmails(t *testing.T) {
+	for _, name := range Templates() {
+		if strings.HasPrefix(name, "_") {
+			t.Errorf("%s is a layout, listed as an email", name)
+		}
+	}
+	if _, err := Write("_layout", map[string]any{}); err == nil {
+		t.Error("a layout was written as an email")
+	}
+}
+
+// button writes a link as a button, escaped, and leaves out a link that
+// is not one a reader may follow; a text writes the label and the link.
+func TestButton(t *testing.T) {
+	got := string(button("https://shop.example/a?b=1&c=2", "Go <now>"))
+	if !strings.Contains(got, `href="https://shop.example/a?b=1&amp;c=2"`) || !strings.Contains(got, "Go &lt;now&gt;") {
+		t.Errorf("button: %s", got)
+	}
+	if branded && !strings.Contains(got, colors["accent"]) {
+		t.Errorf("a brand's button is in its accent: %s", got)
+	}
+	if got := string(button("javascript:alert(1)", "Go")); strings.Contains(got, "href") || strings.Contains(got, "javascript") {
+		t.Errorf("a script as a link: %s", got)
+	}
+	text := layoutFuncs(false)["button"].(func(string, string) string)
+	if got := text("https://shop.example/a", "Go"); got != "Go:\nhttps://shop.example/a" {
+		t.Errorf("a text's button: %q", got)
+	}
+}
+
+// The logo goes along with an email that shows it, once; never with one
+// that does not.
+func TestLogo(t *testing.T) {
+	if strings.Contains(word("why"), "{app}") || !strings.Contains(word("why"), App) {
+		t.Errorf("the footer's word without the app's name: %s", word("why"))
+	}
+	shows := Message{HTML: `<img src="cid:` + logoCID + `">`}
+	if logo() == nil {
+		if len(withLogo(shows).Inline) != 0 {
+			t.Error("no logo, yet one went along")
+		}
+		return
+	}
+	once := withLogo(withLogo(shows))
+	if len(once.Inline) != 1 || once.Inline[0].CID != logoCID || len(once.Inline[0].Data) == 0 {
+		t.Fatalf("the logo: %+v", once.Inline)
+	}
+	if len(withLogo(Message{HTML: "<p>no logo</p>"}).Inline) != 0 {
+		t.Error("the logo went with an email that does not show it")
+	}
+}
+
 func TestWriteAndSend(t *testing.T) {
 	msg, err := Write("welcome", map[string]any{"Name": "<Ana>"})
 	if err != nil || msg.Subject != "Welcome, <Ana>" || !strings.Contains(msg.HTML, "Hi &lt;Ana&gt;") || !strings.Contains(msg.Text, "Hi <Ana>,") {

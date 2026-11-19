@@ -3,6 +3,7 @@ package mail
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,10 +19,21 @@ type resend struct {
 }
 
 func (r *resend) Deliver(ctx context.Context, m Message) error {
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"from": m.From, "to": m.To, "subject": m.Subject, "text": m.Text,
 		"html": m.HTML, "reply_to": m.ReplyTo,
-	})
+	}
+	// The files the HTML shows (the logo) go as attachments named by their
+	// content_id, as cid: names them.
+	var attachments []map[string]string
+	for _, in := range m.Inline {
+		attachments = append(attachments, map[string]string{"filename": in.Name, "content": base64.StdEncoding.EncodeToString(in.Data),
+			"content_type": in.Type, "content_id": in.CID})
+	}
+	if attachments != nil {
+		payload["attachments"] = attachments
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}

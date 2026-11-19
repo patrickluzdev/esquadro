@@ -31,6 +31,19 @@ type Message struct {
 	Text    string
 	// HTML is optional; the text goes along for the readers without it.
 	HTML string
+	// Inline are the files the HTML shows by cid:<CID>, as the brand's
+	// logo, which Deliver adds to a message that shows it.
+	Inline []Inline `json:",omitempty"`
+}
+
+// Inline is a file an email's HTML shows, sent along with it: a picture
+// <img src="cid:CID">.
+type Inline struct {
+	CID  string
+	Name string
+	// Type is its media type: image/png.
+	Type string
+	Data []byte
 }
 
 // Transport hands messages to whoever delivers them.
@@ -95,7 +108,7 @@ func NewWith(transport Transport, from string) *Mailer {
 }
 
 // Deliver hands a written message to the transport now, from MAIL_FROM
-// unless it says otherwise.
+// unless it says otherwise, with the logo its HTML shows.
 func (m *Mailer) Deliver(ctx context.Context, msg Message) error {
 	if msg.From == "" {
 		msg.From = m.from
@@ -103,6 +116,7 @@ func (m *Mailer) Deliver(ctx context.Context, msg Message) error {
 	if msg.ID == "" {
 		msg.ID = uuid.NewV7().String()
 	}
+	msg = withLogo(msg)
 	if err := check(msg); err != nil {
 		return err
 	}
@@ -134,6 +148,11 @@ func check(m Message) error {
 	}
 	if m.Text == "" {
 		return errors.New("mail: a message without text")
+	}
+	for _, in := range m.Inline {
+		if in.CID == "" || in.Type == "" || len(in.Data) == 0 || strings.ContainsAny(in.CID+in.Name+in.Type, "\r\n<>\"") {
+			return fmt.Errorf("mail: an inline file %q that is not one: a CID, a name, a type and its data", in.CID)
+		}
 	}
 	return nil
 }

@@ -19,4 +19,17 @@ blueprint mail {
   env MAIL_FROM string required development("{{.App.Label}} <no-reply@localhost>")
   requires app, env
   optional jobs, compose, domain, testcontainers, docker
+
+  /// The project's folder of its brand (brand, the same an ssr site may
+  /// name), with its theme.json: the emails' layout takes its colors, the
+  /// names of its fonts, and its logo (identity.logo_email, or a logo that
+  /// is a PNG, JPEG or GIF), sent with each email. Without one, the emails
+  /// keep their neutral look.
+  option brand string default("")
+  /// The language of the words the layout writes (its footer): en, pt_br,
+  /// or frontend, the first frontend's (en without one).
+  option locale name default(frontend)
+  /// A line the emails' footer ends with, as the postal address some laws
+  /// ask of them: Shop Ltd, 1 Main Street, Springfield.
+  option address string default("")
 }

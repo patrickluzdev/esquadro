@@ -17,6 +17,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
 	"github.com/patrickluzdev/esquadro/blueprints/integration"
 	"github.com/patrickluzdev/esquadro/blueprints/jobs"
+	mailbp "github.com/patrickluzdev/esquadro/blueprints/mail"
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
 	"github.com/patrickluzdev/esquadro/blueprints/notifications"
 	"github.com/patrickluzdev/esquadro/blueprints/platform/apps"
@@ -68,6 +69,7 @@ func init() {
 	blueprint.Checks["storage"] = storage.Check
 	blueprint.Checks["integration"] = integration.Check
 	blueprint.Checks["rate_limit"] = ratelimit.Check
+	blueprint.Checks["mail"] = mailbp.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
@@ -87,6 +89,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"notifications": notifications.TemplateFuncs(),
 	"storage":       storage.TemplateFuncs(),
 	"integration":   integration.TemplateFuncs(),
+	"mail":          mailbp.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

@@ -253,6 +253,54 @@ func TestConfigAndMessagesRefused(t *testing.T) {
 	}
 }
 
+// A picture the HTML shows by cid: goes along with it: by SMTP, in a
+// multipart/related part beside the HTML; by Resend, an attachment named
+// by its content_id.
+func TestInlineFiles(t *testing.T) {
+	msg := message
+	msg.HTML = `<img src="cid:pic"><p>Seu pedido chegou</p>`
+	msg.Inline = []Inline{ {CID: "pic", Name: "pic.png", Type: "image/png", Data: []byte("\x89PNG")} }
+	raw, err := mimeOf(msg, "shop.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(raw)
+	for _, want := range []string{"multipart/alternative", `multipart/related; type="text/html"`, "Content-ID: <pic>", "Content-Type: image/png; name=pic.png",
+		"Content-Disposition: inline; filename=pic.png", "Content-Transfer-Encoding: base64", "iVBORw=="} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "text/plain") > strings.Index(got, "multipart/related") {
+		t.Error("the text comes first, the HTML with its pictures after")
+	}
+
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Write([]byte(`{"id":"x"}`))
+	}))
+	defer srv.Close()
+	if err := (&resend{key: "re_1", endpoint: srv.URL}).Deliver(t.Context(), msg); err != nil {
+		t.Fatal(err)
+	}
+	attachments, _ := body["attachments"].([]any)
+	if len(attachments) != 1 {
+		t.Fatalf("attachments: %v", body["attachments"])
+	}
+	a := attachments[0].(map[string]any)
+	if a["content_id"] != "pic" || a["filename"] != "pic.png" || a["content_type"] != "image/png" || a["content"] != "iVBORw==" {
+		t.Errorf("attachment: %v", a)
+	}
+
+	m, _ := New(Config{URL: "log://", From: "a@b.example"}, nil)
+	bad := msg
+	bad.Inline = []Inline{ {CID: "pic\r\nBcc: evil@example.com", Name: "pic.png", Type: "image/png", Data: []byte("x")} }
+	if err := m.Deliver(t.Context(), bad); err == nil {
+		t.Error("a CID with a line break passed")
+	}
+}
+
 // transportFunc is a transport that hands messages to a function.
 type transportFunc func(Message)
 

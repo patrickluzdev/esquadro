@@ -1,5 +1,5 @@
 {{define "content"}}
 <p>Open this link to use this email in your account:</p>
-<p><a href="{{.Link}}">Use this email</a></p>
+{{button .Link "Use this email"}}
 <p>It works until {{.Expires}}.</p>
 {{end}}

@@ -83,9 +83,13 @@ type Motion struct {
 	Curve    string `json:"curve"`
 }
 
-// BrandIdentity is what names the site.
+// BrandIdentity is what names the site, and its emails.
 type BrandIdentity struct {
-	Logo       string `json:"logo"`
+	Logo string `json:"logo"`
+	// LogoEmail is the logo the emails show, a PNG, JPEG or GIF: email
+	// clients do not show SVG. Without it, the emails show Logo when it is
+	// one of those, else the app's name.
+	LogoEmail  string `json:"logo_email"`
 	LogoOnDark string `json:"logo_on_dark"`
 	Symbol     string `json:"symbol"`
 	Icons      string `json:"icons"`
@@ -185,10 +189,13 @@ func (b *Brand) Problems() []string {
 		out = append(out, b.missing("states."+name, file)...)
 	}
 	id := t.Identity
-	for key, file := range map[string]string{"logo": id.Logo, "logo_on_dark": id.LogoOnDark, "symbol": id.Symbol, "og_image": id.OGImage} {
+	for key, file := range map[string]string{"logo": id.Logo, "logo_email": id.LogoEmail, "logo_on_dark": id.LogoOnDark, "symbol": id.Symbol, "og_image": id.OGImage} {
 		if file != "" {
 			out = append(out, b.missing("identity."+key, file)...)
 		}
+	}
+	if id.LogoEmail != "" && emailImageType(id.LogoEmail) == "" {
+		out = append(out, fmt.Sprintf("identity.logo_email %s is not a PNG, JPEG or GIF, the pictures email clients show", id.LogoEmail))
 	}
 	if id.Icons != "" {
 		if st, err := os.Stat(filepath.Join(b.Root, b.Dir, id.Icons)); err != nil || !st.IsDir() {
@@ -219,6 +226,52 @@ func (b *Brand) Color(name string) string {
 		return c
 	}
 	return roleDefaults[name]
+}
+
+// EmailLogo is the logo the emails show, a file of the brand folder, and
+// its media type: identity.logo_email, or identity.logo when it is a PNG,
+// JPEG or GIF; "" without one, when the emails show the app's name.
+func (b *Brand) EmailLogo() (file, mediaType string) {
+	for _, f := range []string{b.Theme.Identity.LogoEmail, b.Theme.Identity.Logo} {
+		if t := emailImageType(f); t != "" {
+			return f, t
+		}
+	}
+	return "", ""
+}
+
+// emailImageType is the media type of a picture every email client shows,
+// by its extension; "" for any other (an SVG).
+func emailImageType(file string) string {
+	switch strings.ToLower(path.Ext(file)) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	}
+	return ""
+}
+
+// FontStack is the font-family of a font (display or body) for a page
+// that loads no files of the brand, as an email: its family, then its
+// fallback or the system's fonts; the system's alone without one. Display
+// falls back to body.
+func (b *Brand) FontStack(name string) string {
+	const system = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+	f, ok := b.Theme.Fonts[name]
+	if !ok && name == "display" {
+		f, ok = b.Theme.Fonts["body"]
+	}
+	if !ok || f.Family == "" {
+		return system
+	}
+	fallback := f.Fallback
+	if fallback == "" {
+		fallback = system
+	}
+	return "'" + strings.NewReplacer("'", "", `\`, "", ";", "", "<", "", ">", "").Replace(f.Family) + "', " + fallback
 }
 
 // IconFiles are the files of the icons folder, served at the site's root

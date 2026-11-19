@@ -155,3 +155,44 @@ func TestBrandCSS(t *testing.T) {
 		t.Error("flat buttons have no edge")
 	}
 }
+
+// An email shows a PNG, JPEG or GIF logo, never an SVG, in the brand's
+// fonts by name, with the system's after them.
+func TestBrandForEmail(t *testing.T) {
+	b, err := BrandOf(brandProject(t, goodTheme, goodFiles...), map[string]any{"brand": "brand"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, typ := b.EmailLogo(); f != "" || typ != "" {
+		t.Errorf("an SVG logo is no email's: %s %s", f, typ)
+	}
+	if got := b.FontStack("display"); got != "'Display Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" {
+		t.Errorf("FontStack(display) = %s", got)
+	}
+	png := strings.Replace(goodTheme, `"logo": "logo.svg"`, `"logo": "logo.svg", "logo_email": "logo.png"`, 1)
+	b, _ = BrandOf(brandProject(t, png, append(goodFiles, "logo.png")...), map[string]any{"brand": "brand"})
+	if f, typ := b.EmailLogo(); f != "logo.png" || typ != "image/png" {
+		t.Errorf("EmailLogo = %s %s, want logo_email", f, typ)
+	}
+	if p := b.Problems(); len(p) != 0 {
+		t.Errorf("a PNG logo_email has problems: %v", p)
+	}
+	jpeg := strings.Replace(goodTheme, `"logo": "logo.svg"`, `"logo": "logo.JPG"`, 1)
+	b, _ = BrandOf(brandProject(t, jpeg, append(goodFiles, "logo.JPG")...), map[string]any{"brand": "brand"})
+	if f, typ := b.EmailLogo(); f != "logo.JPG" || typ != "image/jpeg" {
+		t.Errorf("EmailLogo = %s %s, want the JPEG logo", f, typ)
+	}
+	svg := strings.Replace(png, "logo.png", "logo-mail.svg", 1)
+	b, _ = BrandOf(brandProject(t, svg, append(goodFiles, "logo-mail.svg")...), map[string]any{"brand": "brand"})
+	if got := strings.Join(b.Problems(), "\n"); !strings.Contains(got, "identity.logo_email logo-mail.svg is not a PNG, JPEG or GIF") {
+		t.Errorf("an SVG logo_email passes: %s", got)
+	}
+	b, _ = BrandOf(brandProject(t, `{"fonts": {"body": {"family": "Body", "fallback": "Georgia, serif"}}}`), map[string]any{"brand": "brand"})
+	if got := b.FontStack("display"); got != "'Body', Georgia, serif" {
+		t.Errorf("display falls back to body: %s", got)
+	}
+	b, _ = BrandOf(brandProject(t, `{}`), map[string]any{"brand": "brand"})
+	if got := b.FontStack("body"); !strings.HasPrefix(got, "-apple-system") {
+		t.Errorf("without fonts, the system's: %s", got)
+	}
+}

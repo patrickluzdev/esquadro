@@ -14,8 +14,11 @@ import (
 
 // templates are the emails of the app, one per name: <name>.txt, whose
 // first line is "Subject: ...", and, for an HTML version, <name>.html
-// defining "content", which _layout.html wraps. <name>.json, data to try
-// the template with, is for the tests.
+// defining "content", which _layout.html wraps; _layout.txt, when it is
+// there, wraps the text (its footer). <name>.json, data to try the
+// template with, is for the tests. The layouts are yours: they write the
+// look of layout.go (the brand's colors, fonts and logo) with its
+// functions, which every template may use (button).
 //
 //go:embed all:templates
 var templates embed.FS
@@ -55,7 +58,9 @@ func Templates() []string {
 	entries, _ := fs.Glob(templates, "templates/*.txt")
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
-		names = append(names, strings.TrimSuffix(strings.TrimPrefix(e, "templates/"), ".txt"))
+		if name := strings.TrimSuffix(strings.TrimPrefix(e, "templates/"), ".txt"); !strings.HasPrefix(name, "_") {
+			names = append(names, name)
+		}
 	}
 	return names
 }
@@ -64,7 +69,7 @@ func parse(name string) (*written, error) {
 	if w, ok := parsed.Load(name); ok {
 		return w.(*written), nil
 	}
-	if strings.ContainsAny(name, "/\\.") {
+	if strings.ContainsAny(name, "/\\.") || strings.HasPrefix(name, "_") {
 		return nil, fmt.Errorf("mail: %q is not a template name", name)
 	}
 	raw, err := fs.ReadFile(templates, "templates/"+name+".txt")
@@ -80,11 +85,11 @@ func parse(name string) (*written, error) {
 	if w.subject, err = template.New(name + ".subject").Option("missingkey=error").Parse(strings.TrimSpace(subject)); err != nil {
 		return nil, fmt.Errorf("mail: %s.txt: %w", name, err)
 	}
-	if w.text, err = template.New(name + ".txt").Option("missingkey=error").Parse(body); err != nil {
+	if w.text, err = textOf(name, body); err != nil {
 		return nil, fmt.Errorf("mail: %s.txt: %w", name, err)
 	}
 	if _, err := fs.Stat(templates, "templates/"+name+".html"); err == nil {
-		w.html, err = htmltemplate.New(name).Option("missingkey=error").ParseFS(templates, "templates/_layout.html", "templates/"+name+".html")
+		w.html, err = htmltemplate.New(name).Funcs(layoutFuncs(true)).Option("missingkey=error").ParseFS(templates, "templates/_layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("mail: %s.html: %w", name, err)
 		}
@@ -93,4 +98,24 @@ func parse(name string) (*written, error) {
 	}
 	parsed.Store(name, w)
 	return w, nil
+}
+
+// textOf is the text of an email, body, wrapped by _layout.txt when it is
+// there: its "content".
+func textOf(name, body string) (*template.Template, error) {
+	layout, err := fs.ReadFile(templates, "templates/_layout.txt")
+	if errors.Is(err, fs.ErrNotExist) {
+		return template.New(name + ".txt").Funcs(layoutFuncs(false)).Option("missingkey=error").Parse(body)
+	}
+	if err != nil {
+		return nil, err
+	}
+	t, err := template.New(name + ".txt").Funcs(layoutFuncs(false)).Option("missingkey=error").Parse(string(layout))
+	if err != nil {
+		return nil, fmt.Errorf("_layout.txt: %w", err)
+	}
+	if _, err := t.New("content").Parse(strings.TrimRight(body, " \r\n")); err != nil {
+		return nil, err
+	}
+	return t, nil
 }

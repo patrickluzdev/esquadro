@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
@@ -129,7 +131,7 @@ func (a plainAuth) Next(_ []byte, more bool) ([]byte, error) {
 }
 
 // mimeOf writes a message as MIME: its text, and its HTML as an
-// alternative when it has one.
+// alternative when it has one, related to the files it shows (the logo).
 func mimeOf(m Message, host string) ([]byte, error) {
 	var b bytes.Buffer
 	header := func(k, v string) { fmt.Fprintf(&b, "%s: %s\r\n", k, v) }
@@ -151,22 +153,74 @@ func mimeOf(m Message, host string) ([]byte, error) {
 	parts := multipart.NewWriter(&b)
 	header("Content-Type", `multipart/alternative; boundary="`+parts.Boundary()+`"`)
 	b.WriteString("\r\n")
-	for _, p := range []struct{ kind, body string }{ {"text/plain", m.Text}, {"text/html", m.HTML} } {
-		w, err := parts.CreatePart(textproto.MIMEHeader{
-			"Content-Type":              {p.kind + `; charset="utf-8"`},
-			"Content-Transfer-Encoding": {"quoted-printable"},
-		})
-		if err != nil {
+	if err := textPart(parts, "text/plain", m.Text); err != nil {
+		return nil, err
+	}
+	if len(m.Inline) == 0 {
+		if err := textPart(parts, "text/html", m.HTML); err != nil {
 			return nil, err
 		}
-		if err := writeQP(w, p.body); err != nil {
-			return nil, err
-		}
+	} else if err := relatedPart(parts, m); err != nil {
+		return nil, err
 	}
 	if err := parts.Close(); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+// textPart writes a part of text in UTF-8, quoted-printable.
+func textPart(parts *multipart.Writer, kind, body string) error {
+	w, err := parts.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {kind + `; charset="utf-8"`},
+		"Content-Transfer-Encoding": {"quoted-printable"},
+	})
+	if err != nil {
+		return err
+	}
+	return writeQP(w, body)
+}
+
+// relatedPart writes the HTML with the files it shows by cid:, in a
+// multipart/related part of its own.
+func relatedPart(parts *multipart.Writer, m Message) error {
+	var b bytes.Buffer
+	related := multipart.NewWriter(&b)
+	if err := textPart(related, "text/html", m.HTML); err != nil {
+		return err
+	}
+	for _, in := range m.Inline {
+		w, err := related.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {mime.FormatMediaType(in.Type, map[string]string{"name": in.Name})},
+			"Content-Transfer-Encoding": {"base64"},
+			"Content-ID":                {"<" + in.CID + ">"},
+			"Content-Disposition":       {mime.FormatMediaType("inline", map[string]string{"filename": in.Name})},
+		})
+		if err != nil {
+			return err
+		}
+		encoded := base64.StdEncoding.EncodeToString(in.Data)
+		for len(encoded) > 76 {
+			if _, err := io.WriteString(w, encoded[:76]+"\r\n"); err != nil {
+				return err
+			}
+			encoded = encoded[76:]
+		}
+		if _, err := io.WriteString(w, encoded+"\r\n"); err != nil {
+			return err
+		}
+	}
+	if err := related.Close(); err != nil {
+		return err
+	}
+	w, err := parts.CreatePart(textproto.MIMEHeader{
+		"Content-Type": {`multipart/related; type="text/html"; boundary="` + related.Boundary() + `"`},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(b.Bytes())
+	return err
 }
 
 func writeQP(w interface{ Write([]byte) (int, error) }, s string) error {
