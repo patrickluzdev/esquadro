@@ -67,6 +67,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `sort` | string | The order of its list: -created_at, price. |
 | entity | `relations` | list | Relations whose records its page lists: [offers]. |
 | entity | `menu` | bool | An entry in the site's menu. |
+| entity | `og_image` | bool | Each record's page gets an Open Graph image drawn by the app, /&lt;path>/&lt;id>/og.png (1200x630), with blueprint images: drawn by &lt;entity>_og.go, yours, and kept in the store until the record changes. |
 | entity | `label` | string | What this site calls it, when not what @ui says. |
 | entity | `singular` | string | What one of it is called on this site, when not what @ui says. |
 | field | `label` | string | What this site calls the field, when not what @ui says. |

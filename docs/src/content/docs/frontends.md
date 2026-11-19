@@ -706,7 +706,9 @@ Each entity marked `@site(page)` gets:
 - what search engines and shared links read: the title, a description
   (`description`), the canonical address, Open Graph and its picture
   (`image`, or its first image field), structured data (`schema`:
-  `product`, with its price, `article` or `organization`);
+  `product`, with its price, `article` or `organization`); with
+  `og_image` and the `images` blueprint, a picture the app draws of the
+  record, 1200x630 ([Drawn images](/esquadro/images/));
 - a place in `/sitemap.xml`, and `robots.txt` keeps the account's pages
   out.
 
@@ -719,6 +721,7 @@ Each entity marked `@site(page)` gets:
 | `sort` | entity | Its list's first order: `-price` | the newest first |
 | `relations` | entity | Related records its page lists: `[products]` | none |
 | `menu` | entity | An entry in the site's menu | every page, when none is marked |
+| `og_image` | entity | An Open Graph image drawn of each record, `/<path>/<id>/og.png` ([Drawn images](/esquadro/images/)) | none |
 | `label`, `singular` | entity, field, relation, enum value | What this site calls it, over `@ui`'s | `@ui`'s |
 | `hidden` | field | Left out of the site | shown |
 
