@@ -18,6 +18,20 @@ blueprint mail
 - **Requires** [app](../app/), [env](../env/): the app must use them too.
 - **Works with** [jobs](../jobs/), [compose](../compose/), [domain](../domain/), [testcontainers](../testcontainers/), [docker](../docker/) when the app uses them.
 
+## Options
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `brand` | string | `""` | The project's folder of its brand (brand, the same an ssr site may name), with its theme.json: the emails' layout takes its colors, the names of its fonts, and its logo (identity.logo_email, or a logo that is a PNG, JPEG or GIF), sent with each email. Without one, the emails keep their neutral look. |
+| `locale` | name | `"frontend"` | The language of the words the layout writes (its footer): en, pt_br, or frontend, the first frontend's (en without one). |
+| `address` | string | `""` | A line the emails' footer ends with, as the postal address some laws ask of them: Shop Ltd, 1 Main Street, Springfield. |
+
+```esquadro
+blueprint mail {
+  brand ""
+}
+```
+
 ## Environment variables
 
 Read when the app starts; see [Environment variables](/esquadro/language/environment/).

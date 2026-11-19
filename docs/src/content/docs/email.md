@@ -58,8 +58,81 @@ Each email is a template of the project, in
   a customer's inbox.
 
 `welcome` is an example; `verify_email`, `reset_password`,
-`confirm_email_change` and `email_changed` are security's, which you change
-like any other.
+`confirm_email_change`, `email_changed` and `invitation` are security's,
+which you change like any other.
+
+## The layout
+
+Every HTML email is written inside `_layout.html`, and every text inside
+`_layout.txt` when it is there; both are in the same folder, written once
+and then yours. They write the look with the functions of the generated
+`layout.go`, which every template may use too:
+
+| | |
+|---|---|
+| `branded` | whether mail has a brand |
+| `color "accent"` | a color by role: `page`, `surface`, `ink`, `muted`, `line`, `accent`, `on_accent` |
+| `font "body"` | a font family: `display` or `body` |
+| `logo` | the logo's address (`cid:brand-logo`), empty without one |
+| `app`, `address` | the app's name, and the footer's last line |
+| `word "why"` | a word of the layout, in mail's `locale` |
+| `button .Link "Choose a password"` | a link as a button, a paragraph of its own; in a text, the label and the link |
+
+Without a brand, emails keep their neutral look: a white card on a light
+gray page, in the system's fonts, with no header nor footer but the
+`address`, when mail has one.
+
+### A layout with the brand
+
+`brand` names the project's folder of its brand, the same one an
+[ssr site](/esquadro/frontends/#a-site-with-a-brand) may name:
+
+```esquadro
+blueprint mail {
+  brand "brand"
+  locale pt_br
+  address "Shop Ltd, 1 Main Street, Springfield"
+}
+```
+
+The layout then takes from its `theme.json`:
+
+- **colors**: the page, the card (`surface`, edged by `line`), the text
+  (`ink`, the footer `muted`) and the buttons (`accent`, `on_accent`); a
+  role left out keeps the default look's.
+- **fonts**: the `display` font (the header) and the `body` font, by their
+  family's name, then their `fallback` or the system's fonts. Emails load
+  no fonts: a reader's device with the font shows it, any other the next.
+- **the logo**, in the header: `identity.logo_email`, or `identity.logo`
+  when it is a PNG, JPEG or GIF. Email clients do not show SVG, and many
+  block pictures from the web, so the logo goes inside each email that
+  shows it (`cid:brand-logo`, by SMTP and Resend alike), from the brand's
+  folder embedded in the app (`brand/embed.go`). Without one the header
+  writes the app's name, and `esquadro check` warns of a logo that is only
+  an SVG.
+
+Under the card, the footer writes the app's name, why the reader got the
+email ("You are receiving this email from Shop about your account", in
+`locale`: `en`, `pt_br`, or the first frontend's by default) and
+`address`, when there is one (some laws ask for a postal address). The
+text gets the same footer, in plain text. A template changes the reason
+with a `why` of its own:
+
+```html
+{{define "why"}}You are receiving this email because you signed up for our news.{{end}}
+```
+
+The layout is tables with the styles inline, at most 560 px wide: what
+every email client reads.
+
+### Your own layout
+
+`_layout.html` and `_layout.txt` are yours: change them, or write them
+anew, and esquadro keeps them. While yours is still as esquadro wrote it,
+`esquadro gen` brings it the template's changes; once you change it, they
+are merged into it. To leave the brand out, write a layout without its
+functions (or with colors of its own); to leave the text's footer out,
+delete `_layout.txt`, which esquadro does not bring back.
 
 ## Sending
 

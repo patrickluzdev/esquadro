@@ -844,7 +844,9 @@ browsers for a day:
   `icons` whose files are served at the root too (`favicon.ico`,
   `favicon.svg`, `apple-touch-icon.png`, `site.webmanifest`), linked by
   every page; the `og_image` of a page that sets none; the browser's
-  `theme_color`.
+  `theme_color`; and `logo_email`, a PNG, JPEG or GIF of the logo for
+  the [emails](/esquadro/email/#a-layout-with-the-brand), which do not show
+  SVG.
 
 `theme.gen.css` then writes the brand: the tokens, the fonts, the roles,
 and the kit's pieces, `.btn` (`.btn-primary`, `.btn-secondary`,
