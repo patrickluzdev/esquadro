@@ -565,6 +565,37 @@ your links (a profile, an activity log) to its `links`. The settings page's
 sections (password, devices, email, theme) are in `src/pages/_app/settings.tsx`
 (`/settings`): the place for every setting, each in a section of its own.
 
+### Icons
+
+The panel draws its icons by name, from one set: `src/esquadro/icons.gen.ts`,
+regenerated with the model. It has the icons the kit draws (the trash, the
+chevrons, the sidebar's...) and those the model names (`@ui(icon package)`
+on a resource, a number's `icon` on a dashboard), by their
+[Lucide](https://lucide.dev/icons) names in PascalCase (`Trash2`,
+`ShoppingCart`), each Lucide's by default. `src/icons.tsx` is yours: an
+icon given there is drawn instead wherever that one is, in the kit, in the
+menu and in your files.
+
+```tsx
+// src/icons.tsx
+import { createLucideIcon, PackageOpen } from "lucide-react"
+import type { IconOverrides } from "./esquadro/icons.gen.ts"
+
+// An icon of your own, drawn like Lucide's: 24 by 24, with its stroke.
+const Bin = createLucideIcon("bin", [["path", { d: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" }]])
+
+export const icons: IconOverrides = { Package: PackageOpen, Trash2: Bin }
+```
+
+An icon is a Lucide icon, one made with `createLucideIcon`, or any
+component that takes Lucide's props (`className`, `size`). Your files draw
+from the same set, so that a change there reaches them too:
+`import { Trash2 } from "@/esquadro/icons.gen.ts"`, or `iconOf("shopping_cart")`
+for a name as the model writes it. A file that imports from `lucide-react`
+itself still works (it stays a dependency), but draws Lucide's icon whatever
+`src/icons.tsx` says. An icon the model names must be a Lucide name; the
+panel only bundles the icons of the set.
+
 ### Pages of your own
 
 A file in `src/pages/_app/` is a page behind the sign-in. The kit's parts
@@ -603,6 +634,7 @@ alone.
 | The words: only those you change, and your own; the rest are the kit's (`src/esquadro/kit/messages.ts`) | `src/messages.ts` | yours |
 | The sign-in and account pages: they show the kit's (`src/esquadro/kit/pages/`), or a page of yours | `src/pages/login.tsx`, `src/pages/_app/settings.tsx`... | yours |
 | How a field is shown or edited, by name or kind | `src/fields.ts` | yours |
+| The icons: the set, by name, is the kit's and the model's (`src/esquadro/icons.gen.ts`, generated); those you draw instead | `src/icons.tsx` | yours |
 
 So that a new version of esquadro reaches a project, what is yours starts
 small: the words, the menu and the sign-in and account pages take the kit's,
@@ -704,11 +736,30 @@ blueprint's `public_url` to the site's address.
 **The site's own pages** ("Join our groups", "About") go in `routes.go`,
 each a templ component of yours inside `Layout`.
 
+**The site's icons** are drawn by name, `@Icon("share-2")`, as an inline
+`<svg>` of the text's size and color: the kit's (the search, the pages'
+chevrons, sharing) are [Lucide](https://lucide.dev/icons)'s, in
+`icons_gen.go`, under their ISC license. `icons.go` is yours: an icon there
+is drawn instead wherever that name is, in the kit and in your pages, and
+a name of your own adds one.
+
+```go
+// icons.go
+var ownIcons = map[string]string{
+	// What goes inside the <svg>: a 24 by 24 grid, a 2px stroke of the text's color.
+	"share-2": `<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>`,
+	// A whole <svg> of your own, drawn as it is.
+	"whatsapp": `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor">…</svg>`,
+	// None: the kit draws no chevrons.
+	"chevron-left": "", "chevron-right": "",
+}
+```
+
 | | Where | Whose |
 |---|---|---|
-| Routes, reading, SEO, the sitemap, the account, the words, the formats | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
+| Routes, reading, SEO, the sitemap, the account, the words, the formats, the kit's icons | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
 | The frame (header, menu, footer), the first page, the search, each entity's list, card and page | `layout.templ`, `home.templ`, `search.templ`, `<entity>.templ` | yours |
-| Your pages; the words you change; the styles | `routes.go`, `messages.go`, `site.css` | yours |
+| Your pages; the words you change; the styles; your icons | `routes.go`, `messages.go`, `site.css`, `icons.go` | yours |
 
 With `engine go`, the app's binary renders the site: [templ](https://templ.guide)
 for the pages (`esquadro gen` writes their Go, and `task dev` writes it
