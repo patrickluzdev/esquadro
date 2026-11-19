@@ -29,14 +29,16 @@ type Brand struct {
 type BrandTheme struct {
 	// Colors are by role: accent, on_accent, accent_edge, accent_text,
 	// accent_soft, ink, muted, page, surface, line, neutral, neutral_edge,
-	// strike, photo, ok, ok_soft, error, error_soft, warning, warning_soft,
-	// info, info_soft. Any other name is a color of its own (casa,
-	// whatsapp), as --color-<name>.
+	// ok, ok_soft, error, error_soft, warning, warning_soft, info,
+	// info_soft. Any other name is a color of its own (brand, sale), as
+	// --color-<name>.
 	Colors map[string]string `json:"colors"`
-	// Fonts are the display (titles, prices) and body fonts, served by the
+	// Fonts are the display (titles) and body fonts, served by the
 	// app.
 	Fonts map[string]BrandFont `json:"fonts"`
-	// Text are the text roles, each a class .t-<role>.
+	// Text are the text roles, by names of the project's own, each a
+	// class .t-<name>; the kit's titles and texts carry .t-section,
+	// .t-block, .t-item and .t-text.
 	Text map[string]TextRole `json:"text"`
 	// Radius are the corners: sm, md, lg, in px.
 	Radius map[string]float64 `json:"radius"`
@@ -93,10 +95,10 @@ type BrandIdentity struct {
 
 // ColorRoles are the colors a theme names by role, in order.
 var ColorRoles = []string{"accent", "on_accent", "accent_edge", "accent_text", "accent_soft", "ink", "muted", "page", "surface",
-	"line", "neutral", "neutral_edge", "strike", "photo", "ok", "ok_soft", "error", "error_soft", "warning", "warning_soft", "info", "info_soft"}
+	"line", "neutral", "neutral_edge", "ok", "ok_soft", "error", "error_soft", "warning", "warning_soft", "info", "info_soft"}
 
-// TextRoles are the roles a theme may write, in order.
-var TextRoles = []string{"display", "section", "block", "item", "text", "support", "caption", "price"}
+// roleName is the name of a text role or a color of its own.
+var roleName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 // StateNames are the states a theme may picture.
 var StateNames = []string{"empty", "loading", "success", "error", "not_found", "forbidden", "gone"}
@@ -106,7 +108,7 @@ var StateNames = []string{"empty", "loading", "success", "error", "not_found", "
 var roleDefaults = map[string]string{
 	"accent": "#2a85ff", "on_accent": "#ffffff", "accent_edge": "", "accent_text": "#1d5fbf", "accent_soft": "#eaf2ff",
 	"ink": "#0a0a0a", "muted": "#71717a", "page": "#ffffff", "surface": "#ffffff", "line": "#e4e4e7", "neutral": "#f4f4f5",
-	"neutral_edge": "#e4e4e7", "strike": "#dc2626", "photo": "#f4f4f5", "ok": "#15803d", "ok_soft": "#ecfdf3", "error": "#dc2626",
+	"neutral_edge": "#e4e4e7", "ok": "#15803d", "ok_soft": "#ecfdf3", "error": "#dc2626",
 	"error_soft": "#fef2f2", "warning": "#a16207", "warning_soft": "#fefce8", "info": "#1d4ed8", "info_soft": "#eff6ff",
 }
 
@@ -139,7 +141,7 @@ func (b *Brand) Problems() []string {
 		if !hexColor.MatchString(c) {
 			out = append(out, fmt.Sprintf("colors.%s %q is not a color: #rgb or #rrggbb", name, c))
 		}
-		if !regexp.MustCompile(`^[a-z][a-z0-9_]*$`).MatchString(name) {
+		if !roleName.MatchString(name) {
 			out = append(out, fmt.Sprintf("colors.%s: a color's name is lowercase, as accent or casa", name))
 		}
 	}
@@ -158,8 +160,8 @@ func (b *Brand) Problems() []string {
 		}
 	}
 	for name, r := range t.Text {
-		if !slices.Contains(TextRoles, name) {
-			out = append(out, fmt.Sprintf("text.%s is not a role: %s", name, strings.Join(TextRoles, ", ")))
+		if !roleName.MatchString(name) {
+			out = append(out, fmt.Sprintf("text.%s: a role's name is lowercase, as section or caption", name))
 		}
 		if r.Font != "" && r.Font != "display" && r.Font != "body" {
 			out = append(out, fmt.Sprintf("text.%s.font %q is display or body", name, r.Font))
@@ -258,8 +260,7 @@ func px(n float64) string {
 // frontend that serves the brand's files at base (/brand/): the colors by
 // role and its own, as variables and as the names the kit's classes use;
 // the fonts; the text roles (.t-<role>); radii; motion; and buttons,
-// fields, chips, cards, notices, the progress bar, the price and the
-// product's photo.
+// fields, chips, cards, notices and the progress bar.
 func (b *Brand) CSS(base string) string {
 	var w strings.Builder
 	t := b.Theme
@@ -374,11 +375,13 @@ func (b *Brand) CSS(base string) string {
 		display = "var(--brand-font-display)"
 	}
 	fmt.Fprintf(&w, "body { font-family: %s; background: var(--brand-page); color: var(--brand-ink); }\n", body)
-	for _, role := range TextRoles {
-		r, ok := t.Text[role]
-		if !ok {
-			continue
-		}
+	roles := make([]string, 0, len(t.Text))
+	for name := range t.Text {
+		roles = append(roles, name)
+	}
+	sort.Strings(roles)
+	for _, role := range roles {
+		r := t.Text[role]
 		font := body
 		if r.Font == "display" {
 			font = display
@@ -430,15 +433,8 @@ func (b *Brand) CSS(base string) string {
 .notice-warning { background: var(--brand-warning-soft); color: var(--brand-warning); } .notice-info { background: var(--brand-info-soft); color: var(--brand-info); }
 .progress { width: 100%%; height: 6px; border-radius: 99px; background: var(--brand-neutral); overflow: hidden; }
 .progress > i { display: block; height: 100%%; background: var(--brand-accent-text); border-radius: 99px; }
-.price { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.price b { font: 800 22px/1 %[5]s; color: var(--brand-accent-text); letter-spacing: -.01em; white-space: nowrap; }
-.price s { font: 500 13px %[1]s; color: var(--brand-muted); white-space: nowrap; }
-.price .off { font: 700 12px/1 %[1]s; background: var(--brand-accent); color: var(--brand-on-accent); border-radius: 6px; padding: 3px 6px; }
-.price-lg b { font-size: 34px; } .price-lg s { font-size: 15px; } .price-lg .off { font-size: 14px; }
-.photo { background: var(--brand-photo); border-radius: var(--brand-radius-md); overflow: hidden; aspect-ratio: 1; padding: 8%%; display: grid; place-items: center; }
-.photo img { width: 100%%; height: 100%%; object-fit: contain; display: block; mix-blend-mode: multiply; border-radius: 6px; }
-.btn.hidden, .chip.hidden, .notice.hidden, .price.hidden, .photo.hidden { display: none; }
+.btn.hidden, .chip.hidden, .notice.hidden, .progress.hidden { display: none; }
 .state-picture { width: 140px; height: auto; margin: 0 auto 16px; display: block; }
-`, body, map[bool]string{true: "2px", false: "1px"}[raised], edge(accentEdge), edge("var(--brand-neutral-edge)"), display)
+`, body, map[bool]string{true: "2px", false: "1px"}[raised], edge(accentEdge), edge("var(--brand-neutral-edge)"))
 	return w.String()
 }

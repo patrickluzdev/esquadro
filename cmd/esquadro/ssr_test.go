@@ -124,8 +124,8 @@ func TestSSRSiteWithABrand(t *testing.T) {
 		"states/lost.svg":        "<svg/>",
 		"icons/favicon.ico":      "ico",
 		"icons/site.webmanifest": "{}",
-		"theme.json": `{"colors": {"accent": "#A8DC50", "on_accent": "#1D2019", "casa": "#3CC8B4"},
-			"fonts": {"body": {"family": "Figtree", "files": {"300 900": "fonts/Body.woff2"}}},
+		"theme.json": `{"colors": {"accent": "#2F6FEB", "on_accent": "#FFFFFF", "sale": "#E5484D"},
+			"fonts": {"body": {"family": "Body Sans", "files": {"300 900": "fonts/Body.woff2"}}},
 			"text": {"section": {"weight": 800, "size": 28}}, "buttons": "raised",
 			"states": {"not_found": "states/lost.svg"}, "identity": {"logo": "logo.svg", "icons": "icons"}}`,
 	}
@@ -142,8 +142,8 @@ func TestSSRSiteWithABrand(t *testing.T) {
 		"../../brand/embed.go": {"package brand", "//go:embed all:*"},
 		"site_gen.go": {`brand "example.com/shop/brand"`, `m.Handle("GET /brand/"`, `"icons/favicon.ico"`,
 			`"application/manifest+json"`, `"not_found": "states/lost.svg"`},
-		"theme.gen.css": {`url("/shop/brand/fonts/Body.woff2")`, "--brand-accent: #A8DC50;", "--color-casa: var(--brand-casa);", ".t-section {", "inset 0 -2px 0"},
-		"kit.templ":     {`<link rel="manifest" href={ URL("/site.webmanifest") }/>`, `<meta name="theme-color" content="#A8DC50"/>`, `URL("/brand/logo.svg")`, "templ Price(", "templ Photo("},
+		"theme.gen.css": {`url("/shop/brand/fonts/Body.woff2")`, "--brand-accent: #2F6FEB;", "--color-sale: var(--brand-sale);", ".t-section {", "inset 0 -2px 0"},
+		"kit.templ":     {`<link rel="manifest" href={ URL("/site.webmanifest") }/>`, `<meta name="theme-color" content="#2F6FEB"/>`, `URL("/brand/logo.svg")`, "templ StatePicture("},
 	} {
 		got := read(t, filepath.Join(site, path))
 		for _, w := range want {

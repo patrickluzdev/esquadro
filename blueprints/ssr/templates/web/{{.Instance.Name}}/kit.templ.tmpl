@@ -181,29 +181,6 @@ templ Logo() {
 {{- end}}
 }
 
-// Price is a price as a catalog shows it: what it costs now, what it cost
-// before struck out, and the discount; was and off may be empty. large
-// makes it the price of a product's own page.
-templ Price(now, was string, off int, large bool) {
-	<div class={ "price", templ.KV("price-lg", large) }>
-		<b>{ now }</b>
-		if was != "" {
-			<s>{ was }</s>
-		}
-		if off > 0 {
-			<span class="off">-{ Number(int64(off)) }%</span>
-		}
-	</div>
-}
-
-// Photo is a product's picture in its frame: whole, with room around it,
-// its white background blended into the frame's.
-templ Photo(src, alt string) {
-	<div class="photo">
-		<img src={ src } alt={ alt } loading="lazy"/>
-	</div>
-}
-
 // The visitor's account.
 
 // AuthFrame is the frame of the pages of signing in: a narrow card.

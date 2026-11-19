@@ -46,7 +46,7 @@ With `wait`, a person sees where they are going before they go:
 ```
 
 `/<code>` then answers a page in the site's layout that says *Taking you to
-shopee.com.br* (the destination's host), counts the seconds down with a
+store.example.com* (the destination's host), counts the seconds down with a
 bar, and goes on by itself; *Go now* leaves at once. Without JavaScript,
 the page's refresh goes on all the same. `wait` is 1 to 10 seconds, and
 only with `redirect`.

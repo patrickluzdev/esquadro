@@ -489,7 +489,7 @@ export default resource(meta, {
   // ...
   queue: {
     filter: { status: ["PENDING"] },
-    card: { image: f.image_url, title: f.title, fields: [f.price, f.niche_id] },
+    card: { image: f.image_url, title: f.title, fields: [f.price, f.category_id] },
   },
   actions: [
     { label: "Home",  key: "1", patch: { status: "APPROVED", niche_id: niches.home }, ask: [f.hook] },
@@ -504,7 +504,7 @@ An action does any of these, in this order:
 
 - `copy`: copies the text a function makes of the record;
 - `copyImage`: copies the image at the address a function makes of the
-  record, as an image, to paste into WhatsApp ("Image copied."). It goes on
+  record, as an image, to paste into a chat or a post ("Image copied."). It goes on
   the clipboard as PNG, the one type browsers take there; another is drawn
   as PNG first. A browser that cannot copy images says so and offers to
   download it (no download, and the action stops there);
@@ -735,15 +735,15 @@ browsers for a day:
 ```json
 {
   "colors": {
-    "accent": "#A8DC50", "on_accent": "#1D2019", "accent_edge": "#86B33E",
-    "accent_text": "#3B7A12", "accent_soft": "#F1F8E3",
-    "ink": "#1D2019", "muted": "#6A6F63", "page": "#F7F7F3", "surface": "#FFFFFF",
-    "line": "#E7E9E1", "neutral": "#F0F2EA", "neutral_edge": "#DCDFD3",
-    "casa": "#3CC8B4"
+    "accent": "#2F6FEB", "on_accent": "#FFFFFF", "accent_edge": "#1E4FB8",
+    "accent_text": "#1E4FB8", "accent_soft": "#EAF1FE",
+    "ink": "#111827", "muted": "#6B7280", "page": "#FAFAF9", "surface": "#FFFFFF",
+    "line": "#E5E7EB", "neutral": "#F3F4F6", "neutral_edge": "#D1D5DB",
+    "sale": "#E5484D"
   },
   "fonts": {
-    "display": { "family": "Bricolage Grotesque", "files": { "200 800": "fonts/Bricolage-VF.ttf" } },
-    "body": { "family": "Figtree", "files": { "300 900": "fonts/Figtree-VF.ttf" } }
+    "display": { "family": "Display Sans", "files": { "700": "fonts/display-bold.woff2" } },
+    "body": { "family": "Body Sans", "files": { "100 900": "fonts/body-variable.woff2" } }
   },
   "text": {
     "section": { "font": "display", "weight": 800, "size": 28, "line": 1.1, "tracking": -0.02 },
@@ -754,24 +754,25 @@ browsers for a day:
   "control": 44,
   "motion": { "enter": { "duration": 350, "curve": "cubic-bezier(.22,1.2,.36,1)" } },
   "states": { "empty": "states/empty.svg", "not_found": "states/lost.svg", "gone": "states/gone.svg" },
-  "identity": { "logo": "logo/line.svg", "icons": "icons", "og_image": "og.png", "theme_color": "#A8DC50" }
+  "identity": { "logo": "logo/line.svg", "icons": "icons", "og_image": "og.png", "theme_color": "#2F6FEB" }
 }
 ```
 
 - **colors**: by role (`accent`, `on_accent`, `accent_edge`, `accent_text`,
   `accent_soft`, `ink`, `muted`, `page`, `surface`, `line`, `neutral`,
-  `neutral_edge`, `strike`, `photo`, `ok`, `error`, `warning`, `info` and
+  `neutral_edge`, `ok`, `error`, `warning`, `info` and
   their `_soft`), each `--brand-<role>` and a Tailwind color
   (`bg-accent-soft`, `text-accent-text`); a role left out keeps the
-  default look's. Any other name is a color of its own (`bg-casa`). The
+  default look's. Any other name is a color of its own (`bg-sale`). The
   kit's tokens follow: `bg-primary` is the accent, `text-muted-foreground`
   the muted, `border-border` the line.
 - **fonts**: `display` (titles, prices) and `body`, by weight, a range
   for a variable font; `font-display` and `font-body` in Tailwind,
   preloaded by every page.
-- **text**: the text roles `display`, `section`, `block`, `item`,
-  `text`, `support`, `caption`, `price`, each a class `.t-<role>`, which
-  the kit's titles carry.
+- **text**: text roles of the names you choose, each a class
+  `.t-<name>` with its font, weight, size, line height and letter
+  spacing; the kit's titles and texts carry `.t-section`, `.t-block`,
+  `.t-item` and `.t-text`, so roles of those names style them.
 - **radius** (`rounded-sm`, `rounded-md`, `rounded-lg`), **control**
   (the height of buttons and fields), **buttons** (`flat`, or `raised`: an
   edge at the bottom that sinks when pressed), **motion**
@@ -788,8 +789,8 @@ browsers for a day:
 `theme.gen.css` then writes the brand: the tokens, the fonts, the roles,
 and the kit's pieces, `.btn` (`.btn-primary`, `.btn-secondary`,
 `.btn-icon`), `.field`, `.chip`, `.card`, `.notice-ok|error|warning|info`,
-`.progress`, `.price` and `.photo`, which `@Price(now, was, off, large)`
-and `@Photo(src, alt)` write. `esquadro check` says what is wrong with the
+and `.progress`; what is your product's own (a price, a product's photo)
+goes in `site.css`, on the same tokens. `esquadro check` says what is wrong with the
 brand: a color that is none, a role or state that does not exist, a file
 that is not in the folder.
 

@@ -26,10 +26,10 @@ func brandProject(t *testing.T, theme string, files ...string) string {
 }
 
 const goodTheme = `{
-  "colors": {"accent": "#A8DC50", "on_accent": "#1D2019", "accent_edge": "#86B33E", "page": "#F7F7F3", "muted": "#6A6F63", "casa": "#3CC8B4"},
+  "colors": {"accent": "#2F6FEB", "on_accent": "#FFFFFF", "accent_edge": "#1E4FB8", "page": "#FAFAF9", "muted": "#6B7280", "sale": "#E5484D"},
   "fonts": {
-    "display": {"family": "Bricolage Grotesque", "files": {"200 800": "fonts/Bricolage.ttf"}},
-    "body": {"family": "Figtree", "files": {"300 900": "fonts/Figtree.woff2"}}
+    "display": {"family": "Display Sans", "files": {"200 800": "fonts/Display.ttf"}},
+    "body": {"family": "Body Sans", "files": {"300 900": "fonts/Body.woff2"}}
   },
   "text": {"section": {"font": "display", "weight": 800, "size": 28, "line": 1.1, "tracking": -0.02}, "caption": {"size": 12, "color": "muted"}},
   "radius": {"md": 14},
@@ -37,10 +37,10 @@ const goodTheme = `{
   "control": 44,
   "motion": {"enter": {"duration": 350, "curve": "cubic-bezier(.22,1.2,.36,1)"}},
   "states": {"not_found": "states/lost.svg"},
-  "identity": {"logo": "logo.svg", "icons": "icons", "theme_color": "#A8DC50"}
+  "identity": {"logo": "logo.svg", "icons": "icons", "theme_color": "#2F6FEB"}
 }`
 
-var goodFiles = []string{"fonts/Bricolage.ttf", "fonts/Figtree.woff2", "states/lost.svg", "logo.svg", "icons/favicon.ico", "icons/site.webmanifest", "icons/.DS_Store"}
+var goodFiles = []string{"fonts/Display.ttf", "fonts/Body.woff2", "states/lost.svg", "logo.svg", "icons/favicon.ico", "icons/site.webmanifest", "icons/.DS_Store"}
 
 func TestBrandOf(t *testing.T) {
 	app := brandProject(t, goodTheme, goodFiles...)
@@ -60,29 +60,29 @@ func TestBrandOf(t *testing.T) {
 	if got := strings.Join(b.IconFiles(), ","); got != "favicon.ico,site.webmanifest" {
 		t.Errorf("IconFiles = %s, want the icons without hidden files", got)
 	}
-	if b.Color("accent") != "#A8DC50" || b.Color("ink") == "" || b.Color("nope") != "" {
+	if b.Color("accent") != "#2F6FEB" || b.Color("ink") == "" || b.Color("nope") != "" {
 		t.Errorf("Color: a role's, a default, or nothing")
 	}
-	if b.ThemeColor() != "#A8DC50" {
+	if b.ThemeColor() != "#2F6FEB" {
 		t.Errorf("ThemeColor = %s", b.ThemeColor())
 	}
 }
 
 func TestBrandProblems(t *testing.T) {
 	for name, tc := range map[string]struct{ from, to, want string }{
-		"color":    {`"page": "#F7F7F3"`, `"page": "beige"`, `colors.page "beige" is not a color`},
-		"name":     {`"casa": "#3CC8B4"`, `"Casa": "#3CC8B4"`, `colors.Casa: a color's name is lowercase`},
+		"color":    {`"page": "#FAFAF9"`, `"page": "beige"`, `colors.page "beige" is not a color`},
+		"name":     {`"sale": "#E5484D"`, `"Sale": "#E5484D"`, `colors.Sale: a color's name is lowercase`},
 		"font":     {`"display": {"family"`, `"title": {"family"`, `fonts.title: the fonts are display and body`},
 		"weight":   {`"200 800"`, `"bold"`, `"bold" is not a weight`},
-		"file":     {`fonts/Figtree.woff2`, `fonts/Missing.woff2`, `fonts.body.files.300 900: fonts/Missing.woff2 is not in brand`},
+		"file":     {`fonts/Body.woff2`, `fonts/Missing.woff2`, `fonts.body.files.300 900: fonts/Missing.woff2 is not in brand`},
 		"outside":  {`logo.svg`, `../logo.svg`, `identity.logo "../logo.svg" is not a file of brand`},
-		"role":     {`"section": {`, `"headline": {`, `text.headline is not a role`},
+		"role":     {`"section": {`, `"Section": {`, `text.Section: a role's name is lowercase`},
 		"size":     {`"caption": {"size": 12`, `"caption": {"size": 0`, `text.caption has no size`},
 		"radius":   {`"md": 14`, `"xl": 14`, `radius.xl: the radii are sm, md and lg`},
 		"buttons":  {`"raised"`, `"round"`, `buttons "round" is flat or raised`},
 		"state":    {`"not_found":`, `"lost":`, `states.lost is not a state`},
 		"icons":    {`"icons": "icons"`, `"icons": "logo.svg"`, `identity.icons: logo.svg is not a folder of brand`},
-		"theme":    {`"theme_color": "#A8DC50"`, `"theme_color": "green"`, `identity.theme_color "green" is not a color`},
+		"theme":    {`"theme_color": "#2F6FEB"`, `"theme_color": "green"`, `identity.theme_color "green" is not a color`},
 		"textfont": {`"font": "display", "weight": 800`, `"font": "serif", "weight": 800`, `text.section.font "serif" is display or body`},
 	} {
 		theme := strings.Replace(goodTheme, tc.from, tc.to, 1)
@@ -106,12 +106,12 @@ func TestBrandCSS(t *testing.T) {
 	}
 	css := b.CSS("/site/brand/")
 	for _, want := range []string{
-		`@font-face { font-family: "Bricolage Grotesque"; src: url("/site/brand/fonts/Bricolage.ttf") format("truetype"); font-weight: 200 800;`,
-		`src: url("/site/brand/fonts/Figtree.woff2") format("woff2")`,
-		"--brand-accent: #A8DC50;",
+		`@font-face { font-family: "Display Sans"; src: url("/site/brand/fonts/Display.ttf") format("truetype"); font-weight: 200 800;`,
+		`src: url("/site/brand/fonts/Body.woff2") format("woff2")`,
+		"--brand-accent: #2F6FEB;",
 		"--brand-ink: #0a0a0a;", // a role the theme leaves out has its default
-		"--brand-casa: #3CC8B4;",
-		"--color-casa: var(--brand-casa);",
+		"--brand-sale: #E5484D;",
+		"--color-sale: var(--brand-sale);",
 		"--primary: var(--brand-accent);",
 		"--muted-foreground: var(--brand-muted);",
 		"--brand-radius-md: 14px;",
@@ -124,6 +124,20 @@ func TestBrandCSS(t *testing.T) {
 		".btn:active { transform: translateY(2px); }",
 		".notice.hidden",
 	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("CSS lacks %q:\n%s", want, css)
+		}
+	}
+	// The roles come in the order of their names, whatever names they are.
+	if strings.Index(css, ".t-caption") > strings.Index(css, ".t-section") {
+		t.Error("text roles are not in order")
+	}
+	for _, catalog := range []string{".price", ".photo", "--brand-strike"} {
+		if strings.Contains(css, catalog) {
+			t.Errorf("CSS has %s, which is a project's", catalog)
+		}
+	}
+	for _, want := range []string{} {
 		if !strings.Contains(css, want) {
 			t.Errorf("CSS lacks %q:\n%s", want, css)
 		}
