@@ -3,7 +3,7 @@
 // a page with all of them.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Bell, BellOff, Check, CheckCheck, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
+import { Bell, BellOff, Check, CheckCheck, ChevronLeft, ChevronRight, Trash2 } from "../icons.gen.ts"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"

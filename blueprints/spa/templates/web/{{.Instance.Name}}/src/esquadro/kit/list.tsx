@@ -33,7 +33,7 @@ import {
   Trash2,
   Upload,
   X,
-} from "lucide-react"
+} from "../icons.gen.ts"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"

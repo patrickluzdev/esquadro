@@ -1,0 +1,35 @@
+package shop
+
+import (
+	"context"
+	"strings"
+	"testing"
+)
+
+// The icons of icons.go, as TestSSRDrawsItsIconsAndYours writes it: share-2
+// of the project's own, chevron-left none, mine a whole <svg>.
+func TestOwnIcons(t *testing.T) {
+	draw := func(name string) string {
+		var b strings.Builder
+		if err := Icon(name).Render(context.Background(), &b); err != nil {
+			t.Fatal(err)
+		}
+		return b.String()
+	}
+	var share strings.Builder
+	if err := Share("https://loja.com", "Loja").Render(context.Background(), &share); err != nil {
+		t.Fatal(err)
+	}
+	if got := share.String(); !strings.Contains(got, `viewBox="0 0 24 24"`) || !strings.Contains(got, `<path d="M1 1h2"/>`) {
+		t.Errorf("Share draws not the project's icon: %s", got)
+	}
+	if got := draw("search"); !strings.Contains(got, `r="8"`) {
+		t.Errorf("search: %q", got)
+	}
+	if got := draw("mine"); got != `<svg id="mine"></svg>` {
+		t.Errorf("mine: %q", got)
+	}
+	if got := draw("chevron-left") + draw("no-such-icon"); got != "" {
+		t.Errorf("drawn: %q", got)
+	}
+}

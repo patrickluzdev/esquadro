@@ -4,7 +4,7 @@
 // of the filter leaves, and the next takes its place.
 import { useQuery } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Inbox } from "lucide-react"
+import { Inbox } from "../icons.gen.ts"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"

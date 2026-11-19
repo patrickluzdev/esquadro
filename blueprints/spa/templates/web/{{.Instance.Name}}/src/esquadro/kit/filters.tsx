@@ -5,7 +5,7 @@
 // search, a column's header. The filters are the API's (@store(filter)),
 // and live in the URL.
 import { useQuery } from "@tanstack/react-query"
-import { Check, ChevronsUpDown, Filter, ListFilter as ListFilterIcon, Minus, X } from "lucide-react"
+import { Check, ChevronsUpDown, Filter, ListFilter as ListFilterIcon, Minus, X } from "../icons.gen.ts"
 import { Fragment, useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"

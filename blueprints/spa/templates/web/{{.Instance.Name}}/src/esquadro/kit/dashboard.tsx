@@ -4,9 +4,7 @@
 // exported, for pages of your own.
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import * as icons from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { AlertTriangle, RotateCw, TrendingDown, TrendingUp } from "lucide-react"
+import { Activity, iconOf, RotateCw, TrendingDown, TrendingUp, TriangleAlert } from "../icons.gen.ts"
 import type { CSSProperties, ReactNode } from "react"
 import {
   Area,
@@ -249,15 +247,6 @@ const ENUM_COLORS: Record<string, string> = {
 /** The colors of series, in turn: the theme's chart colors. */
 const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 
-function iconOf(name?: string): LucideIcon {
-  const key = (name ?? "")
-    .split(/[-_ ]/)
-    .filter(Boolean)
-    .map((p) => p[0].toUpperCase() + p.slice(1))
-    .join("")
-  return ((icons as unknown as Record<string, LucideIcon>)[key] ?? icons.ChartColumn) as LucideIcon
-}
-
 function paramsOf(w: Widget, since?: Date, until?: Date): Record<string, unknown> {
   const params: Record<string, unknown> = {}
   if (w.since && since) params[w.since] = since.toISOString()
@@ -362,7 +351,7 @@ function StatTile({
   const before = previous(since)
   const prior = useRows(w, before?.since, before?.until, Boolean(w.until && before))
   const yCol = columnOf(w, y)
-  const Icon = iconOf(w.icon)
+  const Icon = iconOf(w.icon, "ChartColumn")
   const Tile = onPick ? "button" : "div"
   const delta = rows.data && prior.data ? change(reckon(rows.data, y, w.total), reckon(prior.data, y, w.total)) : undefined
   return (
@@ -431,7 +420,7 @@ function WidgetCard({ widget: w, since, className }: { widget: Widget; since?: D
         {rows.isPending && <Skeleton className={w.kind === "table" || w.kind === "top" || w.kind === "progress" ? "h-48 w-full" : "h-64 w-full"} />}
         {rows.isError && (
           <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-destructive" role="alert">
-            <AlertTriangle className="size-5" />
+            <TriangleAlert className="size-5" />
             <span>{describe(rows.error)}</span>
             <Button variant="outline" size="sm" onClick={() => rows.refetch()}>
               <RotateCw /> {t("retry")}
@@ -911,7 +900,7 @@ export function Timeline({ widget: w, rows }: { widget: Widget; rows: Row[] }) {
         return (
           <li key={i} className="relative flex gap-3">
             <span className="z-10 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-4 ring-card">
-              {person ? initials(person) : <icons.Activity className="size-4" />}
+              {person ? initials(person) : <Activity className="size-4" />}
             </span>
             <div className="min-w-0 flex-1 pt-0.5">
               {person && <p className="text-sm font-semibold text-foreground">{person}</p>}

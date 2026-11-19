@@ -2,7 +2,7 @@
 // (created_at, or a date field the API filters): presets (today, the last
 // 7 or 30 days, this month) or a range picked in the calendar, with
 // shadcn/ui's Popover and Calendar.
-import { CalendarIcon, X } from "lucide-react"
+import { Calendar as CalendarIcon, X } from "../icons.gen.ts"
 import { useState } from "react"
 import type { DateRange } from "react-day-picker"
 import { ptBR } from "date-fns/locale"

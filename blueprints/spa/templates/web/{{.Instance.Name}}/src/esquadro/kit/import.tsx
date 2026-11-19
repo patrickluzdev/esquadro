@@ -4,7 +4,7 @@
 // wrong, and the import, all or none.
 import { isApiError } from "@api"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, Download, FileUp, Upload } from "lucide-react"
+import { CircleAlert, Download, FileUp, Upload } from "../icons.gen.ts"
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -233,7 +233,7 @@ export function ImportDialog({ meta, open, onOpenChange }: { meta: ResourceMeta;
             </Table>
             {missing.length > 0 && (
               <p className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="size-4" /> {t("importMissing", { fields: missing.map((f) => f.label).join(", ") })}
+                <CircleAlert className="size-4" /> {t("importMissing", { fields: missing.map((f) => f.label).join(", ") })}
               </p>
             )}
           </div>
@@ -271,7 +271,7 @@ export function ImportDialog({ meta, open, onOpenChange }: { meta: ResourceMeta;
             {problems.length > 0 && (
               <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
                 <p className="flex items-center gap-2 text-sm font-semibold text-destructive">
-                  <AlertCircle className="size-4" /> {refused ? t("importRefused") : t("importProblems", { count: problems.length })}
+                  <CircleAlert className="size-4" /> {refused ? t("importRefused") : t("importProblems", { count: problems.length })}
                 </p>
                 <ul className="flex flex-col gap-1 text-sm">
                   {problems.slice(0, 20).map((p, i) => (

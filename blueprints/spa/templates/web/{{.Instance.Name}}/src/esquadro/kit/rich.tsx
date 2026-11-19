@@ -18,8 +18,8 @@ import {
   Strikethrough,
   Underline,
   Undo2,
-  type LucideIcon,
-} from "lucide-react"
+  type IconComponent,
+} from "../icons.gen.ts"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,7 +46,7 @@ export function RichText({ html, className }: { html: string; className?: string
 }
 
 /** A button of the toolbar: what it does, and whether it is on. */
-function Tool({ icon: Icon, label, active, disabled, onClick }: { icon: LucideIcon; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
+function Tool({ icon: Icon, label, active, disabled, onClick }: { icon: IconComponent; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <Button
       type="button"

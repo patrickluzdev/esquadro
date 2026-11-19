@@ -4,7 +4,7 @@
 import { isApiError } from "@api"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { LogOut, Monitor, Moon, Smartphone, Sun } from "lucide-react"
+import { LogOut, Monitor, Moon, Smartphone, Sun } from "../icons.gen.ts"
 import { useTheme } from "next-themes"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"

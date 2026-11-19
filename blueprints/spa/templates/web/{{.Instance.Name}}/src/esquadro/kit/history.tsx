@@ -2,7 +2,7 @@
 // record's history on its page, and every change for those who administer.
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { Link, useNavigate, useSearch } from "@tanstack/react-router"
-import { ArrowRight, Bot, ChevronDown, ChevronLeft, ChevronRight, History as HistoryIcon, KeyRound, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronLeft, ChevronRight, History as HistoryIcon, KeyRound, Pencil, Plus, RotateCcw, Trash2 } from "../icons.gen.ts"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

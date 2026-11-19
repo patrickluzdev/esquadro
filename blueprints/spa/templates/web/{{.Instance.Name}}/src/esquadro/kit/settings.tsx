@@ -3,7 +3,7 @@
 // kept in the URL (?section=). A section's content may be a card: inside,
 // it loses its frame.
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import type { LucideIcon } from "lucide-react"
+import type { IconComponent } from "../icons.gen.ts"
 import type { ReactNode } from "react"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 export interface SettingsSection {
   key: string
   label: string
-  icon?: LucideIcon
+  icon?: IconComponent
   content: ReactNode
 }
 

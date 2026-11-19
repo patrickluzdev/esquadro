@@ -94,7 +94,10 @@ templ Controls(action string, filters []Filter, sorts []Option, search bool, q s
 		if search {
 			<label class="grid min-w-56 flex-1 gap-1 text-sm">
 				<span class="sr-only">{ T("search") }</span>
-				<input type="search" name="q" value={ q } placeholder={ T("searchPlaceholder") } class="field h-10 rounded-lg border border-border bg-background px-3"/>
+				<span class="field flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-muted-foreground">
+					@Icon("search")
+					<input type="search" name="q" value={ q } placeholder={ T("searchPlaceholder") } class="h-full min-w-0 flex-1 bg-transparent text-foreground outline-none"/>
+				</span>
 			</label>
 		}
 		for _, f := range filters {
@@ -127,13 +130,19 @@ templ Pagination(pg Pager) {
 	if pg.Pages > 1 {
 		<nav class="mt-8 flex items-center justify-between gap-4 text-sm">
 			if pg.Number > 1 {
-				<a href={ templ.URL(pg.Link(pg.Number - 1)) } rel="prev" class="btn btn-secondary rounded-lg border border-border px-4 py-2">{ T("previous") }</a>
+				<a href={ templ.URL(pg.Link(pg.Number - 1)) } rel="prev" class="btn btn-secondary inline-flex items-center gap-1 rounded-lg border border-border px-4 py-2">
+					@Icon("chevron-left")
+					{ T("previous") }
+				</a>
 			} else {
 				<span></span>
 			}
 			<span class="text-muted-foreground">{ T("pageOf", "page", Number(int64(pg.Number)), "pages", Number(int64(pg.Pages))) }</span>
 			if pg.Number < pg.Pages {
-				<a href={ templ.URL(pg.Link(pg.Number + 1)) } rel="next" class="btn btn-secondary rounded-lg border border-border px-4 py-2">{ T("next") }</a>
+				<a href={ templ.URL(pg.Link(pg.Number + 1)) } rel="next" class="btn btn-secondary inline-flex items-center gap-1 rounded-lg border border-border px-4 py-2">
+					{ T("next") }
+					@Icon("chevron-right")
+				</a>
 			} else {
 				<span></span>
 			}
@@ -151,7 +160,10 @@ templ Share(url, title string) {
 		target="_blank"
 		rel="noopener"
 		class="btn btn-secondary inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium"
-	>{ T("share") }</a>
+	>
+		@Icon("share-2")
+		{ T("share") }
+	</a>
 }
 
 // Empty is what a list with nothing shows.
@@ -179,6 +191,13 @@ templ Logo() {
 {{- end}}{{else}}
 	<span class="text-lg font-semibold tracking-tight">{ Name }</span>
 {{- end}}
+}
+
+// Icon is an icon by name, of the text's size and color: the kit's are
+// Lucide's (icons_gen.go), unless icons.go, which is yours, gives its own;
+// a name of yours draws yours. Nothing for a name neither has.
+templ Icon(name string) {
+	@templ.Raw(iconSVG(name))
 }
 
 // The visitor's account.

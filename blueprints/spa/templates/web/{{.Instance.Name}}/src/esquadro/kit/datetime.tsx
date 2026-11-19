@@ -2,7 +2,7 @@
 // form: a calendar in a popover (shadcn/ui's), in the frontend's language,
 // with Today and Clear; the time beside it, in hours and minutes.
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, X } from "lucide-react"
+import { Calendar as CalendarIcon, X } from "../icons.gen.ts"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"

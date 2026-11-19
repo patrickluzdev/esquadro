@@ -3,7 +3,7 @@
 // again (what was there, dimmed, under a bar), empty, nothing found, an
 // error (with a way to try again), not found and not allowed.
 import { isApiError } from "@api"
-import { AlertTriangle, FileQuestion, Inbox, RotateCw, SearchX, ShieldX } from "lucide-react"
+import { TriangleAlert, FileQuestion, Inbox, RotateCw, SearchX, ShieldX } from "../icons.gen.ts"
 import type { ReactNode } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -109,7 +109,7 @@ export function ErrorState({
     <StateView
       tone="error"
       framed={framed}
-      icon={<AlertTriangle />}
+      icon={<TriangleAlert />}
       title={t("loadFailed")}
       description={describe(error)}
       action={
@@ -131,7 +131,7 @@ export function ErrorState({
 export function RefreshError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
     <Alert variant="destructive" className="animate-in fade-in-0">
-      <AlertTriangle />
+      <TriangleAlert />
       <AlertTitle>{t("refreshFailed")}</AlertTitle>
       <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
         <span>

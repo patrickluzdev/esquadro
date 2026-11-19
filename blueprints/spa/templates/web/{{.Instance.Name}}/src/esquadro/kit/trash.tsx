@@ -3,7 +3,7 @@
 // the trash lists what went there, to restore or delete for good.
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "../icons.gen.ts"
 import { toast as sonner } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"

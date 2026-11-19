@@ -4,7 +4,7 @@
 // the others.
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { WifiOff } from "lucide-react"
+import { WifiOff } from "../icons.gen.ts"
 import { useEffect, useState } from "react"
 import { base } from "../config.ts"
 import { sessionQuery } from "./auth.tsx"

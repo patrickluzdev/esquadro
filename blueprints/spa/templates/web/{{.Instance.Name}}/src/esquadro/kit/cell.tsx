@@ -3,7 +3,7 @@
 // Enter or on leaving it (Esc gives up). It changes that field alone
 // (PATCH), on the version shown (If-Match).
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Pencil } from "lucide-react"
+import { Pencil } from "../icons.gen.ts"
 import { useRef, useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"

@@ -53,6 +53,8 @@ func TemplateFuncs() template.FuncMap {
 		"displayOf":   DisplayOf,
 		"titleOf":     TitleOf,
 		"lucide":      ui.Lucide,
+		"withIcon":    WithIcon,
+		"iconSet":     IconSet,
 		"uiWords":     ui.Words,
 		"filterable":  Filterable,
 		"fileMeta":    FileMeta,

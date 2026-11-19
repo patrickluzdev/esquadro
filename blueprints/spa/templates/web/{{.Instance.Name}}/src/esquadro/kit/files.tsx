@@ -2,7 +2,7 @@
 // to send one (dragged in or chosen, checked for its size and format
 // before it goes, with its progress), and how one is shown (an image, or
 // a link to download it).
-import { FileIcon, ImagePlus, Loader2, RefreshCw, Trash2, Upload } from "lucide-react"
+import { File as FileIcon, ImagePlus, Loader2, RefreshCw, Trash2, Upload } from "../icons.gen.ts"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"

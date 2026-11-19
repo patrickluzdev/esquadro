@@ -2,7 +2,7 @@
 // value is shown (yours too, from src/fields.ts).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Copy, History as HistoryIcon, Pencil, Trash2 } from "lucide-react"
+import { Copy, History as HistoryIcon, Pencil, Trash2 } from "../icons.gen.ts"
 import { fields as yours } from "@/fields.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

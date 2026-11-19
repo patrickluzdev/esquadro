@@ -2,7 +2,7 @@
 // (yours) shows it, and may show a page of its own instead.
 import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useSearch } from "@tanstack/react-router"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "../../icons.gen.ts"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"

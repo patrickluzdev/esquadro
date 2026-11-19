@@ -1,6 +1,6 @@
 {{- if and (index (optionsOf "security") "services") .Options.service_keys -}}
 import { createFileRoute } from "@tanstack/react-router"
-import { ShieldX } from "lucide-react"
+import { ShieldX } from "../../esquadro/icons.gen.ts"
 import { serviceKeyAdmins } from "../../esquadro/accounts.gen.ts"
 import { allowedBy } from "../../esquadro/kit/accounts-admin.tsx"
 import { useSession } from "../../esquadro/kit/auth.tsx"

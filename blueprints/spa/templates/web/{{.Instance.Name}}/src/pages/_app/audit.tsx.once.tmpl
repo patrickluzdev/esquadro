@@ -1,7 +1,7 @@
 {{- $audit := optionsOf "audit"}}
 {{- if and $audit (auditedOf .Entities $audit) .Options.audit_page (uses "security") -}}
 import { createFileRoute } from "@tanstack/react-router"
-import { ShieldX } from "lucide-react"
+import { ShieldX } from "../../esquadro/icons.gen.ts"
 import { auditAdmins } from "../../esquadro/accounts.gen.ts"
 import { allowedBy } from "../../esquadro/kit/accounts-admin.tsx"
 import { useSession } from "../../esquadro/kit/auth.tsx"

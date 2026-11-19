@@ -4,7 +4,7 @@
 // disabled, signed out or deleted; never one's own way out.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import { Ban, ChevronLeft, ChevronRight, KeyRound, LogOut, MailPlus, MoreHorizontal, RotateCw, ShieldCheck, Trash2, UserCheck, UserPlus } from "lucide-react"
+import { Ban, ChevronLeft, ChevronRight, KeyRound, LogOut, MailPlus, MoreHorizontal, RotateCw, ShieldCheck, Trash2, UserCheck, UserPlus } from "../icons.gen.ts"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

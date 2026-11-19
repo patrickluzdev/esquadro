@@ -2,7 +2,7 @@
 // administer them: the service roles as the model declares them, the keys
 // with their status and last use, new keys (shown once) and revoking.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Ban, Check, Copy, KeyRound, Plus, TriangleAlert } from "lucide-react"
+import { Ban, Check, Copy, KeyRound, Plus, TriangleAlert } from "../icons.gen.ts"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

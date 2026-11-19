@@ -164,3 +164,32 @@ func TestSSRSiteWithABrand(t *testing.T) {
 		t.Fatalf("go vet: %v\n%s", err, out)
 	}
 }
+
+// TestSSRDrawsItsIconsAndYours gives the site icons of the project's own in
+// icons.go, and the kit draws them: one in place of Lucide's, a whole <svg>,
+// none for an empty one.
+func TestSSRDrawsItsIconsAndYours(t *testing.T) {
+	dir, code, errOut := ssrProject(t, nil, nil)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "shop")
+	for path, want := range map[string]string{
+		"icons_gen.go": `"share-2":`,
+		"icons.go":     "var ownIcons = map[string]string{}",
+		"kit.templ":    `@Icon("chevron-left")`,
+	} {
+		if got := read(t, filepath.Join(site, path)); !strings.Contains(got, want) {
+			t.Errorf("%s lacks %q", path, want)
+		}
+	}
+	icons := filepath.Join(site, "icons.go")
+	own := "var ownIcons = map[string]string{\n\t\"share-2\":      `<path d=\"M1 1h2\"/>`,\n\t\"chevron-left\": \"\",\n\t\"mine\":         `<svg id=\"mine\"></svg>`,\n}"
+	os.WriteFile(icons, []byte(strings.Replace(read(t, icons), "var ownIcons = map[string]string{}", own, 1)), 0o644)
+	os.WriteFile(filepath.Join(site, "icons_own_test.go"), []byte(read(t, filepath.Join("testdata", "ssr", "icons_own_test.go.txt"))), 0o644)
+	test := exec.Command("go", "test", "./web/shop/")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
+}
