@@ -158,6 +158,17 @@ func TestMailLayoutWithABrand(t *testing.T) {
 // The built-in emails come in mail's locale: an untouched copy follows
 // it, one the project changed has the change merged in, with conflicts
 // where both changed a line.
+// TestMailName writes the name mail says in the emails.
+func TestMailName(t *testing.T) {
+	dir, _ := mailProject(t, "    name \"Loja do Bairro\"\n")
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	if got := read(t, filepath.Join(dir, "internal", "platform", "mail", "layout.go")); !strings.Contains(got, `const App = "Loja do Bairro"`) {
+		t.Errorf("layout.go lacks the name:\n%s", got)
+	}
+}
+
 func TestMailEmailsInTheLocale(t *testing.T) {
 	dir, appEsq := mailProject(t, "    locale pt_br\n")
 	if code, _, errOut := esq(t, "gen", dir); code != 0 {

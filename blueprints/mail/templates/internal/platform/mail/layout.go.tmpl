@@ -22,7 +22,7 @@ import (
 )
 
 // App is the app's name, as the emails write it.
-const App = {{quote .App.Label}}
+const App = {{quote (or .Options.name .App.Label)}}
 
 // branded reports whether the emails wear a brand: without one, the
 // layout keeps its neutral look, with no header nor footer.

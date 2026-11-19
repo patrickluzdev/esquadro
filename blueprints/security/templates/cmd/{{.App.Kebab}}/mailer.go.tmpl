@@ -15,7 +15,7 @@ import (
 type securityMail struct{ mail *mail.Mailer }
 
 func (s securityMail) Send(ctx context.Context, m security.Message) error {
-	data := map[string]string{"Realm": m.Realm, "To": m.To, "Link": m.Link, "App": "{{.App.Label}}", "From": m.From}
+	data := map[string]string{"Realm": m.Realm, "To": m.To, "Link": m.Link, "App": mail.App, "From": m.From}
 	if !m.Expires.IsZero() {
 		data["Expires"] = mail.Date(m.Expires)
 	}
