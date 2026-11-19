@@ -427,7 +427,17 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 		},
 		// ann returns this blueprint's annotation values on a node (app,
 		// entity, field, relation or job), or nil when it has none.
-		"ann": func(node any) map[string]any { return annOf(node)[self] },
+		// A frontend (a blueprint that requires ui) also sees @ui's values,
+		// under its own.
+		"ann": func(node any) map[string]any {
+			a := annOf(node)
+			if !c.requiresUI(self) || a["ui"] == nil {
+				return a[self]
+			}
+			out := maps.Clone(a["ui"])
+			maps.Copy(out, a[self])
+			return out
+		},
 		// annOf returns another blueprint's annotation values on a node.
 		"annOf":    func(name string, node any) map[string]any { return annOf(node)[name] },
 		"join":     func(sep string, items []string) string { return strings.Join(items, sep) },
@@ -467,6 +477,17 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 			return strings.Join(lines, "\n")
 		},
 	}
+}
+
+// requiresUI reports whether a blueprint of the app is a frontend: one that
+// requires the ui blueprint, whose @ui it reads under its own annotation.
+func (c *composer) requiresUI(name string) bool {
+	for _, b := range c.set.Blueprints {
+		if b.Manifest.Name == name {
+			return slices.ContainsFunc(b.Manifest.Requires, func(d blueprint.Dep) bool { return d.Name == "ui" })
+		}
+	}
+	return false
 }
 
 func annOf(node any) project.Ann {

@@ -12,7 +12,7 @@
 blueprint spa {
   version "0.1.0"
   instances
-  requires app, http, rest, client_ts, workspace, security
+  requires app, http, rest, client_ts, workspace, security, ui
 
   /// The domain it answers on (admin.shop.com); without one, the app's
   /// domain, under path.
@@ -68,27 +68,24 @@ blueprint spa {
   annotation entity {
     /// The entity is a resource of the frontend: its list, form and page.
     resource bool
-    /// What people call it, in the frontend's language: Offers.
+    /// What people call it in this frontend, when not what @ui says.
     label string
-    /// What one of it is called, in titles: "Product".
+    /// What one of it is called in this frontend, when not what @ui says.
     singular string
     /// Its entry in the menu; the label by default.
     menu string
     /// The section of the menu it is in, with the other resources of the
     /// same group: "Catalog".
     group string
-    /// The icon of its menu entry, a Lucide name: tag, users, shopping_cart.
-    icon name
   }
   annotation field {
-    /// What people call the field, in the frontend's language: Price.
+    /// What people call the field in this frontend, when not what @ui
+    /// says.
     label string
-    /// How a report's column is shown: percent (0.42 as 42%, with a bar in
-    /// a table) or duration (seconds as 03:45).
-    format name
   }
   annotation relation {
-    /// What people call the relation, in the frontend's language: Category.
+    /// What people call the relation in this frontend, when not what @ui
+    /// says.
     label string
   }
   annotation report {
@@ -137,13 +134,8 @@ blueprint spa {
     icon name
   }
   annotation value {
-    /// What people call a value of an enum, in the frontend's language:
-    /// Active.
+    /// What people call the value in this frontend, when not what @ui
+    /// says.
     label string
-    /// The color of its dot: green, amber, red, blue, violet, sky, orange
-    /// or gray. Without one, a guess from its name: ACTIVE, PAID and DONE
-    /// are green, PENDING and DRAFT amber, CANCELED and FAILED red; others
-    /// gray.
-    color name
   }
 }

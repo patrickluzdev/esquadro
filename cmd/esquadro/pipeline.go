@@ -24,6 +24,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/spa"
 	"github.com/patrickluzdev/esquadro/blueprints/storage"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
+	"github.com/patrickluzdev/esquadro/blueprints/ui"
 	bpworkspace "github.com/patrickluzdev/esquadro/blueprints/workspace"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
@@ -53,6 +54,7 @@ func init() {
 	blueprint.Checks["platform/apps"] = apps.Check
 	blueprint.Checks["workspace"] = bpworkspace.Check
 	blueprint.Checks["spa"] = spa.Check
+	blueprint.Checks["ui"] = ui.Check
 	blueprint.Checks["seed"] = seed.Check
 	blueprint.Checks["audit"] = audit.Check
 	blueprint.Checks["notifications"] = notifications.Check

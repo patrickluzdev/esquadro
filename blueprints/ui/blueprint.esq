@@ -1,0 +1,35 @@
+/// What every frontend of the app shares: how people call the model's
+/// entities, fields, relations and enum values (@ui), their icons and
+/// colors, and the checks of the frontends' options. The spa and ssr
+/// blueprints require it; each frontend reads @ui, and its own annotation
+/// (@admin, @site) over it, for what only that frontend calls otherwise.
+blueprint ui {
+  version "0.1.0"
+
+  annotation entity {
+    /// What people call it: Offers.
+    label string
+    /// What one of it is called, in titles: Offer.
+    singular string
+    /// Its icon, a Lucide name: tag, users, shopping_cart.
+    icon name
+  }
+  annotation field {
+    /// What people call the field: Price.
+    label string
+    /// How a report's column is shown: percent (0.42 as 42%) or duration
+    /// (seconds as 03:45).
+    format name
+  }
+  annotation relation {
+    /// What people call the relation: Category.
+    label string
+  }
+  annotation value {
+    /// What people call the value: Active.
+    label string
+    /// Its dot: green, amber, red, blue, violet, sky, orange or gray; a
+    /// guess from its name by default.
+    color name
+  }
+}

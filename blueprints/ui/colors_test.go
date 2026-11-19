@@ -1,4 +1,4 @@
-package spa
+package ui
 
 import "testing"
 

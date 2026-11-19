@@ -22,17 +22,17 @@ func spaProject(t *testing.T, change func(app string) string) (string, int, stri
 	}
 	appEsq := filepath.Join(dir, "esquadro", "app.esq")
 	app := strings.Replace(read(t, appEsq), "  blueprint api_docs\n",
-		"  blueprint api_docs\n  blueprint client_ts {\n    scope \"acme\"\n  }\n  blueprint workspace\n  blueprint spa admin {\n    roles [admin, staff]\n    locale pt_br\n  }\n", 1)
+		"  blueprint api_docs\n  blueprint client_ts {\n    scope \"acme\"\n  }\n  blueprint workspace\n  blueprint ui\n  blueprint spa admin {\n    roles [admin, staff]\n    locale pt_br\n  }\n", 1)
 	if change != nil {
 		app = change(app)
 	}
 	os.WriteFile(appEsq, []byte(app), 0o644)
 	catalogEsq := filepath.Join(dir, "esquadro", "catalog.esq")
 	catalog := strings.Replace(read(t, catalogEsq), "  @security(read public, write [user.admin, user.staff])",
-		"  @security(read public, write [user.admin, user.staff])\n  @admin(resource, label \"Produtos\", icon package)", 1)
-	catalog = strings.Replace(catalog, "  name        string  required", "  name        string  required @admin(label \"Nome\")", 1)
-	catalog = strings.Replace(catalog, "  ACTIVE\n", "  ACTIVE @admin(label \"Ativo\")\n", 1)
-	catalog += "\nreport ProductsInAll {\n  products int required @admin(label \"Produtos\")\n  @security(read user)\n  @admin(widget stat, y products)\n}\n"
+		"  @security(read public, write [user.admin, user.staff])\n  @ui(label \"Produtos\", icon package)\n  @admin(resource)", 1)
+	catalog = strings.Replace(catalog, "  name        string  required", "  name        string  required @ui(label \"Nome\")", 1)
+	catalog = strings.Replace(catalog, "  ACTIVE\n", "  ACTIVE @ui(label \"Ativo\")\n", 1)
+	catalog += "\nreport ProductsInAll {\n  products int required @ui(label \"Produtos\")\n  @security(read user)\n  @admin(widget stat, y products)\n}\n"
 	catalog = strings.Replace(catalog, "  @security(read public, write user.admin)", "  @security(read public, write user.admin)\n  @admin(resource)", 1)
 	os.WriteFile(catalogEsq, []byte(catalog), 0o644)
 	code, _, errOut := esq(t, "gen", dir)
@@ -96,10 +96,34 @@ func TestSPAChecksItsInstances(t *testing.T) {
 		"idle":      {func(s string) string { return strings.Replace(s, "locale pt_br", "idle_minutes 1", 1) }, "idle_minutes 1 is too short"},
 		"workspace": {func(s string) string { return strings.Replace(s, "  blueprint workspace\n", "", 1) }, "requires workspace"},
 		"no name":   {func(s string) string { return strings.Replace(s, "blueprint spa admin", "blueprint spa", 1) }, "is used by named instances"},
+		"reserved":  {func(s string) string { return strings.Replace(s, "locale pt_br", "path \"/api\"", 1) }, "where the app's own routes are"},
+		"domain":    {func(s string) string { return strings.Replace(s, "locale pt_br", "domain \"admin\"", 1) }, "domain admin is not a domain name"},
+		"twice": {func(s string) string {
+			return strings.Replace(s, "  blueprint ui\n", "  blueprint ui\n  blueprint spa staff {\n    path \"/admin\"\n  }\n", 1)
+		}, "spa admin answers where spa staff does (/admin)"},
 	} {
 		_, code, errOut := spaProject(t, tc.change)
 		if code == 0 || !strings.Contains(errOut, tc.want) {
 			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
+func TestSPALabelsFromUIAndItsOwn(t *testing.T) {
+	dir, code, errOut := spaProject(t, nil)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	catalogEsq := filepath.Join(dir, "esquadro", "catalog.esq")
+	catalog := strings.Replace(read(t, catalogEsq), `@ui(label "Nome")`, `@ui(label "Nome") @admin(label "Nome do produto")`, 1)
+	os.WriteFile(catalogEsq, []byte(catalog), 0o644)
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	got := read(t, filepath.Join(dir, "web", "admin", "src", "esquadro", "resources.gen.ts"))
+	for _, want := range []string{`label: "Produtos"`, `label: "Nome do produto"`, `ACTIVE: "Ativo"`, "icons.Package"} {
+		if !strings.Contains(got+read(t, filepath.Join(dir, "web", "admin", "src", "esquadro", "menu.gen.ts")), want) {
+			t.Errorf("lacks %q", want)
 		}
 	}
 }

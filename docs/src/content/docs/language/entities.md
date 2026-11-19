@@ -112,4 +112,4 @@ enum Status {
 
 An enum is a type of its module; a field uses it by name, and its default is
 one of its values. A value can carry annotations after it, e.g. the label a
-frontend shows: `ACTIVE @admin(label "Active")`.
+frontend shows: `ACTIVE @ui(label "Active")`.

@@ -1,4 +1,4 @@
-package spa
+package ui
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// hexColor is a color as the spa's options take it: #rgb or #rrggbb.
+// hexColor is a color as a frontend's options take it: #rgb or #rrggbb.
 var hexColor = regexp.MustCompile(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 
 // ValidColor reports whether s is a color the theme takes.
@@ -75,4 +75,23 @@ func ColorError(option, value string) string {
 		return ""
 	}
 	return fmt.Sprintf("%s %q is not a color: #rgb or #rrggbb, as #2a85ff", option, value)
+}
+
+// Theme is a frontend's theme tokens, from its options (primary,
+// primary_dark, radius): every frontend writes the same ones, by
+// shadcn/ui's names, so the app's frontends look alike by default.
+type Theme struct {
+	Radius string
+	// Primary and OnPrimary are the primary color and the text on it;
+	// Dark and OnDark, the same in the dark theme.
+	Primary, OnPrimary, Dark, OnDark string
+}
+
+// ThemeOf is the theme of a frontend with these options.
+func ThemeOf(opts map[string]any) Theme {
+	p, _ := opts["primary"].(string)
+	d, _ := opts["primary_dark"].(string)
+	r, _ := opts["radius"].(string)
+	dark := DarkPrimary(p, d)
+	return Theme{Radius: r, Primary: p, OnPrimary: OnColor(p), Dark: dark, OnDark: OnColor(dark)}
 }

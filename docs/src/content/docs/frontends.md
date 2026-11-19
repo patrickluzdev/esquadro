@@ -11,6 +11,7 @@ blueprint used by name, the architecture first and its purpose after:
 app shop {
   blueprint client_ts
   blueprint workspace            // the repository: one npm workspace
+  blueprint ui                   // what every frontend shares
   blueprint spa admin {          // a single-page app, for the team
     domain "admin.shop.com"      // or, without one, under /admin
     roles  [admin, staff]        // who of the realm may use it
@@ -26,6 +27,57 @@ sign-in with the session cookie, a responsive layout with a light and a dark
 theme, and the app's binary serves its build. `task web:install` installs its
 packages, `task dev` runs the API and the frontend together, `task web:build`
 builds it.
+
+## What every frontend shares
+
+An app may have several frontends: a panel for the team, a portal for its
+customers, a public site. What they all show the same way is said once, by
+the `ui` blueprint (`esquadro add spa admin` adds it):
+
+```esquadro
+entity Product {
+  name   string  required @ui(label "Name")
+  status Status           @ui(label "Status") @portal(label "Availability")
+  @ui(label "Products", singular "Product", icon package)
+  @admin(resource, group "Catalog")
+}
+
+enum Status {
+  ACTIVE   @ui(label "Active", color green)
+  INACTIVE @ui(label "Inactive")
+}
+```
+
+| `@ui` | On | What | Default |
+|---|---|---|---|
+| `label`, `singular` | entity | What people call it, and one of it | its name, humanized |
+| `icon` | entity | Its Lucide icon: `tag`, `users`, `shopping_cart` | a circle |
+| `label` | field, relation, report column | What people call it | its name, humanized |
+| `format` | field, report column | `percent` (0.42 as 42%) or `duration` (seconds as 03:45) | the value as is |
+| `label`, `color` | enum value | What people call the value; its dot: green, amber, red, blue, violet, sky, orange, gray | the value; a guess from its name |
+
+- **One frontend's own words.** Each frontend has its annotation, named
+  after it (`@admin` for `blueprint spa admin`), for what is only its own
+  (a resource, a menu group, a widget), and a `label` or `singular` there
+  wins over `@ui`'s, in that frontend only.
+- **The same options**, meaning the same in every frontend: `domain`,
+  `path`, `auth`, `roles`, `locale`, `serve`, `primary`, `primary_dark`,
+  `radius`; `esquadro check` checks them alike.
+- **Who signs in** is the security blueprint's: `@security(principal,
+  signup open, providers [password, google])` makes an entity sign in (a
+  realm), with the sign-up and the providers it allows; a frontend's `auth`
+  only chooses the realm, and shows the sign-up and the providers that
+  realm has.
+- **The same words**, in its language, for what every frontend says
+  (signing in, the account, errors, empty lists, pages, fields), and **the
+  same theme** from the same options: the app's frontends look alike by
+  default.
+- **Where each answers:** on its `domain`, or under its `path` on the
+  app's (`/<name>` by default). Two frontends cannot answer at the same
+  place, nor one under the app's own routes (`/api`, the security's
+  `/identity`, `/healthz`, `/readyz`, `/docs`, `/.well-known`): `esquadro
+  check` says which. On a [platform](/esquadro/production/), add each
+  frontend's domain to the app's `domains`.
 
 ## The look
 
@@ -96,8 +148,8 @@ reports' time parameters. The period and the number drawn are in the URL
 
 ```esquadro
 report RevenuePerDay {
-  day     string required @admin(label "Day")
-  revenue money  required @admin(label "Revenue")
+  day     string required @ui(label "Day")
+  revenue money  required @ui(label "Revenue")
   since   time   param
   until   time   param
   @admin(widget stat, x day, y revenue, icon dollar_sign, since since, until until, width two_thirds, dashboard "Sales")
@@ -137,9 +189,9 @@ report RevenueByChannel {
 | `dashboard` | The dashboard it is on | the first page's |
 | `icon`, `label` | A number's Lucide icon; what the dashboard calls it | a chart; the report's name |
 
-A column's `@admin(format percent)` shows `0.42` as `42%` (with a bar in a
+A column's `@ui(format percent)` shows `0.42` as `42%` (with a bar in a
 table, on a 0–100% scale on a radar), and `format duration` shows seconds as
-`03:45`. An enum's colors (`@admin(color green)`) color its slices, series
+`03:45`. An enum's colors (`@ui(color green)`) color its slices, series
 and dots. The numbers are the reports': a dashboard asks each once for the
 period (and once more for the period before, with `until`), and keeps them a
 minute.
@@ -241,16 +293,18 @@ list, form and page.
 
 ```esquadro
 entity Product {
-  name  string  required @admin(label "Name")
-  price decimal required @admin(label "Price")
-  @admin(resource, label "Products", singular "Product", icon package, group "Catalog")
+  name  string  required @ui(label "Name")
+  price decimal required @ui(label "Price")
+  @ui(label "Products", singular "Product", icon package)
+  @admin(resource, group "Catalog")
 }
 ```
 
-- `label` names the resource, its fields, its relations and the values of
-  its enums in the frontend's language (`ACTIVE @admin(label "Ativo")`). With a `locale` other than `en`, `esquadro check`
-  warns of each field of a resource without one, which would show its name
-  in English.
+- `@ui`'s labels name the resource, its fields, its relations and the
+  values of its enums in the frontend's language (`ACTIVE @ui(label
+  "Ativo")`). With a `locale` other than `en`, `esquadro check` warns of
+  each field of a resource without one, which would show its name in
+  English.
 - `group` puts the resource in a section of the menu, with the other
   resources of the same group.
 - The list pages, filters, sorts and searches through the API, with all of it
@@ -354,16 +408,15 @@ changed where it belongs: the model (`.esq`), the resource
 
 ### In the model
 
+Labels, icons, formats and colors are `@ui`'s ([above](#what-every-frontend-shares)).
+The frontend's own annotation adds:
+
 | Annotation | On | What | Default |
 |---|---|---|---|
 | `resource` | entity | It is a resource: its list, form and page | not one |
-| `label`, `singular` | entity | What people call it, and one of it | its name, humanized |
-| `menu`, `group`, `icon` | entity | Its menu entry, the section it is in, its Lucide icon | the label, none, a circle |
-| `label` | field, relation | What people call it | its name, humanized |
-| `label` | enum value | What people call the value | the value |
-| `color` | enum value | Its dot: green, amber, red, blue, violet, sky, orange, gray | a guess from its name |
+| `menu`, `group` | entity | Its menu entry, the section it is in | the label, none |
+| `label`, `singular` | entity, field, relation, enum value | What this frontend calls it, over `@ui`'s | `@ui`'s |
 | `widget`, `x`, `y`, `series`, `since`, `until`, `total`, `width`, `dashboard`… | report | A widget of a [dashboard](#dashboards) | not one |
-| `format` | report column | `percent` or `duration` | the value as is |
 
 Each annotation is named after the frontend: `@admin(...)` for
 `blueprint spa admin`. The [blueprint's reference](/esquadro/blueprints/reference/spa/)
