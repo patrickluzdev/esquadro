@@ -1,4 +1,4 @@
-{{- if fileFields .Entities .Options -}}
+{{- if or (fileFields .Entities .Options) (uses "images") -}}
 package main
 
 import (

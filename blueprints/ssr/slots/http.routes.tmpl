@@ -4,7 +4,7 @@
 {{- range siteModules $.Entities $.Modules $i.Name}}
 		{{.Pascal}}: d.{{.Camel}},
 {{- end}}
-{{- if and (siteImages (sitePages $.Entities $i.Name)) (uses "storage")}}
+{{- if or (and (siteImages (sitePages $.Entities $i.Name)) (uses "storage")) (and (siteOG (sitePages $.Entities $i.Name)) (uses "images"))}}
 		Storage: d.storage,
 {{- end}}
 {{- if siteRedirects $.Entities $i.Name}}

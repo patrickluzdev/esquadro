@@ -1,0 +1,16 @@
+/// Images drawn by the app, on the server: internal/platform/images, a
+/// small kit to draw them with (a canvas, colors, rectangles with round
+/// corners, text in a font by name that wraps, shrinks and ends in an
+/// ellipsis, a picture contained or covering a box, PNG), in pure Go
+/// (golang.org/x/image), and a cache of what it drew in the storage
+/// blueprint's store. The fonts are a site's brand's (its TrueType or
+/// OpenType files; a variable font in its default instance) or, without
+/// one, the Go fonts. Its first use: @site(page, og_image) on an entity
+/// gives each record's page an Open Graph image, /<path>/<id>/og.png,
+/// 1200x630, drawn by <entity>_og.go, yours, and kept in the store until
+/// the record changes. Projects draw their own images with the same kit.
+blueprint images {
+  version "0.1.0"
+  requires app, storage
+  go_require "golang.org/x/image" "v0.43.0"
+}

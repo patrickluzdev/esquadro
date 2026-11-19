@@ -5,6 +5,7 @@
 {{- $sys := sitePaths $o.locale -}}
 {{- $realm := realmOf .Entities $o -}}
 {{- $images := and (siteImages $pages) (uses "storage") -}}
+{{- $og := and (siteOG $pages) (uses "images") -}}
 {{- $redirects := siteRedirects .Entities $n -}}
 {{- $brand := siteBrand .App .Options -}}
 // Package {{$n}} is the {{$n}} site: pages rendered on the server, for
@@ -21,6 +22,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+{{- if $og}}
+	"image"
+{{- end}}
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -45,7 +49,10 @@ import (
 	brand "{{.App.Module}}/{{$brand.Dir}}"
 {{- end}}
 	"{{.App.Module}}/internal/platform/security"
-{{- if $images}}
+{{- if $og}}
+	"{{.App.Module}}/internal/platform/images"
+{{- end}}
+{{- if or $images $og}}
 	"{{.App.Module}}/internal/platform/storage"
 {{- end}}
 )
@@ -75,13 +82,13 @@ const pageSize = {{$o.page_size}}
 //go:embed all:dist
 var files embed.FS
 
-// Deps are what the site reads: the modules of its pages{{if $images}}, and the
-// store of their pictures{{end}}.
+// Deps are what the site reads: the modules of its pages{{if or $images $og}}, and the
+// store of their pictures{{end}}{{if $og}} and of the images it draws{{end}}.
 type Deps struct {
 {{- range $mods}}
 	{{.Pascal}} *{{.Snake}}.{{.Pascal}}
 {{- end}}
-{{- if $images}}
+{{- if or $images $og}}
 	Storage *storage.Store
 {{- end}}
 {{- if $redirects}}
@@ -102,6 +109,12 @@ type Site struct {
 	// base is the site's address, for canonical links: the url option, or
 	// the request's.
 	base string
+{{- if $og}}
+	// og is what the site's Open Graph images are drawn with: the brand's
+	// colors and fonts, and its logo (nil without one it can draw).
+	og     images.Theme
+	ogLogo image.Image
+{{- end}}
 }
 
 // New is the site, with what it reads.
@@ -110,9 +123,122 @@ func New(d Deps) *Site {
 		d.Logger = slog.Default()
 	}
 	s := &Site{deps: d, mux: http.NewServeMux(), base: {{quote (or $o.url (and $o.domain (printf "https://%s" $o.domain)) "")}}}
+{{- if $og}}
+	s.og, s.ogLogo = ogTheme(d.Logger)
+{{- end}}
 	s.routes()
 	return s
 }
+{{- if $og}}
+
+// ogThemeHash tells apart what the images are drawn with (the colors, and
+// the brand's font and logo files): part of the name each is kept under,
+// so that a change to them draws the images again.
+const ogThemeHash = {{quote (ogThemeHash $brand $o)}}
+
+// ogTheme is what the site's Open Graph images are drawn with: the colors
+// {{if $brand}}and fonts of its brand, and its logo{{else}}of its theme, in the Go fonts{{end}}.
+func ogTheme(log *slog.Logger) (images.Theme, image.Image) {
+	t := images.Theme{Colors: map[string]string{
+{{- range $role, $c := ogColors $brand $o}}
+		{{quote $role}}: {{quote $c}},
+{{- end}}
+	}}
+	var logo image.Image
+{{- if $brand}}
+{{- $display := ogFont $brand "display"}}{{$body := ogFont $brand "body"}}
+{{- if or $display $body}}
+	fonts, err := images.LoadFonts(brand.Files, map[string]string{ {{- if $display}}"display": {{quote $display}}{{end}}{{if and $display $body}}, {{end}}{{if $body}}"body": {{quote $body}}{{end -}} })
+	if err != nil {
+		log.Warn("site: the brand's fonts, for its images: the Go fonts in their place", "error", err)
+	}
+	t.Fonts = fonts
+{{- end}}
+{{- with ogLogo $brand}}
+	if data, err := fs.ReadFile(brand.Files, {{quote .}}); err == nil {
+		logo, err = images.Decode(data)
+		if err != nil {
+			log.Warn("site: the brand's logo, for its images", "error", err)
+		}
+	}
+{{- end}}
+{{- end}}
+	_ = log
+	return t, logo
+}
+
+// ogCache keeps the site's Open Graph images in the store, until what they
+// are drawn from changes.
+func (s *Site) ogCache() images.Cache {
+	return images.Cache{Store: s.deps.Storage, Logger: s.deps.Logger}
+}
+{{- if siteOGPictures $pages}}
+
+// picture is the picture of an image field's file, to draw: nil without
+// one, or when it cannot be read (logged).
+func (s *Site) picture(ctx context.Context, id uuid.UUID) image.Image {
+	if id == uuid.Nil() || s.deps.Storage == nil {
+		return nil
+	}
+	found, err := s.deps.Storage.Files(ctx, []uuid.UUID{id})
+	f, ok := found[id]
+	if err != nil || !ok {
+		return nil
+	}
+	data, err := s.deps.Storage.Read(ctx, f)
+	if err == nil {
+		var img image.Image
+		if img, err = images.Decode(data); err == nil {
+			return img
+		}
+	}
+	s.deps.Logger.WarnContext(ctx, "site: a picture, for an image", "file", id, "error", err)
+	return nil
+}
+{{- end}}
+
+// servePNG answers an image the site drew: kept by browsers and proxies
+// for an hour (public: everyone may read it), told apart by etag; one
+// asked for again unchanged is not sent.
+func servePNG(w http.ResponseWriter, r *http.Request, etag string, public bool, draw func() ([]byte, error)) error {
+	h := w.Header()
+	h.Set("ETag", etag)
+	h.Set("Cache-Control", map[bool]string{true: "public, max-age=3600", false: "private, max-age=3600"}[public])
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return nil
+	}
+	data, err := draw()
+	if err != nil {
+		h.Del("ETag")
+		h.Set("Cache-Control", "no-store")
+		return err
+	}
+	h.Set("Content-Type", "image/png")
+	h.Set("Content-Length", strconv.Itoa(len(data)))
+	h.Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+	return nil
+}
+
+// ogFailed answers an Open Graph image that could not be drawn: {{with $brand}}{{with .Theme.Identity.OGImage}}the
+// brand's picture, where it is{{else}}an error{{end}}{{else}}an error{{end}}. The error is logged.
+func (s *Site) ogFailed(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	s.deps.Logger.ErrorContext(r.Context(), "site: an Open Graph image", "path", r.URL.Path, "error", err)
+	w.Header().Set("Cache-Control", "no-store")
+{{- with $brand}}{{with .Theme.Identity.OGImage}}
+	http.Redirect(w, r, URL("/brand/{{.}}"), http.StatusFound)
+{{- else}}
+	http.Error(w, "the image could not be drawn", http.StatusInternalServerError)
+{{- end}}{{else}}
+	http.Error(w, "the image could not be drawn", http.StatusInternalServerError)
+{{- end}}
+}
+{{- end}}
 
 func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
 
@@ -136,6 +262,9 @@ func (s *Site) routes() {
 	m.HandleFunc("GET /{{.Path}}/{id}/{slug}", s.read{{.Entity.Pascal}})
 {{- if and .Image $images}}
 	m.HandleFunc("GET /{{.Path}}/{id}/img", s.image{{.Entity.Pascal}})
+{{- end}}
+{{- if and .OG (uses "images")}}
+	m.HandleFunc("GET /{{.Path}}/{id}/og.png", s.og{{.Entity.Pascal}})
 {{- end}}
 {{- end}}
 {{- if $brand}}
@@ -169,6 +298,9 @@ type Page struct {
 	// Title is the page's own title (the site's name is added); Description,
 	// a sentence about it; Image, the absolute address of its picture.
 	Title, Description, Image string
+	// ImageWidth and ImageHeight are its picture's size, in pixels, when
+	// known: an Open Graph image the site draws.
+	ImageWidth, ImageHeight int
 	// Canonical is the page's absolute address; Path, its path on the site.
 	Canonical, Path string
 	// Schema is its structured data (JSON-LD), "" for none.

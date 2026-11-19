@@ -1,4 +1,4 @@
-{{- if fileFields .Entities (optionsOf "storage")}}
+{{- if or (fileFields .Entities (optionsOf "storage")) (uses "images")}}
 	// The files in a folder of the test's own.
 	files, err := storage.Open(context.Background(), storage.Config{URL: "file://" + t.TempDir(), Secret: "the test's secret"}, pool)
 	if err != nil {

@@ -1,5 +1,5 @@
 {{- $o := optionsOf "storage"}}
-{{- if and (fileFields .Entities $o) (eq (index $o "local") "s3")}}
+{{- if and (or (fileFields .Entities $o) (uses "images")) (eq (index $o "local") "s3")}}
   s3-data:
     name: {{or (index (optionsOf "compose") "name") .App.Kebab}}-s3-data
 {{- end}}

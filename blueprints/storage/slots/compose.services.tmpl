@@ -1,5 +1,5 @@
 {{- $o := optionsOf "storage"}}
-{{- if and (fileFields .Entities $o) (eq (index $o "local") "s3")}}
+{{- if and (or (fileFields .Entities $o) (uses "images")) (eq (index $o "local") "s3")}}
 {{- $name := or (index (optionsOf "compose") "name") .App.Kebab}}
   # Files: a local S3 (Versity S3 Gateway), so that development sends and
   # reads files as production does; its bucket, {{.App.Kebab}}, is a folder of its volume.

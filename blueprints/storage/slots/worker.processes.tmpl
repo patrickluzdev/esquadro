@@ -1,3 +1,3 @@
-{{- if and (fileFields .Entities (optionsOf "storage")) (not (uses "jobs"))}}
+{{- if and (or (fileFields .Entities (optionsOf "storage")) (uses "images")) (not (uses "jobs"))}}
 		{Name: "storage", Run: d.storage.Maintain},
 {{- end}}

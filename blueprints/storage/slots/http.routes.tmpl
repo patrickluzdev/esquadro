@@ -1,4 +1,4 @@
-{{- if fileFields .Entities (optionsOf "storage")}}
+{{- if or (fileFields .Entities (optionsOf "storage")) (uses "images")}}
 	// A folder store's signed links, to send and read files.
 	d.storage.Routes(mux)
 {{- end}}

@@ -1,4 +1,4 @@
-{{- if fileFields .Entities (optionsOf "storage")}}
+{{- if or (fileFields .Entities (optionsOf "storage")) (uses "images")}}
   /storage/uploads:
     post:
       tags: [storage]

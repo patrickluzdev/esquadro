@@ -193,3 +193,106 @@ func TestSSRDrawsItsIconsAndYours(t *testing.T) {
 		t.Fatalf("go test: %v\n%s", err, out)
 	}
 }
+
+// withImages adds the storage and images blueprints to the site's app.
+func withImages(s string) string {
+	return strings.Replace(s, "  blueprint api_docs\n", "  blueprint api_docs\n  blueprint storage\n  blueprint images\n", 1)
+}
+
+func TestSSRChecksOGImage(t *testing.T) {
+	ogProducts := func(s string) string {
+		return strings.Replace(s, "sort \"-price\", menu)", "sort \"-price\", menu, og_image)", 1)
+	}
+	for name, tc := range map[string]struct {
+		change, model func(string) string
+		want          string
+	}{
+		"no images": {nil, ogProducts, "og_image of Product on shop draws each record's Open Graph image on the server, which needs blueprint images"},
+		"no page": {withImages, func(s string) string {
+			return strings.Replace(s, "  status      Status  default(ACTIVE)\n", "  status      Status  default(ACTIVE)\n  @shop(og_image)\n", 1)
+		}, "og_image of Product is the image of its records' pages on shop, which it has not"},
+	} {
+		_, code, errOut := ssrProject(t, tc.change, tc.model)
+		if code == 0 || !strings.Contains(errOut, tc.want) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
+func TestSSRDrawsOGImages(t *testing.T) {
+	dir, code, errOut := ssrProject(t, withImages, func(s string) string {
+		s = strings.Replace(s, "sort \"-price\", menu)", "sort \"-price\", menu, og_image)", 1)
+		return strings.Replace(s, "  status      Status  default(ACTIVE)\n", "  status      Status  default(ACTIVE)\n  photo       image\n", 1)
+	})
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "shop")
+	for path, want := range map[string][]string{
+		"../../internal/platform/images/images.go":      {"func New(width, height int, theme Theme) *Canvas", "func (c *Canvas) Picture(", "OGWidth  = 1200"},
+		"../../internal/platform/images/text.go":        {"func Wrap(", "func LoadFonts("},
+		"../../internal/platform/images/cache.go":       {"func (c Cache) PNG(", `"example.com/shop/internal/platform/storage"`},
+		"../../internal/platform/images/images_test.go": {"func TestWrapCutsWithAnEllipsis("},
+		"../../internal/platform/storage/storage.go":    {"func (s *Store) Object(", "func (s *Store) DeleteObjects("},
+		"site_gen.go": {`m.HandleFunc("GET /produtos/{id}/og.png", s.ogProduct)`, "const ogThemeHash = ", "func servePNG(",
+			"func (s *Site) picture(", `"#2a85ff",`},
+		"product_gen.go": {"type ProductOG struct", "Picture image.Image", "func (s *Site) ogProduct(", `"images/shop/products/"`,
+			"view.ImageWidth, view.ImageHeight = images.OGWidth, images.OGHeight", "o.Description = summary(x.Description)"},
+		"product_og.go": {"const productOGVersion = \"1\"", "func DrawProductOG(c *images.Canvas, o ProductOG) error", "c.Picture(card.Inset(28), o.Picture, images.Contain, 12)"},
+		"og_test.go":    {"func TestOGProduct(t *testing.T) {", "m.CreateCategory(ctx, catalog.NewCategory{"},
+		"kit.templ":     {`<meta property="og:image:width"`},
+	} {
+		got := read(t, filepath.Join(site, path))
+		for _, w := range want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s lacks %q", path, w)
+			}
+		}
+	}
+	if _, err := os.Stat(filepath.Join(site, "category_og.go")); err == nil {
+		t.Error("Category has no og_image, yet has an image")
+	}
+	vet := exec.Command("go", "vet", "./web/...", "./internal/platform/images/...", "./internal/platform/storage/...")
+	vet.Dir = dir
+	if out, err := vet.CombinedOutput(); err != nil {
+		t.Fatalf("go vet: %v\n%s", err, out)
+	}
+	test := exec.Command("go", "test", "./internal/platform/images/...")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
+
+	// With a brand: its colors and fonts, and a warning of a font the
+	// images cannot draw.
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "    name \"Loja\"\n", "    name \"Loja\"\n    brand \"brand\"\n", 1)), 0o644)
+	for name, content := range map[string]string{
+		"fonts/Body.woff2":  "font",
+		"fonts/Display.ttf": "font",
+		"logo.png":          "png",
+		"theme.json": `{"colors": {"accent": "#E5484D", "page": "#1C1917"},
+			"fonts": {"display": {"family": "Display", "files": {"700": "fonts/Display.ttf"}}, "body": {"family": "Body Sans", "files": {"300 900": "fonts/Body.woff2"}}},
+			"identity": {"logo": "logo.png", "og_image": "logo.png"}}`,
+	} {
+		p := filepath.Join(dir, "brand", filepath.FromSlash(name))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte(content), 0o644)
+	}
+	code, _, errOut = esq(t, "gen", dir)
+	if code != 0 || !strings.Contains(errOut, "the body font has no TrueType or OpenType file") {
+		t.Fatalf("exit %d, want a warning of the body font:\n%s", code, errOut)
+	}
+	got := read(t, filepath.Join(site, "site_gen.go"))
+	for _, w := range []string{`images.LoadFonts(brand.Files, map[string]string{"display": "fonts/Display.ttf"})`, `fs.ReadFile(brand.Files, "logo.png")`,
+		`"#1C1917",`, `http.Redirect(w, r, URL("/brand/logo.png"), http.StatusFound)`} {
+		if !strings.Contains(got, w) {
+			t.Errorf("site_gen.go lacks %q", w)
+		}
+	}
+	vet = exec.Command("go", "vet", "./web/...")
+	vet.Dir = dir
+	if out, err := vet.CombinedOutput(); err != nil {
+		t.Fatalf("go vet: %v\n%s", err, out)
+	}
+}

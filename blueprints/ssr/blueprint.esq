@@ -98,6 +98,11 @@ blueprint ssr {
     relations list
     /// An entry in the site's menu.
     menu bool
+    /// Each record's page gets an Open Graph image drawn by the app,
+    /// /<path>/<id>/og.png (1200x630), with blueprint images: drawn by
+    /// <entity>_og.go, yours, and kept in the store until the record
+    /// changes.
+    og_image bool
     /// What this site calls it, when not what @ui says.
     label string
     /// What one of it is called on this site, when not what @ui says.

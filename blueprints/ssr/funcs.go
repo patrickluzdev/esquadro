@@ -57,6 +57,22 @@ func TemplateFuncs() template.FuncMap {
 		"siteImages": func(pages []*Page) bool {
 			return slices.ContainsFunc(pages, func(p *Page) bool { return p.Image != nil })
 		},
+		"siteOG": func(pages []*Page) bool {
+			return slices.ContainsFunc(pages, func(p *Page) bool { return p.OG })
+		},
+		"siteOGPictures": func(pages []*Page) bool {
+			return slices.ContainsFunc(pages, func(p *Page) bool { return p.OG && p.Image != nil })
+		},
+		"ogColors":        OGColors,
+		"ogThemeHash":     OGThemeHash,
+		"ogFont":          OGFont,
+		"ogLogo":          OGLogo,
+		"ogPublic":        ogPublic,
+		"ogSample":        ogSample,
+		"ogParents":       ogParents,
+		"ogSampleImports": ogSampleImports,
+		"ogTested":        ogTested,
+		"ogPackages":      ogPackages,
 		"siteSearch": func(pages []*Page) bool {
 			return slices.ContainsFunc(pages, func(p *Page) bool { return p.Search })
 		},
@@ -102,6 +118,9 @@ type Page struct {
 	Lists []*List
 	// Menu puts it in the site's menu.
 	Menu bool
+	// OG gives each record an Open Graph image drawn by the app
+	// (/<path>/<id>/og.png), with the images blueprint.
+	OG bool
 	// Fields are those the site shows, in order: none hidden, no files.
 	Fields []*project.Field
 	// Keys are its relations to one record the site shows.
@@ -168,6 +187,7 @@ func Pages(entities []*project.Entity, instance string) []*Page {
 		pg.Schema, _ = a["schema"].(string)
 		pg.Sort, _ = a["sort"].(string)
 		pg.Menu, _ = a["menu"].(bool)
+		pg.OG, _ = a["og_image"].(bool)
 		for _, s := range store.ListSorts(e, nil) {
 			pg.Sorts = append(pg.Sorts, s.Key, "-"+s.Key)
 		}

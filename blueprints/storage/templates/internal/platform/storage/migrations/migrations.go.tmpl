@@ -1,4 +1,4 @@
-{{- if fileFields .Entities .Options -}}
+{{- if or (fileFields .Entities .Options) (uses "images") -}}
 // Package migrations holds the migrations of the storage table, which come
 // with esquadro: a new version of the storage blueprint may add one.
 //

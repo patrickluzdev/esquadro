@@ -1,4 +1,4 @@
-{{- if fileFields .Entities (optionsOf "storage")}}
+{{- if or (fileFields .Entities (optionsOf "storage")) (uses "images")}}
 	d.storage, err = storage.Open(ctx, storage.Config{URL: d.config.StorageURL, Secret: d.config.StorageSecret, Prefix: d.config.StoragePrefix, AccessKey: d.config.StorageAccessKey, SecretKey: d.config.StorageSecretKey}, d.pool)
 	if err != nil {
 		release()

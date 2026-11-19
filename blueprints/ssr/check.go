@@ -50,6 +50,13 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 				for _, problem := range b.Problems() {
 					diags.Errorf(f.Blueprint.Ref.Pos, f.Blueprint.Ref.Pos, "brand %s: %s", dir, problem)
 				}
+				og := slices.ContainsFunc(Pages(p.Entities, f.Name), func(pg *Page) bool { return pg.OG })
+				for _, name := range []string{"display", "body"} {
+					if _, ok := b.Theme.Fonts[name]; ok && og && OGFont(b, name) == "" {
+						diags.Warnf(f.Blueprint.Ref.Pos, f.Blueprint.Ref.Pos, "brand %s: the %s font has no TrueType or OpenType file (.ttf, .otf), which the Open Graph images are drawn with: they draw it in a Go font", dir, name).
+							Suggestion = "name its .ttf in fonts." + name + ".files (browsers read it too)"
+					}
+				}
 			}
 		}
 		at := func(key string) diag.Pos {
@@ -133,6 +140,19 @@ func checkPages(p *project.Project, set *blueprint.Set, f *ui.Frontend, system m
 		}
 		if pg.Image != nil && set.Get("storage") == nil {
 			diags.Errorf(where, where, "%s's pages show its image, which needs blueprint storage", e.Raw)
+		}
+		if pg.OG && set.Get("images") == nil {
+			diags.Errorf(where, where, "og_image of %s on %s draws each record's Open Graph image on the server, which needs blueprint images (and blueprint storage, where it keeps them)", e.Raw, name).
+				Suggestion = "add blueprint storage and blueprint images to app.esq"
+		}
+	}
+	// og_image is of a record's page: an entity without pages has none.
+	for _, e := range p.Entities {
+		a := e.Ann[name]
+		if og, _ := a["og_image"].(bool); og {
+			if page, _ := a["page"].(bool); !page {
+				diags.Errorf(e.Pos, e.Pos, "og_image of %s is the image of its records' pages on %s, which it has not: @%s(page, og_image)", e.Raw, name, name)
+			}
 		}
 	}
 	return diags

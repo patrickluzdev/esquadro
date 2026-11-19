@@ -1,4 +1,4 @@
-{{- if and (fileFields .Entities .Options) (not (uses "jobs")) (uses "worker") -}}
+{{- if and (or (fileFields .Entities .Options) (uses "images")) (not (uses "jobs")) (uses "worker") -}}
 package storage
 
 import (

@@ -1,0 +1,70 @@
+{{- $pg := sitePage .Entities .Instance.Name .Entity -}}
+{{- if and $pg $pg.OG (uses "images") -}}
+{{- $e := .Entity -}}
+// The Open Graph image of a {{lower $e.Label}}'s page: what a shared link shows.
+// Yours: esquadro wrote it once, and merges its changes into yours.
+
+package {{.Instance.Name}}
+
+import (
+	"image"
+
+	"{{.App.Module}}/internal/platform/images"
+)
+
+// {{$e.Camel}}OGVersion names how a {{lower $e.Label}}'s image is drawn: change it when you
+// change Draw{{$e.Pascal}}OG, and every image is drawn again (each is kept in
+// the store until its {{lower $e.Label}}, this version or the brand changes).
+const {{$e.Camel}}OGVersion = "1"
+
+// Draw{{$e.Pascal}}OG draws a {{lower $e.Label}}'s Open Graph image on c, 1200x630: the
+// brand's page color, the site's logo or name, the {{lower $e.Label}}'s title in the
+// display font{{if $pg.Description}} and its description{{end}}{{if $pg.Image}}, its picture on the right{{end}}, and a band of the
+// accent. c draws with the brand's colors (c.Color("accent")) and fonts
+// ("display", "body"); every text stays in its box, shrinking and ending
+// in an ellipsis when it is long.
+func Draw{{$e.Pascal}}OG(c *images.Canvas, o {{$e.Pascal}}OG) error {
+	w, h := c.Bounds().Dx(), c.Bounds().Dy()
+	const pad, band = 72, 12
+	c.Fill(c.Color("page"))
+	c.Rect(image.Rect(0, h-band, w, h), c.Color("accent"), 0)
+	area := image.Rect(pad, pad, w-pad, h-band-pad)
+{{- if $pg.Image}}
+	if o.Picture != nil {
+		// The picture, whole, on a card of the surface's color.
+		card := image.Rect(area.Max.X-440, area.Min.Y, area.Max.X, area.Max.Y)
+		c.Rect(card, c.Color("line"), 28)
+		c.Rect(card.Inset(2), c.Color("surface"), 26)
+		c.Picture(card.Inset(28), o.Picture, images.Contain, 12)
+		area.Max.X = card.Min.X - 56
+	}
+{{- end}}
+
+	// The site: its logo, or its name.
+	const head = 52
+	if o.Logo != nil {
+		b := o.Logo.Bounds()
+		lw := min(area.Dx(), 360, b.Dx()*head/max(b.Dy(), 1))
+		c.Picture(image.Rect(area.Min.X, area.Min.Y, area.Min.X+lw, area.Min.Y+head), o.Logo, images.Contain, 0)
+	} else {
+		c.Text(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+head), o.Site,
+			images.Text{Font: "body", Size: 32, MinSize: 24, MaxLines: 1, Color: c.Color("accent_text")})
+	}
+
+	// The title, as large as it fits in three lines.
+	top := area.Min.Y + head + 48
+	title := c.Text(image.Rect(area.Min.X, top, area.Max.X, area.Max.Y), o.Title,
+		images.Text{Font: "display", Size: 76, MinSize: 44, Line: 1.1, MaxLines: 3, Color: c.Color("ink")})
+{{- if $pg.Description}}
+
+	// The description, in what is left.
+	if o.Description != "" && !title.Empty() {
+		c.Text(image.Rect(area.Min.X, title.Max.Y+28, area.Max.X, area.Max.Y), o.Description,
+			images.Text{Font: "body", Size: 30, Line: 1.35, MaxLines: 3, Color: c.Color("muted")})
+	}
+{{- else}}
+	_ = title
+{{- end}}
+	return nil
+}
+{{- end}}

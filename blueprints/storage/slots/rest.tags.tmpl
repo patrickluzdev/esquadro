@@ -1,4 +1,4 @@
-{{- if fileFields .Entities (optionsOf "storage")}}
+{{- if or (fileFields .Entities (optionsOf "storage")) (uses "images")}}
   - name: storage
     description: Files of the file and image fields, sent before the record that uses them.
 {{- end}}
