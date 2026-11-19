@@ -89,6 +89,39 @@ principal (`Customer` itself) owns its own record. With `owner`:
   such as an admin, chooses the owner, creating on someone's behalf;
 - an owner cannot hand a record over to someone else on update.
 
+### Limits of creates
+
+With the [rate_limit](/esquadro/blueprints/reference/rate_limit/)
+blueprint, an entity with an owner may say how many records each person
+creates in a period: `N/min`, `N/h` or `N/d`.
+
+```esquadro
+entity Review {
+  body     text required
+  customer > Customer required
+  @security(read public, write owner)
+  @rate_limit(create "10/h")   // each customer creates at most 10 an hour
+}
+```
+
+- A person is a principal of the owner's realm, and what they created is
+  what they own, created in the period. The count is in the database, so
+  it holds with more than one instance of the service, unlike the limit of
+  requests a minute.
+- Past it, the create answers `429 rate_limited`, with `Retry-After`: when
+  the oldest of those records leaves the period.
+- The limit is in the module's `Create<Entity>`, not in the API: the admin
+  panel, the portal and your own code that creates with the person's
+  context are limited too. An import counts each record it creates, and is
+  refused whole past the limit.
+- Anyone else is not limited: another realm (an admin creating on someone's
+  behalf), a service key, or code without a person, such as a job or the
+  seeds.
+- `esquadro check` asks for an owner rule, and refuses a create that lets in
+  anyone (`public`): a visitor without an account has no records to count.
+- A record deleted for good no longer counts; with
+  `@store(soft_delete)`, one in the trash still does.
+
 ### Policies
 
 Each entity has a policy, in `internal/<module>/<entity>_policy.go`, that the
