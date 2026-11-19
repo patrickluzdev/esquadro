@@ -732,6 +732,15 @@ func new{{$P}}Of(req *apigen.New{{$P}}) (New{{$P}}, []FieldError) {
 		{{$x}} = v
 {{- end}}
 	}
+{{- /* A number or a yes/no left out takes its default: its empty value
+     is one it may have, so WithDefaults cannot tell it from none. */}}
+{{- if and .Default (or (eq .Type "int") (eq .Type "int64") (eq .Type "bool"))}} else {
+		{{$x}} = {{.Default.Text}}
+	}
+{{- else if and .Default (eq .Type "decimal")}} else {
+		{{$x}} = decimal.RequireFromString({{quote .Default.Text}})
+	}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- end}}
