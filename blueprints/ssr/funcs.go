@@ -17,7 +17,15 @@ import (
 // TemplateFuncs are the ssr blueprint's template functions.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"sitePages":     Pages,
+		"sitePages": Pages,
+		"siteBrand": brandOf,
+		"hasSuffix": strings.HasSuffix,
+		"siteBrandDir": func(opts map[string]any) string {
+			if dir, _ := opts["brand"].(string); strings.Trim(dir, "/") != "" {
+				return strings.Trim(dir, "/")
+			}
+			return "brand"
+		},
 		"siteRedirects": Redirects,
 		"siteField": func(instance, suffix string) string {
 			return project.FieldName(strings.ToUpper(instance) + "_" + suffix)
@@ -396,4 +404,17 @@ func Plain(f *project.Field) bool {
 		return false
 	}
 	return true
+}
+
+// brandOf is a site's brand, read from the project of app; nil without one
+// (or when it cannot be read: the check says why).
+func brandOf(app *project.App, opts map[string]any) *ui.Brand {
+	if app == nil {
+		return nil
+	}
+	b, err := ui.BrandOf(app.Pos.File, opts)
+	if err != nil {
+		return nil
+	}
+	return b
 }

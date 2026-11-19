@@ -50,6 +50,12 @@ blueprint ssr {
   option primary_dark string default("")
   /// How round the corners are, as CSS: 0.75rem, 0.5rem, 0.
   option radius string default("0.75rem")
+  /// The project's folder of its brand, with its theme.json (colors,
+  /// fonts, text roles, radii, buttons, motion, the pictures of the states)
+  /// and the files it names (logo, favicon, fonts): brand. The site takes
+  /// its look and identity from it, in place of primary and radius, and
+  /// serves its files at /brand/ (the icons' at the root too).
+  option brand string default("")
 
   /// The key a visit of a redirect is told apart by, a day at a time,
   /// without keeping who it is (edge.Visitor): with a redirect.

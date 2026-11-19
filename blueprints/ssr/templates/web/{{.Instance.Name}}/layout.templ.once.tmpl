@@ -17,7 +17,9 @@ templ Layout(p Page) {
 			<a href="#main" class="sr-only focus:not-sr-only">{ T("skipToContent") }</a>
 			<header class="border-b border-border">
 				<div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
-					<a href={ templ.URL(URL("/")) } class="text-lg font-semibold tracking-tight">{ Name }</a>
+					<a href={ templ.URL(URL("/")) } aria-label={ Name }>
+						@Logo()
+					</a>
 					<nav class="flex flex-wrap gap-4 text-sm">
 {{- range $pages}}{{if or .Menu (not $menu)}}
 						<a href={ templ.URL({{.Entity.Plural.Pascal}}URL()) } class="text-muted-foreground hover:text-foreground">{ {{.Entity.Plural.Pascal}}Label }</a>

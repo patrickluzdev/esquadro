@@ -41,6 +41,17 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		if !ok {
 			continue
 		}
+		if dir, _ := f.Options["brand"].(string); dir != "" {
+			b, err := ui.BrandOf(p.App.Pos.File, f.Options)
+			switch {
+			case err != nil:
+				diags.Errorf(f.Blueprint.Ref.Pos, f.Blueprint.Ref.Pos, "%v", err)
+			case b != nil:
+				for _, problem := range b.Problems() {
+					diags.Errorf(f.Blueprint.Ref.Pos, f.Blueprint.Ref.Pos, "brand %s: %s", dir, problem)
+				}
+			}
+		}
 		at := func(key string) diag.Pos {
 			for _, o := range f.Blueprint.Ref.Options {
 				if o.Key.Name == key {

@@ -38,6 +38,24 @@ templ Head(p Page) {
 	if p.Schema != "" {
 		@templ.Raw(`<script type="application/ld+json">` + p.Schema + `</script>`)
 	}
+{{- with siteBrand .App .Options}}{{$b := .}}
+{{- if .HasIcon "favicon.ico"}}
+	<link rel="icon" href={ URL("/favicon.ico") } sizes="48x48"/>
+{{- end}}
+{{- if .HasIcon "favicon.svg"}}
+	<link rel="icon" href={ URL("/favicon.svg") } type="image/svg+xml"/>
+{{- end}}
+{{- if .HasIcon "apple-touch-icon.png"}}
+	<link rel="apple-touch-icon" href={ URL("/apple-touch-icon.png") }/>
+{{- end}}
+{{- if .HasIcon "site.webmanifest"}}
+	<link rel="manifest" href={ URL("/site.webmanifest") }/>
+{{- end}}
+	<meta name="theme-color" content="{{.ThemeColor}}"/>
+{{- range $name, $font := .Theme.Fonts}}{{range $weight, $file := $font.Files}}
+	<link rel="preload" href={ URL("/brand/{{$file}}") } as="font" crossorigin/>
+{{- end}}{{end}}
+{{- end}}
 	<link rel="stylesheet" href={ templ.URL(URL("/{{(sitePaths .Options.locale).assets}}/site.css")) }/>
 	<script src={ URL("/{{(sitePaths .Options.locale).assets}}/htmx.min.js") } defer></script>
 	<script src={ URL("/{{(sitePaths .Options.locale).assets}}/kit.js") } defer></script>
@@ -48,9 +66,10 @@ templ Head(p Page) {
 templ ProblemPage(p Page, title, text string) {
 	@Layout(p) {
 		<section class="mx-auto max-w-xl py-24 text-center">
-			<h1 class="text-3xl font-semibold tracking-tight">{ title }</h1>
-			<p class="mt-3 text-muted-foreground">{ text }</p>
-			<a href={ templ.URL(URL("/")) } class="mt-8 inline-flex rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">{ T("home") }</a>
+			@StatePicture(stateOf(p.Status))
+			<h1 class="t-section text-3xl font-semibold tracking-tight">{ title }</h1>
+			<p class="t-text mt-3 text-muted-foreground">{ text }</p>
+			<a href={ templ.URL(URL("/")) } class="btn btn-primary mt-8 inline-flex rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground">{ T("home") }</a>
 		</section>
 	}
 }
@@ -72,13 +91,13 @@ templ Controls(action string, filters []Filter, sorts []Option, search bool, q s
 		if search {
 			<label class="grid min-w-56 flex-1 gap-1 text-sm">
 				<span class="sr-only">{ T("search") }</span>
-				<input type="search" name="q" value={ q } placeholder={ T("searchPlaceholder") } class="h-10 rounded-lg border border-border bg-background px-3"/>
+				<input type="search" name="q" value={ q } placeholder={ T("searchPlaceholder") } class="field h-10 rounded-lg border border-border bg-background px-3"/>
 			</label>
 		}
 		for _, f := range filters {
 			<label class="grid gap-1 text-sm">
 				<span class="text-muted-foreground">{ f.Label }</span>
-				<select name={ f.Param } class="h-10 rounded-lg border border-border bg-background px-3">
+				<select name={ f.Param } class="field h-10 rounded-lg border border-border bg-background px-3">
 					for _, o := range f.Options {
 						<option value={ o.Value } selected?={ o.Chosen }>{ o.Label }</option>
 					}
@@ -88,7 +107,7 @@ templ Controls(action string, filters []Filter, sorts []Option, search bool, q s
 		if len(sorts) > 1 {
 			<label class="grid gap-1 text-sm">
 				<span class="text-muted-foreground">{ T("order") }</span>
-				<select name="sort" class="h-10 rounded-lg border border-border bg-background px-3">
+				<select name="sort" class="field h-10 rounded-lg border border-border bg-background px-3">
 					for _, o := range sorts {
 						<option value={ o.Value } selected?={ o.Chosen }>{ o.Label }</option>
 					}
@@ -105,13 +124,13 @@ templ Pagination(pg Pager) {
 	if pg.Pages > 1 {
 		<nav class="mt-8 flex items-center justify-between gap-4 text-sm">
 			if pg.Number > 1 {
-				<a href={ templ.URL(pg.Link(pg.Number - 1)) } rel="prev" class="rounded-lg border border-border px-4 py-2">{ T("previous") }</a>
+				<a href={ templ.URL(pg.Link(pg.Number - 1)) } rel="prev" class="btn btn-secondary rounded-lg border border-border px-4 py-2">{ T("previous") }</a>
 			} else {
 				<span></span>
 			}
 			<span class="text-muted-foreground">{ T("pageOf", "page", Number(int64(pg.Number)), "pages", Number(int64(pg.Pages))) }</span>
 			if pg.Number < pg.Pages {
-				<a href={ templ.URL(pg.Link(pg.Number + 1)) } rel="next" class="rounded-lg border border-border px-4 py-2">{ T("next") }</a>
+				<a href={ templ.URL(pg.Link(pg.Number + 1)) } rel="next" class="btn btn-secondary rounded-lg border border-border px-4 py-2">{ T("next") }</a>
 			} else {
 				<span></span>
 			}
@@ -128,13 +147,58 @@ templ Share(url, title string) {
 		data-share-title={ title }
 		target="_blank"
 		rel="noopener"
-		class="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium"
+		class="btn btn-secondary inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium"
 	>{ T("share") }</a>
 }
 
 // Empty is what a list with nothing shows.
 templ Empty(text string) {
-	<p class="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">{ text }</p>
+	<div class="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
+		@StatePicture("empty")
+		<p class="t-text">{ text }</p>
+	</div>
+}
+
+// StatePicture is the brand's picture of a state (empty, not_found, gone,
+// error, forbidden, loading, success); nothing without one.
+templ StatePicture(state string) {
+	if src := statePictures[state]; src != "" {
+		<img src={ URL("/brand/" + src) } alt="" class="state-picture" width="140" height="140"/>
+	}
+}
+
+// Logo is the site's logo, from its brand; its name without one.
+templ Logo() {
+{{- with siteBrand .App .Options}}{{with .Theme.Identity.Logo}}
+	<img src={ URL("/brand/{{.}}") } alt={ Name } class="h-8 w-auto"/>
+{{- else}}
+	<span class="text-lg font-semibold tracking-tight">{ Name }</span>
+{{- end}}{{else}}
+	<span class="text-lg font-semibold tracking-tight">{ Name }</span>
+{{- end}}
+}
+
+// Price is a price as a catalog shows it: what it costs now, what it cost
+// before struck out, and the discount; was and off may be empty. large
+// makes it the price of a product's own page.
+templ Price(now, was string, off int, large bool) {
+	<div class={ "price", templ.KV("price-lg", large) }>
+		<b>{ now }</b>
+		if was != "" {
+			<s>{ was }</s>
+		}
+		if off > 0 {
+			<span class="off">-{ Number(int64(off)) }%</span>
+		}
+	</div>
+}
+
+// Photo is a product's picture in its frame: whole, with room around it,
+// its white background blended into the frame's.
+templ Photo(src, alt string) {
+	<div class="photo">
+		<img src={ src } alt={ alt } loading="lazy"/>
+	</div>
 }
 
 // The visitor's account.
@@ -144,7 +208,7 @@ templ AuthFrame(p Page, title, hint string) {
 	@Layout(p) {
 		@templ.Raw(`<script id="site-words" type="application/json">` + authWords() + `</script>`)
 		<section class="mx-auto w-full max-w-sm py-16">
-			<h1 class="text-2xl font-semibold tracking-tight">{ title }</h1>
+			<h1 class="t-section text-2xl font-semibold tracking-tight">{ title }</h1>
 			if hint != "" {
 				<p class="mt-2 text-sm text-muted-foreground">{ hint }</p>
 			}
@@ -159,17 +223,17 @@ templ AuthFrame(p Page, title, hint string) {
 templ field(name, label, kind, autocomplete string) {
 	<label class="grid gap-1 text-sm">
 		<span>{ label }</span>
-		<input name={ name } type={ kind } autocomplete={ autocomplete } required class="h-10 rounded-lg border border-border bg-background px-3"/>
+		<input name={ name } type={ kind } autocomplete={ autocomplete } required class="field h-10 rounded-lg border border-border bg-background px-3"/>
 	</label>
 }
 
 // formMessage is where an account's form tells how it went.
 templ formMessage() {
-	<p data-message role="status" class="hidden rounded-lg bg-muted p-3 text-sm"></p>
+	<p data-message role="status" class="notice notice-info hidden rounded-lg bg-muted p-3 text-sm"></p>
 }
 
 templ submit(label string) {
-	<button type="submit" class="h-10 w-full rounded-lg bg-primary font-medium text-primary-foreground disabled:opacity-60">{ label }</button>
+	<button type="submit" class="btn btn-primary btn-wide h-10 w-full rounded-lg bg-primary font-medium text-primary-foreground disabled:opacity-60">{ label }</button>
 }
 
 // SignInPage signs the visitor in: email and password, and the realm's

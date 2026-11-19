@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,5 +104,57 @@ func TestSSRChecksItsPages(t *testing.T) {
 		if code == 0 || !strings.Contains(errOut, tc.want) {
 			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
 		}
+	}
+}
+
+func TestSSRSiteWithABrand(t *testing.T) {
+	dir, code, errOut := ssrProject(t, nil, nil)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "    name \"Loja\"\n", "    name \"Loja\"\n    brand \"brand\"\n", 1)), 0o644)
+
+	if code, _, errOut := esq(t, "check", dir); code == 0 || !strings.Contains(errOut, "brand brand:") {
+		t.Fatalf("a brand without its folder checks: exit %d\n%s", code, errOut)
+	}
+	files := map[string]string{
+		"fonts/Body.woff2":       "font",
+		"logo.svg":               "<svg/>",
+		"states/lost.svg":        "<svg/>",
+		"icons/favicon.ico":      "ico",
+		"icons/site.webmanifest": "{}",
+		"theme.json": `{"colors": {"accent": "#A8DC50", "on_accent": "#1D2019", "casa": "#3CC8B4"},
+			"fonts": {"body": {"family": "Figtree", "files": {"300 900": "fonts/Body.woff2"}}},
+			"text": {"section": {"weight": 800, "size": 28}}, "buttons": "raised",
+			"states": {"not_found": "states/lost.svg"}, "identity": {"logo": "logo.svg", "icons": "icons"}}`,
+	}
+	for name, content := range files {
+		p := filepath.Join(dir, "brand", filepath.FromSlash(name))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte(content), 0o644)
+	}
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "shop")
+	for path, want := range map[string][]string{
+		"../../brand/embed.go": {"package brand", "//go:embed all:*"},
+		"site_gen.go": {`brand "example.com/shop/brand"`, `m.Handle("GET /brand/"`, `"icons/favicon.ico"`,
+			`"application/manifest+json"`, `"not_found": "states/lost.svg"`},
+		"theme.gen.css": {`url("/shop/brand/fonts/Body.woff2")`, "--brand-accent: #A8DC50;", "--color-casa: var(--brand-casa);", ".t-section {", "inset 0 -2px 0"},
+		"kit.templ":     {`<link rel="manifest" href={ URL("/site.webmanifest") }/>`, `<meta name="theme-color" content="#A8DC50"/>`, `URL("/brand/logo.svg")`, "templ Price(", "templ Photo("},
+	} {
+		got := read(t, filepath.Join(site, path))
+		for _, w := range want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s lacks %q", path, w)
+			}
+		}
+	}
+	vet := exec.Command("go", "vet", "./web/...", "./brand/...")
+	vet.Dir = dir
+	if out, err := vet.CombinedOutput(); err != nil {
+		t.Fatalf("go vet: %v\n%s", err, out)
 	}
 }

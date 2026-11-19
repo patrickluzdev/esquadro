@@ -34,6 +34,7 @@ blueprint ssr
 | `primary` | string | `"#2a85ff"` | The primary color (buttons, links), as #rrggbb. |
 | `primary_dark` | string | `""` | The primary color of the dark theme; by default the primary, or a light gray when the primary is too dark to stand out there. |
 | `radius` | string | `"0.75rem"` | How round the corners are, as CSS: 0.75rem, 0.5rem, 0. |
+| `brand` | string | `""` | The project's folder of its brand, with its theme.json (colors, fonts, text roles, radii, buttons, motion, the pictures of the states) and the files it names (logo, favicon, fonts): brand. The site takes its look and identity from it, in place of primary and radius, and serves its files at /brand/ (the icons' at the root too). |
 
 ```esquadro
 blueprint ssr {

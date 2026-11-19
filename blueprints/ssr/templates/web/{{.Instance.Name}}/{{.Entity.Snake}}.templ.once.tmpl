@@ -23,7 +23,7 @@ templ {{$e.Camel}}Card(x {{$m}}.{{$e.Pascal}}) {
 			<div class="aspect-square w-full rounded-lg bg-muted"></div>
 		}
 {{- end}}
-		<h3 class="line-clamp-2 font-medium group-hover:underline">{ {{$e.Pascal}}Title(x) }</h3>
+		<h3 class="t-item line-clamp-2 font-medium group-hover:underline">{ {{$e.Pascal}}Title(x) }</h3>
 {{- $count := 0}}
 {{- range $pg.Fields}}{{if and (ne . $pg.Title) (sitePlain .) (lt $count 2)}}{{$count = add1 $count}}
 		if {{siteShown . "x"}} {
@@ -37,7 +37,7 @@ templ {{$e.Camel}}Card(x {{$m}}.{{$e.Pascal}}) {
 // the pages.
 templ {{$e.Pascal}}ListPage(v {{$e.Pascal}}List) {
 	@Layout(v.Page) {
-		<h1 class="mb-6 text-2xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h1>
+		<h1 class="t-section mb-6 text-2xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h1>
 		@Controls({{$e.Plural.Pascal}}URL(), v.Filters, v.Sorts, {{$pg.Search}}, v.Query)
 		<div id="results" class="mt-6">
 			<p class="mb-4 text-sm text-muted-foreground" aria-live="polite">{ T("count", "count", Number(v.Pager.Total)) }</p>
@@ -69,7 +69,7 @@ templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
 			}
 {{- end}}
 			<div class="grid content-start gap-4">
-				<h1 class="text-3xl font-semibold tracking-tight">{ {{$e.Pascal}}Title(v.Item) }</h1>
+				<h1 class="t-section text-3xl font-semibold tracking-tight">{ {{$e.Pascal}}Title(v.Item) }</h1>
 				<dl class="grid gap-3">
 {{- range $pg.Fields}}{{if ne . $pg.Title}}
 					if {{siteShown . "v.Item"}} {
@@ -100,7 +100,7 @@ templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
 {{- range $pg.Lists}}{{$t := .Target}}
 		if len(v.{{.Relation.Pascal}}) > 0 {
 			<section class="mt-12">
-				<h2 class="mb-4 text-xl font-semibold tracking-tight">{{quote (siteLabel .Relation.Ann $n (siteLabel .Target.Ann $n .Relation.Label)) | printf "{ %s }"}}</h2>
+				<h2 class="t-block mb-4 text-xl font-semibold tracking-tight">{{quote (siteLabel .Relation.Ann $n (siteLabel .Target.Ann $n .Relation.Label)) | printf "{ %s }"}}</h2>
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 					for _, x := range v.{{.Relation.Pascal}} {
 {{- if .Page}}

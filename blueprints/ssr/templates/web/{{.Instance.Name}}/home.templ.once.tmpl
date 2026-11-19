@@ -11,7 +11,7 @@ templ HomePage(v Home) {
 		if len(v.{{$e.Plural.Pascal}}) > 0 {
 			<section class="mb-12">
 				<div class="mb-4 flex items-baseline justify-between">
-					<h2 class="text-xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h2>
+					<h2 class="t-block text-xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h2>
 					<a href={ templ.URL({{$e.Plural.Pascal}}URL()) } class="text-sm text-muted-foreground hover:text-foreground">{ T("seeAll") }</a>
 				</div>
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">

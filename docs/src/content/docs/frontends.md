@@ -711,6 +711,82 @@ place, Tailwind for the styles (`npm run build`, or `task web:build`,
 writes them into `dist/assets`). The site uses the theme's options and
 the shared words of every frontend.
 
+### A site with a brand
+
+A site whose look is a brand of its own, not the frontends' default,
+names the project's folder of its brand:
+
+```esquadro
+blueprint ssr site {
+  brand "brand"
+}
+```
+
+The folder has a `theme.json` and the files it names; the app embeds it
+(`brand/embed.go`, generated) and the site serves it at `/brand/`, kept by
+browsers for a day:
+
+```json
+{
+  "colors": {
+    "accent": "#A8DC50", "on_accent": "#1D2019", "accent_edge": "#86B33E",
+    "accent_text": "#3B7A12", "accent_soft": "#F1F8E3",
+    "ink": "#1D2019", "muted": "#6A6F63", "page": "#F7F7F3", "surface": "#FFFFFF",
+    "line": "#E7E9E1", "neutral": "#F0F2EA", "neutral_edge": "#DCDFD3",
+    "casa": "#3CC8B4"
+  },
+  "fonts": {
+    "display": { "family": "Bricolage Grotesque", "files": { "200 800": "fonts/Bricolage-VF.ttf" } },
+    "body": { "family": "Figtree", "files": { "300 900": "fonts/Figtree-VF.ttf" } }
+  },
+  "text": {
+    "section": { "font": "display", "weight": 800, "size": 28, "line": 1.1, "tracking": -0.02 },
+    "caption": { "font": "body", "weight": 500, "size": 12, "color": "muted" }
+  },
+  "radius": { "sm": 10, "md": 14, "lg": 20 },
+  "buttons": "raised",
+  "control": 44,
+  "motion": { "enter": { "duration": 350, "curve": "cubic-bezier(.22,1.2,.36,1)" } },
+  "states": { "empty": "states/empty.svg", "not_found": "states/lost.svg", "gone": "states/gone.svg" },
+  "identity": { "logo": "logo/line.svg", "icons": "icons", "og_image": "og.png", "theme_color": "#A8DC50" }
+}
+```
+
+- **colors**: by role (`accent`, `on_accent`, `accent_edge`, `accent_text`,
+  `accent_soft`, `ink`, `muted`, `page`, `surface`, `line`, `neutral`,
+  `neutral_edge`, `strike`, `photo`, `ok`, `error`, `warning`, `info` and
+  their `_soft`), each `--brand-<role>` and a Tailwind color
+  (`bg-accent-soft`, `text-accent-text`); a role left out keeps the
+  default look's. Any other name is a color of its own (`bg-casa`). The
+  kit's tokens follow: `bg-primary` is the accent, `text-muted-foreground`
+  the muted, `border-border` the line.
+- **fonts**: `display` (titles, prices) and `body`, by weight, a range
+  for a variable font; `font-display` and `font-body` in Tailwind,
+  preloaded by every page.
+- **text**: the text roles `display`, `section`, `block`, `item`,
+  `text`, `support`, `caption`, `price`, each a class `.t-<role>`, which
+  the kit's titles carry.
+- **radius** (`rounded-sm`, `rounded-md`, `rounded-lg`), **control**
+  (the height of buttons and fields), **buttons** (`flat`, or `raised`: an
+  edge at the bottom that sinks when pressed), **motion**
+  (`--motion-<name>` and `--ease-<name>`).
+- **states**: the pictures of `empty`, `loading`, `success`, `error`,
+  `not_found`, `forbidden` and `gone`; the error pages and the empty lists
+  show them (`@StatePicture("empty")` in your pages).
+- **identity**: the `logo` of the header (`@Logo()`), the folder of
+  `icons` whose files are served at the root too (`favicon.ico`,
+  `favicon.svg`, `apple-touch-icon.png`, `site.webmanifest`), linked by
+  every page; the `og_image` of a page that sets none; the browser's
+  `theme_color`.
+
+`theme.gen.css` then writes the brand: the tokens, the fonts, the roles,
+and the kit's pieces, `.btn` (`.btn-primary`, `.btn-secondary`,
+`.btn-icon`), `.field`, `.chip`, `.card`, `.notice-ok|error|warning|info`,
+`.progress`, `.price` and `.photo`, which `@Price(now, was, off, large)`
+and `@Photo(src, alt)` write. `esquadro check` says what is wrong with the
+brand: a color that is none, a role or state that does not exist, a file
+that is not in the folder.
+
 ## Where it runs
 
 The app's binary serves the frontend's build (`serve app`, the only way so
