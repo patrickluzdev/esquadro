@@ -3,7 +3,8 @@
 // (a profile, an activity log) to links.
 import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { LogOut, Settings, type IconComponent } from "../esquadro/icons.gen.ts"
+import { LogOut, Settings } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,7 +20,7 @@ import { signOut, useSession } from "../esquadro/kit/auth.tsx"
 import { t } from "../esquadro/kit/i18n.ts"
 
 /** The menu's links, under who is signed in. */
-const links: { label: string; icon: IconComponent; to: string }[] = [{ label: t("settings"), icon: Settings, to: "/settings" }]
+const links: { label: string; icon: LucideIcon; to: string }[] = [{ label: t("settings"), icon: Settings, to: "/settings" }]
 
 export function UserMenu() {
   const session = useSession()

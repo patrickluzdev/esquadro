@@ -593,7 +593,8 @@ from the same set, so that a change there reaches them too:
 `import { Trash2 } from "@/esquadro/icons.gen.ts"`, or `iconOf("shopping_cart")`
 for a name as the model writes it. A file that imports from `lucide-react`
 itself still works (it stays a dependency), but draws Lucide's icon whatever
-`src/icons.tsx` says. An icon the model names must be a Lucide name; the
+`src/icons.tsx` says: so does the account menu (`src/components/user-menu.tsx`),
+whose links, and their icons, are yours to add. An icon the model names must be a Lucide name; the
 panel only bundles the icons of the set.
 
 ### Pages of your own

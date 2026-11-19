@@ -24,7 +24,10 @@ func TestKitDrawsItsIconsFromTheSet(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), `from "lucide-react"`) {
+		// The account menu's links are the project's to add to, next to
+		// its icons' import: it keeps lucide-react, so that an upgrade
+		// merges into a project's links without a conflict.
+		if strings.Contains(string(data), `from "lucide-react"`) && !strings.HasSuffix(path, "user-menu.tsx.once.tmpl") {
 			t.Errorf("%s imports lucide-react, not the icon set", path)
 		}
 		for _, m := range importOf.FindAllStringSubmatch(string(data), -1) {
