@@ -12,5 +12,5 @@
 		TrustProxy:    d.config.TrustProxy,
 {{- end}}
 		Logger: d.logger,
-	}), {{$i.Name}}.Domain, {{$i.Name}}.Path)
+	}), {{printf "%q" $i.Name}}, {{$i.Name}}.Domain, {{$i.Name}}.Path)
 {{- end}}

@@ -1,0 +1,49 @@
+{{- if frontends -}}
+package web
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func answer(body string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) })
+}
+
+// A frontend on a domain of its own answers there and on its alias, with
+// the app's port or none; the app's own paths reach the app on both.
+func TestHandleOnADomainAndItsAlias(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.Handle("GET /api/v1/things", answer("api"))
+	mux.Handle("GET /identity/user/session", answer("identity"))
+	Handle(mux, answer("site"), "site", "shop.example.com", "")
+	for _, c := range []struct{ host, path, want string }{
+		{"shop.example.com", "/", "site"},
+		{"shop.example.com", "/products/1", "site"},
+		{"shop.example.com", "/api/v1/things", "api"},
+		{"site.localhost:8080", "/", "site"},
+		{"site.localhost", "/products/1", "site"},
+		{"site.localhost:8080", "/api/v1/things", "api"},
+		{"site.localhost:8080", "/identity/user/session", "identity"},
+		{"localhost:8080", "/api/v1/things", "api"},
+	} {
+		req := httptest.NewRequest("GET", c.path, nil)
+		req.Host = c.host
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Body.String() != c.want {
+			t.Errorf("%s%s: %d %q, want %q", c.host, c.path, rec.Code, rec.Body, c.want)
+		}
+	}
+	for _, host := range []string{"localhost:8080", "admin.localhost:8080"} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Host = host
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("%s: %d, want the site only on its domain and alias", host, rec.Code)
+		}
+	}
+}
+{{end -}}

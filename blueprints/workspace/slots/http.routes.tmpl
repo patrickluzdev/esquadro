@@ -1,6 +1,6 @@
 {{- range instances "spa"}}
 	// The {{.Name}} frontend, built into the binary.
-	if err := web.Mount(mux, {{.Name}}.Files, {{printf "%q" .Options.domain}}, {{printf "%q" (or .Options.path (printf "/%s" .Name))}}); err != nil {
+	if err := web.Mount(mux, {{.Name}}.Files, {{printf "%q" .Name}}, {{printf "%q" .Options.domain}}, {{if .Options.domain}}""{{else}}{{printf "%q" (or .Options.path (printf "/%s" .Name))}}{{end}}); err != nil {
 		return nil, err
 	}
 {{- end}}

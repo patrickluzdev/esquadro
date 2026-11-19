@@ -880,3 +880,23 @@ reach the app, so the frontend calls the API without CORS; or under its path,
 without one. The image builds the frontend with Node first. On a
 [platform](/esquadro/production/), add the frontend's domain to the app's
 `domains`.
+
+**In development**, a frontend on a domain of its own answers on its
+alias too, `<name>.localhost` on the app's port: `http://site.localhost:8080/`
+is the site, `http://admin.localhost:8080/` the panel the app has built,
+and the app's own paths (`/api`, `/identity`) reach the app there as on
+the domain. Browsers send any `*.localhost` to this machine, so there is
+nothing to set up. The alias answers in every environment, which is
+harmless: the proxy of a platform forwards only the frontends' domains.
+On the alias a site's absolute addresses (its canonical links, Open Graph
+and sitemap) are on the alias too, so that its links lead back to it; on
+its domain, on the domain. A panel is still opened where `task dev` serves
+it, `http://localhost:5173/` (at the root: on a domain of its own, its
+base is `/`), whose `/api` and `/identity` Vite sends to the app.
+
+The links of the emails and of `security create`, `invite` and `reset` to
+a frontend on a domain of its own are on that domain
+(`https://admin.shop.com/reset-password`), which the security blueprint
+allows as a redirect without listing it in `redirect_urls`; in
+development they open where the frontend is: a panel's where `task dev`
+serves it, a site's on its alias ([Security](/esquadro/security/#commands)).

@@ -4,11 +4,17 @@ package security
 import "testing"
 
 // A link of an email begins with the app's address; in development, a
-// page of a panel opens where task dev serves it.
+// page of a panel opens where task dev serves it, and an address on a
+// frontend's own domain where it is in development: a panel's, where task
+// dev serves it; a site's, on its alias.
 func TestLinksOpenWhereThePageIs(t *testing.T) {
-	s := &Security{cfg: Config{PublicURL: "https://shop.example/", DevServers: map[string]string{"/admin": "http://localhost:5173"}}}
+	s := &Security{cfg: Config{PublicURL: "https://shop.example/", DevServers: map[string]string{
+		"/admin":             "http://localhost:5173",
+		"painel.shop.example": "http://localhost:5173",
+		"loja.example":        OnHost("http://localhost:8080", "site.localhost"),
+	}}}
 	for _, c := range []struct {
-		dev               bool
+		dev            bool
 		redirect, want string
 	}{
 		{false, "/admin/reset-password", "https://shop.example/admin/reset-password?token=t"},
@@ -16,10 +22,44 @@ func TestLinksOpenWhereThePageIs(t *testing.T) {
 		{true, "/administration/x", "https://shop.example/administration/x?token=t"},
 		{true, "/shop/nova-senha", "https://shop.example/shop/nova-senha?token=t"},
 		{true, "https://other.example/x", "https://other.example/x?token=t"},
+		{false, "https://painel.shop.example/reset-password", "https://painel.shop.example/reset-password?token=t"},
+		{true, "https://painel.shop.example/reset-password", "http://localhost:5173/reset-password?token=t"},
+		{true, "https://painel.shop.example/reset-password?invite=1", "http://localhost:5173/reset-password?invite=1&token=t"},
+		{false, "https://loja.example/nova-senha", "https://loja.example/nova-senha?token=t"},
+		{true, "https://loja.example/nova-senha", "http://site.localhost:8080/nova-senha?token=t"},
 	} {
 		s.cfg.Development = c.dev
 		if got := s.link(c.redirect, "t"); got != c.want {
 			t.Errorf("development %v, %s: %s, want %s", c.dev, c.redirect, got, c.want)
+		}
+	}
+}
+
+func TestOnHost(t *testing.T) {
+	for address, want := range map[string]string{
+		"http://localhost:8080":  "http://site.localhost:8080",
+		"http://localhost:8080/": "http://site.localhost:8080",
+		"https://localhost":      "https://site.localhost",
+		"":                       "http://site.localhost",
+	} {
+		if got := OnHost(address, "site.localhost"); got != want {
+			t.Errorf("%q: %s, want %s", address, got, want)
+		}
+	}
+}
+
+// The frontends' own domains are allowed redirects, in RedirectURLs.
+func TestRedirectsToAFrontendsDomain(t *testing.T) {
+	s := &Security{cfg: Config{RedirectURLs: []string{"https://painel.shop.example"}}}
+	for target, want := range map[string]bool{
+		"https://painel.shop.example/reset-password":    true,
+		"https://painel.shop.example/confirm-email?x=1": true,
+		"http://painel.shop.example/reset-password":     false,
+		"https://evil.example/reset-password":           false,
+		"/admin/reset-password":                         true,
+	} {
+		if got := s.allowedRedirect(target); got != want {
+			t.Errorf("%s: %v, want %v", target, got, want)
 		}
 	}
 }

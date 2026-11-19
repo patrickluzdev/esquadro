@@ -44,15 +44,18 @@ type Config struct {
 	PasswordLists []string
 	// PublicURL is the address of the app, for the providers' callbacks.
 	PublicURL string
-	// DevServers are where task dev serves the app's panels, by their path
-	// (/admin: http://localhost:5173): in Development, a link to a page of
-	// one opens there.
+	// DevServers are where the app's frontends are in development, by their
+	// path on the app's domain (/admin: http://localhost:5173, where task
+	// dev serves a panel) or their own domain (admin.shop.com:
+	// http://localhost:5173; shop.com: http://site.localhost:8080, a site's
+	// alias): in Development, a link to a page of one opens there.
 	DevServers map[string]string
 	// Development is the app's first environment, where DevServers count.
 	Development bool
 	// RedirectURLs are where, besides the app's own paths, people may be sent
-	// back to after signing in with a provider: an origin, or an origin and
-	// the start of a path.
+	// back to after signing in with a provider, or by an email's link: an
+	// origin, or an origin and the start of a path. The frontends' own
+	// domains are among them.
 	RedirectURLs []string
 	// Providers sign in with other accounts, by name: google, github.
 	Providers map[string]Provider

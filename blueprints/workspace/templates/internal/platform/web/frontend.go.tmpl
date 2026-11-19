@@ -18,12 +18,21 @@ const CSP = "default-src 'self'; img-src 'self' https: data: blob:; style-src 's
 // to the app: its API and identity, its health, its keys.
 var own = []string{"/api/", "/identity/", "/.well-known/", "/healthz", "/readyz", "/docs"}
 
+// Alias is where a frontend on a domain of its own answers besides it, for
+// development: <name>.localhost, which browsers send to this machine, on
+// the app's port (http://site.localhost:8080; the mux matches a host
+// without its port). It answers there in every environment, harmlessly: in
+// production the proxy forwards only the frontends' domains, and nothing
+// else names a .localhost host.
+func Alias(name string) string { return name + ".localhost" }
+
 // Handle serves a frontend on mux: on domain, when it has one (the app's
 // own paths still reach the app there), or under prefix, which h does not
-// see (it serves / and below).
-func Handle(mux *http.ServeMux, h http.Handler, domain, prefix string) {
+// see (it serves / and below). On a domain, it answers on its alias too,
+// Alias(name), for development.
+func Handle(mux *http.ServeMux, h http.Handler, name, domain, prefix string) {
 	if domain != "" {
-		mux.Handle(domain+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		on := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			for _, p := range own {
 				if strings.HasPrefix(r.URL.Path, p) {
 					// The app's routes have no domain: without it, the mux
@@ -35,7 +44,9 @@ func Handle(mux *http.ServeMux, h http.Handler, domain, prefix string) {
 				}
 			}
 			h.ServeHTTP(w, r)
-		}))
+		})
+		mux.Handle(domain+"/", on)
+		mux.Handle(Alias(name)+"/", on)
 		return
 	}
 	prefix = "/" + strings.Trim(prefix, "/")

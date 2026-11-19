@@ -27,6 +27,7 @@ import (
 {{- end}}
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -385,10 +386,12 @@ func assetCache(w http.ResponseWriter, r *http.Request, name string) {
 func URL(path string) string { return Path + path }
 
 // Abs is a path of the site as an absolute address: for canonical links,
-// Open Graph and the sitemap.
+// Open Graph and the sitemap. On this machine (localhost, or the site's
+// alias in development, site.localhost:8080), it is on the request's
+// address, so that the links lead back to it.
 func (s *Site) Abs(r *http.Request, path string) string {
 	base := s.base
-	if base == "" {
+	if base == "" || local(r.Host) {
 		scheme := "http"
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 			scheme = "https"
@@ -396,6 +399,15 @@ func (s *Site) Abs(r *http.Request, path string) string {
 		base = scheme + "://" + r.Host
 	}
 	return strings.TrimSuffix(base, "/") + URL(path)
+}
+
+// local reports whether host is this machine's: localhost, or a name under
+// it, with a port or none.
+func local(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return host == "localhost" || strings.HasSuffix(host, ".localhost")
 }
 
 // render answers a page: the HTML of c, with the status of p.

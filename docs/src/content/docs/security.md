@@ -349,12 +349,24 @@ development, where it is the `public_url` option, `http://localhost:8080`).
 In development, a link to a page of a panel opens where `task dev` serves
 it (`http://localhost:5173/admin/...`).
 
+A frontend on a [domain of its own](/esquadro/frontends/#where-it-runs)
+has its links there instead: `https://admin.shop.com/reset-password`,
+whatever `PUBLIC_URL` is. Its pages send that address as the `redirect`
+of their requests, and the app allows it without `redirect_urls`, which
+holds the frontends' domains (over HTTPS) besides the ones it lists. In
+development such a link opens where the frontend is: a panel's where
+`task dev` serves it (`http://localhost:5173/reset-password`), a site's on
+its alias on the app's port (`http://site.localhost:8080/nova-senha`, from
+the development `PUBLIC_URL`). The same holds where a provider sends the
+browser back to.
+
 `create` prints a link that sets the password; with `-password-stdin` it reads
 the password instead, never from the arguments. `reset` prints a new link
 for an account that has one already, or lost it. The link, and `invite`'s,
 opens the page that sets a password of the realm's frontend
-(`/admin/reset-password` of a panel, `/nova-senha` of a site in pt_br), or
-the page `-redirect` names.
+(`/admin/reset-password` of a panel, `/nova-senha` of a site in pt_br,
+`https://admin.shop.com/reset-password` of a panel on a domain of its own),
+or the page `-redirect` names.
 
 ## Tests
 

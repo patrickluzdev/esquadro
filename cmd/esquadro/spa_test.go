@@ -82,13 +82,13 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 	if gen := read(t, filepath.Join(web, "src/esquadro/resources.gen.ts")); !strings.Contains(gen, `name: { name: "name", label: "Nome"`) || !strings.Contains(gen, `labels: { ACTIVE: "Ativo", INACTIVE: "INACTIVE" }`) || !strings.Contains(gen, `default: "ACTIVE"`) || !strings.Contains(gen, "categories:") {
 		t.Errorf("resources.gen.ts:\n%s", gen)
 	}
-	if cmd := read(t, filepath.Join(dir, "cmd", "shop", "security_command.go")); !strings.Contains(cmd, `"user": {path: "/admin/reset-password"},`) {
+	if cmd := read(t, filepath.Join(dir, "cmd", "shop", "security_command.go")); !strings.Contains(cmd, `"user": {page: "/admin/reset-password"},`) {
 		t.Error("a password's link does not open the panel's page by default")
 	}
 	if pkg := read(t, filepath.Join(dir, "package.json")); !strings.Contains(pkg, `"web/admin"`) || !strings.Contains(pkg, `"clients/ts"`) {
 		t.Errorf("package.json:\n%s", pkg)
 	}
-	if routes := read(t, filepath.Join(dir, "cmd", "shop", "routes_gen.go")); !strings.Contains(routes, `web.Mount(mux, admin.Files, "", "/admin")`) {
+	if routes := read(t, filepath.Join(dir, "cmd", "shop", "routes_gen.go")); !strings.Contains(routes, `web.Mount(mux, admin.Files, "admin", "", "/admin")`) {
 		t.Errorf("routes_gen.go:\n%s", routes)
 	}
 	if ignore := read(t, filepath.Join(dir, ".gitignore")); !strings.Contains(ignore, "node_modules/") {
@@ -205,6 +205,54 @@ entity Comment {
 		t.Errorf("no migration keys parent_id to comments: %v", migrations)
 	}
 	for _, args := range [][]string{{"vet", "./..."}, {"test", "./internal/catalog/", "./web/site/"}} {
+		cmd := exec.Command("go", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+}
+
+// TestFrontendsOnDomainsOfTheirOwn generates a panel and a site on domains
+// of their own: they answer on their aliases too (admin.localhost,
+// site.localhost), the realm's links open the panel's domain, which is an
+// allowed redirect, and in development where each is.
+func TestFrontendsOnDomainsOfTheirOwn(t *testing.T) {
+	dir, code, errOut := spaProject(t, func(app string) string {
+		app = strings.Replace(app, "  blueprint spa admin {\n", "  blueprint spa admin {\n    domain \"painel.shop.test\"\n", 1)
+		return strings.Replace(app, "    locale pt_br\n  }\n", "    locale pt_br\n  }\n  blueprint ssr site {\n    domain \"shop.test\"\n    locale pt_br\n  }\n", 1)
+	})
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	for path, want := range map[string][]string{
+		"cmd/shop/routes_gen.go": {
+			`web.Mount(mux, admin.Files, "admin", "painel.shop.test", "")`,
+			`}), "site", site.Domain, site.Path)`,
+		},
+		"cmd/shop/security_command.go": {`"user": {page: "https://painel.shop.test/reset-password"},`},
+		"cmd/shop/dependencies.go": {
+			`"painel.shop.test": "http://localhost:5173",`,
+			`"shop.test":        security.OnHost(d.config.PublicURL, "site.localhost"),`,
+			`[]string{"https://painel.shop.test", "https://shop.test"},`,
+		},
+		"internal/platform/web/frontend.go":                    {`mux.Handle(Alias(name)+"/", on)`},
+		"web/admin/src/esquadro/config.ts":                     {`export const origin: string = "https://painel.shop.test"`},
+		"web/admin/src/esquadro/kit/pages/forgot-password.tsx": {`redirect: pageURL("reset-password")`},
+		"web/site/account_gen.go":                              {`return "https://" + Domain + strings.TrimPrefix(path, Path)`},
+	} {
+		got := read(t, filepath.Join(dir, path))
+		for _, w := range want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s lacks %q", path, w)
+			}
+		}
+	}
+	for _, args := range [][]string{
+		{"vet", "./..."},
+		{"test", "./internal/platform/web/", "./web/site/"},
+		{"test", "-run", "TestLinksOpenWhereThePageIs|TestOnHost|TestRedirectsToAFrontendsDomain", "./internal/platform/security/"},
+	} {
 		cmd := exec.Command("go", args...)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {

@@ -46,14 +46,14 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
 realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
 // resetPage is the page of a frontend that sets a password: its path on
-// the app's domain.
-type resetPage struct{ path string }
+// the app's domain, or its address on the frontend's own.
+type resetPage struct{ page string }
 
 // resetPages are the pages that set a password, by realm: those of the
 // frontend that signs it in.
 var resetPages = map[string]resetPage{
 {{- range $realm, $page := resetPages .Entities frontends}}
-	{{quote $realm}}: {path: {{quote $page.Path}}},
+	{{quote $realm}}: {page: {{quote $page.Page}}},
 {{- end}}
 }
 
@@ -194,9 +194,10 @@ func createAccount(ctx context.Context, d dependencies, args []string, stdin io.
 	return printResetLink(ctx, d, realm.Name, id, *redirect)
 }
 
-// resetPathOf is the page a realm's links open: its frontend's, or /.
+// resetPathOf is the page a realm's links open: its frontend's (a path, or
+// an address on the frontend's own domain), or /.
 func resetPathOf(realm string) string {
-	if p := resetPages[realm].path; p != "" {
+	if p := resetPages[realm].page; p != "" {
 		return p
 	}
 	return "/"

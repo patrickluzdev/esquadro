@@ -9,6 +9,16 @@
 /** Where the frontend lives: / on its own domain, else its path. */
 export const base = {{if .Options.domain}}"/"{{else}}"{{$path}}/"{{end}}
 
+/** Its own domain's address, https://admin.shop.com; "" on the app's. */
+export const origin: string = "{{with .Options.domain}}https://{{.}}{{end}}"
+
+/**
+ * A page of the frontend as an email's link or a provider sends people to
+ * it: its path on the app's domain, or its address on its own (which the
+ * app opens where task dev serves it, in development).
+ */
+export const pageURL = (page: string): string => `${origin}${base}${page}`
+
 /** The realm that signs in, and its key in the API client's identity. */
 export const realm = "{{$realm}}"
 export const realmKey = "{{$key}}" as const

@@ -64,7 +64,7 @@ func TestSSRGeneratesASite(t *testing.T) {
 		"routes.go":                          "func (s *Site) ownRoutes(",
 		"dist/README.md":                     "dist/assets",
 		"../../package.json":                 `"web/shop"`,
-		"../../cmd/shop/security_command.go": `"customer": {path: "/shop/nova-senha"},`,
+		"../../cmd/shop/security_command.go": `"customer": {page: "/shop/nova-senha"},`,
 	} {
 		got := read(t, filepath.Join(site, path))
 		if path == "product_gen.go" {

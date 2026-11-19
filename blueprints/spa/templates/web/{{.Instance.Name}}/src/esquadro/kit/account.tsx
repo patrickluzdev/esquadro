@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import { api } from "../api.ts"
-import { base, realmKey } from "../config.ts"
+import { base, pageURL, realmKey } from "../config.ts"
 import { signOut } from "./auth.tsx"
 import { ask } from "./confirm.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
@@ -216,7 +216,7 @@ export function EmailCard() {
   const sensitive = useSensitive()
   const change = useMutation({
     mutationFn: async (email: string) => {
-      if (await sensitive(() => account().changeEmail({ email, redirect: `${base}confirm-email` }), t("linkSentShort"))) setSent(email)
+      if (await sensitive(() => account().changeEmail({ email, redirect: pageURL("confirm-email") }), t("linkSentShort"))) setSent(email)
     },
   })
   return (

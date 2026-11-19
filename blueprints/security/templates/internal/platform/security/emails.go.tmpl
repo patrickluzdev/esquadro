@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"uuid"
@@ -102,6 +103,8 @@ func (s *Security) verification(ctx context.Context, q Querier, realm, purpose, 
 func (s *Security) link(redirect, token string) string {
 	if strings.HasPrefix(redirect, "/") {
 		redirect = s.base(redirect) + redirect
+	} else {
+		redirect = s.local(redirect)
 	}
 	return withQuery(redirect, "token", token)
 }
@@ -111,12 +114,49 @@ func (s *Security) link(redirect, token string) string {
 func (s *Security) base(path string) string {
 	if s.cfg.Development {
 		for prefix, server := range s.cfg.DevServers {
-			if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			if strings.HasPrefix(prefix, "/") && (path == prefix || strings.HasPrefix(path, prefix+"/")) {
 				return strings.TrimSuffix(server, "/")
 			}
 		}
 	}
 	return strings.TrimSuffix(s.cfg.PublicURL, "/")
+}
+
+// local is target where it opens in development: an address on the domain
+// of a frontend, where DevServers says it is (https://admin.shop.com/x,
+// http://localhost:5173/x); target itself outside development, or
+// elsewhere.
+func (s *Security) local(target string) string {
+	if !s.cfg.Development {
+		return target
+	}
+	u, err := url.Parse(target)
+	if err != nil || u.Host == "" {
+		return target
+	}
+	server, ok := s.cfg.DevServers[u.Host]
+	if !ok {
+		return target
+	}
+	at, err := url.Parse(server)
+	if err != nil {
+		return target
+	}
+	u.Scheme, u.Host = at.Scheme, at.Host
+	return u.String()
+}
+
+// OnHost is address with another host, its port kept: the app's address in
+// development on a site's alias, http://site.localhost:8080.
+func OnHost(address, host string) string {
+	u, err := url.Parse(address)
+	if err != nil || u.Host == "" {
+		return "http://" + host
+	}
+	if port := u.Port(); port != "" {
+		host += ":" + port
+	}
+	return u.Scheme + "://" + host
 }
 
 // emailRequest is a request that sends an email: to whom, and the page of

@@ -20,8 +20,8 @@
 		PublicURL: d.config.PublicURL,
 {{- with devServers frontends}}
 		DevServers: map[string]string{
-{{- range $path, $server := .}}
-			{{quote $path}}: {{quote $server}},
+{{- range .}}
+			{{quote .At}}: {{if .Host}}security.OnHost(d.config.PublicURL, {{quote .Host}}){{else}}{{quote .URL}}{{end}},
 {{- end}}
 		},
 		Development: d.config.Env == "{{index $.Environments 0}}",
@@ -30,7 +30,7 @@
 		VerifyEmailHours: {{.Options.verify_email_hours}}, PasswordResetMinutes: {{.Options.password_reset_minutes}}, InviteDays: {{.Options.invite_days}},
 		ResendMinutes: {{.Options.resend_minutes}}, ResendPerDay: {{.Options.resend_per_day}},
 		RotateKeysDays: {{.Options.rotate_keys_days}},
-{{- with strs .Options.redirect_urls}}
+{{- with redirectURLs (strs .Options.redirect_urls) frontends}}
 		RedirectURLs: {{goStrings .}},
 {{- end}}
 {{- if or (usesProvider .Entities "google") (usesProvider .Entities "github")}}

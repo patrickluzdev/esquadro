@@ -28,7 +28,7 @@ func serve(t *testing.T, mux *http.ServeMux, host, path string) *httptest.Respon
 func TestMountOnADomain(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/things", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("api")) })
-	if err := Mount(mux, built(), "admin.example.com", ""); err != nil {
+	if err := Mount(mux, built(), "admin", "admin.example.com", "/admin"); err != nil {
 		t.Fatal(err)
 	}
 	if rec := serve(t, mux, "admin.example.com", "/products/1"); !strings.Contains(rec.Body.String(), "app") || rec.Header().Get("Content-Security-Policy") != CSP {
@@ -43,18 +43,35 @@ func TestMountOnADomain(t *testing.T) {
 	if rec := serve(t, mux, "api.example.com", "/products/1"); rec.Code != http.StatusNotFound {
 		t.Fatalf("another domain: %d", rec.Code)
 	}
+	// In development, on its alias and the app's port.
+	if rec := serve(t, mux, "admin.localhost:8080", "/products/1"); !strings.Contains(rec.Body.String(), "app") {
+		t.Fatalf("the alias: %d %s", rec.Code, rec.Body)
+	}
+	if rec := serve(t, mux, "admin.localhost:8080", "/api/v1/things"); rec.Body.String() != "api" {
+		t.Fatalf("the API on the alias: %d %s", rec.Code, rec.Body)
+	}
+	unbuilt := http.NewServeMux()
+	if err := Mount(unbuilt, fstest.MapFS{"dist/README.md": {Data: []byte("build me")}}, "admin", "admin.example.com", "/admin"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := serve(t, unbuilt, "admin.localhost:8080", "/"); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "http://localhost:5173/ by default") {
+		t.Fatalf("not built, on a domain: %d %s", rec.Code, rec.Body)
+	}
 }
 
 func TestMountUnderAPathAndUnbuilt(t *testing.T) {
 	mux := http.NewServeMux()
-	if err := Mount(mux, built(), "", "/admin"); err != nil {
+	if err := Mount(mux, built(), "admin", "", "/admin"); err != nil {
 		t.Fatal(err)
 	}
 	if rec := serve(t, mux, "app.example.com", "/admin/products"); !strings.Contains(rec.Body.String(), "app") {
 		t.Fatalf("under the path: %d %s", rec.Code, rec.Body)
 	}
+	if rec := serve(t, mux, "admin.localhost:8080", "/products"); rec.Code != http.StatusNotFound {
+		t.Fatalf("an alias, without a domain: %d", rec.Code)
+	}
 	unbuilt := http.NewServeMux()
-	if err := Mount(unbuilt, fstest.MapFS{"dist/README.md": {Data: []byte("build me")}}, "", "/admin"); err != nil {
+	if err := Mount(unbuilt, fstest.MapFS{"dist/README.md": {Data: []byte("build me")}}, "admin", "", "/admin"); err != nil {
 		t.Fatal(err)
 	}
 	if rec := serve(t, unbuilt, "app.example.com", "/admin/"); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "http://localhost:5173/admin/") {

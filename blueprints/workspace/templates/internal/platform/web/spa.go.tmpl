@@ -11,14 +11,20 @@ import (
 )
 
 // Mount serves a frontend's build (dist/app of files) on mux: on domain,
-// when it has one (the app's own paths still reach the app there), or under
-// prefix. Paths of no file answer index.html, for the frontend's routes.
-func Mount(mux *http.ServeMux, files fs.FS, domain, prefix string) error {
+// when it has one (the app's own paths still reach the app there, and so
+// does its alias, Alias(name)), or under prefix. Paths of no file answer
+// index.html, for the frontend's routes.
+func Mount(mux *http.ServeMux, files fs.FS, name, domain, prefix string) error {
 	app, err := fs.Sub(files, "dist/app")
 	if err != nil {
 		return err
 	}
-	Handle(mux, handler(app, prefix), domain, prefix)
+	if domain != "" {
+		// On a domain of its own, it is at the root, where task dev serves
+		// it too.
+		prefix = ""
+	}
+	Handle(mux, handler(app, prefix), name, domain, prefix)
 	return nil
 }
 

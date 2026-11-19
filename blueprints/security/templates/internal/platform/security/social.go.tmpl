@@ -133,7 +133,7 @@ func (s *Security) oauthCallback(realm Realm, name string) http.HandlerFunc {
 			return
 		}
 		back := func(code string) {
-			http.Redirect(w, r, withQuery(flow.Redirect, "error", code), http.StatusFound)
+			http.Redirect(w, r, withQuery(s.local(flow.Redirect), "error", code), http.StatusFound)
 		}
 		if q.Get("error") != "" {
 			back("provider_refused")
@@ -175,7 +175,7 @@ func (s *Security) oauthCallback(realm Realm, name string) http.HandlerFunc {
 				return
 			}
 		}
-		http.Redirect(w, r, flow.Redirect, http.StatusFound)
+		http.Redirect(w, r, s.local(flow.Redirect), http.StatusFound)
 	}
 }
 

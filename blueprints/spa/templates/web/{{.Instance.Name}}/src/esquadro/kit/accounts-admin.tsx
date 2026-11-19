@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils"
 import { isApiError } from "@api"
 import { api } from "../api.ts"
 import type { AccountRealm } from "../accounts.gen.ts"
-import { base, locale } from "../config.ts"
+import { locale, pageURL } from "../config.ts"
 import { useSession } from "./auth.tsx"
 import { ask } from "./confirm.tsx"
 import { describe, fieldErrors, fieldMessage } from "./errors.ts"
@@ -130,10 +130,10 @@ export function mustWait(a: { resend_at: string | null }, now = Date.now()): boo
 }
 
 /** The page that opens an invitation's link: choosing the password, greeted. */
-const inviteRedirect = () => `${base}reset-password?invite=1`
+const inviteRedirect = () => pageURL("reset-password?invite=1")
 
 /** The page that opens the link that confirms an email. */
-const verifyRedirect = () => `${base}confirm-email?verify=1`
+const verifyRedirect = () => pageURL("confirm-email?verify=1")
 
 /**
  * A realm's accounts: its roles in cards, the accounts in a table with a

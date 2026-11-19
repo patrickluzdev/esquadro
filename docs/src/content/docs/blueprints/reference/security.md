@@ -30,7 +30,7 @@ blueprint security
 | `service_key_choices` | list | `[30, 90, 365]` | The lifetimes, in days, a frontend offers for a new key (those within service_key_max_days), besides until revoked when there is no limit. |
 | `hsts` | bool | `false` | Send Strict-Transport-Security, behind HTTPS only. &lt;APP>_HSTS overrides it. |
 | `public_url` | string | `"http://localhost:8080"` | The address of the app in development, for the links of emails and the OAuth callbacks; PUBLIC_URL gives it in the other environments. |
-| `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link. |
+| `redirect_urls` | list | `[]` | Where the app may send people back to after sign-in or an email link, besides its own paths and the frontends' own domains. |
 | `session_days` | int | `7` | Days a session lasts without being used to renew it. |
 | `session_idle_hours` | int | `24` | Hours of inactivity that end a session. |
 | `session_max_days` | int | `30` | Days after which a session ends, used or not. |

@@ -50,9 +50,10 @@ type Account struct {
 	Providers []Provider
 	Fields    []AccountField
 	SignUp    bool
-	// Next is where signing in goes back to; Reset, the address of the page
-	// a forgotten password's link opens; Token, a link's token.
-	Next, Reset, Token string
+	// Next is where signing in goes back to; Reset and Confirm, the
+	// addresses of the pages a forgotten password's link and an email's
+	// confirmation open; Token, a link's token.
+	Next, Reset, Confirm, Token string
 }
 
 // Provider is a way to sign in with an account elsewhere: Google.
@@ -107,9 +108,10 @@ func (s *Site) accountRoutes(m *http.ServeMux) {
 func (s *Site) authPage(w http.ResponseWriter, r *http.Request, title string, page func(Page, Account) templ.Component) {
 	p := s.page(r, title, "")
 	p.NoIndex = true
-	a := Account{Identity: identity, SignUp: signUpOpen, Token: r.URL.Query().Get("token"), Next: next(r), Reset: s.Abs(r, paths.reset)}
+	a := Account{Identity: identity, SignUp: signUpOpen, Token: r.URL.Query().Get("token"), Next: next(r),
+		Reset: back(URL(paths.reset)), Confirm: back(URL(paths.confirm))}
 {{- range $realm.Providers}}{{if ne . "password"}}
-	a.Providers = append(a.Providers, Provider{Name: {{quote (printf "%s" . | humanize)}}, URL: identity + "/oauth/{{.}}?redirect=" + url.QueryEscape(s.back(r, a.Next))})
+	a.Providers = append(a.Providers, Provider{Name: {{quote (printf "%s" . | humanize)}}, URL: identity + "/oauth/{{.}}?redirect=" + url.QueryEscape(back(a.Next))})
 {{- end}}{{end}}
 {{- range $realm.Entity.Fields}}{{if and .Required (not .Implicit) (or (eq (printf "%v" .Type) "string") (eq (printf "%v" .Type) "text"))}}
 	a.Fields = append(a.Fields, AccountField{Name: {{quote .Snake}}, Label: {{quote (siteLabel .Ann $n .Label)}}, Autocomplete: {{if eq .Snake "name"}}"name"{{else}}"off"{{end}}})
@@ -128,14 +130,15 @@ func next(r *http.Request) string {
 	return URL("/")
 }
 
-// back is where a provider sends the visitor back to: a path on the app's
-// domain, or the site's address on a domain of its own (which the security
-// blueprint's redirect_urls must hold).
-func (s *Site) back(r *http.Request, path string) string {
+// back is where a provider or an email's link sends the visitor back to: a
+// path on the app's domain, or the address of the site's domain on one of
+// its own (which the security blueprint allows, and in development opens
+// on the site's alias).
+func back(path string) string {
 	if Domain == "" {
 		return path
 	}
-	return s.Abs(r, strings.TrimPrefix(path, Path))
+	return "https://" + Domain + strings.TrimPrefix(path, Path)
 }
 
 // ogLocale is the site's language as Open Graph writes it: pt_BR.

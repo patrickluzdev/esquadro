@@ -1,0 +1,40 @@
+{{- $n := .Instance.Name -}}
+{{- $o := .Options -}}
+{{- $sys := sitePaths $o.locale -}}
+package {{$n}}
+
+import (
+	"net/http/httptest"
+	"testing"
+)
+
+// The site's absolute addresses are on its address, but on this machine
+// (localhost, its alias in development) on the request's.
+func TestAbsOnThisMachine(t *testing.T) {
+	s := &Site{base: "https://shop.example"}
+	for host, want := range map[string]string{
+		"shop.example":        "https://shop.example" + URL("/x"),
+		"{{$n}}.localhost:8080": "http://{{$n}}.localhost:8080" + URL("/x"),
+		"localhost:8080":      "http://localhost:8080" + URL("/x"),
+	} {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.Host = host
+		if got := s.Abs(r, "/x"); got != want {
+			t.Errorf("on %s: %s, want %s", host, got, want)
+		}
+	}
+}
+
+// The pages an email's link opens are a path on the app's domain, or the
+// address of the site's own domain.
+func TestBack(t *testing.T) {
+{{- if $o.domain}}
+	if got, want := back(URL(paths.reset)), {{quote (printf "https://%s/%s" $o.domain $sys.reset)}}; got != want {
+		t.Errorf("reset: %s, want %s", got, want)
+	}
+{{- else}}
+	if got, want := back(URL(paths.reset)), {{quote (printf "%s/%s" (or $o.path (printf "/%s" $n)) $sys.reset)}}; got != want {
+		t.Errorf("reset: %s, want %s", got, want)
+	}
+{{- end}}
+}

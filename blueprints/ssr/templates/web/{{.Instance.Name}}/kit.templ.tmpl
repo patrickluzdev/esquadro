@@ -270,7 +270,7 @@ templ SignInPage(p Page, a Account) {
 // password.
 templ SignUpPage(p Page, a Account) {
 	@AuthFrame(p, T("signUp"), T("signUpHint")) {
-		<form data-identity={ a.Identity + "/sign-up" } data-done={ T("signedUp") } class="grid gap-4">
+		<form data-identity={ a.Identity + "/sign-up" } data-redirect={ a.Confirm } data-done={ T("signedUp") } class="grid gap-4">
 			for _, f := range a.Fields {
 				@field(f.Name, f.Label, "text", f.Autocomplete)
 			}

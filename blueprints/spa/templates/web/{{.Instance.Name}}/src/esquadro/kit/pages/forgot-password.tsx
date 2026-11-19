@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { AuthFrame, BackToSignIn } from "@/components/auth-frame"
 import { api } from "../../api.ts"
-import { base, realmKey } from "../../config.ts"
+import { pageURL, realmKey } from "../../config.ts"
 import { t } from "../i18n.ts"
 
 // Asking for a link to set a new password. It says the same whether the
@@ -25,7 +25,7 @@ export function ForgotPasswordPage() {
           const identity = api.identity[realmKey] as { forgotPassword?: (r: { email: string; redirect?: string }) => Promise<void> }
           setBusy(true)
           try {
-            await identity.forgotPassword?.({ email, redirect: `${base}reset-password` })
+            await identity.forgotPassword?.({ email, redirect: pageURL("reset-password") })
           } finally {
             setBusy(false)
             setSent(true)

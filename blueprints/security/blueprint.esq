@@ -66,7 +66,8 @@ blueprint security {
   /// The address of the app in development, for the links of emails and
   /// the OAuth callbacks; PUBLIC_URL gives it in the other environments.
   option public_url string default("http://localhost:8080")
-  /// Where the app may send people back to after sign-in or an email link.
+  /// Where the app may send people back to after sign-in or an email link,
+  /// besides its own paths and the frontends' own domains.
   option redirect_urls list default([])
 
   /// Days a session lasts without being used to renew it.

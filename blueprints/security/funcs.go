@@ -16,6 +16,7 @@ func TemplateFuncs() template.FuncMap {
 		"securityTable": Table,
 		"resetPages":    ResetPages,
 		"devServers":    DevServers,
+		"redirectURLs":  RedirectURLs,
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
@@ -115,8 +116,8 @@ func Admins(entities []*project.Entity, e *project.Entity) []string {
 }
 
 // ResetPageOf is a realm's page that sets a password: its path on the app's
-// domain.
-type ResetPageOf struct{ Path string }
+// domain, or its address on its frontend's own.
+type ResetPageOf struct{ Page string }
 
 // DevServer is where task dev serves a panel by default: Vite's address.
 const DevServer = "http://localhost:5173"
@@ -133,18 +134,19 @@ func SiteResetPage(locale string) string {
 	return "new-password"
 }
 
-// ResetPage is the page of a frontend that sets a password, as a path of
-// the app's domain: /admin/reset-password; "" for a frontend on a domain
-// of its own, or of a kind that has none.
+// ResetPage is the page of a frontend that sets a password: a path of the
+// app's domain, /admin/reset-password, or an address on the frontend's own,
+// https://admin.shop.com/reset-password; "" for a frontend of a kind that
+// has none.
 func ResetPage(kind, name string, opts map[string]any) string {
-	if domain, _ := opts["domain"].(string); domain != "" {
-		return ""
-	}
 	path, _ := opts["path"].(string)
 	if path == "" {
 		path = "/" + name
 	}
 	path = strings.TrimSuffix(path, "/")
+	if domain, _ := opts["domain"].(string); domain != "" {
+		path = "https://" + domain
+	}
 	switch kind {
 	case "spa":
 		return path + "/" + PanelResetPage
@@ -156,8 +158,7 @@ func ResetPage(kind, name string, opts map[string]any) string {
 }
 
 // ResetPages are the pages that set a password, by realm: those of the
-// first frontend that signs each realm in (its auth, or the first realm),
-// on the app's domain.
+// first frontend that signs each realm in (its auth, or the first realm).
 func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[string]ResetPageOf {
 	realms := RealmsOf(entities)
 	if len(realms) == 0 {
@@ -173,31 +174,60 @@ func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[s
 			continue
 		}
 		if page := ResetPage(f.Kind, f.Name, f.Options); page != "" {
-			out[realm] = ResetPageOf{Path: page}
+			out[realm] = ResetPageOf{Page: page}
 		}
 	}
 	return out
 }
 
-// DevServers are where task dev serves the app's panels in development, by
-// their path on the app's domain: /admin, http://localhost:5173. A panel on
-// a domain of its own has none.
-func DevServers(frontends []*compose.Instance) map[string]string {
-	out := map[string]string{}
+// DevServerOf is where the links to a frontend open in development: those
+// under At, a path of the app's domain (/admin) or the frontend's own
+// domain (admin.shop.com), open at URL (task dev's, http://localhost:5173),
+// or, with Host, on the app's address in development with that host
+// instead (a site's alias, site.localhost: http://site.localhost:8080).
+type DevServerOf struct{ At, URL, Host string }
+
+// DevServers are where the app's frontends are in development, by where
+// they are otherwise: a panel where task dev serves it, on the app's domain
+// or its own; a site on a domain of its own, on its alias on the app's
+// port. A site on the app's domain is where the app is.
+func DevServers(frontends []*compose.Instance) []DevServerOf {
+	var out []DevServerOf
+	seen := map[string]bool{}
 	for _, f := range frontends {
-		if f.Kind != "spa" {
+		domain, _ := f.Options["domain"].(string)
+		var d DevServerOf
+		switch {
+		case f.Kind == "spa" && domain != "":
+			d = DevServerOf{At: domain, URL: DevServer}
+		case f.Kind == "spa":
+			path, _ := f.Options["path"].(string)
+			if path == "" {
+				path = "/" + f.Name
+			}
+			d = DevServerOf{At: strings.TrimSuffix(path, "/"), URL: DevServer}
+		case f.Kind == "ssr" && domain != "":
+			d = DevServerOf{At: domain, Host: f.Name + ".localhost"}
+		default:
 			continue
 		}
-		if domain, _ := f.Options["domain"].(string); domain != "" {
-			continue
+		if !seen[d.At] {
+			seen[d.At] = true
+			out = append(out, d)
 		}
-		path, _ := f.Options["path"].(string)
-		if path == "" {
-			path = "/" + f.Name
-		}
-		path = strings.TrimSuffix(path, "/")
-		if _, ok := out[path]; !ok {
-			out[path] = DevServer
+	}
+	slices.SortFunc(out, func(a, b DevServerOf) int { return strings.Compare(a.At, b.At) })
+	return out
+}
+
+// RedirectURLs are where, besides the app's own paths, people may be sent:
+// the security blueprint's redirect_urls, and the domains of the frontends
+// that have one of their own, over HTTPS.
+func RedirectURLs(listed []string, frontends []*compose.Instance) []string {
+	out := slices.Clone(listed)
+	for _, f := range frontends {
+		if domain, _ := f.Options["domain"].(string); domain != "" && !slices.Contains(out, "https://"+domain) {
+			out = append(out, "https://"+domain)
 		}
 	}
 	return out

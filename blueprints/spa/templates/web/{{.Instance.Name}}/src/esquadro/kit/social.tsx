@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { isApiError } from "@api"
 import { api } from "../api.ts"
-import { base, providers, realmKey, socialLogin } from "../config.ts"
+import { pageURL, providers, realmKey, socialLogin } from "../config.ts"
 import { useSensitive } from "./account.tsx"
 import { afterSignIn, sessionQuery } from "./auth.tsx"
 import { announceSession } from "./connection.tsx"
@@ -80,7 +80,7 @@ export function socialProblem(code: string): string {
 /** Where the provider sends the browser back to: the sign-in page, which goes on. */
 function back(redirect?: string): string {
   const to = afterSignIn(redirect)
-  return `${base}login?social=1${to !== "/" ? `&redirect=${encodeURIComponent(to)}` : ""}`
+  return `${pageURL("login")}?social=1${to !== "/" ? `&redirect=${encodeURIComponent(to)}` : ""}`
 }
 
 /** The buttons of the providers, below the password's form (or alone). */
@@ -197,7 +197,7 @@ export function ConnectedAccountsCard() {
                     onClick={async () => {
                       setGoing(p)
                       try {
-                        const { url } = await social().linkProvider(p, `${base}settings?section=connected`)
+                        const { url } = await social().linkProvider(p, pageURL("settings?section=connected"))
                         window.location.assign(url)
                       } catch (e) {
                         setGoing("")
