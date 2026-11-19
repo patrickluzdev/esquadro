@@ -10,7 +10,7 @@ import type { FieldMeta } from "./meta.ts"
  * language.
  */
 export function isRule(e: unknown): boolean {
-  return isApiError(e) && e.status === 422 && e.code !== "invalid_fields" && e.code !== "too_many_records"
+  return isApiError(e) && e.status === 422 && e.code !== "invalid_fields" && e.code !== "too_many_records" && e.code !== "import_refused" && e.code !== "too_many_rows"
 }
 
 /** The message of an error, for a notice. */

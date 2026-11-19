@@ -65,6 +65,51 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.
 	return &answer, nil
 }
 {{- end}}
+{{- if importable $e}}
+
+func (h HTTP) Import{{.Plural.Pascal}}(ctx context.Context, req *apigen.{{$P}}Import, _ apigen.Import{{.Plural.Pascal}}Params) (*apigen.Imported, error) {
+	rows := make([]New{{$P}}, len(req.Rows))
+	var unreadable []RowError
+	for i := range req.Rows {
+		n, unread := new{{$P}}Of(&req.Rows[i])
+		if unread != nil {
+			unreadable = append(unreadable, RowError{Row: i + 1, Fields: unread})
+		}
+		rows[i] = n
+	}
+	if len(unreadable) > 0 {
+		return nil, problemOf(&ImportRefused{Rows: unreadable})
+	}
+{{- if $pol}}
+	// Each row as its create, or the change of the record it replaces.
+	guard := func(stored *{{$P}}, n *New{{$P}}) error {
+		if stored == nil {
+{{- if $claims}}
+			{{$P}}Policy{}.Claim(ctx, n, nil)
+{{- end}}
+			if !({{$P}}Policy{}).Create(ctx, *n) {
+				return security.Refusal(ctx)
+			}
+			return nil
+		}
+{{- if $claims}}
+		{{$P}}Policy{}.Claim(ctx, n, stored)
+{{- end}}
+		if !({{$P}}Policy{}).Read(ctx, *stored) || !({{$P}}Policy{}).Update(ctx, *stored) {
+			return security.Refusal(ctx)
+		}
+		return nil
+	}
+	done, err := h.{{$p}}.Import{{.Plural.Pascal}}(ctx, rows, guard)
+{{- else}}
+	done, err := h.{{$p}}.Import{{.Plural.Pascal}}(ctx, rows, nil)
+{{- end}}
+	if err != nil {
+		return nil, problemOf(err)
+	}
+	return &apigen.Imported{Created: done.Created, Updated: done.Updated}, nil
+}
+{{- end}}
 
 func (h HTTP) Get{{$P}}(ctx context.Context, params apigen.Get{{$P}}Params) (*apigen.{{$P}}, error) {
 {{- if $pol}}
@@ -1004,6 +1049,25 @@ func problemOf(err error) error {
 		return edge.Conflict("in_use", {{quote (printf "Other records still point at the %s." (lower .Label))}})
 {{- end}}
 	}
+{{- $imports := false}}{{range $m.Entities}}{{if importable .}}{{$imports = true}}{{end}}{{end}}
+{{- if $imports}}
+	if errors.Is(err, ErrImportTooLarge) {
+		return edge.TooManyRows(ImportMax)
+	}
+	if refused, ok := errors.AsType[*ImportRefused](err); ok {
+		var fields []edge.FieldProblem
+		for _, row := range refused.Rows {
+			for _, f := range row.Fields {
+				name := f.Field
+				if api, ok := apiFields[name]; ok {
+					name = api
+				}
+				fields = append(fields, edge.FieldProblem{Field: name, Code: f.Code, Row: row.Row})
+			}
+		}
+		return edge.ImportRefused(fields)
+	}
+{{- end}}
 	if broken, ok := errors.AsType[*RuleError](err); ok {
 		fields := make([]edge.FieldProblem, 0, len(broken.Fields))
 		for _, name := range broken.Fields {

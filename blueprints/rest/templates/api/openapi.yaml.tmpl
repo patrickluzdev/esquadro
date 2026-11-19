@@ -150,6 +150,40 @@ paths:
                 $ref: "#/components/schemas/{{.Pascal}}"
         default:
           $ref: "#/components/responses/Problem"
+{{- if importable $e}}
+  /api/v1/{{.Plural.Kebab}}/import:
+    post:
+      operationId: import{{.Plural.Pascal}}
+      summary: {{quote (printf "Import %s" (lower .Plural.Label))}}
+      description: |
+        Stores rows, as `POST` would each{{with importBy $e}}; a row whose `{{.Snake}}` is that of a
+        {{lower $e.Label}} replaces it instead, as `PUT` would{{end}}. All or none: in one
+        transaction, every row checked, and nothing stored when one is refused.
+        At most {{importMax}} rows.
+        Codes: `import_refused` (422), whose `errors` give each refused field
+        with its `row` (from 1); `too_many_rows` (422); `invalid_request` (400).
+{{- with accessLine $.Entities $e "create"}}
+        {{.}}
+{{- end}}
+      tags: [{{.Module.Snake}}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/{{.Pascal}}Import"
+      responses:
+        "200":
+          description: How many it created and updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Imported"
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
 {{- end}}
 {{- if single $e}}
   /api/v1/{{.Kebab}}:
@@ -593,6 +627,15 @@ components:
         to: {description: The value after.}
         secret: {type: boolean, description: It changed; its values are not kept.}
 {{- end}}
+{{- $imports := false}}{{range .Entities}}{{if importable .}}{{$imports = true}}{{end}}{{end}}
+{{- if $imports}}
+    Imported:
+      type: object
+      required: [created, updated]
+      properties:
+        created: {type: integer, description: How many records it created.}
+        updated: {type: integer, description: How many records it replaced.}
+{{- end}}
 {{- $soft := false}}{{range .Entities}}{{if softDeleted .}}{{$soft = true}}{{end}}{{end}}
 {{- if $soft}}
     Purged:
@@ -622,6 +665,7 @@ components:
       properties:
         field: {type: string}
         code: {type: string}
+        row: {type: integer, description: "With `import_refused`, the row (from 1) the field is in."}
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- $files := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$files = true}}{{end}}{{end}}{{end}}
@@ -720,6 +764,16 @@ components:
           items: {type: string, format: uuid}
 {{- end}}
 {{- if and (not (inRequest $e)) (not (keys $e)) (not (idLinks $e))}} {}
+{{- end}}
+{{- if importable $e}}
+    {{.Pascal}}Import:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          description: At most {{importMax}}; past them, `too_many_rows` (422).
+          items: {$ref: "#/components/schemas/New{{.Pascal}}"}
 {{- end}}
     {{.Pascal}}Changes:
       type: object

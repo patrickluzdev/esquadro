@@ -15,6 +15,12 @@ SELECT * FROM {{$t}} WHERE id = @id{{$live}};
 INSERT INTO {{$t}} (id) VALUES (@id) ON CONFLICT (id) DO NOTHING;
 {{- end}}
 
+{{- with importKey $e}}
+
+-- name: Get{{$e.Pascal}}ByImportKey :one
+SELECT * FROM {{$t}} WHERE {{.Column}} = @{{.Param}}{{$live}};
+{{- end}}
+
 -- name: Get{{$e.Plural.Pascal}}ByIDs :many
 SELECT * FROM {{$t}} WHERE id = ANY(@ids::uuid[]){{$live}};
 

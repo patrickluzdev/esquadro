@@ -34,6 +34,8 @@ export interface ClientOptions {
 export interface FieldProblem {
   field: string
   code: string
+  /** In an import refused (import_refused), the row (from 1) it is in. */
+  row?: number
 }
 
 /** A response that is not a success: its status, and the API's code. */
@@ -257,7 +259,7 @@ export function single(t: Transport, path: string, history = false): unknown {
   }
 }
 
-export function records(t: Transport, path: string, pagination: readonly string[], trash = false, history = false): unknown {
+export function records(t: Transport, path: string, pagination: readonly string[], trash = false, history = false, imports = false): unknown {
   const one = (id: string) => `${path}/${encodeURIComponent(id)}`
   const list = (query: Query = {}, o: ReadOptions = {}) => t.request<Page<unknown>>("GET", path, { query, signal: o.signal })
   return {
@@ -293,6 +295,10 @@ export function records(t: Transport, path: string, pagination: readonly string[
     ...(history && {
       history: (id: string, query: Query = {}, o: ReadOptions = {}) =>
         t.request<AuditPage>("GET", `${one(id)}/history`, { query, signal: o.signal }),
+    }),
+    ...(imports && {
+      import: (rows: unknown[], o: CreateOptions = {}) =>
+        t.request("POST", `${path}/import`, { body: { rows }, idempotencyKey: o.idempotencyKey ?? crypto.randomUUID() }),
     }),
     ...(trash && {
       trash: {

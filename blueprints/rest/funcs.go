@@ -109,6 +109,9 @@ func TemplateFuncs() template.FuncMap {
 		"modulePaths":      modulePaths,
 		"softDeleted":      store.SoftDeleted,
 		"single":           store.Single,
+		"importable":       store.Importable,
+		"importBy":         store.ImportBy,
+		"importMax":        func() int { return store.ImportMax },
 		"idLinks":          store.IDLinks,
 		"html":             HTML,
 		"anyHTML": func(entities []*project.Entity) bool {

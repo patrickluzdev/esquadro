@@ -66,6 +66,8 @@ func TemplateFuncs() template.FuncMap {
 		"enumName":    func(e *project.Enum) string { return e.Module.Pascal + e.Pascal },
 		"softDeleted": store.SoftDeleted,
 		"single":      store.Single,
+		"importable":  store.Importable,
+		"importBy":    store.ImportBy,
 		"idLinks":     store.IDLinks,
 		"audited":     audit.Audited,
 		"auditedOf":   audit.AuditedOf,

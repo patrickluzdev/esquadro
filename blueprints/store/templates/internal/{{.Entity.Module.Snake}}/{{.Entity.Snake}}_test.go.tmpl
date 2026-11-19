@@ -611,7 +611,47 @@ func Test{{$e.Pascal}}Writes{{.Pascal}}WithIt(t *testing.T) {
 }
 {{- end}}{{end}}
 
-func TestRead{{$e.Pascal}}ThatDoesNotExist(t *testing.T) {
+{{if importable $e}}{{$key := importBy $e -}}
+// TestImport{{$e.Plural.Pascal}} imports rows: each is stored{{if $key}}, importing them again
+// updates them{{end}}, and one refused row stores none.
+func TestImport{{$e.Plural.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	rows := []{{$p}}.New{{$e.Pascal}}{given{{$e.Pascal}}(t, {{$r}}, 1), given{{$e.Pascal}}(t, {{$r}}, 2)}
+	done, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, rows, nil)
+	if err != nil || done.Created != 2 || done.Updated != 0 {
+		t.Fatalf("import: %+v, %v", done, err)
+	}
+{{- if $key}}
+	again, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, rows, nil)
+	if err != nil || again.Created != 0 || again.Updated != 2 {
+		t.Fatalf("import again: %+v, %v", again, err)
+	}
+{{- end}}
+{{- if mustRefuseEmpty $e}}
+	// The second row is refused: the first is not stored either.
+	third := given{{$e.Pascal}}(t, {{$r}}, 3)
+	_, err = {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{third, {}}, nil)
+	refused, ok := errors.AsType[*{{$p}}.ImportRefused](err)
+	if !ok || len(refused.Rows) != 1 || refused.Rows[0].Row != 2 || len(refused.Rows[0].Fields) == 0 {
+		t.Fatalf("a refused row: %v", err)
+	}
+	if done, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{third}, nil); err != nil || done.Created != 1 {
+		t.Fatalf("the row stored with a refused one: %+v, %v", done, err)
+	}
+{{- end}}
+	guarded := errors.New("refused by the guard")
+	if _, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{given{{$e.Pascal}}(t, {{$r}}, 4)}, func(*{{$p}}.{{$e.Pascal}}, *{{$p}}.New{{$e.Pascal}}) error { return guarded }); !errors.Is(err, guarded) {
+		t.Fatalf("a guard's refusal: %v", err)
+	}
+	if _, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, make([]{{$p}}.New{{$e.Pascal}}, {{$p}}.ImportMax+1), nil); !errors.Is(err, {{$p}}.ErrImportTooLarge) {
+		t.Fatalf("too many rows: %v", err)
+	}
+}
+
+{{end}}func TestRead{{$e.Pascal}}ThatDoesNotExist(t *testing.T) {
 	t.Parallel()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
 

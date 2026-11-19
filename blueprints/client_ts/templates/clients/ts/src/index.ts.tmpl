@@ -52,11 +52,11 @@ export function createClient(options: ClientOptions) {
 {{- if single $e}}
     {{.Camel}}: single(t, "/api/v1/{{.Kebab}}"{{if audited $e (optionsOf "audit")}}, true{{end}}) as {{.Pascal}}Api,
 {{- else}}
-    {{.Plural.Camel}}: {{if manyToMany $e}}Object.assign(records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as object, {
+    {{.Plural.Camel}}: {{if manyToMany $e}}Object.assign(records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit")) (importable $e)}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{if importable $e}}, true{{end}}{{end}}) as object, {
 {{- range manyToMany $e}}
       {{.Camel}}: links(t, "/api/v1/{{$e.Plural.Kebab}}", "{{.Kebab}}"),
 {{- end}}
-    }) as {{.Plural.Pascal}}Api{{else}}records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit"))}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{end}}) as {{.Plural.Pascal}}Api{{end}},
+    }) as {{.Plural.Pascal}}Api{{else}}records(t, "/api/v1/{{.Plural.Kebab}}", [{{range $i, $p := $pag}}{{if $i}}, {{end}}{{tsString $p}}{{end}}]{{if or (softDeleted $e) (audited $e (optionsOf "audit")) (importable $e)}}, {{softDeleted $e}}, {{audited $e (optionsOf "audit")}}{{if importable $e}}, true{{end}}{{end}}) as {{.Plural.Pascal}}Api{{end}},
 {{- end}}
 {{- end}}
 {{- if $realms}}

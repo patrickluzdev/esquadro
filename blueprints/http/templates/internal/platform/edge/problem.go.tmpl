@@ -19,6 +19,8 @@ type Problem struct {
 type FieldProblem struct {
 	Field string `json:"field"`
 	Code  string `json:"code"`
+	// Row is, in an import refused, the row (from 1) the field is in.
+	Row int `json:"row,omitempty"`
 }
 
 func (p *Problem) Error() string { return p.Code + ": " + p.Title }

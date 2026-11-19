@@ -1,0 +1,85 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$key := importKey $e -}}
+{{- if importable $e -}}
+package {{$m.Snake}}
+
+{{importBlock "context" (and $key "errors") (and $key "github.com/jackc/pgx/v5") (and $key (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake)) (printf "%s/internal/platform/postgres" .App.Module)}}
+// Import{{$e.Plural.Pascal}} stores rows, {{if $key}}each updating the {{lower $e.Label}} with its
+// {{(importBy $e).Snake}}, or creating one when there is none{{else}}each a new {{lower $e.Label}}{{end}}, through the rules of
+// {{if $key}}a change{{else}}a create{{end}} ({{$e.Snake}}_rules.go among them), in one transaction: all or
+// none. A row refused does not stop the others from being checked:
+// *ImportRefused lists them all, and nothing is stored. guard, when not
+// nil, sees each row before it is written, with the {{lower $e.Label}} it
+// changes (nil for a new one), and may refuse it: that error ends the
+// import.
+func ({{$r}} *{{$m.Pascal}}) Import{{$e.Plural.Pascal}}(ctx context.Context, rows []New{{$e.Pascal}}, guard func(stored *{{$e.Pascal}}, n *New{{$e.Pascal}}) error) (Imported, error) {
+	if len(rows) > ImportMax {
+		return Imported{}, ErrImportTooLarge
+	}
+	var done Imported
+	var refused []RowError
+	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		tx, _ := postgres.TxOf(ctx)
+		for i, n := range rows {
+			// Each row in a savepoint: a refused one leaves the
+			// transaction usable to check the next.
+			row, err := tx.Begin(ctx)
+			if err != nil {
+				return err
+			}
+			created, err := {{$r}}.import{{$e.Pascal}}(postgres.WithTx(ctx, row), n, guard)
+			if err != nil {
+				_ = row.Rollback(ctx)
+				if why, ok := rowError(i+1, err); ok {
+					refused = append(refused, why)
+					continue
+				}
+				return err
+			}
+			if err := row.Commit(ctx); err != nil {
+				return err
+			}
+			if created {
+				done.Created++
+			} else {
+				done.Updated++
+			}
+		}
+		if len(refused) > 0 {
+			return &ImportRefused{Rows: refused}
+		}
+		return nil
+	})
+	if err != nil {
+		return Imported{}, err
+	}
+	return done, nil
+}
+
+// import{{$e.Pascal}} writes one row of an import, and tells whether it created a
+// {{lower $e.Label}}.
+func ({{$r}} *{{$m.Pascal}}) import{{$e.Pascal}}(ctx context.Context, n New{{$e.Pascal}}, guard func(stored *{{$e.Pascal}}, n *New{{$e.Pascal}}) error) (bool, error) {
+{{- if $key}}
+	found, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Pascal}}ByImportKey(ctx, {{$key.In "n"}})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
+	}
+	if err == nil {
+		stored := {{$e.Camel}}Of(found)
+		if guard != nil {
+			if err := guard(&stored, &n); err != nil {
+				return false, err
+			}
+		}
+		_, err := {{$r}}.Update{{$e.Pascal}}(ctx, stored.ID, 0, n)
+		return false, err
+	}
+{{- end}}
+	if guard != nil {
+		if err := guard(nil, &n); err != nil {
+			return false, err
+		}
+	}
+	_, err {{if $key}}={{else}}:={{end}} {{$r}}.Create{{$e.Pascal}}(ctx, n)
+	return true, err
+}
+{{- end}}

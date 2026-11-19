@@ -133,7 +133,42 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 	}
 }
 
-// TestAPI{{.Plural.Pascal}}Patch changes a {{lower .Label}} by PATCH: nothing sent changes
+{{if importable $e -}}
+// TestAPI{{.Plural.Pascal}}Import imports {{lower .Plural.Label}}{{if importBy $e}}, and again, which replaces them{{end}},
+// and refuses more rows than an import takes.
+func TestAPI{{.Plural.Pascal}}Import(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	// An import is a large body: past the one the other tests allow.
+	d := newTestDependencies(t)
+	d.config.MaxBodyKB = 0
+	srv, _ := newTestServerOf(t, d)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := []apigen.New{{$P}}{*givenAPI{{$P}}(t, c, 1), *givenAPI{{$P}}(t, c, 2)}
+	done, err := c.Import{{.Plural.Pascal}}(ctx, &apigen.{{$P}}Import{Rows: rows}, apigen.Import{{.Plural.Pascal}}Params{})
+	if err != nil || done.Created != 2 || done.Updated != 0 {
+		t.Fatalf("import: %+v, %v", done, err)
+	}
+{{- if importBy $e}}
+	again, err := c.Import{{.Plural.Pascal}}(ctx, &apigen.{{$P}}Import{Rows: rows}, apigen.Import{{.Plural.Pascal}}Params{})
+	if err != nil || again.Created != 0 || again.Updated != 2 {
+		t.Fatalf("import again: %+v, %v", again, err)
+	}
+{{- end}}
+	many := make([]apigen.New{{$P}}, {{importMax}}+1)
+	for i := range many {
+		many[i] = rows[0]
+	}
+	_, err = c.Import{{.Plural.Pascal}}(ctx, &apigen.{{$P}}Import{Rows: many}, apigen.Import{{.Plural.Pascal}}Params{})
+	if p, ok := errors.AsType[*apigen.ProblemStatusCode](err); !ok || p.StatusCode != 422 || p.Response.Code != "too_many_rows" {
+		t.Fatalf("too many rows: %v, want 422 too_many_rows", err)
+	}
+}
+
+{{end}}// TestAPI{{.Plural.Pascal}}Patch changes a {{lower .Label}} by PATCH: nothing sent changes
 // nothing, and an old version is refused.
 func TestAPI{{.Plural.Pascal}}Patch(t *testing.T) {
 	t.Parallel()

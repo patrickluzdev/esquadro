@@ -379,3 +379,25 @@ func TestCheckSingleEntities(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckImports(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":      {"entity Commission {\n  external_id string required unique\n  @store(import_by external_id)\n}\n\nentity Coupon {\n  code string required\n  @store(import)\n}\n", ""},
+		"missing": {"entity Commission {\n  external_id string required unique\n  @store(import_by order_id)\n}\n", "import_by: order_id is not a field of Commission"},
+		"unique":  {"entity Commission {\n  external_id string required\n  @store(import_by external_id)\n}\n", "Commission.external_id must be required and unique"},
+		"type":    {"entity Commission {\n  paid bool required unique\n  @store(import_by paid)\n}\n", "Commission.paid is bool"},
+		"single":  {"entity SiteSettings {\n  note string\n  @store(single, import)\n}\n", "SiteSettings is single and imported"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

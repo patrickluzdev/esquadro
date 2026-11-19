@@ -39,6 +39,17 @@ func InvalidFields(fields []FieldProblem) *Problem {
 	return &Problem{Status: 422, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
 }
 
+// ImportRefused lists every field refused in an import, each with its
+// row: nothing was stored.
+func ImportRefused(fields []FieldProblem) *Problem {
+	return &Problem{Status: 422, Code: "import_refused", Title: "Some rows are not valid: nothing was imported.", Errors: fields}
+}
+
+// TooManyRows is an import of more than max rows.
+func TooManyRows(max int) *Problem {
+	return &Problem{Status: 422, Code: "too_many_rows", Title: fmt.Sprintf("An import takes %d rows at most.", max)}
+}
+
 // TooManyRecords is a list without pagination that has more than max
 // records: it answers none, rather than some as if they were all.
 func TooManyRecords(what string, max int) *Problem {

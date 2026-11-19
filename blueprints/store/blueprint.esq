@@ -27,6 +27,12 @@ blueprint store {
     /// someone changes it: read and changed, never listed, created or
     /// deleted (settings the team tunes without a deploy).
     single bool
+    /// Records may be imported in a batch (a CSV in the admin panel): all
+    /// or none, each through the rules of a create.
+    import bool
+    /// Imported by this field, unique and required: a row with the value
+    /// of a record updates it, others are created (import_by external_id).
+    import_by name
   }
   annotation field {
     /// Lists may filter by it: by value, by range (numbers and dates), or

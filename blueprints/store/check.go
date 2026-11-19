@@ -20,6 +20,7 @@ var SearchLanguages = []string{"simple", "arabic", "armenian", "basque", "catala
 func Check(p *project.Project, set *blueprint.Set) diag.List {
 	var diags diag.List
 	checkSingle(p, &diags)
+	checkImports(p, &diags)
 	for _, e := range p.Entities {
 		for _, f := range e.Fields {
 			a := f.Ann["store"]

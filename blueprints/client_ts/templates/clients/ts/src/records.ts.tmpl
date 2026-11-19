@@ -193,6 +193,10 @@ export interface {{.Plural.Pascal}}Api {
   update(id: string, record: New{{$P}}, options?: ChangeOptions): Promise<{{$P}}>
   /** Changes only the fields sent; with ifMatch, only the version read. */
   patch(id: string, changes: {{$P}}Changes, options?: ChangeOptions): Promise<{{$P}}>
+{{- if importable $e}}
+  /** Stores rows{{with importBy $e}}, replacing the {{lower $e.Plural.Label}} of the same {{.Snake}}{{end}}: all or none (import_refused, each error with its row). */
+  import(rows: New{{$P}}[], options?: CreateOptions): Promise<{ created: number; updated: number }>
+{{- end}}
 {{- if audited $e (optionsOf "audit")}}
   /** Its changes, the newest first: who, when, each field before and after. */
   history(id: string, query?: { page?: number; per_page?: number }, options?: ReadOptions): Promise<AuditPage>
