@@ -717,6 +717,11 @@ place, Tailwind for the styles (`npm run build`, or `task web:build`,
 writes them into `dist/assets`). The site uses the theme's options and
 the shared words of every frontend.
 
+Pages link the assets with a hash of their content (`Asset("site.css")`
+writes `/assets/site.css?v=5e3091a8c7`): browsers keep an asset at its
+version for good, and a new build is a new address, seen at once after a
+deploy.
+
 ### A site with a brand
 
 A site whose look is a brand of its own, not the frontends' default,

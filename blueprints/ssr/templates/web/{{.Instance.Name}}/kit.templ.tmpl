@@ -59,9 +59,9 @@ templ Head(p Page) {
 	<link rel="preload" href={ URL("/brand/{{$file}}") } as="font" crossorigin/>
 {{- end}}{{end}}
 {{- end}}
-	<link rel="stylesheet" href={ templ.URL(URL("/{{(sitePaths .Options.locale).assets}}/site.css")) }/>
-	<script src={ URL("/{{(sitePaths .Options.locale).assets}}/htmx.min.js") } defer></script>
-	<script src={ URL("/{{(sitePaths .Options.locale).assets}}/kit.js") } defer></script>
+	<link rel="stylesheet" href={ templ.URL(Asset("site.css")) }/>
+	<script src={ Asset("htmx.min.js") } defer></script>
+	<script src={ Asset("kit.js") } defer></script>
 }
 
 // ProblemPage is the page of something that went wrong: not found, an

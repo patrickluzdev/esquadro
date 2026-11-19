@@ -15,7 +15,9 @@ package {{$n}}
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -120,7 +122,7 @@ func (s *Site) routes() {
 	assets, _ := fs.Sub(files, "dist")
 	static := http.FileServerFS(assets)
 	m.Handle("GET /{{$sys.assets}}/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		assetCache(w, r, strings.TrimPrefix(r.URL.Path, "/{{$sys.assets}}/"))
 		static.ServeHTTP(w, r)
 	}))
 	m.HandleFunc("GET /{{$sys.sitemap}}", s.sitemap)
@@ -206,6 +208,44 @@ func (p Page) FullTitle() string {
 		return Name
 	}
 	return T("pageTitle", "title", p.Title, "site", Name)
+}
+
+// assetVersions are the assets' versions by name (site.css, kit.js): a
+// hash of their content, which their addresses carry, so that a new build
+// is a new address and browsers keep each one for good.
+var assetVersions = func() map[string]string {
+	v := map[string]string{"kit.js": version(kitJS)}
+	entries, _ := fs.ReadDir(files, "dist/{{$sys.assets}}")
+	for _, e := range entries {
+		if b, err := fs.ReadFile(files, "dist/{{$sys.assets}}/"+e.Name()); err == nil && !e.IsDir() {
+			v[e.Name()] = version(b)
+		}
+	}
+	return v
+}()
+
+func version(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:5])
+}
+
+// Asset is the address of an asset of the site (site.css, kit.js), with
+// its version.
+func Asset(name string) string {
+	if v := assetVersions[name]; v != "" {
+		return URL("/{{$sys.assets}}/" + name + "?v=" + v)
+	}
+	return URL("/{{$sys.assets}}/" + name)
+}
+
+// assetCache says how long a browser keeps an asset: for good at the
+// address of its version, a few minutes at any other.
+func assetCache(w http.ResponseWriter, r *http.Request, name string) {
+	if v := r.URL.Query().Get("v"); v != "" && v == assetVersions[name] {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=300")
 }
 
 // URL is a path of the site as links write it: under Path, on the app's

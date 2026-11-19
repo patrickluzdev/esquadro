@@ -70,9 +70,9 @@ type AccountField struct {
 var kitJS []byte
 
 func (s *Site) accountRoutes(m *http.ServeMux) {
-	m.HandleFunc("GET /{{$sys.assets}}/kit.js", func(w http.ResponseWriter, _ *http.Request) {
+	m.HandleFunc("GET /{{$sys.assets}}/kit.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		assetCache(w, r, "kit.js")
 		_, _ = w.Write(kitJS)
 	})
 	m.HandleFunc("GET "+paths.signin, func(w http.ResponseWriter, r *http.Request) {

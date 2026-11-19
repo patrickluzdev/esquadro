@@ -73,6 +73,12 @@ func TestSSRGeneratesASite(t *testing.T) {
 			t.Errorf("%s lacks %q", path, want)
 		}
 	}
+	if kit := read(t, filepath.Join(site, "kit.templ")); !strings.Contains(kit, `href={ templ.URL(Asset("site.css")) }`) || !strings.Contains(kit, `src={ Asset("kit.js") }`) {
+		t.Error("the site's assets are not linked with their versions")
+	}
+	if gen := read(t, filepath.Join(site, "site_gen.go")); !strings.Contains(gen, `"public, max-age=31536000, immutable"`) {
+		t.Error("an asset at its version is not kept for good")
+	}
 	routes := read(t, filepath.Join(dir, "cmd", "shop", "routes_gen.go"))
 	if !strings.Contains(routes, "web.Handle(mux, shop.New(shop.Deps{") || !strings.Contains(routes, "Catalog: d.catalog,") {
 		t.Errorf("the app does not serve the site:\n%s", routes)
