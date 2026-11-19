@@ -128,8 +128,8 @@ func TestCanaryUpgrades(t *testing.T) {
 	// Its short links: the site redirects by the code, which a rule makes up.
 	deals = strings.Replace(deals, "  code        string required unique min(4) max(12)", "  code        string unique min(4) max(12)", 1)
 	deals = strings.Replace(deals, "  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n}",
-		"  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n  @site(redirect, by code, to target_url)\n}", 1)
-	if !strings.Contains(deals, "@site(redirect, by code, to target_url)") || strings.Contains(deals, "code        string required") {
+		"  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n  @site(redirect, by code, to target_url, wait 3)\n}", 1)
+	if !strings.Contains(deals, "@site(redirect, by code, to target_url, wait 3)") || strings.Contains(deals, "code        string required") {
 		t.Fatal("the canary's Link was not made a redirect")
 	}
 	// The visitors' comments on an offer, and the replies to them: each
@@ -214,8 +214,9 @@ func (OfferRules) BeforeUpdate(ctx context.Context, m *Deals, stored Offer, n *N
 }
 `)
 	e.esquadro(0, "gen", dir)
-	// The short links, end to end: the code made up, a person and a preview
-	// sent on and counted apart, and an expired offer's link to its page.
+	// The short links, end to end: the code made up, a person shown the page
+	// on the way and a preview sent on, counted apart, and an expired offer's
+	// link to its page, at once.
 	write("web/site/link_redirect_test.go", `package site
 
 import (
@@ -256,11 +257,11 @@ func TestShortLinks(t *testing.T) {
 		res.Body.Close()
 		return res
 	}
-	if res := visit("Mozilla/5.0"); res.StatusCode != http.StatusFound || res.Header.Get("Location") != "https://shopee.com.br/panela" {
-		t.Fatalf("a person: %d to %s", res.StatusCode, res.Header.Get("Location"))
+	if res := visit("Mozilla/5.0"); res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("a person: %d (%s), want the page on the way", res.StatusCode, res.Header.Get("Cache-Control"))
 	}
-	if res := visit("WhatsApp/2.24"); res.StatusCode != http.StatusFound {
-		t.Fatalf("a preview: %d", res.StatusCode)
+	if res := visit("WhatsApp/2.24"); res.StatusCode != http.StatusFound || res.Header.Get("Location") != "https://shopee.com.br/panela" {
+		t.Fatalf("a preview: %d to %s", res.StatusCode, res.Header.Get("Location"))
 	}
 	var people, bots int
 	if err := pool.QueryRow(ctx, "SELECT count(*) FILTER (WHERE NOT bot), count(*) FILTER (WHERE bot) FROM clicks").Scan(&people, &bots); err != nil || people != 1 || bots != 1 {

@@ -35,5 +35,8 @@
   "noAccountYet": "Ainda não tem conta?",
   "haveAccount": "Já tem conta?",
   "goneTitle": "Este link não está mais disponível",
-  "goneText": "O que ele mostrava acabou. Veja o que tem aqui agora."
+  "goneText": "O que ele mostrava acabou. Veja o que tem aqui agora.",
+  "redirectTitle": "Levando você para {host}",
+  "redirectWait": "Abrindo em {n} s",
+  "redirectGo": "Ir agora"
 }

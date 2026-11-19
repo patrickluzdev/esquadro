@@ -18,6 +18,9 @@ type Redirect struct {
 	// By is the unique field a record is found by; To, the field of where
 	// it sends.
 	By, To *project.Field
+	// Wait is how many seconds a person sees where they are going before
+	// going on (@site(redirect, wait 3)), 0 to go on at once.
+	Wait int
 }
 
 // Route is the redirect's pattern on the site's mux: /{key} or
@@ -42,20 +45,43 @@ func Redirects(entities []*project.Entity, instance string) []*Redirect {
 		if s, _ := a["path"].(string); s != "" {
 			r.Path = strings.Trim(s, "/")
 		}
+		if n, ok := a["wait"].(int64); ok {
+			r.Wait = int(n)
+		}
 		out = append(out, r)
 	}
 	return out
 }
 
+// RedirectOf is the redirect of e on a site (instance), nil when its
+// records do not redirect there.
+func RedirectOf(entities []*project.Entity, instance string, e *project.Entity) *Redirect {
+	for _, r := range Redirects(entities, instance) {
+		if r.Entity == e {
+			return r
+		}
+	}
+	return nil
+}
+
 // checkRedirects checks a site's redirects: by a unique text field (it
 // may be left empty for BeforeCreate to fill: a code made up), to a text field, not beside the entity's pages, and one at most at
-// the site's root.
+// the site's root; a wait of 1 to 10 seconds, with redirect only.
 func checkRedirects(p *project.Project, instance string) diag.List {
 	var diags diag.List
 	root := ""
 	for _, e := range p.Entities {
 		a := e.Ann[instance]
-		if on, _ := a["redirect"].(bool); !on {
+		on, _ := a["redirect"].(bool)
+		if wait, ok := a["wait"].(int64); ok {
+			switch {
+			case !on:
+				diags.Errorf(e.Pos, e.Pos, "@%s(wait) of %s is for a redirect: @%s(redirect, by code, to target_url, wait 3)", instance, e.Raw, instance)
+			case wait < 1 || wait > 10:
+				diags.Errorf(e.Pos, e.Pos, "@%s(redirect, wait %d) of %s: a person waits 1 to 10 seconds", instance, wait, e.Raw)
+			}
+		}
+		if !on {
 			continue
 		}
 		text := []project.Type{project.TypeString, project.TypeText}

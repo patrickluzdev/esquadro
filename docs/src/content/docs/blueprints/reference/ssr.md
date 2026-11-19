@@ -58,6 +58,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `redirect` | bool | Its records redirect: /&lt;path>/&lt;by> (at the root without a path) sends to the address in &lt;to>. &lt;entity>_rules.go decides where each visit goes (BeforeRedirect) and what is kept of it (Visited). |
 | entity | `by` | name | The unique field a record is found by, with redirect: code. |
 | entity | `to` | name | The field of the address a record sends to, with redirect: target_url. |
+| entity | `wait` | int | With redirect, the seconds (1 to 10) a person sees a page of where they are going (&lt;entity>_redirect.templ) before going on; bots go on at once. |
 | entity | `path` | string | The part of the address: ofertas. Its plural, in kebab case, by default. |
 | entity | `title` | name | The field a record is called by, in titles and its address; the first text field by default. |
 | entity | `description` | name | The field of a record's description, for search engines and shared links. |

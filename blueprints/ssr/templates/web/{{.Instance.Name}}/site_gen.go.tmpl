@@ -179,6 +179,9 @@ type Page struct {
 	Query string
 	// Status is the HTTP status the page is answered with.
 	Status int
+	// Refresh is where the page goes on by itself, and after how many
+	// seconds ("3;url=https://..."), "" for nowhere: a redirect's page.
+	Refresh string
 }
 
 // page is a page of a request, with the title and description given.
@@ -229,10 +232,13 @@ func (s *Site) render(w http.ResponseWriter, r *http.Request, status int, c temp
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Content-Security-Policy", csp)
 	// A page shows who reads it (the header's account): a browser asks
-	// again each time, and no shared cache keeps it.
-	if status == http.StatusOK && r.Method == http.MethodGet {
+	// again each time, and no shared cache keeps it. A page that said how
+	// it is kept (no-store) keeps it.
+	switch {
+	case h.Get("Cache-Control") != "":
+	case status == http.StatusOK && r.Method == http.MethodGet:
 		h.Set("Cache-Control", "private, no-cache")
-	} else {
+	default:
 		h.Set("Cache-Control", "no-store")
 	}
 	w.WriteHeader(status)
@@ -262,10 +268,26 @@ func (s *Site) Gone(w http.ResponseWriter, r *http.Request) {
 }
 {{- range $redirects}}{{$e := .Entity}}{{$p := $e.Module.Snake}}
 
+// {{$e.Pascal}}Redirect is the page a person sees on the way from a {{lower $e.Label}}'s
+// address to another site's, with a wait ({{$e.Snake}}_redirect.templ, yours).
+type {{$e.Pascal}}Redirect struct {
+	Page Page
+	// Record is the {{lower $e.Label}} visited.
+	Record {{$p}}.{{$e.Pascal}}
+	// To is where it goes; Host, the host of To, without www
+	// (shopee.com.br).
+	To, Host string
+	// Wait is the seconds before it goes on by itself.
+	Wait int
+}
+
 // redirect{{$e.Pascal}} sends a visit of a {{lower $e.Label}}'s address on: where its
 // rules say (BeforeRedirect, in {{$e.Snake}}_rules.go; its {{.To.Snake}} by default),
 // or to the page of what is no longer there. Bots go on too (a link's
 // preview shows what it leads to), told apart in the Visit.
+{{- if .Wait}} A person going
+// to another site sees where first, for {{.Wait}} seconds ({{$e.Pascal}}RedirectPage).
+{{- end}}
 func (s *Site) redirect{{$e.Pascal}}(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	m := s.deps.{{$e.Module.Pascal}}
@@ -301,7 +323,19 @@ func (s *Site) redirect{{$e.Pascal}}(w http.ResponseWriter, r *http.Request) {
 	}
 	// Never kept by a browser or a proxy: every visit comes here.
 	w.Header().Set("Cache-Control", "no-store")
+{{- if .Wait}}
+	if dest, err := url.Parse(to); err == nil && !visit.Bot && (dest.Scheme == "http" || dest.Scheme == "https") && dest.Host != "" {
+		const wait = {{.Wait}}
+		host := strings.TrimPrefix(dest.Hostname(), "www.")
+		p := s.page(r, T("redirectTitle", "host", host), "")
+		p.NoIndex, p.Refresh = true, fmt.Sprintf("%d;url=%s", wait, to)
+		s.render(w, r, http.StatusOK, {{$e.Pascal}}RedirectPage({{$e.Pascal}}Redirect{Page: p, Record: x, To: to, Host: host, Wait: wait}))
+	} else {
+		http.Redirect(w, r, to, http.StatusFound)
+	}
+{{- else}}
 	http.Redirect(w, r, to, http.StatusFound)
+{{- end}}
 	// After the answer, whatever the client does with the connection.
 	if err := rules.Visited(context.WithoutCancel(ctx), m, x, visit); err != nil {
 		s.deps.Logger.ErrorContext(ctx, "site: keeping a visit", "path", r.URL.Path, "error", err)

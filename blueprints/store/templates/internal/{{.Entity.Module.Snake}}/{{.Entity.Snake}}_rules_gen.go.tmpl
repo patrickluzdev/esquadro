@@ -55,8 +55,9 @@ func ({{$e.Camel}}Hooks) BeforeRedirect(_ context.Context, _ *{{$m.Pascal}}, x {
 	return {{with redirectTo $e}}x.{{.Pascal}}{{else}}""{{end}}, nil
 }
 
-// Visited runs once a visit went on to where BeforeRedirect sent it: what
-// is kept of it (a click). An error is logged; the visit went on anyway.
+// Visited runs once a visit went on to where BeforeRedirect sent it, or was
+// shown the page on the way there (@site(redirect, wait)): what is kept of
+// it (a click). An error is logged; the visit went on anyway.
 func ({{$e.Camel}}Hooks) Visited(context.Context, *{{$m.Pascal}}, {{$e.Pascal}}, Visit) error {
 	return nil
 }

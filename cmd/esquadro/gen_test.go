@@ -512,13 +512,17 @@ func TestCheckSiteRedirects(t *testing.T) {
 	}
 	fields := "  code string unique\n  target_url string required\n"
 	for name, tc := range map[string]struct{ entity, want string }{
-		"ok":    {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string required unique\n  url string\n  @site(redirect, path \"go\", by slug, to url)\n}\n", ""},
-		"no by": {link(fields, "redirect, to target_url"), "@site(redirect) of Link needs by"},
-		"by":    {link("  code string\n  target_url string\n", "redirect, by code, to target_url"), "Link.code must be a unique string"},
-		"no to": {link(fields, "redirect, by code"), "@site(redirect) of Link needs to"},
-		"to":    {link(fields, "redirect, by code, to url"), "to url is not a field of Link"},
-		"page":  {link(fields, "redirect, page, by code, to target_url"), "either redirect or have pages"},
-		"twice": {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string unique\n  url string\n  @site(redirect, by slug, to url)\n}\n", "Link and Go both redirect at the root of the site site"},
+		"ok":        {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string required unique\n  url string\n  @site(redirect, path \"go\", by slug, to url)\n}\n", ""},
+		"no by":     {link(fields, "redirect, to target_url"), "@site(redirect) of Link needs by"},
+		"by":        {link("  code string\n  target_url string\n", "redirect, by code, to target_url"), "Link.code must be a unique string"},
+		"no to":     {link(fields, "redirect, by code"), "@site(redirect) of Link needs to"},
+		"to":        {link(fields, "redirect, by code, to url"), "to url is not a field of Link"},
+		"page":      {link(fields, "redirect, page, by code, to target_url"), "either redirect or have pages"},
+		"twice":     {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string unique\n  url string\n  @site(redirect, by slug, to url)\n}\n", "Link and Go both redirect at the root of the site site"},
+		"wait":      {link(fields, "redirect, by code, to target_url, wait 3"), ""},
+		"wait 0":    {link(fields, "redirect, by code, to target_url, wait 0"), "a person waits 1 to 10 seconds"},
+		"wait 11":   {link(fields, "redirect, by code, to target_url, wait 11"), "a person waits 1 to 10 seconds"},
+		"wait page": {link(fields, "page, wait 3"), "@site(wait) of Link is for a redirect"},
 	} {
 		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
 		code, _, errOut := esq(t, "check", dir)

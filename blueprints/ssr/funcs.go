@@ -27,6 +27,7 @@ func TemplateFuncs() template.FuncMap {
 			return "brand"
 		},
 		"siteRedirects": Redirects,
+		"siteRedirect":  RedirectOf,
 		"siteField": func(instance, suffix string) string {
 			return project.FieldName(strings.ToUpper(instance) + "_" + suffix)
 		},

@@ -73,6 +73,10 @@ blueprint ssr {
     /// The field of the address a record sends to, with redirect:
     /// target_url.
     to name
+    /// With redirect, the seconds (1 to 10) a person sees a page of where
+    /// they are going (<entity>_redirect.templ) before going on; bots go
+    /// on at once.
+    wait int
     /// The part of the address: ofertas. Its plural, in kebab case, by
     /// default.
     path string

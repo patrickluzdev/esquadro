@@ -35,5 +35,8 @@
   "noAccountYet": "No account yet?",
   "haveAccount": "Have an account?",
   "goneTitle": "This link is no longer available",
-  "goneText": "What it led to has ended. See what is here now."
+  "goneText": "What it led to has ended. See what is here now.",
+  "redirectTitle": "Taking you to {host}",
+  "redirectWait": "Opening in {n} s",
+  "redirectGo": "Go now"
 }

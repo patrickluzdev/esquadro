@@ -16,6 +16,9 @@ templ Head(p Page) {
 	if p.Description != "" {
 		<meta name="description" content={ p.Description }/>
 	}
+	if p.Refresh != "" {
+		<meta http-equiv="refresh" content={ p.Refresh }/>
+	}
 	if p.NoIndex {
 		<meta name="robots" content="noindex"/>
 	} else {
