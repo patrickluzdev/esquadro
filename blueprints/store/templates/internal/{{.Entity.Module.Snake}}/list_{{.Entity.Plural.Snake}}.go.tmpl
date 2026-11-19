@@ -23,6 +23,10 @@ type {{$e.Pascal}}Filter struct {
 	{{.Field}} []{{.Go}}
 {{- else if eq .Go "uuid.UUID"}}
 	{{.Field}} uuid.UUID
+{{- if .None}}
+	// {{.None}} keeps only those without one.
+	{{.None}} bool
+{{- end}}
 {{- else}}
 	{{.Field}} *{{.Go}}
 {{- end}}
@@ -187,6 +191,9 @@ func {{$e.Camel}}PageOf(rows []sqlgen.{{sqlcModel $e $pg}}, size int, cursor fun
 			{{sqlcName .Name}}: postgres.Strings(f.{{.Field}}),
 {{- else if eq .Go "uuid.UUID"}}
 			{{sqlcName .Name}}: postgres.UUID(f.{{.Field}}),
+{{- if .None}}
+			{{.None}}: f.{{.None}},
+{{- end}}
 {{- else}}
 			{{sqlcName .Name}}: postgres.Opt(f.{{.Field}}, {{.Conv}}),
 {{- end}}

@@ -62,6 +62,10 @@ paths:
         Every one at once, up to {{unpagedMax $e $.Options}}; past it, `too_many_records` (422).
 {{- end}}
         Filters ending in `_min` and `_max` are inclusive bounds.
+{{- $none := ""}}{{range apiFilters $e}}{{if and .None (not $none)}}{{$none = .Param}}{{end}}{{end}}
+{{- if $none}}
+        A key that may be empty takes `null` too: `{{$none}}=null` keeps those without one.
+{{- end}}
 {{- with accessLine $.Entities $e "list"}}
         {{.}}
 {{- end}}

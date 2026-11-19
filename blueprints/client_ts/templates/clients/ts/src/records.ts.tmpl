@@ -155,6 +155,9 @@ export interface {{$P}}Query<F extends {{$P}}Field, I extends {{$P}}Include> ext
   per_page?: number
 {{- end}}
 {{- range apiFilters $e}}
+{{- if .None}}
+  /** An id, or "null" for those without one. */
+{{- end}}
   {{.Param}}?: {{tsFilter . $e}}
 {{- end}}
 {{- if has (sortsOf $e (optionsOf "postgres")) "relevance"}}

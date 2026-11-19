@@ -43,6 +43,10 @@ type APIFilter struct {
 	Kind, Field, Go string
 	// Array is whether the parameter is a list, written a,b,c.
 	Array bool
+	// None is, for a key that may be empty, the domain filter's field that
+	// keeps the records without one (NoParent): the parameter takes null
+	// too, so its schema is a string.
+	None string
 }
 
 // APIFilters are the filter parameters of e's list: _min and _max for a
@@ -64,7 +68,10 @@ func APIFilters(e *project.Entity) []APIFilter {
 			out = append(out, APIFilter{Param: f.Name, Kind: "in", Field: f.Field, Go: f.Go, Array: true,
 				Schema: fmt.Sprintf(`{type: array, items: {$ref: "#/components/schemas/%s"}}`, enumOf(e, f.Field))})
 		default:
-			out = append(out, APIFilter{Param: f.Name, Schema: schema, Kind: "eq", Field: f.Field, Go: f.Go})
+			if f.None != "" {
+				schema = `{type: string, description: 'An id, or null for those without one.'}`
+			}
+			out = append(out, APIFilter{Param: f.Name, Schema: schema, Kind: "eq", Field: f.Field, Go: f.Go, None: f.None})
 		}
 	}
 	return out

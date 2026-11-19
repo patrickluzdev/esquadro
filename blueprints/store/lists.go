@@ -25,6 +25,9 @@ type ListFilter struct {
 	Go, Field string
 	// Conv turns a Go value into its parameter (postgres.Numeric...).
 	Conv string
+	// None is, for a key that may be empty, the domain field that keeps
+	// only the records without one: NoParent. Empty for the others.
+	None string
 }
 
 // ListSort is an order a list takes: by creation, or by a field.
@@ -82,8 +85,12 @@ func ListFilters(e *project.Entity) []ListFilter {
 		if on, _ := r.Ann["store"]["filter"].(bool); !on || !r.OwnsForeignKey() {
 			continue
 		}
-		out = append(out, ListFilter{Name: r.Snake + "_id", Column: postgres.Ident(r.Snake + "_id"), Kind: "eq", SQLType: "uuid",
-			Go: "uuid.UUID", Field: r.Pascal + "ID", Conv: "postgres.UUID"})
+		lf := ListFilter{Name: r.Snake + "_id", Column: postgres.Ident(r.Snake + "_id"), Kind: "eq", SQLType: "uuid",
+			Go: "uuid.UUID", Field: r.Pascal + "ID", Conv: "postgres.UUID"}
+		if !r.Required {
+			lf.None = "No" + r.Pascal
+		}
+		out = append(out, lf)
 	}
 	return out
 }
@@ -201,9 +208,16 @@ func ListWhere(entities []*project.Entity, e *project.Entity, opts map[string]an
 		default:
 			conds = append(conds, "(sqlc.narg("+f.Name+")::"+f.SQLType+" IS NULL OR "+f.Column+" = sqlc.narg("+f.Name+")::"+f.SQLType+")")
 		}
+		if f.None != "" {
+			conds = append(conds, "(NOT sqlc.arg("+NoneParam(f)+")::boolean OR "+f.Column+" IS NULL)")
+		}
 	}
 	return "WHERE " + strings.Join(conds, "\n  AND ")
 }
+
+// NoneParam is the parameter of a key filter that keeps the records
+// without one: no_parent.
+func NoneParam(f ListFilter) string { return "no_" + strings.TrimSuffix(f.Name, "_id") }
 
 // Rank is the relevance of a record to the search, for its order.
 func Rank(lang string) string {

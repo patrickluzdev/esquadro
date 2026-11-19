@@ -75,6 +75,8 @@ function useRelated(field: FieldMeta) {
     staleTime: 60_000,
   })
   const options: [string, string][] = (related.data?.items ?? []).map((r: Rec) => [r.id, capitalize(String(r[field.display ?? "id"] ?? r.id))])
+  // A key that may be empty filters by null too: the comments that answer none.
+  if (!field.required) options.unshift(["null", capitalize(t("none"))])
   return options
 }
 

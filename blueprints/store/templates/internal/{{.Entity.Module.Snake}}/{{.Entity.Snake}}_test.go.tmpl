@@ -281,6 +281,24 @@ func TestList{{$e.Plural.Pascal}}(t *testing.T) {
 		t.Fatalf("a search of %q did not find it", created[1].{{.}})
 	}
 {{- end}}
+{{- range $f := listFilters $e}}{{if $f.None}}{{range $rel := $e.Relations}}{{if and (eq (printf "%sID" $rel.Pascal) $f.Field) (eq $rel.Target.Raw $e.Raw)}}
+
+	// By its {{$rel.Snake}}, another {{lower $e.Label}}, and those without one.
+	{
+		n := given{{$e.Pascal}}(t, {{$r}}, 3)
+		n.{{$f.Field}} = created[0].ID
+		answer, err := {{$r}}.Create{{$e.Pascal}}(ctx, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page := list({{$p}}.{{$e.Pascal}}Query{Filter: {{$p}}.{{$e.Pascal}}Filter{ {{- $f.Field}}: created[0].ID}, Limit: 10}); len(page.{{$e.Plural.Pascal}}) != 1 || page.{{$e.Plural.Pascal}}[0].ID != answer.ID {
+			t.Fatalf("by its {{$rel.Snake}}: %+v", page.{{$e.Plural.Pascal}})
+		}
+		if page := list({{$p}}.{{$e.Pascal}}Query{Filter: {{$p}}.{{$e.Pascal}}Filter{ {{- $f.None}}: true}, Limit: 10}); len(page.{{$e.Plural.Pascal}}) != len(created) {
+			t.Fatalf("without a {{$rel.Snake}}: %d of %d", len(page.{{$e.Plural.Pascal}}), len(created))
+		}
+	}
+{{- end}}{{end}}{{end}}{{end}}
 
 	// Without pagination, past the limit: Next says there were more.
 	if page := list({{$p}}.{{$e.Pascal}}Query{Limit: 2, Unpaged: true}); len(page.{{$e.Plural.Pascal}}) != 2 || page.Next == "" {

@@ -143,7 +143,7 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- if searchFieldsOf $e}}
 	q.Search = params.Q.Or("")
 {{- end}}
-{{- $dec := false}}{{range apiFilters $e}}{{if eq .Go "decimal.Decimal"}}{{$dec = true}}{{end}}{{end}}
+{{- $dec := false}}{{range apiFilters $e}}{{if or (eq .Go "decimal.Decimal") .None}}{{$dec = true}}{{end}}{{end}}
 {{- if $dec}}
 	var invalid []edge.FieldProblem
 {{- end}}
@@ -164,6 +164,17 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- else}}
 			q.Filter.{{.Field}}Max = &d
 {{- end}}
+		}
+	}
+{{- else if .None}}
+	// null keeps those without one.
+	if v, ok := params.{{$g}}.Get(); ok {
+		if v == "null" {
+			q.Filter.{{.None}} = true
+		} else if id, err := uuid.Parse(v); err != nil {
+			invalid = append(invalid, edge.FieldProblem{Field: {{quote .Param}}, Code: "invalid_value"})
+		} else {
+			q.Filter.{{.Field}} = id
 		}
 	}
 {{- else}}

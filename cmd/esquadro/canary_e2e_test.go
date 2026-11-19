@@ -132,6 +132,13 @@ func TestCanaryUpgrades(t *testing.T) {
 	if !strings.Contains(deals, "@site(redirect, by code, to target_url)") || strings.Contains(deals, "code        string required") {
 		t.Fatal("the canary's Link was not made a redirect")
 	}
+	// The visitors' comments on an offer, and the replies to them.
+	deals += "\n/// A comment on an offer, or a reply to another.\nentity Comment {\n  body    text required max(2000)\n  offer   > Offer required on_delete(cascade) @store(filter)\n  parent  > Comment on_delete(cascade) @store(filter)\n  replies < Comment\n  author  > Visitor required\n  @security(read public, write owner)\n  @store(soft_delete)\n  @site(page, path \"comentarios\", relations [replies])\n}\n"
+	withComments := strings.Replace(deals, `@site(page, path "ofertas", schema product, menu)`, `@site(page, path "ofertas", schema product, relations [comments], menu)`, 1)
+	if withComments == deals {
+		t.Fatal("the canary's Offer has no site page to list its comments on")
+	}
+	deals = withComments
 	write("esquadro/deals.esq", deals)
 	write("internal/deals/link_rules.go", `package deals
 
@@ -246,6 +253,68 @@ func TestShortLinks(t *testing.T) {
 	}
 	if res := visit("Mozilla/5.0"); res.Header.Get("Location") != Path+"/ofertas/"+offer.ID.String() {
 		t.Fatalf("an expired offer's link: %d to %s", res.StatusCode, res.Header.Get("Location"))
+	}
+}
+`)
+	// The comments, end to end: the top ones apart, and the replies on
+	// their comment's page.
+	write("web/site/comment_replies_test.go", `package site
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"uuid"
+
+	"github.com/bojanz/currency"
+
+	"example.com/promo/internal/accounts"
+	"example.com/promo/internal/deals"
+	"example.com/promo/internal/platform/postgres/postgrestest"
+)
+
+func TestCommentReplies(t *testing.T) {
+	ctx := context.Background()
+	pool := postgrestest.Fresh(t)
+	m := deals.New(deals.Deps{Pool: pool})
+	price, _ := currency.NewAmount("89.90", "BRL")
+	offer, err := m.CreateOffer(ctx, deals.NewOffer{Source: deals.SourceShopee, Store: "Shopee", Title: "Panela", ProductURL: "https://shopee.com.br/panela", Price: price})
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, err := m.CreateComment(ctx, deals.NewComment{Body: "Vale a pena?", OfferID: offer.ID, AuthorID: uuid.NewV7()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := m.CreateComment(ctx, deals.NewComment{Body: "Comprei, recomendo", OfferID: offer.ID, ParentID: top.ID, AuthorID: uuid.NewV7()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := m.ListComments(ctx, deals.CommentQuery{Filter: deals.CommentFilter{OfferID: offer.ID, NoParent: true}, Limit: 10})
+	if err != nil || len(page.Comments) != 1 || page.Comments[0].ID != top.ID {
+		t.Fatalf("the top comments: %+v, %v", page.Comments, err)
+	}
+	srv := httptest.NewServer(New(Deps{Deals: m, Accounts: accounts.New(accounts.Deps{Pool: pool}), VisitorSecret: []byte("test"), Logger: slog.New(slog.DiscardHandler)}))
+	defer srv.Close()
+	res, err := http.Get(srv.URL + CommentPath(top))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), reply.Body) {
+		t.Fatalf("a comment's page: %d, without its reply", res.StatusCode)
+	}
+	// A comment in the trash takes its replies with it.
+	if err := m.DeleteComment(ctx, top.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.ReadComment(ctx, reply.ID); err == nil {
+		t.Fatal("a reply outlived its comment")
 	}
 }
 `)

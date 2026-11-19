@@ -11,7 +11,7 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	q := sqlgen.New(db)
 {{- range dependents $e}}
 {{- if and (eq .Action "cascade") .Soft}}
-	// The {{lower .Relation.Entity.Plural.Snake}} of its {{.Relation.Snake}} go with it.
+	// The {{lower .Relation.Entity.Plural.Snake}} whose {{.Relation.Snake}} it is go with it.
 	{
 		children, err := q.Live{{.Name}}(ctx, postgres.UUID(id))
 		if err != nil {

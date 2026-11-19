@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -124,6 +125,72 @@ func TestSPALabelsFromUIAndItsOwn(t *testing.T) {
 	for _, want := range []string{`label: "Produtos"`, `label: "Nome do produto"`, `ACTIVE: "Ativo"`, "icons.Package"} {
 		if !strings.Contains(got+read(t, filepath.Join(dir, "web", "admin", "src", "esquadro", "menu.gen.ts")), want) {
 			t.Errorf("lacks %q", want)
+		}
+	}
+}
+
+// TestSPAAndSiteWorkARelationToItself generates comments that answer each
+// other (parent > Comment, replies < Comment) with the panel and a site,
+// and builds and tests them.
+func TestSPAAndSiteWorkARelationToItself(t *testing.T) {
+	dir, code, errOut := spaProject(t, func(app string) string {
+		return strings.Replace(app, "  blueprint ui\n", "  blueprint ui\n  blueprint ssr site\n", 1)
+	})
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	catalogEsq := filepath.Join(dir, "esquadro", "catalog.esq")
+	os.WriteFile(catalogEsq, []byte(read(t, catalogEsq)+`
+entity Offer {
+  title    string required max(120)
+  comments < Comment
+  @security(read public, write [user.admin, user.staff])
+  @admin(resource)
+  @site(page, relations [comments])
+}
+
+entity Comment {
+  body    text required max(2000)
+  offer   > Offer required on_delete(cascade) @store(filter)
+  parent  > Comment on_delete(cascade) @store(filter)
+  replies < Comment
+  author  > Customer required
+  @security(read public, write owner)
+  @store(soft_delete)
+  @admin(resource)
+  @site(page, relations [replies])
+}
+`), 0o644)
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	for path, want := range map[string]string{
+		"internal/catalog/queries.sql":            "(NOT sqlc.arg(no_parent)::boolean OR parent_id IS NULL)",
+		"internal/catalog/list_comments.go":       "NoParent bool",
+		"internal/catalog/trash_comment.go":       "q.LiveCommentByParent(",
+		"internal/catalog/http.go":                "q.Filter.NoParent = true",
+		"api/openapi.yaml":                        "`parent_id=null` keeps those without one",
+		"clients/ts/src/records.ts":               `/** An id, or "null" for those without one. */`,
+		"web/admin/src/resources/comments.tsx":    `relation(self, "parent_id")`,
+		"web/admin/src/esquadro/resources.gen.ts": `target: "comments", display: "body"`,
+		"web/site/comment_gen.go":                 "q.Filter.ParentID = x.ID",
+	} {
+		if got := read(t, filepath.Join(dir, path)); !strings.Contains(got, want) {
+			t.Errorf("%s lacks %q", path, want)
+		}
+	}
+	// The second generation migrates to the comments, keyed to their own table.
+	migrations, _ := filepath.Glob(filepath.Join(dir, "migrations", "*.sql"))
+	if !slices.ContainsFunc(migrations, func(p string) bool {
+		return strings.Contains(read(t, p), "FOREIGN KEY (parent_id) REFERENCES public.comments (id) ON DELETE CASCADE")
+	}) {
+		t.Errorf("no migration keys parent_id to comments: %v", migrations)
+	}
+	for _, args := range [][]string{{"vet", "./..."}, {"test", "./internal/catalog/", "./web/site/"}} {
+		cmd := exec.Command("go", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
 }

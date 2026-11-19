@@ -114,9 +114,10 @@ export interface ResourceDef {
   image?: (record: Rec) => string | null | undefined
   /**
    * The lists of related records on a record's page. A function, so that
-   * two resources can list each other.
+   * two resources can list each other; self is this resource, for the
+   * records of its own that point at one (a comment's replies).
    */
-  relations?: () => Relation[]
+  relations?: (self: Resource) => Relation[]
 }
 
 export interface Resource extends ResourceDef {

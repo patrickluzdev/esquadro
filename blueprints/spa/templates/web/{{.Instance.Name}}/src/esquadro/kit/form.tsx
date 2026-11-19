@@ -48,10 +48,17 @@ class MissingFields extends Error {
   }
 }
 
-type InputProps = { field: FieldMeta; value: unknown; onChange: (v: unknown) => void; invalid?: boolean }
+type InputProps = {
+  field: FieldMeta
+  value: unknown
+  onChange: (v: unknown) => void
+  invalid?: boolean
+  /** The id of the record edited, which a relation to its own resource does not offer: a comment answers another. */
+  self?: string
+}
 
 /** The input of a field, by its kind. */
-export function FieldInput({ field, value, onChange, invalid }: InputProps) {
+export function FieldInput({ field, value, onChange, invalid, self }: InputProps) {
   const own = yours[field.name] ?? yours[field.kind]
   if (own?.input) return <>{own.input(value, onChange)}</>
   const str = value === null || value === undefined ? "" : String(value)
@@ -76,7 +83,7 @@ export function FieldInput({ field, value, onChange, invalid }: InputProps) {
         </Choice>
       )
     case "relation":
-      return <RelationInput id={id} field={field} value={str} onChange={onChange} invalid={invalid} />
+      return <RelationInput id={id} field={field} value={str} onChange={onChange} invalid={invalid} self={self} />
     case "many":
       return <ManyInput id={id} field={field} value={value} onChange={onChange} invalid={invalid} />
     case "int":
@@ -130,7 +137,7 @@ function Choice({
 }
 
 /** A related record, picked from its resource's list. */
-function RelationInput({ id, field, value, onChange, invalid }: InputProps & { id: string; value: string }) {
+function RelationInput({ id, field, value, onChange, invalid, self }: InputProps & { id: string; value: string }) {
   const target = (resources as unknown as Record<string, ResourceMeta>)[field.target ?? ""]
   const options = useQuery({
     queryKey: [target?.name ?? field.target, "options"],
@@ -151,7 +158,7 @@ function RelationInput({ id, field, value, onChange, invalid }: InputProps & { i
   }
   return (
     <Choice id={id} field={field} value={value} onChange={onChange} invalid={invalid}>
-      {options.data?.items.map((r: Rec) => (
+      {options.data?.items.filter((r: Rec) => r.id !== self).map((r: Rec) => (
         <SelectItem key={r.id} value={r.id}>
           {capitalize(String(r[field.display ?? "id"] ?? r.id))}
         </SelectItem>
@@ -298,6 +305,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                             field={f}
                             value={values[f.name]}
                             invalid={error !== undefined}
+                            self={record?.id}
                             onChange={(v) => {
                               dirty.current = true
                               setErrors(({ [f.name]: _, ...rest }) => rest)

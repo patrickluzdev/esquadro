@@ -130,7 +130,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const can = r.can ?? []
   const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
   const fields = resource.show ?? resource.form
-  const relations = resource.relations?.() ?? []
+  const relations = resource.relations?.(resource) ?? []
   // Beside the picture, a few short fields; every field in the Details tab,
   // in the form's sections when it has them.
   const long: FieldMeta["kind"][] = ["textarea", "json", "image", "file"]

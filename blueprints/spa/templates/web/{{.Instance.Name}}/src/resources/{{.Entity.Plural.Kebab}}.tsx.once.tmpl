@@ -13,7 +13,7 @@
 //             { label: "Copy", key: "c", copy: (r) => String(r.message) }],
 // A queue beside the table, the records of a filter worked with those keys:
 //   queue: { filter: { status: ["PENDING"] }, card: { title: f.name, fields: [f.price] } },
-import { {{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}{{if $rel}} relation,{{end}} resource } from "../esquadro/kit/resource.ts"
+import { {{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}{{if $rel}} relation,{{end}} resource } from "../esquadro/kit/resource.ts"
 import { resources } from "../esquadro/resources.gen.ts"
 {{- range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}
 import {{$r.Target.Plural.Camel}} from "./{{$r.Target.Plural.Kebab}}.tsx"
@@ -46,12 +46,12 @@ export default resource(meta, {
   // A second line under each name in the list: change it, or remove it.
   subtitle: f.{{keyName (index . 0)}},
 {{- end}}
-{{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}
+{{- $rel := false}}{{$own := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{if eq $r.Target.Raw $.Entity.Raw}}{{$own = true}}{{end}}{{end}}{{end}}
 {{- if $rel}}
-  // The related records on a record's page.
-  relations: () => [
-{{- range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}
-    relation({{$r.Target.Plural.Camel}}, "{{inverseKey $r}}"),
+  // The related records on a record's page{{if $own}}; self is this resource{{end}}.
+  relations: ({{if $own}}self{{end}}) => [
+{{- range $r := .Entity.Relations}}{{if and (hasMany $r) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}
+    relation({{if eq $r.Target.Raw $.Entity.Raw}}self{{else}}{{$r.Target.Plural.Camel}}{{end}}, "{{inverseKey $r}}"),
 {{- end}}{{end}}
   ],
 {{- end}}

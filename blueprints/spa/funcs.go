@@ -160,9 +160,9 @@ func TitleOf(e *project.Entity) string {
 }
 
 // DisplayOf is the field a relation's target is shown by: the one it
-// declares, or the target's first text field, or its id.
+// declares, or the target's first text field (a comment's body), or its id.
 func DisplayOf(r *project.Relation) string {
-	if r.Display != nil {
+	if r.Display != nil && !r.Display.Implicit {
 		return r.Display.Snake
 	}
 	for _, f := range r.Target.Fields {
