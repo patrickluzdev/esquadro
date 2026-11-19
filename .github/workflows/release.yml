@@ -82,4 +82,6 @@ jobs:
 
   homebrew:
     needs: release
+    # The CI skipped (it passed on main) must not skip this one.
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     uses: ./.github/workflows/homebrew.yml
