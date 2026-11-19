@@ -77,6 +77,23 @@ func TestVerifyEmail(t *testing.T) {
 	}
 }
 
+func TestVerifyEmailAgainNotTooOften(t *testing.T) {
+	f := newFlow(t)
+	f.s.cfg.ResendMinutes, f.s.cfg.ResendPerDay = 5, 5
+	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")
+	// The sign-up's email counts: asked again at once, the answer is the
+	// same, and nothing is sent.
+	f.expect(f.call("POST", "/identity/person/verify-email/send", map[string]string{"email": "ana@example.com"}), 202, "")
+	if f.mail.count() != 1 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+	*f.now = f.now.Add(5*time.Minute + time.Second)
+	f.expect(f.call("POST", "/identity/person/verify-email/send", map[string]string{"email": "ana@example.com"}), 202, "")
+	if f.mail.count() != 2 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+}
+
 func TestPasswordReset(t *testing.T) {
 	f := newFlow(t)
 	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": password, "name": "Ana"}), 202, "")

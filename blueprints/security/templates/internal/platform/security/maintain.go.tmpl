@@ -4,6 +4,7 @@
 {{- $verifications := securityTable "verifications" $pg -}}
 {{- $attempts := securityTable "attempts" $pg -}}
 {{- $keys := securityTable "signing_keys" $pg -}}
+{{- $sends := securityTable "email_sends" $pg -}}
 package security
 
 import (
@@ -13,7 +14,7 @@ import (
 )
 
 // Cleanup deletes what no longer works: expired sessions and links,
-// forgotten attempts, and signing keys a day after they stop checking
+// forgotten attempts, emails counted more than a day ago, and signing keys a day after they stop checking
 // tokens. It answers how many rows it deleted.
 func (s *Security) Cleanup(ctx context.Context) (int64, error) {
 	now := s.now()
@@ -27,6 +28,7 @@ func (s *Security) Cleanup(ctx context.Context) (int64, error) {
 		{`DELETE FROM {{$sessions}} WHERE expires_at < $1 OR max_expires_at < $1 OR last_seen_at < $2`, []any{now, idle}},
 		{`DELETE FROM {{$verifications}} WHERE expires_at < $1`, []any{now}},
 		{`DELETE FROM {{$attempts}} WHERE window_start < $1 AND (locked_until IS NULL OR locked_until < $2)`, []any{window, now}},
+		{`DELETE FROM {{$sends}} WHERE sent_at < $1`, []any{now.Add(-day)}},
 		{`DELETE FROM {{$keys}} WHERE expires_at < $1`, []any{now.Add(-24 * time.Hour)}},
 	} {
 		tag, err := s.db.Exec(ctx, q.sql, q.args...)

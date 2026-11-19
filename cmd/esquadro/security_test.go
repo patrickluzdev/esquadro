@@ -107,6 +107,40 @@ entity User {
 	}
 }
 
+// An invitation or an email's confirmation is sent again from the accounts'
+// routes not too often: resend_minutes and resend_per_day, 5 and 5 by
+// default, counted in a table of their own.
+func TestSecurityResendLimits(t *testing.T) {
+	accounts := "package accounts\n\nentity User {\n  name string required\n  @security(principal, roles [admin], read user, write user.admin)\n}\n"
+	dir := securityProject(t, accounts, "")
+	if code, out, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatalf("gen: %s%s", out, errOut)
+	}
+	sec := filepath.Join(dir, "internal", "platform", "security")
+	for path, want := range map[string]string{
+		filepath.Join(dir, "cmd", "shop", "dependencies.go"):      "ResendMinutes: 5, ResendPerDay: 5,",
+		filepath.Join(sec, "migrations", "00003_email_sends.sql"): "CREATE TABLE security_email_sends (",
+		filepath.Join(sec, "migrations", "migrations.go"):         "goose.WithAllowOutofOrder(true)",
+		filepath.Join(sec, "accounts.go"):                         `mux.HandleFunc("POST "+base+"/accounts/{id}/verify-email", s.resendVerification(realm))`,
+		filepath.Join(sec, "resend.go"):                           `Code: "too_soon"`,
+		filepath.Join(sec, "maintain.go"):                         "DELETE FROM security_email_sends WHERE sent_at < $1",
+		filepath.Join(sec, "openapi.yaml"):                        "/identity/user/accounts/{id}/verify-email:",
+	} {
+		if got := read(t, path); !strings.Contains(got, want) {
+			t.Errorf("%s lacks %q", path, want)
+		}
+	}
+
+	app := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(app, []byte(strings.Replace(read(t, app), "  blueprint security\n", "  blueprint security {\n    resend_minutes 10\n    resend_per_day 3\n  }\n", 1)), 0o644)
+	if code, out, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatalf("gen: %s%s", out, errOut)
+	}
+	if deps := read(t, filepath.Join(dir, "cmd", "shop", "dependencies.go")); !strings.Contains(deps, "ResendMinutes: 10, ResendPerDay: 3,") {
+		t.Errorf("the options are not the limits:\n%s", deps)
+	}
+}
+
 // A provider's variables exist only when a realm signs in with it: env
 // declarations with when.
 func TestSecurityProviderVariables(t *testing.T) {

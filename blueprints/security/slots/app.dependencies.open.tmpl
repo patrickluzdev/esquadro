@@ -20,6 +20,7 @@
 		PublicURL: {{printf "%q" .Options.public_url}},
 		Mailer: securityMail{d.mail},
 		VerifyEmailHours: {{.Options.verify_email_hours}}, PasswordResetMinutes: {{.Options.password_reset_minutes}}, InviteDays: {{.Options.invite_days}},
+		ResendMinutes: {{.Options.resend_minutes}}, ResendPerDay: {{.Options.resend_per_day}},
 		RotateKeysDays: {{.Options.rotate_keys_days}},
 {{- with strs .Options.redirect_urls}}
 		RedirectURLs: {{goStrings .}},

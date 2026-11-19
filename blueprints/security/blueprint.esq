@@ -86,6 +86,11 @@ blueprint security {
   /// Days an invitation's link works: an account made by an administrator
   /// (from the frontend, or <app> security invite), to choose its password.
   option invite_days int default(7)
+  /// Minutes before an invitation or an email's confirmation may be sent
+  /// again to an account, and how many times a day at most (the first one
+  /// counts); 0 is no limit. A request sooner is answered 429 too_soon.
+  option resend_minutes int default(5)
+  option resend_per_day int default(5)
 
   /// The shortest password. NIST asks for 15 when the password is the only
   /// factor.

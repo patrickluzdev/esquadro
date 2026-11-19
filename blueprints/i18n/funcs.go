@@ -59,6 +59,7 @@ var Problems = []Problem{
 	{"idempotency_key_required", "rest", "Send an Idempotency-Key, a new random UUID for each operation."},
 	{"rate_limited", "rate_limit", "Too many requests; try again later."},
 	{"too_many_attempts", "security", "Too many attempts. Try again later."},
+	{"too_soon", "security", "This email was sent a short while ago: it may be sent again later."},
 	{"internal", "http", "Something went wrong on our side."},
 	{"not_ready", "http", "The service is not ready."},
 	{"not_implemented", "rest", "The operation is not implemented."},
@@ -102,6 +103,7 @@ var translations = map[string]map[string]string{
 		"email_taken":               "Outra conta já usa este e-mail.",
 		"last_credential":           "Esta é a única forma de entrar que sobrou.",
 		"too_many_attempts":         "Tentativas demais. Tente de novo mais tarde.",
+		"too_soon":                  "Este e-mail foi enviado há pouco: ele pode ser enviado de novo mais tarde.",
 		"provider_not_configured":   "Entrar desta forma não está configurado.",
 	},
 	"es": {
@@ -138,6 +140,7 @@ var translations = map[string]map[string]string{
 		"email_taken":               "Otra cuenta ya usa este correo.",
 		"last_credential":           "Es la única forma de entrar que queda.",
 		"too_many_attempts":         "Demasiados intentos. Inténtelo más tarde.",
+		"too_soon":                  "Este correo se envió hace poco: se podrá enviar de nuevo más tarde.",
 		"provider_not_configured":   "Entrar de esta forma no está configurado.",
 	},
 }

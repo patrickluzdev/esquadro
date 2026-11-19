@@ -28,6 +28,7 @@ var (
 	ErrOwnAccount    = &edge.Problem{Status: http.StatusConflict, Code: "own_account", Title: "You may not do this to your own account."}
 	ErrLastAdmin     = &edge.Problem{Status: http.StatusConflict, Code: "last_administrator", Title: "Someone else must be able to administer the accounts first."}
 	ErrAccountActive = &edge.Problem{Status: http.StatusConflict, Code: "already_active", Title: "The account has a password already: it needs no invitation."}
+	ErrEmailVerified = &edge.Problem{Status: http.StatusConflict, Code: "already_verified", Title: "The account has no email to confirm: it is confirmed already, or the account is invited or disabled."}
 )
 
 // Account is an account of a realm, as those who administer it see it.
@@ -44,6 +45,10 @@ type Account struct {
 	Status     string     `json:"status"`
 	LastSeenAt *time.Time `json:"last_seen_at"`
 	CreatedAt  time.Time  `json:"created_at"`
+	// ResendAt is, for an account invited or unverified, when its
+	// invitation or the confirmation of its email may be sent again; null
+	// when it may now.
+	ResendAt *time.Time `json:"resend_at"`
 }
 
 // accountRoutes are the routes that administer a realm's accounts, for
@@ -55,6 +60,9 @@ func (s *Security) accountRoutes(mux *http.ServeMux, base string, realm Realm) {
 	mux.HandleFunc("GET "+base+"/accounts", s.listAccounts(realm))
 	mux.HandleFunc("POST "+base+"/accounts", s.inviteAccount(realm))
 	mux.HandleFunc("POST "+base+"/accounts/{id}/invite", s.reinvite(realm))
+	if realm.VerifyEmail != "off" {
+		mux.HandleFunc("POST "+base+"/accounts/{id}/verify-email", s.resendVerification(realm))
+	}
 	mux.HandleFunc("PUT "+base+"/accounts/{id}/roles", s.setRoles(realm))
 	mux.HandleFunc("POST "+base+"/accounts/{id}/disable", s.setDisabled(realm, true))
 	mux.HandleFunc("POST "+base+"/accounts/{id}/enable", s.setDisabled(realm, false))
@@ -209,7 +217,14 @@ func (s *Security) accounts(ctx context.Context, realm Realm, q, role, status st
 		}
 		out = append(out, a)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	rows.Close()
+	if err := s.withResendAt(ctx, out); err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
 }
 
 // account reads one account of the realm.
@@ -295,6 +310,9 @@ func (s *Security) Invite(ctx context.Context, realm Realm, email string, fields
 	if err := s.invitation(ctx, realm, id, normalEmail(email), redirect, from); err != nil {
 		return id, err
 	}
+	if err := s.sent(ctx, s.db, id, sendInvitation); err != nil {
+		return id, err
+	}
 	s.event(ctx, "account_invited", realm.Name, id.String(), true)
 	return id, nil
 }
@@ -375,7 +393,8 @@ func (s *Security) inviteAccount(realm Realm) http.HandlerFunc {
 }
 
 // reinvite sends an invitation again, to an account that has not chosen
-// its password yet.
+// its password yet: not sooner than ResendMinutes after the last one, nor
+// more than ResendPerDay times a day (429 too_soon).
 func (s *Security) reinvite(realm Realm) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -403,10 +422,68 @@ func (s *Security) reinvite(realm Realm) http.HandlerFunc {
 			edge.Write(w, r, ErrAccountActive)
 			return
 		}
+		wait, err := s.claimSend(ctx, id, sendInvitation)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if !wait.IsZero() {
+			s.tooSoon(w, r, wait)
+			return
+		}
 		if err := s.invitation(ctx, realm, id, a.Email, in.Redirect, s.emailOf(ctx, p.ID)); err != nil {
 			s.fail(w, r, err)
 			return
 		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// resendVerification sends the link that confirms an account's email
+// again, to an account with a password whose email is not confirmed: not
+// sooner than ResendMinutes after the last one, nor more than ResendPerDay
+// times a day (429 too_soon).
+func (s *Security) resendVerification(realm Realm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if _, ok := s.administrator(w, r, realm); !ok {
+			return
+		}
+		id, ok := s.target(w, r, realm)
+		if !ok {
+			return
+		}
+		var in struct {
+			Redirect string `json:"redirect"`
+		}
+		_ = decode(w, r, &in)
+		redirect, ok := s.redirectOf(w, r, in.Redirect)
+		if !ok {
+			return
+		}
+		a, err := s.account(ctx, realm, id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if a.Status != "unverified" {
+			edge.Write(w, r, ErrEmailVerified)
+			return
+		}
+		wait, err := s.claimSend(ctx, id, sendVerifyEmail)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if !wait.IsZero() {
+			s.tooSoon(w, r, wait)
+			return
+		}
+		if err := s.verificationEmail(ctx, realm.Name, id, a.Email, redirect); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.event(ctx, "verification_resent", realm.Name, id.String(), true)
 		w.WriteHeader(http.StatusAccepted)
 	}
 }

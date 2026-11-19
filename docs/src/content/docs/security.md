@@ -297,9 +297,10 @@ administer its realm's accounts through the API, and in a
 
 | Route | What |
 |---|---|
-| `GET <prefix>/<realm>/accounts?q=&role=&status=&page=` | the accounts: email, name, roles, status (`active`, `invited`, `unverified`, `disabled`), last seen |
+| `GET <prefix>/<realm>/accounts?q=&role=&status=&page=` | the accounts: email, name, roles, status (`active`, `invited`, `unverified`, `disabled`), last seen, and `resend_at`: when an invited or unverified one's email may be sent again (`null`, now) |
 | `POST <prefix>/<realm>/accounts` | invite: `{email, roles, fields, redirect}` makes the account without a password, and emails it a link to choose one, which works for `invite_days` (7) |
 | `POST .../accounts/{id}/invite` | the invitation again, while it has no password |
+| `POST .../accounts/{id}/verify-email` | the link that confirms its email again, while it is `unverified`: `{redirect}`, the page of the app it opens (`409 already_verified` otherwise) |
 | `PUT .../accounts/{id}/roles` | its roles: `{roles}` |
 | `POST .../accounts/{id}/disable`, `.../enable` | disable it (its sessions end; it cannot sign in), enable it again |
 | `DELETE .../accounts/{id}/sessions` | sign it out everywhere |
@@ -309,7 +310,24 @@ administer its realm's accounts through the API, and in a
 No one disables, deletes or takes the administering role from their own
 account (`own_account`), and the realm always keeps someone enabled who
 administers it (`last_administrator`). The invitation is the mail
-blueprint's `invitation` template, saying who invited.
+blueprint's `invitation` template, saying who invited; the confirmation, its
+`verify_email`.
+
+An account's invitation, or the confirmation of its email, is sent again
+no sooner than 5 minutes after the last one (`resend_minutes`), nor more
+than 5 times in a day (`resend_per_day`); the first one, of the invitation
+or the sign-up, counts. Sooner, the routes answer `429 too_soon`, with
+`Retry-After`, and the account's `resend_at` says when. The server keeps the
+count, a day long, in `security_email_sends`, so it holds across requests,
+processes and restarts; `POST verify-email/send` keeps it too, without
+saying so, as it answers the same to anyone. `0` is no limit.
+
+```esquadro
+blueprint security {
+  resend_minutes 10
+  resend_per_day 3
+}
+```
 
 ## Commands
 

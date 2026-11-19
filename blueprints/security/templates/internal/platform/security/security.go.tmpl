@@ -56,6 +56,10 @@ type Config struct {
 	VerifyEmailHours, PasswordResetMinutes int
 	// InviteDays is how long an invitation's link works.
 	InviteDays int
+	// An invitation or an email's confirmation is sent again no sooner than
+	// ResendMinutes after the last one, and no more than ResendPerDay times
+	// a day, to an account; 0 is no limit.
+	ResendMinutes, ResendPerDay int
 	// RotateKeysDays makes a new JWT signing key that often; 0 never does.
 	RotateKeysDays int
 }

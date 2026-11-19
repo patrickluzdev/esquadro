@@ -124,8 +124,17 @@ func (s *Security) redirectOf(w http.ResponseWriter, r *http.Request, redirect s
 	return redirect, true
 }
 
-// sendVerification sends the link that verifies an identity's email.
+// sendVerification sends the link that verifies an identity's email, and
+// counts it: the first of those sent again (resend.go).
 func (s *Security) sendVerification(ctx context.Context, realm string, id uuid.UUID, email, redirect string) error {
+	if err := s.verificationEmail(ctx, realm, id, email, redirect); err != nil {
+		return err
+	}
+	return s.sent(ctx, s.db, id, sendVerifyEmail)
+}
+
+// verificationEmail sends the link that verifies an identity's email.
+func (s *Security) verificationEmail(ctx context.Context, realm string, id uuid.UUID, email, redirect string) error {
 	token, expires, err := s.newVerification(ctx, s.db, realm, "verify_email", id, "", time.Duration(s.cfg.VerifyEmailHours)*time.Hour)
 	if err != nil {
 		return err
@@ -146,7 +155,8 @@ func (s *Security) limited(ctx context.Context, realm, address string) bool {
 
 // sendVerifyEmail sends the verification link again: to the signed-in
 // identity, or to an email, answering the same whether it has an account
-// or not.
+// or not, and whether it was sent too recently to be sent again
+// (ResendMinutes, ResendPerDay) or not.
 func (s *Security) sendVerifyEmail(realm Realm) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -171,9 +181,16 @@ func (s *Security) sendVerifyEmail(realm Realm) http.HandlerFunc {
 			return
 		}
 		if err == nil && !verified && !s.limited(ctx, realm.Name, email) {
-			if err := s.sendVerification(ctx, realm.Name, id, email, redirect); err != nil {
+			wait, err := s.claimSend(ctx, id, sendVerifyEmail)
+			if err != nil {
 				s.fail(w, r, err)
 				return
+			}
+			if wait.IsZero() {
+				if err := s.verificationEmail(ctx, realm.Name, id, email, redirect); err != nil {
+					s.fail(w, r, err)
+					return
+				}
 			}
 		}
 		w.WriteHeader(http.StatusAccepted)

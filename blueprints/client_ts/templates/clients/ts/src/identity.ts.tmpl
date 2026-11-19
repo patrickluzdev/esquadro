@@ -41,6 +41,8 @@ export interface Account {
   status: "active" | "invited" | "unverified" | "disabled"
   last_seen_at: string | null
   created_at: string
+  /** Invited or unverified: when its invitation or its email's confirmation may be sent again; null when it may now. */
+  resend_at: string | null
 }
 
 /** A page of accounts. */
@@ -80,8 +82,13 @@ function accounts(t: Transport, path: string) {
     /** Makes an account without a password and emails it a link to choose one. */
     invite: (invitation: { email: string; roles?: string[]; fields?: Record<string, unknown>; redirect?: string }) =>
       t.request<Account>("POST", `${path}/accounts`, { body: invitation }),
+    /** Sends the invitation again; a 429 too_soon when it went a short while ago. */
     reinvite: async (id: string, redirect?: string) => {
       await t.request("POST", `${one(id)}/invite`, { body: { redirect } })
+    },
+    /** Sends the link that confirms the account's email again; a 429 too_soon when it went a short while ago. */
+    resendVerification: async (id: string, redirect?: string) => {
+      await t.request("POST", `${one(id)}/verify-email`, { body: { redirect } })
     },
     setRoles: (id: string, roles: string[]) => t.request<Account>("PUT", `${one(id)}/roles`, { body: { roles } }),
     disable: (id: string) => t.request<Account>("POST", `${one(id)}/disable`),

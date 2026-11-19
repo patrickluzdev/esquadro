@@ -1,0 +1,153 @@
+{{- if realms .Entities -}}
+{{- $pg := optionsOf "postgres" -}}
+{{- $identities := securityTable "identities" $pg -}}
+{{- $sends := securityTable "email_sends" $pg -}}
+package security
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+
+	"{{.App.Module}}/internal/platform/edge"
+)
+
+// The emails sent again on request (an invitation, the confirmation of an
+// email) are counted per account, so that no one floods an inbox with
+// them: not again within ResendMinutes of the last one, and no more than
+// ResendPerDay of them in a day. The first one (of a sign-up, of an
+// invitation) counts too.
+
+// ErrTooSoon is an email asked again before it may be sent: Retry-After
+// says when it may, and so does the account's resend_at.
+var ErrTooSoon = &edge.Problem{Status: http.StatusTooManyRequests, Code: "too_soon", Title: "This email was sent a short while ago: it may be sent again later."}
+
+// The kinds of email counted.
+const (
+	sendInvitation  = "invitation"
+	sendVerifyEmail = "verify_email"
+)
+
+// day is how far back the emails of a day are counted.
+const day = 24 * time.Hour
+
+// resendQuery reads, for each identity, when the last email of a kind went
+// and when the nth last within a day did (NULL with fewer of them).
+const resendQuery = `SELECT identity_id, max(sent_at), (array_agg(sent_at ORDER BY sent_at DESC))[$4::int]
+	FROM {{$sends}} WHERE identity_id = ANY($1) AND purpose = $2 AND sent_at > $3 GROUP BY identity_id`
+
+// resendTimes are when an email of purpose may be sent again to each of
+// ids, those that must wait only: ResendMinutes after the last one, and a
+// day after the first of the last ResendPerDay ones.
+func (s *Security) resendTimes(ctx context.Context, q Querier, ids []uuid.UUID, purpose string) (map[uuid.UUID]time.Time, error) {
+	out := map[uuid.UUID]time.Time{}
+	if len(ids) == 0 || (s.cfg.ResendMinutes <= 0 && s.cfg.ResendPerDay <= 0) {
+		return out, nil
+	}
+	now := s.now()
+	nth := s.cfg.ResendPerDay
+	if nth <= 0 {
+		nth = 1 << 30
+	}
+	rows, err := q.Query(ctx, resendQuery, ids, purpose, now.Add(-day), nth)
+	if err != nil {
+		return nil, fmt.Errorf("security: read the emails sent: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		var last time.Time
+		var first *time.Time
+		if err := rows.Scan(&id, &last, &first); err != nil {
+			return nil, fmt.Errorf("security: read the emails sent: %w", err)
+		}
+		var at time.Time
+		if s.cfg.ResendMinutes > 0 {
+			at = last.Add(time.Duration(s.cfg.ResendMinutes) * time.Minute)
+		}
+		if s.cfg.ResendPerDay > 0 && first != nil && first.Add(day).After(at) {
+			at = first.Add(day)
+		}
+		if at.After(now) {
+			out[id] = at.UTC()
+		}
+	}
+	return out, rows.Err()
+}
+
+// sent counts an email of purpose sent to the identity.
+func (s *Security) sent(ctx context.Context, q Querier, id uuid.UUID, purpose string) error {
+	if _, err := q.Exec(ctx, `INSERT INTO {{$sends}} (identity_id, purpose, sent_at) VALUES ($1, $2, $3)`, id, purpose, s.now()); err != nil {
+		return fmt.Errorf("security: count an email sent: %w", err)
+	}
+	return nil
+}
+
+// claimSend counts an email of purpose about to be sent to the identity,
+// when it may be: it answers the zero time then, or when it may be sent.
+// The identity's row is locked meanwhile, so that two requests at once
+// never both send it.
+func (s *Security) claimSend(ctx context.Context, id uuid.UUID, purpose string) (time.Time, error) {
+	var wait time.Time
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT 1 FROM {{$identities}} WHERE id = $1 FOR UPDATE`, id); err != nil {
+			return err
+		}
+		times, err := s.resendTimes(ctx, tx, []uuid.UUID{id}, purpose)
+		if err != nil {
+			return err
+		}
+		if at, ok := times[id]; ok {
+			wait = at
+			return nil
+		}
+		return s.sent(ctx, tx, id, purpose)
+	})
+	return wait, err
+}
+
+// tooSoon answers ErrTooSoon, with Retry-After until at.
+func (s *Security) tooSoon(w http.ResponseWriter, r *http.Request, at time.Time) {
+	w.Header().Set("Retry-After", fmt.Sprint(int(at.Sub(s.now()).Seconds())+1))
+	edge.Write(w, r, ErrTooSoon)
+}
+
+// resendPurpose is the email an account of status is sent again: its
+// invitation, or the confirmation of its email; "" for none.
+func resendPurpose(status string) string {
+	switch status {
+	case "invited":
+		return sendInvitation
+	case "unverified":
+		return sendVerifyEmail
+	}
+	return ""
+}
+
+// withResendAt fills the accounts' ResendAt: when the email their status
+// asks for may be sent again, for those that must wait.
+func (s *Security) withResendAt(ctx context.Context, accounts []Account) error {
+	ids := map[string][]uuid.UUID{}
+	for _, a := range accounts {
+		if p := resendPurpose(a.Status); p != "" {
+			ids[p] = append(ids[p], a.ID)
+		}
+	}
+	for purpose, list := range ids {
+		times, err := s.resendTimes(ctx, s.db, list, purpose)
+		if err != nil {
+			return err
+		}
+		for i, a := range accounts {
+			if at, ok := times[a.ID]; ok && resendPurpose(a.Status) == purpose {
+				accounts[i].ResendAt = &at
+			}
+		}
+	}
+	return nil
+}
+{{end -}}

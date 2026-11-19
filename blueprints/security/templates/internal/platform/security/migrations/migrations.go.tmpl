@@ -17,13 +17,15 @@ import (
 var fsys embed.FS
 
 // Apply applies the security migrations the database does not have yet,
-// keeping their versions apart from the model's.
+// keeping their versions apart from the model's. One that comes with an
+// option turned on later (00002, the service keys) may be older than those
+// applied already: it is applied all the same.
 func Apply(ctx context.Context, db *sql.DB) error {
 	store, err := database.NewStore(database.DialectPostgres, "security_goose_db_version")
 	if err != nil {
 		return fmt.Errorf("security migrations: %w", err)
 	}
-	provider, err := goose.NewProvider("", db, fsys, goose.WithStore(store))
+	provider, err := goose.NewProvider("", db, fsys, goose.WithStore(store), goose.WithAllowOutofOrder(true))
 	if err != nil {
 		return fmt.Errorf("security migrations: %w", err)
 	}

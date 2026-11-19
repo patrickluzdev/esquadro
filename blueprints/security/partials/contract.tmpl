@@ -335,7 +335,7 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
   {{$p}}/{{$r.Name}}/accounts/{id}/invite:
     post:
       tags: [{{$r.Name}}]
-      summary: Send the invitation again, to an account without a password yet
+      summary: Send the invitation again, to an account without a password yet (not too often; 429 too_soon says when)
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       requestBody:
@@ -347,7 +347,27 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
                 redirect: {type: string}
       responses:
         "202": {description: Sent.}
+        "429": {$ref: "#/components/responses/Problem"}
         default: {$ref: "#/components/responses/Problem"}
+{{- if ne $r.VerifyEmail "off"}}
+  {{$p}}/{{$r.Name}}/accounts/{id}/verify-email:
+    post:
+      tags: [{{$r.Name}}]
+      summary: Send the link that confirms an account's email again (not too often; 429 too_soon says when)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect: {type: string, description: The page of the app the link opens.}
+      responses:
+        "202": {description: Sent.}
+        "429": {$ref: "#/components/responses/Problem"}
+        default: {$ref: "#/components/responses/Problem"}
+{{- end}}
   {{$p}}/{{$r.Name}}/accounts/{id}/roles:
     put:
       tags: [{{$r.Name}}]
@@ -525,6 +545,7 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
         status: {type: string, enum: [active, invited, unverified, disabled]}
         last_seen_at: {type: string, format: date-time, nullable: true}
         created_at: {type: string, format: date-time}
+        resend_at: {type: string, format: date-time, nullable: true, description: "Invited or unverified: when its invitation or its email's confirmation may be sent again; null when it may now."}
     IdentityAccountPage:
       type: object
       properties:

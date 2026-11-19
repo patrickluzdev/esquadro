@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"{{.App.Module}}/internal/platform/edge"
 
@@ -144,6 +145,129 @@ func TestAnAdminChangesRolesAndDisablesButNeverTheirOwnWay(t *testing.T) {
 	_ = f.s.db.QueryRow(ctx, `SELECT count(*) FROM team WHERE id = $1`, bossID).Scan(&left)
 	if left != 0 {
 		t.Fatal("the record of a deleted account was left")
+	}
+}
+
+// resendAtOf is the resend_at of the account of email in the list.
+func (f *flow) resendAtOf(email string, headers ...string) string {
+	f.t.Helper()
+	list := f.call("GET", "/identity/team/accounts?q="+email, nil, headers...)
+	f.expect(list, 200, "")
+	items, _ := list.body["items"].([]any)
+	if len(items) != 1 {
+		f.t.Fatalf("list: %v", list.body)
+	}
+	at, _ := items[0].(map[string]any)["resend_at"].(string)
+	return at
+}
+
+func TestAnAdminSendsTheConfirmationAgainNotTooOften(t *testing.T) {
+	f, team := adminFlow(t)
+	ctx := context.Background()
+	f.s.cfg.ResendMinutes, f.s.cfg.ResendPerDay = 5, 3
+	anaID, err := f.s.CreateAccount(ctx, team, "ana@example.com", password, json.RawMessage(`{"name":"Ana"}`), "member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resend := "/identity/team/accounts/" + anaID.String() + "/verify-email"
+	again := map[string]string{"redirect": "https://app.example/reset"}
+
+	// Only those who administer the realm.
+	f.expect(f.call("POST", resend, again), 401, "unauthorized")
+	f.expect(f.call("POST", resend, again, f.as("ana@example.com")...), 403, "forbidden")
+	boss := f.as("boss@example.com")
+	f.expect(f.call("POST", "/identity/team/accounts/"+uuid.NewV7().String()+"/verify-email", again, boss...), 404, "not_found")
+	f.expect(f.call("POST", resend, map[string]string{"redirect": "https://evil.example"}, boss...), 400, "invalid_redirect")
+	if at := f.resendAtOf("ana", boss...); at != "" {
+		t.Fatalf("resend_at before any: %s", at)
+	}
+
+	// Sent, then not again within 5 minutes: 429, and when it may.
+	f.expect(f.call("POST", resend, again, boss...), 202, "")
+	msg, _ := f.mail.last(t, "verify_email")
+	if msg.To != "ana@example.com" || !strings.HasPrefix(msg.Link, "https://app.example/reset?token=") {
+		t.Fatalf("email: %+v", msg)
+	}
+	first := *f.now
+	soon := f.call("POST", resend, again, boss...)
+	f.expect(soon, 429, "too_soon")
+	if soon.header.Get("Retry-After") != "301" || f.mail.count() != 1 {
+		t.Fatalf("too soon: Retry-After %q, %d emails", soon.header.Get("Retry-After"), f.mail.count())
+	}
+	if at := f.resendAtOf("ana", boss...); at != first.Add(5*time.Minute).UTC().Format(time.RFC3339) {
+		t.Fatalf("resend_at: %s", at)
+	}
+
+	// Again after 5 minutes, up to 3 a day.
+	for range 2 {
+		*f.now = f.now.Add(5 * time.Minute)
+		f.expect(f.call("POST", resend, again, boss...), 202, "")
+	}
+	*f.now = f.now.Add(5 * time.Minute)
+	f.expect(f.call("POST", resend, again, boss...), 429, "too_soon")
+	if at := f.resendAtOf("ana", boss...); at != first.Add(24*time.Hour).UTC().Format(time.RFC3339) {
+		t.Fatalf("resend_at after 3: %s", at)
+	}
+	if f.mail.count() != 3 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+
+	// A day after the first, it may again; its link confirms the email.
+	*f.now = first.Add(24*time.Hour + time.Second)
+	boss = f.as("boss@example.com")
+	f.expect(f.call("POST", resend, again, boss...), 202, "")
+	_, token := f.mail.last(t, "verify_email")
+	f.expect(f.call("POST", "/identity/team/verify-email", map[string]string{"token": token}), 204, "")
+	f.expect(f.call("POST", resend, again, boss...), 409, "already_verified")
+
+	// Counted a day only.
+	*f.now = f.now.Add(25 * time.Hour)
+	if _, err := f.s.Cleanup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var kept int
+	_ = f.s.db.QueryRow(ctx, `SELECT count(*) FROM {{securityTable "email_sends" (optionsOf "postgres")}}`).Scan(&kept)
+	if kept != 0 {
+		t.Fatalf("%d emails still counted", kept)
+	}
+}
+
+func TestAnInvitationIsSentAgainNotTooOften(t *testing.T) {
+	f, _ := adminFlow(t)
+	f.s.cfg.ResendMinutes, f.s.cfg.ResendPerDay = 5, 5
+	boss := f.as("boss@example.com")
+	invite := map[string]any{"email": "bia@example.com", "roles": []string{"member"}, "fields": map[string]string{"name": "Bia"}, "redirect": "https://app.example/reset"}
+	a := f.call("POST", "/identity/team/accounts", invite, boss...)
+	f.expect(a, 201, "")
+	if a.str("resend_at") != f.now.Add(5*time.Minute).UTC().Format(time.RFC3339) {
+		t.Fatalf("invited: %s", a.raw)
+	}
+	reinvite := "/identity/team/accounts/" + a.str("id") + "/invite"
+	again := map[string]string{"redirect": "https://app.example/reset"}
+	// The invitation itself counts: not again within 5 minutes.
+	f.expect(f.call("POST", reinvite, again, boss...), 429, "too_soon")
+	// The confirmation is no invitation's: Bia has no password to confirm.
+	f.expect(f.call("POST", "/identity/team/accounts/"+a.str("id")+"/verify-email", again, boss...), 409, "already_verified")
+	*f.now = f.now.Add(5*time.Minute + time.Second)
+	f.expect(f.call("POST", reinvite, again, boss...), 202, "")
+	if f.mail.count() != 2 {
+		t.Fatalf("%d emails", f.mail.count())
+	}
+}
+
+func TestNoLimitWithoutOne(t *testing.T) {
+	f, team := adminFlow(t)
+	ctx := context.Background()
+	anaID, err := f.s.CreateAccount(ctx, team, "ana@example.com", password, json.RawMessage(`{"name":"Ana"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	boss := f.as("boss@example.com")
+	for range 3 {
+		f.expect(f.call("POST", "/identity/team/accounts/"+anaID.String()+"/verify-email", nil, boss...), 202, "")
+	}
+	if at := f.resendAtOf("ana", boss...); at != "" {
+		t.Fatalf("resend_at: %s", at)
 	}
 }
 {{end -}}
