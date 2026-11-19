@@ -253,3 +253,32 @@ func TestATotalStartsAsWhatItCounts(t *testing.T) {
 		t.Errorf("no change, no migration:\n%s", again.Up)
 	}
 }
+
+// TestAHistoryIsATableOfItsOwn keeps the values of a field (@store(history))
+// in a table of its own, gone with the record, that starts with the value
+// each record has.
+func TestAHistoryIsATableOfItsOwn(t *testing.T) {
+	cur := load(t, "testdata/shop/v1")
+	kept := *snapshot(t, cur)
+	for _, e := range kept.Entities {
+		for j, f := range e.Fields {
+			if e.Raw == "Product" && f.Raw == "price" {
+				e.Fields[j].Ann = project.Ann{"store": {"history": true}}
+			}
+		}
+	}
+	up := Diff(snapshot(t, cur), kept).Up
+	for _, want := range []string{
+		"CREATE TABLE public.product_price_history (\n    id uuid NOT NULL,\n    product_id uuid NOT NULL,\n    value numeric NOT NULL,\n    at timestamptz NOT NULL DEFAULT now(),",
+		"INSERT INTO public.product_price_history (id, product_id, value, at)\nSELECT gen_random_uuid(), id, price, updated_at FROM public.products WHERE price IS NOT NULL;",
+		"FOREIGN KEY (product_id) REFERENCES public.products (id) ON DELETE CASCADE;",
+		"CREATE INDEX product_price_history_product_id_at_idx ON public.product_price_history (product_id, at);",
+	} {
+		if !strings.Contains(up, want) {
+			t.Errorf("misses %q:\n%s", want, up)
+		}
+	}
+	if again := Diff(snapshot(t, kept), kept); strings.TrimSpace(again.Up) != "" {
+		t.Errorf("no change, no migration:\n%s", again.Up)
+	}
+}

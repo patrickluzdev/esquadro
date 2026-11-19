@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) "encoding/json") (and (auditedOf $m.Entities (optionsOf "audit")) "github.com/go-faster/jx")}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (and (anyHistory $m.Entities) "time") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) "encoding/json") (and (auditedOf $m.Entities (optionsOf "audit")) "github.com/go-faster/jx")}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -544,6 +544,34 @@ func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Para
 		return nil, err
 	}
 	return auditAnswer(page), nil
+}
+{{- end}}
+{{- range histories $e}}{{$N := printf "%s%s" $P .Pascal}}
+
+func (h HTTP) Get{{$N}}History(ctx context.Context, params apigen.Get{{$N}}HistoryParams) (*apigen.{{$N}}History, error) {
+{{- if $pol}}
+	if _, err := h.readable{{$P}}(ctx{{$idArg}}); err != nil {
+{{- else}}
+	if _, err := h.{{$p}}.Read{{$P}}(ctx{{$idArg}}); err != nil {
+{{- end}}
+		return nil, problemOf(err)
+	}
+	since := params.Since.Or(time.Now().AddDate(0, 0, -90))
+	points, err := h.{{$p}}.{{$N}}History(ctx, uuid.UUID(params.{{$id}}), since)
+	if err != nil {
+		return nil, err
+	}
+	answer := &apigen.{{$N}}History{Items: make([]apigen.{{$N}}Point, 0, len(points))}
+	for _, x := range points {
+{{- if eq .Type "decimal"}}
+		answer.Items = append(answer.Items, apigen.{{$N}}Point{Value: x.Value.String(), At: x.At})
+{{- else if eq .Type "money"}}
+		answer.Items = append(answer.Items, apigen.{{$N}}Point{Value: apigen.Money{Amount: x.Value.Number(), Currency: apigen.NewOptString(x.Value.CurrencyCode())}, At: x.At})
+{{- else}}
+		answer.Items = append(answer.Items, apigen.{{$N}}Point{Value: x.Value, At: x.At})
+{{- end}}
+	}
+	return answer, nil
 }
 {{- end}}
 {{- if $pol}}

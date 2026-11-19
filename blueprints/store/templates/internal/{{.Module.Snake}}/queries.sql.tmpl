@@ -98,6 +98,28 @@ WHERE id = @id;
 SELECT DISTINCT {{.Group.Column}} FROM {{pgTable .Via.Entity (optionsOf "postgres")}} WHERE {{pgIdent (printf "%s_id" .Via.Snake)}} = @id AND {{.Group.Column}} IS NOT NULL;
 {{- end}}
 {{- end}}
+{{- range histories $e}}{{$h := historyTable $e . (optionsOf "postgres")}}{{$key := pgIdent (printf "%s_id" $e.Snake)}}{{$money := eq .Type "money"}}{{$since := "(sqlc.narg(since)::timestamptz IS NULL OR at >= sqlc.narg(since)::timestamptz)"}}
+
+-- name: Add{{$e.Pascal}}{{.Pascal}}Point :exec
+INSERT INTO {{$h}} (id, {{$key}}, value{{if $money}}, value_currency{{end}})
+VALUES (@id, @{{$e.Snake}}_id, @value{{if $money}}, @value_currency{{end}});
+
+-- name: {{$e.Pascal}}{{.Pascal}}History :many
+SELECT value{{if $money}}, value_currency{{end}}, at FROM {{$h}}
+WHERE {{$key}} = @id AND {{$since}}
+ORDER BY at DESC, id DESC
+LIMIT sqlc.arg(max)::int;
+
+-- name: {{$e.Pascal}}{{.Pascal}}Range :one
+SELECT count(*)::int AS points, min(at)::timestamptz AS first,
+  coalesce(min(value), 0)::{{historyCast .}} AS low, coalesce(max(value), 0)::{{historyCast .}} AS high
+{{- if $money}},
+  coalesce((array_agg(value_currency ORDER BY value, at))[1], '')::text AS low_currency,
+  coalesce((array_agg(value_currency ORDER BY value DESC, at))[1], '')::text AS high_currency
+{{- end}}
+FROM {{$h}}
+WHERE {{$key}} = @id AND {{$since}};
+{{- end}}
 
 -- name: Touch{{$e.Pascal}} :execrows
 UPDATE {{$t}}

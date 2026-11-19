@@ -62,6 +62,12 @@ blueprint store {
     /// in its default; another change is refused (not_allowed), whoever
     /// makes it, and the API lets only those of by make theirs.
     flow list
+    /// Every value it takes is kept, with when, in a table of its own:
+    /// added in the transaction of the create or the change that sets it
+    /// (an empty one is not). Read by <Entity><Field>History and Range
+    /// (how low and how high it went since a time), and by the API. Of
+    /// int, int64, decimal or money fields.
+    history bool
   }
   annotation relation {
     /// Lists may filter by the related record's id.

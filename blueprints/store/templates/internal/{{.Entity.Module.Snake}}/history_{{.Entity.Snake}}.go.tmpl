@@ -1,0 +1,76 @@
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$key := sqlcName (printf "%s_id" $e.Snake) -}}
+{{- with histories $e -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "slices" "time" "uuid" (historyImports $e) (printf "%s/internal/%s/sqlgen" $.App.Module $m.Snake) (printf "%s/internal/platform/postgres" $.App.Module)}}
+// {{$e.Camel}}HistoryMax is the most points a history of a {{lower $e.Label}} answers:
+// the newest.
+const {{$e.Camel}}HistoryMax = {{historyMax}}
+
+// {{$e.Camel}}Histories adds to the history of each field of a {{lower $e.Label}} kept
+// with @store(history) the value it has after a change, when before had
+// another (before is nil for a create) and it is not empty, in the
+// transaction of ctx.
+func ({{$r}} *{{$m.Pascal}}) {{$e.Camel}}Histories(ctx context.Context, before *{{$e.Pascal}}, after {{$e.Pascal}}) error {
+	q := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool))
+{{- range .}}{{$v := printf "after.%s" .Pascal}}
+	if {{if eq .Type "money"}}{{$v}}.CurrencyCode() != "" && {{end}}(before == nil || {{historyChanged . (printf "before.%s" .Pascal) $v}}) {
+		err := q.Add{{$e.Pascal}}{{.Pascal}}Point(ctx, sqlgen.Add{{$e.Pascal}}{{.Pascal}}PointParams{
+			ID: postgres.UUID({{$r}}.NewID()), {{$key}}: postgres.UUID(after.ID), Value: {{historyIn . $v}},{{if eq .Type "money"}} ValueCurrency: {{$v}}.CurrencyCode(),{{end}}
+		})
+		if err != nil {
+			return err
+		}
+	}
+{{- end}}
+	return nil
+}
+{{- range .}}{{$f := .}}{{$N := printf "%s%s" $e.Pascal $f.Pascal}}
+
+// {{$N}}Point is a value the {{$f.Snake}} of a {{lower $e.Label}} took, and when.
+type {{$N}}Point struct {
+	Value {{goType $f}}
+	At    time.Time
+}
+
+// {{$N}}Range is how low and how high the {{$f.Snake}} of a {{lower $e.Label}}
+// went in a time: Points is how many values it took, 0 when none, and First
+// when the first of them was.
+type {{$N}}Range struct {
+	Low, High {{goType $f}}
+	Points    int
+	First     time.Time
+}
+
+// {{$N}}History is every value the {{$f.Snake}} of the {{lower $e.Label}} id took
+// since since (all of them when zero), the oldest first: the newest
+// {{$e.Camel}}HistoryMax when there are more.
+func ({{$r}} *{{$m.Pascal}}) {{$N}}History(ctx context.Context, id uuid.UUID, since time.Time) ([]{{$N}}Point, error) {
+	rows, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).{{$N}}History(ctx, sqlgen.{{$N}}HistoryParams{
+		ID: postgres.UUID(id), Since: postgres.Timestamptz(since), Max: {{$e.Camel}}HistoryMax,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]{{$N}}Point, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, {{$N}}Point{Value: {{historyOut $f "row.Value"}}, At: row.At.Time})
+	}
+	slices.Reverse(out)
+	return out, nil
+}
+
+// {{$N}}Range is how low and how high the {{$f.Snake}} of the {{lower $e.Label}} id
+// went since since (ever, when zero): the lowest in 90 days, with since 90
+// days ago.
+func ({{$r}} *{{$m.Pascal}}) {{$N}}Range(ctx context.Context, id uuid.UUID, since time.Time) ({{$N}}Range, error) {
+	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).{{$N}}Range(ctx, sqlgen.{{$N}}RangeParams{
+		ID: postgres.UUID(id), Since: postgres.Timestamptz(since),
+	})
+	if err != nil {
+		return {{$N}}Range{}, err
+	}
+	return {{$N}}Range{Low: {{historyOut $f "row.Low"}}, High: {{historyOut $f "row.High"}}, Points: int(row.Points), First: row.First.Time}, nil
+}
+{{- end}}
+{{end -}}

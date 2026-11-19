@@ -52,6 +52,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 			return err
 		}
 {{- end}}
+{{- if histories $e}}
+		if err := {{$r}}.{{$e.Camel}}Histories(ctx, nil, created); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $links}}
 		if err := {{$e.Camel}}Links(ctx, postgres.Querier(ctx, {{$r}}.Pool), created.ID, n); err != nil {
 			return err

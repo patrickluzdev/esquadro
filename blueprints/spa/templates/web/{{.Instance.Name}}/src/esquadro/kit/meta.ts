@@ -103,6 +103,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   trash?: { days: number }
   /** Its changes are kept (the audit blueprint): its plural, and who sees a record's history. */
   history?: { entity: string; who: "update" | "read" | "admins" }
+  /** The fields whose values are kept (@store(history)), and the client's operation that reads them. */
+  histories?: readonly { field: string; api: string }[]
   /** One record only (@store(single)): its page is its form, with no list. */
   single?: boolean
   /** Its records may be imported from a CSV file (@store(import)); by: the field a row replaces the record of. */

@@ -462,6 +462,27 @@ func TestCheckFlows(t *testing.T) {
 	}
 }
 
+func TestCheckHistories(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":     {"entity Offer {\n  price decimal required @store(history)\n  views int64 @store(history)\n}\n", ""},
+		"type":   {"entity Offer {\n  title string @store(history)\n}\n", "Offer.title is string; a history keeps int, int64, decimal or money"},
+		"single": {"entity Settings {\n  fee decimal default(1) @store(history)\n  @store(single)\n}\n", "Settings is single"},
+		"total":  {"entity Offer {\n  votes < Vote\n  score int @store(sum votes.value, history)\n}\n\nentity Vote {\n  value int required\n  offer > Offer required\n}\n", "Offer.score is a total the store keeps"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
 func TestCheckIntegrations(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "promo")
 	if code, _, errOut := esq(t, "new", "-starter", "worker", "-module", "example.com/promo", "-no-git", "-no-gen", dir); code != 0 {

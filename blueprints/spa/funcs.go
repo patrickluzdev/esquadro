@@ -32,6 +32,7 @@ func TemplateFuncs() template.FuncMap {
 		"inAnswer":   rest.InAnswer,
 		"isTotal":    store.IsTotal,
 		"orders":     store.Orders,
+		"histories":  store.Histories,
 		"written":    store.Written,
 		// hasFlow reports whether a field has a flow (@store(flow)).
 		"hasFlow": func(f *project.Field) bool {

@@ -204,6 +204,10 @@ export interface {{.Plural.Pascal}}Api {
   /** Its changes, the newest first: who, when, each field before and after. */
   history(id: string, query?: { page?: number; per_page?: number }, options?: ReadOptions): Promise<AuditPage>
 {{- end}}
+{{- range histories $e}}
+  /** The values its {{.Snake}} took since since (RFC 3339; 90 days ago when left out), with when, the oldest first. */
+  {{.Camel}}History(id: string, query?: { since?: string }, options?: ReadOptions): Promise<{ items: { value: {{tsType .}}; at: string }[] }>
+{{- end}}
 {{- if softDeleted $e}}
   /** Puts one in the trash, with what goes with it; trash.restore takes it out. */
   delete(id: string, options?: ChangeOptions): Promise<void>

@@ -31,6 +31,7 @@ import { RichText } from "./rich.tsx"
 import { confirmRemove, removed } from "./trash.tsx"
 import { useSession } from "./auth.tsx"
 import { RecordHistory, seesHistory } from "./history.tsx"
+import { ValueHistory } from "./trend.tsx"
 
 /** A field's value: your own renderer for its name or kind, or the kit's. */
 /** A field's value, as a page shows it; inline, in a line of a list. */
@@ -211,44 +212,50 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
           {buttons}
         </CardContent>
       </Card>
-      <Card className="py-0">
-        <Tabs defaultValue={"details"} className="gap-0">
-          <TabsList variant="line" className="px-6 pt-4">
-            <TabsTrigger value="details">
-              {t("details")}
-            </TabsTrigger>
-            {relations.map((rel) => (
-              <TabsTrigger key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`}>
-                {rel.label ?? rel.resource.meta.label}
-                <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
+      <div className="flex min-w-0 flex-col gap-6">
+        <Card className="py-0">
+          <Tabs defaultValue={"details"} className="gap-0">
+            <TabsList variant="line" className="px-6 pt-4">
+              <TabsTrigger value="details">
+                {t("details")}
               </TabsTrigger>
-            ))}
+              {relations.map((rel) => (
+                <TabsTrigger key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`}>
+                  {rel.label ?? rel.resource.meta.label}
+                  <RelationCount resource={rel.resource} param={rel.param} value={r.id} />
+                </TabsTrigger>
+              ))}
+              {history && (
+                <TabsTrigger value="history">
+                  <HistoryIcon /> {t("history")}
+                </TabsTrigger>
+              )}
+            </TabsList>
             {history && (
-              <TabsTrigger value="history">
-                <HistoryIcon /> {t("history")}
-              </TabsTrigger>
+              <TabsContent value="history" className="p-6">
+                <RecordHistory meta={meta} id={r.id} />
+              </TabsContent>
             )}
-          </TabsList>
-          {history && (
-            <TabsContent value="history" className="p-6">
-              <RecordHistory meta={meta} id={r.id} />
+            <TabsContent value="details" className="flex flex-col gap-8 p-6">
+              {groups.map((g, i) => (
+                <section key={g.title ?? i} className="flex flex-col gap-5">
+                  {g.title && <h2 className="text-base font-bold text-foreground">{g.title}</h2>}
+                  <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">{g.fields.map(value)}</dl>
+                </section>
+              ))}
             </TabsContent>
-          )}
-          <TabsContent value="details" className="flex flex-col gap-8 p-6">
-            {groups.map((g, i) => (
-              <section key={g.title ?? i} className="flex flex-col gap-5">
-                {g.title && <h2 className="text-base font-bold text-foreground">{g.title}</h2>}
-                <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">{g.fields.map(value)}</dl>
-              </section>
+            {relations.map((rel) => (
+              <TabsContent key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`} className="p-5">
+                <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
+              </TabsContent>
             ))}
-          </TabsContent>
-          {relations.map((rel) => (
-            <TabsContent key={`${rel.resource.meta.name}-${rel.param}`} value={`${rel.resource.meta.name}-${rel.param}`} className="p-5">
-              <ResourceList resource={rel.resource} scope={ { param: rel.param, value: r.id, label: rel.label } } />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </Card>
+          </Tabs>
+        </Card>
+        {meta.histories?.map((h) => {
+          const field = meta.fields[h.field]
+          return field && <ValueHistory key={h.field} meta={meta} field={field} op={h.api} id={r.id} />
+        })}
+      </div>
     </div>
   )
 }

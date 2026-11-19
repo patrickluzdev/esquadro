@@ -314,6 +314,11 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}} }); err != nil {
 		t.Fatalf("update: %v", err)
 	}
+{{- range histories $e}}
+	if h, err := c.Get{{$P}}{{.Pascal}}History(ctx, apigen.Get{{$P}}{{.Pascal}}HistoryParams{ {{- $id}}: created.ID}); err != nil{{if .Required}} || len(h.Items) == 0{{end}} {
+		t.Fatalf("{{.Kebab}}-history: %+v, %v", h, err)
+	}
+{{- end}}
 	if err := c.Delete{{$P}}(ctx, apigen.Delete{{$P}}Params{ {{$id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}} }); err != nil {
 		t.Fatalf("delete: %v", err)
 	}

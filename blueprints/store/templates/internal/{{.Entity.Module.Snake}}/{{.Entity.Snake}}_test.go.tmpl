@@ -124,7 +124,7 @@ func TestAudit{{$e.Pascal}}(t *testing.T) {
 {{- else}}
 
 {{- $texts := textFields $e}}{{$limit := createLimit .Entities $e}}
-{{importBlock "context" "errors" (and (audited $e (optionsOf "audit")) "strings") "testing" (and (or (softDeleted $e) $limit) "time") "uuid" (and (audited $e (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and $texts "reflect") (and (gt (len $texts) 1) "sync") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and $limit (printf "%s/internal/platform/security" .App.Module))}}
+{{importBlock "context" "errors" (and (audited $e (optionsOf "audit")) "strings") "testing" (and (or (softDeleted $e) $limit (histories $e)) "time") "uuid" (and (audited $e (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and $texts "reflect") (and (gt (len $texts) 1) "sync") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and $limit (printf "%s/internal/platform/security" .App.Module))}}
 // given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
 // first; i tells records apart. Change the values freely: esquadro wrote
 // them from the rules in the .esq file.
@@ -929,6 +929,46 @@ func Test{{$e.Pascal}}Uncounts{{$C.Plural.Pascal}}By{{.Via.Pascal}}(t *testing.T
 {{- end}}
 }
 {{- end}}
+{{- end}}
+{{- end}}
+{{- range histories $e}}{{$f := .}}{{with historySamples $f}}{{$N := printf "%s%s" $e.Pascal $f.Pascal}}
+
+// Test{{$N}}History keeps each value the {{$f.Snake}} of a {{lower $e.Label}}
+// takes, with when: on a create and on a change of it, not on a change
+// that leaves it as it was.
+func Test{{$N}}History(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+	since := time.Now().Add(-time.Hour)
+	low, high := {{index . 0}}, {{index . 1}}
+
+	n := given{{$e.Pascal}}(t, {{$r}}, 1)
+	n.{{$f.Pascal}} = high
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.{{$f.Pascal}} = low
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, 0, n); err != nil {
+		t.Fatalf("changed: %v", err)
+	}
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, created.ID, 0, n); err != nil {
+		t.Fatalf("left as it was: %v", err)
+	}
+	points, err := {{$r}}.{{$N}}History(ctx, created.ID, since)
+	if err != nil || len(points) != 2 || !({{historyEqual $f "points[0].Value" "high"}}) || !({{historyEqual $f "points[1].Value" "low"}}) || points[1].At.Before(points[0].At) {
+		t.Fatalf("history: %+v, %v", points, err)
+	}
+	took, err := {{$r}}.{{$N}}Range(ctx, created.ID, since)
+	if err != nil || took.Points != 2 || !({{historyEqual $f "took.Low" "low"}}) || !({{historyEqual $f "took.High" "high"}}) || !took.First.Equal(points[0].At) {
+		t.Fatalf("range: %+v, %v", took, err)
+	}
+	none, err := {{$r}}.{{$N}}Range(ctx, created.ID, time.Now().Add(time.Hour))
+	if err != nil || none.Points != 0 {
+		t.Fatalf("range of a time without points: %+v, %v", none, err)
+	}
+}
 {{- end}}
 {{- end}}
 {{- range flows $e}}{{$f := .Field}}{{$start := .Start}}{{$next := index (.Next $start) 0}}

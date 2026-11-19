@@ -147,6 +147,9 @@ func plan(from, to database) *steps {
 		}
 		if prev == nil {
 			s.createTables = append(s.createTables, createTable(t))
+			if t.seed != "" {
+				s.fills = append(s.fills, t.seed)
+			}
 			for _, fk := range t.foreignKeys {
 				s.addConstraints = append(s.addConstraints, addForeignKey(t, fk))
 			}

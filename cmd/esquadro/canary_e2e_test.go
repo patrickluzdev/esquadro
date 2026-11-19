@@ -158,6 +158,12 @@ func TestCanaryUpgrades(t *testing.T) {
 		t.Fatal("the canary's Offer has no status to give a flow")
 	}
 	deals = flowed
+	// The lowest price in 90 days: every price an offer had, with when.
+	priced := regexp.MustCompile(`(?m)^(  price +money +required min\(0\) )@store\(sort\)$`).ReplaceAllString(deals, "${1}@store(sort, history)")
+	if priced == deals {
+		t.Fatal("the canary's Offer has no price to keep the history of")
+	}
+	deals = priced
 	write("esquadro/deals.esq", deals)
 	write("internal/deals/link_rules.go", `package deals
 

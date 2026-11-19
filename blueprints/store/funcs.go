@@ -149,16 +149,34 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return out
 		},
-		"links":       links,
-		"totalGroups": TotalGroups,
-		"countedBy":   CountedBy,
-		"cascades":    Cascades,
-		"totalSQL":    TotalSQL,
-		"orders":      Orders,
-		"isTotal":     IsTotal,
-		"written":     Written,
-		"flows":       security.Flows,
-		"manyToMany":  func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
+		"links":          links,
+		"totalGroups":    TotalGroups,
+		"countedBy":      CountedBy,
+		"cascades":       Cascades,
+		"totalSQL":       TotalSQL,
+		"orders":         Orders,
+		"isTotal":        IsTotal,
+		"written":        Written,
+		"flows":          security.Flows,
+		"histories":      Histories,
+		"historyTable":   historyTable,
+		"historyIn":      historyIn,
+		"historyOut":     historyOut,
+		"historyChanged": historyChanged,
+		"historyCast":    historyCast,
+		"historyImports": historyImports,
+		"historyEqual":   historyEqual,
+		"historyMax":     func() int { return HistoryMax },
+		// historySamples are a field's low and high values for tests, or
+		// none when its rules leave room for one.
+		"historySamples": func(f *project.Field) []string {
+			lo, hi, ok := HistorySamples(f)
+			if !ok {
+				return nil
+			}
+			return []string{lo, hi}
+		},
+		"manyToMany": func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}
 }
 

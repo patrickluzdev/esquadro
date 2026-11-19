@@ -35,13 +35,18 @@ func TemplateFuncs() template.FuncMap {
 		"orders":              store.Orders,
 		"inAnswer":            InAnswer,
 		"countedBy":           store.CountedBy,
-		"flows":               security.Flows,
-		"flowsBy":             security.FlowsBy,
-		"canNames":            security.CanNames,
-		"sortDoc":             SortDoc,
-		"searchFieldsOf":      store.SearchFields,
-		"has":                 has,
-		"accessLine":          accessLine,
+		"histories":           store.Histories,
+		"anyHistory": func(entities []*project.Entity) bool {
+			return slices.ContainsFunc(entities, func(e *project.Entity) bool { return len(store.Histories(e)) > 0 })
+		},
+		"historyMax":     func() int { return store.HistoryMax },
+		"flows":          security.Flows,
+		"flowsBy":        security.FlowsBy,
+		"canNames":       security.CanNames,
+		"sortDoc":        SortDoc,
+		"searchFieldsOf": store.SearchFields,
+		"has":            has,
+		"accessLine":     accessLine,
 		// policies reports whether the API asks the entities' policies:
 		// when something signs in.
 		"policies":     func(entities []*project.Entity) bool { return len(security.RealmsOf(entities)) > 0 },

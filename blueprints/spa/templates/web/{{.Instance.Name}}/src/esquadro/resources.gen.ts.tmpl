@@ -48,6 +48,9 @@ export const resources = {
 {{- if importable $e}}
     import: { {{- with importBy $e}}by: "{{.Snake}}"{{end -}} },
 {{- end}}
+{{- with histories $e}}
+    histories: [{{range $i, $f := .}}{{if $i}}, {{end}}{ field: "{{$f.Snake}}", api: "{{$f.Camel}}History" }{{end}}],
+{{- end}}
 {{- if and $.Options.history (audited $e (optionsOf "audit"))}}
     history: { entity: "{{$e.Plural.Snake}}", who: "{{index (optionsOf "audit") "history"}}" },
 {{- end}}

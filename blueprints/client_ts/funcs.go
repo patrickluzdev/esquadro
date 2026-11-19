@@ -74,6 +74,7 @@ func TemplateFuncs() template.FuncMap {
 		"idLinks":     store.IDLinks,
 		"audited":     audit.Audited,
 		"auditedOf":   audit.AuditedOf,
+		"histories":   store.Histories,
 		"manyToMany": func(e *project.Entity) []*project.Relation {
 			var out []*project.Relation
 			for _, r := range e.Relations {

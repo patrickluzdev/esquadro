@@ -47,6 +47,9 @@ type table struct {
 	// primaryKey lists the key's columns: id, or both columns of a join
 	// table.
 	primaryKey []string
+	// seed is the SQL that fills the table when it is created, or "": a
+	// history starts with the value each record has.
+	seed string
 }
 
 func (t table) qualified() string { return t.schema + "." + t.name }
@@ -222,6 +225,11 @@ func describe(d project.Description) database {
 		for _, r := range e.Relations {
 			if r.Kind == "many-to-many" && !r.Inferred {
 				db.tables = append(db.tables, joinTable(l, e, r, entities[r.Target]))
+			}
+		}
+		for _, f := range e.Fields {
+			if on, _ := f.Ann["store"]["history"].(bool); on && !f.Implicit {
+				db.tables = append(db.tables, historyTable(l, e, f))
 			}
 		}
 	}
@@ -534,6 +542,37 @@ func joinTable(l layout, e project.EntityDescription, r project.RelationDescript
 			refTable: schema + "." + tableName(target), onDelete: "CASCADE",
 		})
 	}
+	return t
+}
+
+// historyTable is the table of a field's history (@store(history)): each
+// value a record's field took, and when, gone with the record. It starts
+// with the value each record has.
+func historyTable(l layout, e project.EntityDescription, f project.FieldDescription) table {
+	schema := l.schema(e.Module)
+	name := e.Snake + "_" + f.Snake + "_history"
+	key := e.Snake + "_id"
+	value := column{name: "value", sqlType: sqlTypes[f.Type], notNull: true}
+	t := table{
+		key:    "history " + e.Module + "." + e.Raw + "." + f.Raw,
+		schema: schema, name: name, primaryKey: []string{"id"},
+		columns: []column{{name: "id", sqlType: "uuid", notNull: true}, {name: key, sqlType: "uuid", notNull: true}, value},
+		foreignKeys: []foreignKey{{
+			name: name + "_" + key + "_fkey", column: key,
+			refTable: schema + "." + tableName(e), onDelete: "CASCADE",
+		}},
+		indexes: []index{{name: name + "_" + key + "_at_idx", columns: []string{key, "at"}}},
+	}
+	cols, values := "id, "+postgres.Ident(key)+", value", "gen_random_uuid(), id, "+postgres.Ident(columnName(f))
+	where := postgres.Ident(columnName(f)) + " IS NOT NULL"
+	if f.Type == project.TypeMoney {
+		t.columns = append(t.columns, column{name: "value_currency", sqlType: "char(3)", notNull: true, check: "value_currency ~ '^[A-Z]{3}$'"})
+		cols += ", value_currency"
+		values += ", " + postgres.Ident(columnName(f)+"_currency")
+		where += " AND " + postgres.Ident(columnName(f)+"_currency") + " IS NOT NULL"
+	}
+	t.columns = append(t.columns, column{name: "at", sqlType: "timestamptz", notNull: true, def: "now()"})
+	t.seed = "INSERT INTO " + t.qualified() + " (" + cols + ", at)\nSELECT " + values + ", updated_at FROM " + schema + "." + tableName(e) + " WHERE " + where + ";"
 	return t
 }
 

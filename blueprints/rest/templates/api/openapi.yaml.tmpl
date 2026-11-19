@@ -351,6 +351,40 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 {{- end}}
+{{- range histories $e}}{{$N := printf "%s%s" $e.Pascal .Pascal}}
+  /api/v1/{{$e.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/{{.Kebab}}-history:
+    parameters:
+      - name: {{$id}}
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: get{{$N}}History
+      summary: {{quote (printf "The values the %s of a %s took" (lower .Label) (lower $e.Label))}}
+      description: |
+        Each value its {{.Snake}} took since `since` (90 days ago by default), with
+        when, the oldest first: the newest {{historyMax}} when there are more. Codes:
+        `not_found` (404).
+{{- with accessLine $.Entities $e "read"}}
+        {{.}}
+{{- end}}
+      tags: [{{$e.Module.Snake}}]
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Since when, as RFC 3339; 90 days ago when left out.
+          schema: {type: string, format: date-time}
+      responses:
+        "200":
+          description: Its values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{$N}}History"
+        default:
+          $ref: "#/components/responses/Problem"
+{{- end}}
 {{- if softDeleted $e}}
   /api/v1/{{.Plural.Kebab}}/{{"{"}}{{$id}}{{"}"}}/restore:
     parameters:
@@ -839,6 +873,23 @@ components:
         next: {type: string, description: The cursor of the next page; absent on the last one.}
 {{- end}}{{end}}
 {{- end}}
+{{- range $e := .Entities}}{{range histories $e}}{{$N := printf "%s%s" $e.Pascal .Pascal}}
+    {{$N}}History:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/{{$N}}Point"
+    {{$N}}Point:
+      type: object
+      description: {{quote (printf "A value the %s of a %s took, and when." (lower .Label) (lower $e.Label))}}
+      required: [value, at]
+      properties:
+        value: {{schema .}}
+        at: {type: string, format: date-time}
+{{- end}}{{end}}
 {{- range .Reports}}
     {{.Pascal}}Report:
       type: object
