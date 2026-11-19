@@ -53,7 +53,8 @@ func TestServiceKeys(t *testing.T) {
 		t.Fatalf("%d, signed in as %+v", code, who)
 	}
 	keys, err := s.ServiceKeys(ctx)
-	if err != nil || len(keys) != 1 || keys[0].LastUsedAt == nil || strings.Contains(key, keys[0].Prefix+"x") {
+	// The list shows the key's beginning, never the key.
+	if err != nil || len(keys) != 1 || keys[0].LastUsedAt == nil || !strings.HasPrefix(key, keys[0].Prefix) || len(keys[0].Prefix) != len(ServiceKeyPrefix)+6 {
 		t.Fatalf("listed %+v (%v)", keys, err)
 	}
 
