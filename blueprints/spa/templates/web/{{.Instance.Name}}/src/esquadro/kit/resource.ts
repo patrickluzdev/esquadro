@@ -19,8 +19,9 @@ export type Column = FieldMeta | ({ field: FieldMeta } & ColumnOptions)
 
 /**
  * An action of yours, on a record: approve, publish, copy its message. It
- * changes fields (patch, after the fields of ask), copies text (copy),
- * runs your code (run), or more than one, in that order: copy, patch, run.
+ * changes fields (patch, after the fields of ask), copies text (copy) or an
+ * image (copyImage), runs your code (run), or more than one, in that order:
+ * copy, copyImage, patch, run.
  */
 export interface Action {
   label: string
@@ -35,6 +36,8 @@ export interface Action {
   ask?: FieldMeta[]
   /** Text to copy: a message to paste elsewhere. */
   copy?: (record: Rec) => string
+  /** The address of an image to copy, as an image: a picture to paste into WhatsApp. */
+  copyImage?: (record: Rec) => string
   /** Its key, on the record in focus (the queue) or open: "1", "s". */
   key?: string
   /** Ask first, with this question. */
