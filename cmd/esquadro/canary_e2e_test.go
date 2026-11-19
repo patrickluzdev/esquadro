@@ -125,8 +125,6 @@ func TestCanaryUpgrades(t *testing.T) {
 	}
 	// A job posted once per offer and group, ever.
 	deals += "\n/// Posts an offer to a group, once.\njob PostOffer {\n  offer_id       uuid required\n  destination_id uuid required\n  @jobs(unique_by [offer_id, destination_id])\n}\n"
-	// What visitors say of the offers: each visitor at most 30 an hour.
-	deals += "\n/// What a visitor says of an offer.\nentity Comment {\n  body    text required min(2) max(500)\n  offer   > Offer required on_delete(cascade)\n  visitor > Visitor required\n  @security(read public, write owner)\n  @rate_limit(create \"30/h\")\n}\n"
 	// Its short links: the site redirects by the code, which a rule makes up.
 	deals = strings.Replace(deals, "  code        string required unique min(4) max(12)", "  code        string unique min(4) max(12)", 1)
 	deals = strings.Replace(deals, "  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n}",
@@ -134,8 +132,9 @@ func TestCanaryUpgrades(t *testing.T) {
 	if !strings.Contains(deals, "@site(redirect, by code, to target_url)") || strings.Contains(deals, "code        string required") {
 		t.Fatal("the canary's Link was not made a redirect")
 	}
-	// The visitors' comments on an offer, and the replies to them.
-	deals += "\n/// A comment on an offer, or a reply to another.\nentity Comment {\n  body    text required max(2000)\n  offer   > Offer required on_delete(cascade) @store(filter)\n  parent  > Comment on_delete(cascade) @store(filter)\n  replies < Comment\n  author  > Visitor required\n  @security(read public, write owner)\n  @store(soft_delete)\n  @site(page, path \"comentarios\", relations [replies])\n}\n"
+	// The visitors' comments on an offer, and the replies to them: each
+	// visitor at most 30 an hour.
+	deals += "\n/// A comment on an offer, or a reply to another.\nentity Comment {\n  body    text required max(2000)\n  offer   > Offer required on_delete(cascade) @store(filter)\n  parent  > Comment on_delete(cascade) @store(filter)\n  replies < Comment\n  author  > Visitor required\n  @security(read public, write owner)\n  @store(soft_delete)\n  @rate_limit(create \"30/h\")\n  @site(page, path \"comentarios\", relations [replies])\n}\n"
 	withComments := strings.Replace(deals, `@site(page, path "ofertas", schema product, menu)`, `@site(page, path "ofertas", schema product, relations [comments], menu)`, 1)
 	if withComments == deals {
 		t.Fatal("the canary's Offer has no site page to list its comments on")
