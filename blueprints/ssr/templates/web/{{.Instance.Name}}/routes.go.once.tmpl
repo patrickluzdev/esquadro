@@ -1,0 +1,15 @@
+package {{.Instance.Name}}
+
+import "net/http"
+
+// ownRoutes are the {{.Instance.Name}} site's pages of your own: "Join our
+// groups", "About". Yours: esquadro wrote it once. Each renders a templ
+// component of yours inside Layout, e.g.:
+//
+//	m.HandleFunc("GET /about", func(w http.ResponseWriter, r *http.Request) {
+//		s.render(w, r, http.StatusOK, AboutPage(s.page(r, "About", "Who we are.")))
+//	})
+func (s *Site) ownRoutes(m *http.ServeMux) {
+	_ = m
+	_ = http.MethodGet
+}

@@ -1,5 +1,5 @@
 {{- $pg := optionsOf "postgres" -}}
-{{- $loc := .Options.locale}}{{range instances "spa"}}{{if not $loc}}{{$loc = .Options.locale}}{{end}}{{end -}}
+{{- $loc := .Options.locale}}{{range frontends}}{{if not $loc}}{{$loc = .Options.locale}}{{end}}{{end -}}
 {{- if eq $loc "pt_br"}}{{$loc = "pt-BR"}}{{else if not $loc}}{{$loc = "en"}}{{end -}}
 {{- $money := noticeMoney .Entities -}}
 // Package notifications keeps the notices of the people who sign in: sent

@@ -24,7 +24,10 @@ func PrincipalIn(ctx context.Context, realm string) (Principal, bool) {
 // realm, or an Authorization: Bearer header with a JWT or a session token.
 // With a session cookie, a request that changes something must come from
 // the app (Origin, Sec-Fetch-Site) and carry the session's CSRF token in
-// X-CSRF-Token. A request that comes from no one goes on, for the routes
+// X-CSRF-Token. A request to a realm's identity routes (signing up, in,
+// out) is that realm's alone: the sessions of the others are not read, so
+// that a person signed in to another frontend of the app still signs up or
+// in to this one. A request that comes from no one goes on, for the routes
 // open to anyone.
 func (s *Security) Authenticate(realms []string, origins []string) edge.Middleware {
 	return func(next http.Handler) http.Handler {
@@ -53,7 +56,16 @@ func (s *Security) Authenticate(realms []string, origins []string) edge.Middlewa
 				}
 				principals[p.Realm] = p
 			}
+			only := ""
+			if rest, ok := strings.CutPrefix(r.URL.Path, s.prefix+"/"); ok {
+				if realm, _, _ := strings.Cut(rest, "/"); slices.Contains(realms, realm) {
+					only = realm
+				}
+			}
 			for _, realm := range realms {
+				if only != "" && realm != only {
+					continue
+				}
 				c, err := r.Cookie(s.SessionCookieName(realm))
 				if err != nil || c.Value == "" {
 					continue

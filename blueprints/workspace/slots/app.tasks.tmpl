@@ -7,15 +7,22 @@
     desc: Build the frontends
     cmds:
       - npm run build
-{{- with instances "spa"}}
+{{- with frontends}}
 
   dev:
     desc: Run the API and the frontends together (Ctrl-C stops them)
-    deps: [run{{range .}}, web:dev:{{.Name}}{{end}}]
+    deps: [run{{range .}}, web:dev:{{.Name}}{{end}}{{if instances "ssr"}}, web:templ{{end}}]
+{{- if instances "ssr"}}
+
+  web:templ:
+    desc: Write the Go of the sites' .templ files again as they change
+    cmds:
+      - go run github.com/a-h/templ/cmd/templ@v0.3.1118 generate --watch -path web
+{{- end}}
 {{- range .}}
 
   web:dev:{{.Name}}:
-    desc: Run the {{.Name}} frontend, with its API calls sent to the app
+    desc: {{if eq .Kind "spa"}}Run the {{.Name}} frontend, with its API calls sent to the app{{else}}Build the {{.Name}} site's styles and pages again as they change{{end}}
     dir: web/{{.Name}}
     cmds:
       - npm run dev

@@ -1,0 +1,48 @@
+{{- $n := .Instance.Name -}}
+{{- $pages := sitePages .Entities $n -}}
+{{- $menu := false}}{{range $pages}}{{if .Menu}}{{$menu = true}}{{end}}{{end -}}
+// The frame of every page of the {{$n}} site: the header, with the menu,
+// the search and the account, and the footer. Yours: esquadro wrote it once,
+// and merges its changes into yours.
+
+package {{$n}}
+
+templ Layout(p Page) {
+	<!DOCTYPE html>
+	<html lang={ Locale }>
+		<head>
+			@Head(p)
+		</head>
+		<body class="min-h-screen bg-background text-foreground antialiased">
+			<a href="#main" class="sr-only focus:not-sr-only">{ T("skipToContent") }</a>
+			<header class="border-b border-border">
+				<div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
+					<a href={ templ.URL(URL("/")) } class="text-lg font-semibold tracking-tight">{ Name }</a>
+					<nav class="flex flex-wrap gap-4 text-sm">
+{{- range $pages}}{{if or .Menu (not $menu)}}
+						<a href={ templ.URL({{.Entity.Plural.Pascal}}URL()) } class="text-muted-foreground hover:text-foreground">{ {{.Entity.Plural.Pascal}}Label }</a>
+{{- end}}{{end}}
+					</nav>
+					<div class="ml-auto flex items-center gap-3">
+{{- if siteSearch $pages}}
+						<form action={ templ.URL(SearchURL()) } method="get" role="search">
+							<input type="search" name="q" value={ p.Query } placeholder={ T("searchPlaceholder") } aria-label={ T("search") } class="h-9 w-48 rounded-lg border border-border bg-background px-3 text-sm"/>
+						</form>
+{{- end}}
+						if p.SignedIn {
+							<a href={ templ.URL(AccountURL()) } class="text-sm font-medium">{ T("myAccount") }</a>
+						} else {
+							<a href={ templ.URL(SignInURL()) } class="text-sm font-medium">{ T("signIn") }</a>
+						}
+					</div>
+				</div>
+			</header>
+			<main id="main" class="mx-auto max-w-6xl px-4 py-8">
+				{ children... }
+			</main>
+			<footer class="border-t border-border">
+				<div class="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">{ Name }</div>
+			</footer>
+		</body>
+	</html>
+}

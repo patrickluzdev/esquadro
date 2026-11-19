@@ -1,0 +1,6 @@
+{{- range instances "ssr"}}
+	"{{$.App.Module}}/web/{{.Name}}"
+{{- end}}
+{{- if and (instances "ssr") (not (instances "spa"))}}
+	"{{$.App.Module}}/internal/platform/web"
+{{- end}}

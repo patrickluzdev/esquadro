@@ -23,7 +23,7 @@ import (
 var blueprintGroups = map[string]string{
 	"app": "base", "env": "base", "domain": "base", "http": "base", "worker": "base", "jobs": "base",
 	"postgres": "data", "migrations": "data", "store": "data", "seed": "data", "audit": "data", "notifications": "data", "testcontainers": "data", "compose": "data",
-	"rest": "api", "api_docs": "api", "client_ts": "api", "ui": "api", "spa": "api", "security": "api", "mail": "api", "storage": "api", "rate_limit": "api",
+	"rest": "api", "api_docs": "api", "client_ts": "api", "ui": "api", "spa": "api", "ssr": "api", "security": "api", "mail": "api", "storage": "api", "rate_limit": "api",
 	"compression": "api", "i18n": "api",
 	"docker": "ship", "github_actions": "ship", "deploy": "ship", "observability": "ship",
 	"workspace": "tools", "git": "tools", "branching": "tools",

@@ -23,7 +23,7 @@ are kept; generated ones are made when their list is empty.
   --allow-production  seed the production database`
 
 // seedLocale picks the words of generated texts.
-const seedLocale = "{{range $i, $s := instances "spa"}}{{if eq $i 0}}{{$s.Options.locale}}{{end}}{{else}}en{{end}}"
+const seedLocale = "{{range $i, $s := frontends}}{{if eq $i 0}}{{$s.Options.locale}}{{end}}{{else}}en{{end}}"
 
 // seedCommand runs {{.App.Kebab}} seed.
 func seedCommand(ctx context.Context, args []string) error {

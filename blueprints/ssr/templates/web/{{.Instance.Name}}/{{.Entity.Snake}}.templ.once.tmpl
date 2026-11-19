@@ -1,0 +1,118 @@
+{{- $n := .Instance.Name -}}
+{{- $pg := sitePage .Entities $n .Entity -}}
+{{- if $pg -}}
+{{- $e := .Entity -}}
+{{- $m := $e.Module.Snake -}}
+{{- $images := and $pg.Image (uses "storage") -}}
+// The {{lower $e.Plural.Label}} of the {{$n}} site: their list, a card for
+// each, and a page for each. Yours: esquadro wrote it once, and merges its
+// changes into yours.
+
+package {{$n}}
+
+import "{{.App.Module}}/internal/{{$m}}"
+
+// {{$e.Camel}}Card is a {{lower $e.Label}} in a list: its picture, what it is called,
+// and a few of its values.
+templ {{$e.Camel}}Card(x {{$m}}.{{$e.Pascal}}) {
+	<a href={ templ.URL({{$e.Pascal}}URL(x)) } class="group grid gap-2 rounded-xl border border-border p-3 hover:border-foreground/30">
+{{- if $images}}
+		if img := {{$e.Pascal}}Image(x); img != "" {
+			<img src={ img } alt={ {{$e.Pascal}}Title(x) } loading="lazy" class="aspect-square w-full rounded-lg bg-muted object-cover"/>
+		} else {
+			<div class="aspect-square w-full rounded-lg bg-muted"></div>
+		}
+{{- end}}
+		<h3 class="line-clamp-2 font-medium group-hover:underline">{ {{$e.Pascal}}Title(x) }</h3>
+{{- $count := 0}}
+{{- range $pg.Fields}}{{if and (ne . $pg.Title) (sitePlain .) (lt $count 2)}}{{$count = add1 $count}}
+		if {{siteShown . "x"}} {
+			<p class="text-sm text-muted-foreground">{{siteValue . "x"}}</p>
+		}
+{{- end}}{{end}}
+	</a>
+}
+
+// {{$e.Pascal}}ListPage is the list of {{lower $e.Plural.Label}}: its controls, the cards and
+// the pages.
+templ {{$e.Pascal}}ListPage(v {{$e.Pascal}}List) {
+	@Layout(v.Page) {
+		<h1 class="mb-6 text-2xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h1>
+		@Controls({{$e.Plural.Pascal}}URL(), v.Filters, v.Sorts, {{$pg.Search}}, v.Query)
+		<div id="results" class="mt-6">
+			<p class="mb-4 text-sm text-muted-foreground" aria-live="polite">{ T("count", "count", Number(v.Pager.Total)) }</p>
+			if len(v.Items) == 0 {
+				@Empty(T("noResults"))
+			} else {
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+					for _, x := range v.Items {
+						@{{$e.Camel}}Card(x)
+					}
+				</div>
+				@Pagination(v.Pager)
+			}
+		</div>
+	}
+}
+
+// {{$e.Pascal}}Page is the page of a {{lower $e.Label}}: its picture, its values, what it
+// relates to, and sharing it.
+templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
+	@Layout(v.Page) {
+		<nav class="mb-6 text-sm text-muted-foreground">
+			<a href={ templ.URL({{$e.Plural.Pascal}}URL()) } class="hover:text-foreground">{ {{$e.Plural.Pascal}}Label }</a>
+		</nav>
+		<article class="grid gap-8 md:grid-cols-2">
+{{- if $images}}
+			if img := {{$e.Pascal}}Image(v.Item); img != "" {
+				<img src={ img } alt={ {{$e.Pascal}}Title(v.Item) } class="w-full rounded-xl bg-muted object-cover"/>
+			}
+{{- end}}
+			<div class="grid content-start gap-4">
+				<h1 class="text-3xl font-semibold tracking-tight">{ {{$e.Pascal}}Title(v.Item) }</h1>
+				<dl class="grid gap-3">
+{{- range $pg.Fields}}{{if ne . $pg.Title}}
+					if {{siteShown . "v.Item"}} {
+						<div>
+							<dt class="text-sm text-muted-foreground">{{quote (siteLabel .Ann $n .Label) | printf "{ %s }"}}</dt>
+							<dd class="mt-1">{{siteValue . "v.Item"}}</dd>
+						</div>
+					}
+{{- end}}{{end}}
+{{- range $pg.Keys}}{{$tp := sitePage $.Entities $n .Target}}
+					if v.{{.Pascal}} != nil {
+						<div>
+							<dt class="text-sm text-muted-foreground">{{quote (siteLabel .Ann $n .Label) | printf "{ %s }"}}</dt>
+{{- if $tp}}
+							<dd class="mt-1"><a href={ templ.URL({{.Target.Pascal}}URL(*v.{{.Pascal}})) } class="underline">{ {{.Target.Pascal}}Title(*v.{{.Pascal}}) }</a></dd>
+{{- else}}
+							<dd class="mt-1">{ v.{{.Pascal}}.ID.String() }</dd>
+{{- end}}
+						</div>
+					}
+{{- end}}
+				</dl>
+				<div>
+					@Share(v.Canonical, {{$e.Pascal}}Title(v.Item))
+				</div>
+			</div>
+		</article>
+{{- range $pg.Lists}}{{$t := .Target}}
+		if len(v.{{.Relation.Pascal}}) > 0 {
+			<section class="mt-12">
+				<h2 class="mb-4 text-xl font-semibold tracking-tight">{{quote (siteLabel .Relation.Ann $n (siteLabel .Target.Ann $n .Relation.Label)) | printf "{ %s }"}}</h2>
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+					for _, x := range v.{{.Relation.Pascal}} {
+{{- if .Page}}
+						@{{$t.Camel}}Card(x)
+{{- else}}
+						<p>{ x.ID.String() }</p>
+{{- end}}
+					}
+				</div>
+			</section>
+		}
+{{- end}}
+	}
+}
+{{- end}}

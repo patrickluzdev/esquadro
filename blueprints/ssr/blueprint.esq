@@ -1,0 +1,97 @@
+/// A site rendered on the server, for people and search engines (a store's
+/// shop window, a site of offers), used by name: blueprint ssr site. Each
+/// entity marked @<name>(page) gets a list (/<path>, with the filters,
+/// order, search and pages the store allows) and a page per record
+/// (/<path>/<id>/<slug>), with titles, descriptions, Open Graph, structured
+/// data, a sitemap and robots.txt. People read what @security(read ...)
+/// lets them: everyone what is public, and who signs in to the realm of
+/// auth what that realm may. What is generated is regenerated; the
+/// layout, the pages, the words and the styles are yours, written once and
+/// merged with esquadro's changes. With engine go, the app's binary renders
+/// it (templ, htmx and Tailwind).
+blueprint ssr {
+  version "0.1.0"
+  instances
+  requires app, http, store, security, workspace, ui
+  go_require "github.com/a-h/templ" "v0.3.1118"
+  hook post-gen "templ" writes "web/**/*_templ.go"
+
+  /// What renders the site: go (the app's binary, with templ), the only
+  /// one so far.
+  option engine name default(go)
+  /// The domain it answers on (shop.com); without one, the app's domain,
+  /// under path.
+  option domain string default("")
+  /// Its path on the app's domain, when it has no domain of its own;
+  /// /<name> by default.
+  option path string default("")
+  /// The realm whose people sign in to it; the first realm by default.
+  option auth string default("")
+  /// The roles of the realm let in to its pages that need a session; any
+  /// role when empty.
+  option roles list default([])
+  /// en or pt_br: the language of its words and of dates, numbers and
+  /// money.
+  option locale name default(en)
+  /// app: the app's binary serves it.
+  option serve name default(app)
+  /// The site's name: in every title and in Open Graph; the app's label by
+  /// default.
+  option name string default("")
+  /// The site's address, for canonical links, Open Graph and the sitemap:
+  /// https://shop.com; https://<domain> by default.
+  option url string default("")
+  /// How many records a list shows at a time.
+  option page_size int default(24)
+  /// The primary color (buttons, links), as #rrggbb.
+  option primary string default("#2a85ff")
+  /// The primary color of the dark theme; by default the primary, or a
+  /// light gray when the primary is too dark to stand out there.
+  option primary_dark string default("")
+  /// How round the corners are, as CSS: 0.75rem, 0.5rem, 0.
+  option radius string default("0.75rem")
+
+  annotation entity {
+    /// The entity has pages: a list at /<path>, and one per record.
+    page bool
+    /// The part of the address: ofertas. Its plural, in kebab case, by
+    /// default.
+    path string
+    /// The field a record is called by, in titles and its address; the
+    /// first text field by default.
+    title name
+    /// The field of a record's description, for search engines and
+    /// shared links.
+    description name
+    /// The image field of a record's picture, for its page and shared
+    /// links.
+    image name
+    /// The structured data of its pages: product, article or
+    /// organization.
+    schema name
+    /// The order of its list: -created_at, price.
+    sort string
+    /// Relations whose records its page lists: [offers].
+    relations list
+    /// An entry in the site's menu.
+    menu bool
+    /// What this site calls it, when not what @ui says.
+    label string
+    /// What one of it is called on this site, when not what @ui says.
+    singular string
+  }
+  annotation field {
+    /// What this site calls the field, when not what @ui says.
+    label string
+    /// Leave the field out of the site.
+    hidden bool
+  }
+  annotation relation {
+    /// What this site calls the relation, when not what @ui says.
+    label string
+  }
+  annotation value {
+    /// What this site calls the value, when not what @ui says.
+    label string
+  }
+}

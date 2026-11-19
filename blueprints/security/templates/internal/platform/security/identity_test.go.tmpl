@@ -161,6 +161,9 @@ func TestSignUpAndSignIn(t *testing.T) {
 
 	// What changes something needs the CSRF token, from the app's origin.
 	f.expect(f.call("POST", "/identity/person/token", nil, cookie), 403, "csrf")
+	// Another realm's routes do not read this session: signing in there
+	// (another frontend of the app) needs no token of it.
+	f.expect(f.call("POST", "/identity/staff/sign-in", map[string]string{"email": "ana@example.com", "password": password}, cookie), 401, "invalid_credentials")
 	f.expect(f.call("POST", "/identity/person/token", nil, cookie, csrf, "Origin: https://evil.example", "Sec-Fetch-Site: cross-site"), 403, "csrf")
 	tok := f.call("POST", "/identity/person/token", nil, cookie, csrf)
 	f.expect(tok, 200, "")

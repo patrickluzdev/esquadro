@@ -1,4 +1,4 @@
-{{- with instances "spa"}}
+{{- with frontends}}
 # The frontends, built with Node before the binary that serves them.
 FROM --platform=$BUILDPLATFORM node:26-alpine AS web
 WORKDIR /src

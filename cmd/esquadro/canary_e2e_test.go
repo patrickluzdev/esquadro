@@ -101,7 +101,19 @@ func TestCanaryUpgrades(t *testing.T) {
 	deals := read("esquadro/deals.esq")
 	write("esquadro/deals.esq", regexp.MustCompile(`\bdecimal\b`).ReplaceAllString(deals, "money"))
 	write("esquadro/app.esq", strings.Replace(read("esquadro/app.esq"), `  module "example.com/promo"`, "  module \"example.com/promo\"\n  currency \"BRL\"", 1))
+	// And its public site: the offers and the coupons, for visitors.
+	write("esquadro/app.esq", strings.Replace(read("esquadro/app.esq"), "  blueprint api_docs\n",
+		"  blueprint api_docs\n  blueprint workspace\n  blueprint ui\n  blueprint ssr site {\n    auth \"visitor\"\n    locale pt_br\n    name \"Promo do Duro\"\n  }\n", 1))
+	deals = read("esquadro/deals.esq")
+	deals = strings.Replace(deals, "  @security(read public, write [user.admin, user.operator])\n}\n\n/// A short link",
+		"  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Ofertas\", singular \"Oferta\")\n  @site(page, path \"ofertas\", schema product, menu)\n}\n\n/// A short link", 1)
+	deals = strings.Replace(deals, "  expires_on date\n  @security(read public, write [user.admin, user.operator])",
+		"  expires_on date\n  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Cupons\", singular \"Cupom\")\n  @site(page, path \"cupons\", menu)", 1)
+	write("esquadro/deals.esq", deals)
 	e.esquadro(0, "gen", dir)
+	if !strings.Contains(read("web/site/offer_gen.go"), "func (s *Site) listOffers(") || !strings.Contains(read("web/site/coupon_gen.go"), "func (s *Site) readCoupon(") {
+		t.Fatal("the site has no pages of offers and coupons")
+	}
 	e.run(nil, "go", "vet", "./...")
 	e.run(nil, "go", "test", "./...")
 	e.esquadro(0, "gen", "-check", dir)

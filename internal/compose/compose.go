@@ -420,6 +420,17 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 			}
 			return out
 		},
+		// frontends are the app's frontends, of every kind (spa admin, ssr
+		// site): the instances of the blueprints that require ui.
+		"frontends": func() []*Instance {
+			var out []*Instance
+			for _, b := range c.set.Blueprints {
+				if b.Kind != "" && c.requiresUI(b.Manifest.Name) {
+					out = append(out, &Instance{Name: b.Manifest.Name, Kind: b.Kind, Options: c.set.Options[b.Manifest.Name]})
+				}
+			}
+			return out
+		},
 		// uses reports whether the app uses a blueprint, for what a
 		// template writes only alongside it.
 		"uses": func(name string) bool {

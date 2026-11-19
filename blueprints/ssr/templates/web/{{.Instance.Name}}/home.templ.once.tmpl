@@ -1,0 +1,26 @@
+{{- $n := .Instance.Name -}}
+{{- $pages := sitePages .Entities $n -}}
+// The {{$n}} site's first page: the latest of each. Yours.
+
+package {{$n}}
+
+templ HomePage(v Home) {
+	@Layout(v.Page) {
+		<h1 class="sr-only">{ Name }</h1>
+{{- range $pages}}{{$e := .Entity}}
+		if len(v.{{$e.Plural.Pascal}}) > 0 {
+			<section class="mb-12">
+				<div class="mb-4 flex items-baseline justify-between">
+					<h2 class="text-xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h2>
+					<a href={ templ.URL({{$e.Plural.Pascal}}URL()) } class="text-sm text-muted-foreground hover:text-foreground">{ T("seeAll") }</a>
+				</div>
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+					for _, x := range v.{{$e.Plural.Pascal}} {
+						@{{$e.Camel}}Card(x)
+					}
+				</div>
+			</section>
+		}
+{{- end}}
+	}
+}

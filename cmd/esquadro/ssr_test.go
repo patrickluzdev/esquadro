@@ -1,0 +1,107 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// ssrProject is the api starter with a site (ssr shop) beside its panel,
+// whose pages are the catalog's; change rewrites app.esq, and model the
+// catalog, first.
+func ssrProject(t *testing.T, change, model func(string) string) (string, int, string) {
+	t.Helper()
+	if testing.Short() {
+		// Generating the api starter runs its hooks, sqlc among them.
+		t.Skip("generates the api starter, which needs sqlc or Docker")
+	}
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	app := strings.Replace(read(t, appEsq), "  blueprint api_docs\n",
+		"  blueprint api_docs\n  blueprint workspace\n  blueprint ui\n  blueprint ssr shop {\n    auth \"customer\"\n    locale pt_br\n    name \"Loja\"\n  }\n", 1)
+	if change != nil {
+		app = change(app)
+	}
+	os.WriteFile(appEsq, []byte(app), 0o644)
+	catalogEsq := filepath.Join(dir, "esquadro", "catalog.esq")
+	catalog := read(t, catalogEsq)
+	catalog = strings.Replace(catalog, "  @security(read public, write user.admin)",
+		"  @security(read public, write user.admin)\n  @ui(label \"Categorias\", singular \"Categoria\")\n  @shop(page, path \"categorias\", relations [products], menu)", 1)
+	catalog = strings.Replace(catalog, "  @security(read public, write [user.admin, user.staff])",
+		"  @security(read public, write [user.admin, user.staff])\n  @ui(label \"Produtos\", singular \"Produto\")\n  @shop(page, path \"produtos\", description description, schema product, sort \"-price\", menu)", 1)
+	if model != nil {
+		catalog = model(catalog)
+	}
+	os.WriteFile(catalogEsq, []byte(catalog), 0o644)
+	code, _, errOut := esq(t, "gen", dir)
+	return dir, code, errOut
+}
+
+func TestSSRGeneratesASite(t *testing.T) {
+	dir, code, errOut := ssrProject(t, nil, nil)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "shop")
+	for path, want := range map[string]string{
+		"site_gen.go":        `Path   = "/shop"`,
+		"product_gen.go":     `m.Read`,
+		"category_gen.go":    `q.Filter.CategoryID = x.ID`,
+		"product.templ":      "templ ProductListPage(v ProductList)",
+		"kit.templ":          `<meta property="og:title"`,
+		"layout.templ":       "templ Layout(p Page)",
+		"pages_gen.go":       "func (s *Site) sitemap(",
+		"account_gen.go":     `identity = "/identity/customer"`,
+		"theme.gen.css":      "--primary-foreground:",
+		"product_templ.go":   "func ProductListPage(",
+		"package.json":       `"htmx.org"`,
+		"messages.go":        "var ownWords",
+		"routes.go":          "func (s *Site) ownRoutes(",
+		"dist/README.md":     "dist/assets",
+		"../../package.json": `"web/shop"`,
+	} {
+		got := read(t, filepath.Join(site, path))
+		if path == "product_gen.go" {
+			want = "s.deps.Catalog.ReadProduct(ctx, id)"
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("%s lacks %q", path, want)
+		}
+	}
+	routes := read(t, filepath.Join(dir, "cmd", "shop", "routes_gen.go"))
+	if !strings.Contains(routes, "web.Handle(mux, shop.New(shop.Deps{") || !strings.Contains(routes, "Catalog: d.catalog,") {
+		t.Errorf("the app does not serve the site:\n%s", routes)
+	}
+}
+
+func TestSSRChecksItsPages(t *testing.T) {
+	for name, tc := range map[string]struct {
+		change, model func(string) string
+		want          string
+	}{
+		"engine": {func(s string) string { return strings.Replace(s, "locale pt_br", "engine astro", 1) }, nil, "engine astro is not one esquadro generates yet"},
+		"url":    {func(s string) string { return strings.Replace(s, "locale pt_br", "url \"shop.com\"", 1) }, nil, "url shop.com is not a site's address"},
+		"path": {nil, func(s string) string { return strings.Replace(s, `path "produtos"`, `path "busca"`, 1) },
+			"path busca of Product is where ssr shop has its search page"},
+		"same": {nil, func(s string) string { return strings.Replace(s, `path "produtos"`, `path "categorias"`, 1) },
+			"have the same path on shop: categorias"},
+		"title": {nil, func(s string) string { return strings.Replace(s, "description description", "title nome", 1) },
+			"title nome of @shop is not a field of Product"},
+		"filter": {nil, func(s string) string {
+			return strings.Replace(s, "category    > Category required @store(filter)", "category    > Category required", 1)
+		},
+			"which needs @store(filter)"},
+		"readable": {nil, func(s string) string {
+			return strings.Replace(s, "@security(read public, write [user.admin, user.staff])", "@security(read user, write [user.admin, user.staff])", 1)
+		}, "Product has pages on shop, which nobody there may read"},
+	} {
+		_, code, errOut := ssrProject(t, tc.change, tc.model)
+		if code == 0 || !strings.Contains(errOut, tc.want) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

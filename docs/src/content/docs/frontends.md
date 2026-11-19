@@ -1,6 +1,6 @@
 ---
 title: Frontends
-description: Single-page frontends of the app, in the same repository, with resources made from the model and screens of your own.
+description: "The app's frontends, in the same repository: single-page panels and sites rendered on the server, made from the model, with screens of your own."
 ---
 
 An app's frontends live in its repository, beside it: the model, the API, the
@@ -568,6 +568,104 @@ export const messages = {
   "pt-BR": { signIn: "Acessar", promoQueue: "Fila de ofertas" },
 } satisfies Record<string, Words>
 ```
+
+## Sites rendered on the server
+
+A site for people and search engines (a store's shop window, a site of
+offers) is a frontend too, of another architecture: `ssr`. Its pages come
+rendered from the server, with what search engines and shared links read;
+it is no single-page app.
+
+```esquadro
+app shop {
+  blueprint workspace
+  blueprint ui
+  blueprint ssr site {
+    engine go                // what renders it: go (the app's binary)
+    domain "shop.com"        // or, without one, under path (/site)
+    auth   "customer"        // the realm whose people sign in to it
+    locale pt_br
+    name   "Shop"            // in every title and in shared links
+  }
+}
+
+entity Product {
+  name  string required @store(search, sort)
+  price money  required @store(sort)
+  photo image
+  category > Category required @store(filter)
+  @ui(label "Products", singular "Product")
+  @site(page, path "products", description name, schema product, menu)
+}
+
+entity Category {
+  name string required
+  products < Product
+  @site(page, path "categories", relations [products], menu)
+}
+
+entity Customer {
+  name string required
+  @security(principal, signup open, providers [password, google])
+}
+```
+
+Each entity marked `@site(page)` gets:
+
+- **its list**, at `/products`: the search, filters (its enums, yes or no
+  fields and related records marked `@store(filter)`) and orders the store
+  allows, in the address (`?status=ACTIVE&sort=-price&page=2`); with htmx,
+  a choice changes only the list;
+- **a page per record**, at `/products/<id>/<slug>`: the slug comes from
+  its title, and an address with another slug (an old title) moves to the
+  right one; with its related records (`relations`) and a button to share
+  it;
+- what search engines and shared links read: the title, a description
+  (`description`), the canonical address, Open Graph and its picture
+  (`image`, or its first image field), structured data (`schema`:
+  `product`, with its price, `article` or `organization`);
+- a place in `/sitemap.xml`, and `robots.txt` keeps the account's pages
+  out.
+
+| `@site` | On | What | Default |
+|---|---|---|---|
+| `page` | entity | Its list and its records' pages | none |
+| `path` | entity | The part of the address | its plural, in kebab case |
+| `title`, `description`, `image` | entity | What a record is called, described and pictured by | the first text field; none; the first image field |
+| `schema` | entity | `product`, `article` or `organization` | none |
+| `sort` | entity | Its list's first order: `-price` | the newest first |
+| `relations` | entity | Related records its page lists: `[products]` | none |
+| `menu` | entity | An entry in the site's menu | every page, when none is marked |
+| `label`, `singular` | entity, field, relation, enum value | What this site calls it, over `@ui`'s | `@ui`'s |
+| `hidden` | field | Left out of the site | shown |
+
+**Who reads what** is the model's: a page reads through the module's use
+cases, with `@security(read ...)`. What everyone may read (`read public`)
+everyone sees; what only the site's realm may read, those who signed in.
+What the reader may not see is not found, and stays out of the sitemap.
+
+**The visitor's account** comes with `auth`: signing in, the providers the
+realm has, signing up when it is `signup open`, the forgotten password,
+the email confirmed and an account page (signing out, deleting the
+account). Their forms call the app's identity routes. With sign-in by
+Google or GitHub and the site on a domain of its own, set the security
+blueprint's `public_url` to the site's address.
+
+**The site's own pages** ("Join our groups", "About") go in `routes.go`,
+each a templ component of yours inside `Layout`.
+
+| | Where | Whose |
+|---|---|---|
+| Routes, reading, SEO, the sitemap, the account, the words, the formats | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
+| The frame (header, menu, footer), the first page, the search, each entity's list, card and page | `layout.templ`, `home.templ`, `search.templ`, `<entity>.templ` | yours |
+| Your pages; the words you change; the styles | `routes.go`, `messages.go`, `site.css` | yours |
+
+With `engine go`, the app's binary renders the site: [templ](https://templ.guide)
+for the pages (`esquadro gen` writes their Go, and `task dev` writes it
+again as you change them), [htmx](https://htmx.org) for lists changed in
+place, Tailwind for the styles (`npm run build`, or `task web:build`,
+writes them into `dist/assets`). The site uses the theme's options and
+the shared words of every frontend.
 
 ## Where it runs
 

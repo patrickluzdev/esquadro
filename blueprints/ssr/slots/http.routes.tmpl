@@ -1,0 +1,12 @@
+{{- range $i := instances "ssr"}}
+	// The {{$i.Name}} site, rendered by the binary.
+	web.Handle(mux, {{$i.Name}}.New({{$i.Name}}.Deps{
+{{- range siteModules $.Entities $.Modules $i.Name}}
+		{{.Pascal}}: d.{{.Camel}},
+{{- end}}
+{{- if and (siteImages (sitePages $.Entities $i.Name)) (uses "storage")}}
+		Storage: d.storage,
+{{- end}}
+		Logger: d.logger,
+	}), {{$i.Name}}.Domain, {{$i.Name}}.Path)
+{{- end}}

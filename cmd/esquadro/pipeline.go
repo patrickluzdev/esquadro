@@ -22,6 +22,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/seed"
 	"github.com/patrickluzdev/esquadro/blueprints/spa"
+	"github.com/patrickluzdev/esquadro/blueprints/ssr"
 	"github.com/patrickluzdev/esquadro/blueprints/storage"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/blueprints/ui"
@@ -39,6 +40,7 @@ var builtinHooks = map[string]hook.Func{
 	hook.Key("migrations", "write"): migrations.Write,
 	hook.Key("store", "sqlc"):       store.SQLC,
 	hook.Key("rest", "ogen"):        rest.Ogen,
+	hook.Key("ssr", "templ"):        ssr.Templ,
 	hook.Key("git", "init"):         git.Init,
 	hook.Key("branching", "setup"):  branching.Setup,
 	hook.Key("env", "files"):        env.Files,
@@ -55,6 +57,7 @@ func init() {
 	blueprint.Checks["workspace"] = bpworkspace.Check
 	blueprint.Checks["spa"] = spa.Check
 	blueprint.Checks["ui"] = ui.Check
+	blueprint.Checks["ssr"] = ssr.Check
 	blueprint.Checks["seed"] = seed.Check
 	blueprint.Checks["audit"] = audit.Check
 	blueprint.Checks["notifications"] = notifications.Check
@@ -71,6 +74,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"jobs":          jobs.TemplateFuncs(),
 	"security":      security.TemplateFuncs(),
 	"spa":           spa.TemplateFuncs(),
+	"ssr":           ssr.TemplateFuncs(),
 	"seed":          seed.TemplateFuncs(),
 	"audit":         audit.TemplateFuncs(),
 	"notifications": notifications.TemplateFuncs(),

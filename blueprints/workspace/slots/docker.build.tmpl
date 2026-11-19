@@ -1,3 +1,3 @@
-{{- range instances "spa"}}
-COPY --from=web /src/web/{{.Name}}/dist/app web/{{.Name}}/dist/app
+{{- range frontends}}
+COPY --from=web /src/web/{{.Name}}/dist/{{if eq .Kind "spa"}}app{{else}}assets{{end}} web/{{.Name}}/dist/{{if eq .Kind "spa"}}app{{else}}assets{{end}}
 {{- end}}

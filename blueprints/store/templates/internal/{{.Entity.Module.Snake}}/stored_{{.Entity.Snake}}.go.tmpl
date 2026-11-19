@@ -193,7 +193,7 @@ func {{$e.Camel}}Noticed(ctx context.Context, db sqlgen.DBTX, action string, bef
 	if x == nil {
 		x = before
 	}
-{{- $spa := ""}}{{range instances "spa"}}{{if not $spa}}{{$spa = .Name}}{{end}}{{end}}
+{{- $spa := ""}}{{range frontends}}{{if not $spa}}{{$spa = .Name}}{{end}}{{end}}
 	// The record's values as people read them: an amount in the app's
 	// language, an enum by its name, a date as a date.
 	values := map[string]string{
@@ -205,7 +205,7 @@ func {{$e.Camel}}Noticed(ctx context.Context, db sqlgen.DBTX, action string, bef
 {{- else if eq $t "time"}}
 		{{quote .Snake}}: notifications.DateTime(x.{{.Pascal}}),
 {{- else if .Enum}}
-		{{quote .Snake}}: notifications.Label(string(x.{{.Pascal}}), map[string]string{ {{- range $i, $v := .Enum.Values}}{{if $i}}, {{end}}{{quote $v.Raw}}: {{quote (or (and $spa (index (annOf $spa $v) "label")) $v.Raw)}}{{end -}} }),
+		{{quote .Snake}}: notifications.Label(string(x.{{.Pascal}}), map[string]string{ {{- range $i, $v := .Enum.Values}}{{if $i}}, {{end}}{{quote $v.Raw}}: {{quote (or (and $spa (index (annOf $spa $v) "label")) (index (annOf "ui" $v) "label") $v.Raw)}}{{end -}} }),
 {{- else}}
 		{{quote .Snake}}: fmt.Sprint(x.{{.Pascal}}),
 {{- end}}

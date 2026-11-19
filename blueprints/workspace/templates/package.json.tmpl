@@ -7,7 +7,7 @@
 {{- if uses "client_ts"}}
     "clients/ts"{{$first = false}}
 {{- end}}
-{{- range instances "spa"}}{{if not $first}},{{end}}{{$first = false}}
+{{- range frontends}}{{if not $first}},{{end}}{{$first = false}}
     "web/{{.Name}}"
 {{- end}}
   ],

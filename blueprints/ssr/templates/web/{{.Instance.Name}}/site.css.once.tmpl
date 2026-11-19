@@ -1,0 +1,19 @@
+/* The {{.Instance.Name}} site's styles: Tailwind, with the theme's tokens.
+   Yours: esquadro wrote it once. npm run build writes dist/assets/site.css
+   from it and the classes of the .templ files. */
+@import "tailwindcss";
+@import "./theme.gen.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
