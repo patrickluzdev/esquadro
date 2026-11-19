@@ -69,6 +69,8 @@ export interface RecordsApi {
   delete(id: string, options?: { ifMatch?: number | { version: number } }): Promise<void>
   /** Where delete puts records, when their entity has a trash. */
   trash?: TrashApi
+  /** Stores rows, all or none, when the entity takes imports. */
+  import?(rows: Record<string, unknown>[], options?: { idempotencyKey?: string }): Promise<{ created: number; updated: number }>
 }
 
 /** The trash of a resource whose entity has one. */
@@ -99,6 +101,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   history?: { entity: string; who: "update" | "read" | "admins" }
   /** One record only (@store(single)): its page is its form, with no list. */
   single?: boolean
+  /** Its records may be imported from a CSV file (@store(import)); by: the field a row replaces the record of. */
+  import?: { by?: string }
 }
 
 export function defineMeta<const F extends Record<string, FieldMeta>, A>(

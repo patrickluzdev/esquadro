@@ -617,7 +617,8 @@ func Test{{$e.Pascal}}Writes{{.Pascal}}WithIt(t *testing.T) {
 func TestImport{{$e.Plural.Pascal}}(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+	pool := postgrestest.Fresh(t)
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: pool})
 
 	rows := []{{$p}}.New{{$e.Pascal}}{given{{$e.Pascal}}(t, {{$r}}, 1), given{{$e.Pascal}}(t, {{$r}}, 2)}
 	done, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, rows, nil)
@@ -638,8 +639,21 @@ func TestImport{{$e.Plural.Pascal}}(t *testing.T) {
 	if !ok || len(refused.Rows) != 1 || refused.Rows[0].Row != 2 || len(refused.Rows[0].Fields) == 0 {
 		t.Fatalf("a refused row: %v", err)
 	}
+	// In a transaction that commits anyway (a request's), the same.
+	_ = postgres.InTx(ctx, pool, func(ctx context.Context) error {
+		_, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{third, {}}, nil)
+		if _, ok := errors.AsType[*{{$p}}.ImportRefused](err); !ok {
+			t.Errorf("a refused row in a transaction: %v", err)
+		}
+		return nil
+	})
 	if done, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{third}, nil); err != nil || done.Created != 1 {
 		t.Fatalf("the row stored with a refused one: %+v, %v", done, err)
+	}
+	// Two imported, then the third alone: the refused imports left nothing.
+	var stored int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM {{pgTable $e (optionsOf "postgres")}}`).Scan(&stored); err != nil || stored != 3 {
+		t.Fatalf("%d {{$e.Plural.Snake}} stored (%v), want 3", stored, err)
 	}
 {{- end}}
 	guarded := errors.New("refused by the guard")

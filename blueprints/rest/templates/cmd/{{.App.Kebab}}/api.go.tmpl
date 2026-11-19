@@ -104,7 +104,11 @@ func (a api) NewError(ctx context.Context, err error) *apigen.ProblemStatusCode 
 	doc := edge.DocumentOf(ctx, a.problem(ctx, err))
 	fields := make([]apigen.FieldProblem, 0, len(doc.Errors))
 	for _, f := range doc.Errors {
-		fields = append(fields, apigen.FieldProblem{Field: f.Field, Code: f.Code})
+		field := apigen.FieldProblem{Field: f.Field, Code: f.Code}
+		if f.Row > 0 {
+			field.Row = apigen.NewOptInt(f.Row)
+		}
+		fields = append(fields, field)
 	}
 	p := &apigen.ProblemStatusCode{
 		StatusCode: doc.Status,

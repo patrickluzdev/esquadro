@@ -32,6 +32,8 @@ func TemplateFuncs() template.FuncMap {
 		"realms":      security.RealmsOf,
 		"softDeleted": store.SoftDeleted,
 		"single":      store.Single,
+		"importable":  store.Importable,
+		"importBy":    store.ImportBy,
 		"idLinks":     store.IDLinks,
 		"richText":    rest.HTML,
 		"audited":     audit.Audited,

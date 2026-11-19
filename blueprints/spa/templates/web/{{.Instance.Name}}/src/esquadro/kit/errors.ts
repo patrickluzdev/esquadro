@@ -61,6 +61,8 @@ export function fieldMessage(field: FieldMeta, code: string): string {
     case "not_found":
     case "foreign_key":
       return t("fieldGone")
+    case "ambiguous":
+      return t("fieldAmbiguous")
   }
   return t("fieldInvalid")
 }

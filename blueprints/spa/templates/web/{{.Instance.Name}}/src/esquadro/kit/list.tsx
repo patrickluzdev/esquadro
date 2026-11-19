@@ -29,6 +29,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Upload,
   X,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -57,6 +58,7 @@ import { SavedFiltersMenu, SaveFilterButton, useViews } from "./views.tsx"
 import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
+import { ImportDialog } from "./import.tsx"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -244,6 +246,7 @@ function RecordsList({
   const selectable = resource.table.select !== false && (bulkActions.length > 0 || canDeleteAny)
 
   const [rowSelection, setRowSelection] = useState({})
+  const [importing, setImporting] = useState(false)
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>(() =>
     Object.fromEntries(tableColumns.filter((c) => columnOptions(c).hidden).map((c) => [columnField(c).name, false])),
   )
@@ -537,12 +540,18 @@ function RecordsList({
       <Download /> {t("export")}
     </Button>
   )
+  const importButton = meta.import && page?.can.includes("create") && (
+    <Button variant="outline" onClick={() => setImporting(true)} size={embedded ? "sm" : "default"}>
+      <Upload /> {t("importAction")}
+    </Button>
+  )
   return (
     <div className={cn("flex flex-col gap-4", !embedded && "rounded-xl border border-border bg-card p-5")}>
       {embedded ? (
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-bold tracking-tight">{scope.label ?? meta.label}</h2>
           <div className="flex gap-2">
+            {importButton}
             {exportButton}
             {create}
           </div>
@@ -559,6 +568,7 @@ function RecordsList({
                   {Boolean(trashCount) && <span className="rounded-full bg-muted px-1.5 text-xs font-semibold tabular-nums">{trashCount}</span>}
                 </Button>
               )}
+              {importButton}
               {exportButton}
               {create}
             </>
@@ -816,6 +826,7 @@ function RecordsList({
           </Button>
         </div>
       )}
+      {meta.import && <ImportDialog meta={meta} open={importing} onOpenChange={setImporting} />}
     </div>
   )
 }

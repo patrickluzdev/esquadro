@@ -18,7 +18,16 @@ func ({{$r}} *{{$m.Pascal}}) Import{{$e.Plural.Pascal}}(ctx context.Context, row
 	var done Imported
 	var refused []RowError
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
-		tx, _ := postgres.TxOf(ctx)
+		// The import's own savepoint: refused, it leaves nothing, even in a
+		// transaction that commits anyway (a request's, which keeps its
+		// Idempotency-Key with the answer).
+		outer, _ := postgres.TxOf(ctx)
+		tx, err := outer.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		ctx = postgres.WithTx(ctx, tx)
 		for i, n := range rows {
 			// Each row in a savepoint: a refused one leaves the
 			// transaction usable to check the next.
@@ -47,7 +56,7 @@ func ({{$r}} *{{$m.Pascal}}) Import{{$e.Plural.Pascal}}(ctx context.Context, row
 		if len(refused) > 0 {
 			return &ImportRefused{Rows: refused}
 		}
-		return nil
+		return tx.Commit(ctx)
 	})
 	if err != nil {
 		return Imported{}, err
