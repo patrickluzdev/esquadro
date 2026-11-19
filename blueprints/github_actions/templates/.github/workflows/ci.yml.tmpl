@@ -27,10 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The code first: every step after reads it.
+      - uses: actions/checkout@v7.0.1
 {{- with slot "github_actions.test.steps" .}}
 {{.}}
 {{- end}}
-      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod

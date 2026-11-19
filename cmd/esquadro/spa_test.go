@@ -45,6 +45,16 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 	if code != 0 {
 		t.Fatal(errOut)
 	}
+	// The CI checks the code out before any step reads it (the client's
+	// type check, the frontends' packages).
+	ci := read(t, filepath.Join(dir, ".github", "workflows", "ci.yml"))
+	test := ci[strings.Index(ci, "\n  test:"):]
+	if checkout, reads := strings.Index(test, "actions/checkout"), strings.Index(test, "working-directory:"); checkout < 0 || reads >= 0 && reads < checkout {
+		t.Errorf("the CI reads the code before checking it out:\n%s", test)
+	}
+	if checkout, npm := strings.Index(test, "actions/checkout"), strings.Index(test, "npm "); npm >= 0 && npm < checkout {
+		t.Errorf("the CI installs packages before checking the code out:\n%s", test)
+	}
 	web := filepath.Join(dir, "web", "admin")
 	for path, want := range map[string]string{
 		"src/esquadro/resources.gen.ts":     `label: "Produtos"`,
