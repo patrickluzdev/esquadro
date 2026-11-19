@@ -1,6 +1,6 @@
 {{- $e := .Entity -}}
 {{- $utf8 := ""}}{{$re := "" -}}
-{{- range $e.Fields}}{{if not .Implicit -}}
+{{- range $e.Fields}}{{if written . -}}
 {{- if and (or (eq .Type "string") (eq .Type "text")) (or .Min .Max)}}{{$utf8 = "unicode/utf8"}}{{end -}}
 {{- if .Pattern}}{{$re = "regexp"}}{{end -}}
 {{- end}}{{end -}}
@@ -28,7 +28,7 @@ type {{$e.Pascal}} struct {
 
 // New{{$e.Pascal}} is {{if eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower $e.Label}} as it is written, before it is stored.
 type New{{$e.Pascal}} struct {
-{{- range $e.Fields}}{{if not .Implicit}}
+{{- range $e.Fields}}{{if written .}}
 	{{.Pascal}} {{goType .}}
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
@@ -44,7 +44,7 @@ type New{{$e.Pascal}} struct {
 // {{$e.Pascal}}Changes are changes to {{if eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o"}}an{{else}}a{{end}} {{lower $e.Label}}: each field not nil is
 // set (to its zero value, to empty it); the rest stay as they are.
 type {{$e.Pascal}}Changes struct {
-{{- range $e.Fields}}{{if not .Implicit}}
+{{- range $e.Fields}}{{if written .}}
 	{{.Pascal}} *{{goType .}}
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
@@ -58,14 +58,14 @@ type {{$e.Pascal}}Changes struct {
 // Apply is x with the changes c makes, as it would be written again.
 func (c {{$e.Pascal}}Changes) Apply(x {{$e.Pascal}}) New{{$e.Pascal}} {
 	n := New{{$e.Pascal}}{
-{{- range $e.Fields}}{{if not .Implicit}}
+{{- range $e.Fields}}{{if written .}}
 		{{.Pascal}}: x.{{.Pascal}},
 {{- end}}{{end}}
 {{- range $e.Relations}}{{if .OwnsForeignKey}}
 		{{.Pascal}}ID: x.{{.Pascal}}ID,
 {{- end}}{{end}}
 	}
-{{- range $e.Fields}}{{if not .Implicit}}
+{{- range $e.Fields}}{{if written .}}
 	if c.{{.Pascal}} != nil {
 		n.{{.Pascal}} = *c.{{.Pascal}}
 	}
@@ -85,16 +85,16 @@ func (c {{$e.Pascal}}Changes) Apply(x {{$e.Pascal}}) New{{$e.Pascal}} {
 
 // Empty reports whether c changes nothing.
 func (c {{$e.Pascal}}Changes) Empty() bool {
-	return {{$first := true}}{{range $e.Fields}}{{if not .Implicit}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}{{if not $first}} && {{end}}{{$first = false}}c.{{(.IDs).Pascal}} == nil{{end}}{{end}}{{if $first}}true{{end}}
+	return {{$first := true}}{{range $e.Fields}}{{if written .}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}} == nil{{end}}{{end}}{{range $e.Relations}}{{if .OwnsForeignKey}}{{if not $first}} && {{end}}{{$first = false}}c.{{.Pascal}}ID == nil{{end}}{{end}}{{range $e.Relations}}{{if and (eq .Kind.String "many-to-many") (not .Inferred)}}{{if not $first}} && {{end}}{{$first = false}}c.{{(.IDs).Pascal}} == nil{{end}}{{end}}{{if $first}}true{{end}}
 }
 {{- $defaults := false}}
-{{- range $e.Fields}}{{if and .Default (not .Implicit) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date") (eq .Type "money"))}}{{$defaults = true}}{{end}}{{end}}
+{{- range $e.Fields}}{{if and .Default (written .) (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date") (eq .Type "money"))}}{{$defaults = true}}{{end}}{{end}}
 {{- if $defaults}}
 
 // WithDefaults fills the fields left empty with the defaults declared for
 // {{$e.Plural.Snake}}.
 func (n New{{$e.Pascal}}) WithDefaults() New{{$e.Pascal}} {
-{{- range $e.Fields}}{{if and .Default (not .Implicit)}}{{$x := printf "n.%s" .Pascal}}
+{{- range $e.Fields}}{{if and .Default (written .)}}{{$x := printf "n.%s" .Pascal}}
 {{- if or (eq .Type "string") (eq .Type "text")}}
 	if {{$x}} == "" {
 		{{$x}} = {{quote .Default.Text}}
@@ -137,7 +137,7 @@ var {{$e.Camel}}{{.Pascal}}Pattern = regexp.MustCompile({{rawQuote .Pattern}})
 func (n New{{$e.Pascal}}) Validate() error {
 	var invalid []FieldError
 	refuse := func(field, code string) { invalid = append(invalid, FieldError{Field: field, Code: code}) }
-{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{$x := printf "n.%s" .Pascal}}
+{{- range $e.Fields}}{{if written .}}{{$f := .}}{{$x := printf "n.%s" .Pascal}}
 {{- if .Required}}
 {{- if or (eq .Type "string") (eq .Type "text") (eq .Type "enum")}}
 	if {{$x}} == "" {

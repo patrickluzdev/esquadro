@@ -33,6 +33,12 @@ blueprint store {
     /// Imported by this field, unique and required: a row with the value
     /// of a record updates it, others are created (import_by external_id).
     import_by name
+    /// An order of its lists worked out by an SQL expression over its
+    /// columns, a name and the expression: order [hot, "temperature /
+    /// power(extract(epoch from now() - created_at) / 3600 + 2, 1.5)"].
+    /// sort=hot lists the largest first, -hot the smallest; a list in it
+    /// pages by number only. More orders go on in pairs.
+    order list
   }
   annotation field {
     /// Lists may filter by it: by value, by range (numbers and dates), or
@@ -43,6 +49,13 @@ blueprint store {
     sort bool
     /// Lists may search its text (q).
     search bool
+    /// The sum of a field of the records of a one-to-many relation, kept
+    /// by the store in the transaction of every change of one of them:
+    /// sum votes.value. Read only: creates and changes leave it out.
+    sum name
+    /// How many records a one-to-many relation has, kept as a sum is:
+    /// count comments.
+    count name
   }
   annotation relation {
     /// Lists may filter by the related record's id.

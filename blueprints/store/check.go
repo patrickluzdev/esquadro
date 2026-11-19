@@ -21,6 +21,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 	var diags diag.List
 	checkSingle(p, &diags)
 	checkImports(p, &diags)
+	checkTotals(p, &diags)
 	for _, e := range p.Entities {
 		for _, f := range e.Fields {
 			a := f.Ann["store"]
@@ -47,7 +48,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 				switch {
 				case f.Type == project.TypeJSON:
 					diags.Errorf(s.Pos, s.End, "sort: %s.%s is json, which has no order", e.Raw, f.Raw)
-				case !f.Required && f.Default == nil:
+				case !f.Required && f.Default == nil && !IsTotal(f):
 					diags.Errorf(s.Pos, s.End, "sort: %s.%s may be empty, and a page ordered by it would skip the empty ones: make it required or give it a default", e.Raw, f.Raw)
 				}
 			}

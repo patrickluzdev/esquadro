@@ -18,7 +18,7 @@ func Test{{$e.Pascal}}UseCases(t *testing.T) {
 func given{{$e.Pascal}}(t *testing.T, i int) {{$p}}.New{{$e.Pascal}} {
 	t.Helper()
 	return {{$p}}.New{{$e.Pascal}}{
-{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{with sample $f $p "i"}}
+{{- range $e.Fields}}{{if written .}}{{$f := .}}{{with sample $f $p "i"}}
 		{{$f.Pascal}}: {{.}},
 {{- end}}{{end}}{{end}}
 	}
@@ -137,7 +137,7 @@ func given{{$e.Pascal}}(t *testing.T, {{if parents $e}}{{$r}}{{else}}_{{end}} *{
 	}
 {{- end}}
 	return {{$p}}.New{{$e.Pascal}}{
-{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{with sample $f $p "i"}}
+{{- range $e.Fields}}{{if written .}}{{$f := .}}{{with sample $f $p "i"}}
 		{{$f.Pascal}}: {{.}},
 {{- end}}{{end}}{{end}}
 {{- range $e.Relations}}{{if and .OwnsForeignKey .Required}}
@@ -223,8 +223,11 @@ func TestList{{$e.Plural.Pascal}}(t *testing.T) {
 	}
 
 	// Every order, both ways, a page at a time by cursor: each one once.
+{{- if orders $e}}
+	// Those worked out by an expression page by number only.
+{{- end}}
 	for _, sort := range {{$p}}.{{$e.Pascal}}Sorts {
-		if sort == "relevance" {
+		if sort == "relevance"{{range orders $e}} || sort == {{quote .Snake}} || sort == {{quote (printf "-%s" .Snake)}}{{end}} {
 			continue
 		}
 		seen := map[uuid.UUID]bool{}
@@ -787,6 +790,185 @@ func TestCreate{{$e.Pascal}}RefusesBrokenRules(t *testing.T) {
 	if _, ok := errors.AsType[*{{$p}}.InvalidFields](err); !ok {
 		t.Fatalf("creating an empty {{lower $e.Label}}: %v", err)
 	}
+}
+{{- end}}
+{{- range countedBy $e}}{{$g := .}}{{$P := $g.Parent}}{{$k := $g.Key}}
+{{- if and (ne $P $e) (canSample $P)}}
+
+// Test{{$e.Pascal}}Counts{{$g.Name}} keeps the totals of {{$P.Plural.Snake}} over their
+// {{$g.Relation.Snake}} ({{range $i, $t := $g.Totals}}{{if $i}}, {{end}}{{$t.Field.Snake}}{{end}}) as {{$e.Plural.Snake}} are created, moved, deleted{{if softDeleted $e}}, restored{{end}}{{if importable $e}} and imported{{end}}.
+func Test{{$e.Pascal}}Counts{{$g.Name}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	a, err := {{$r}}.Create{{$P.Pascal}}(ctx, given{{$P.Pascal}}(t, {{$r}}, 1001))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := {{$r}}.Create{{$P.Pascal}}(ctx, given{{$P.Pascal}}(t, {{$r}}, 1002))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check reads the totals of the {{lower $P.Label}} id: those of the {{$e.Plural.Snake}} counted.
+	check := func(when string, id uuid.UUID, counted ...{{$p}}.New{{$e.Pascal}}) {
+		t.Helper()
+		got, err := {{$r}}.Read{{$P.Pascal}}(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+{{- range $g.Totals}}{{$f := .Field}}
+{{- if eq .Kind "count"}}
+		if got.{{$f.Pascal}} != {{goType $f}}(len(counted)) {
+			t.Fatalf("%s: {{$f.Snake}} %v, want %d", when, got.{{$f.Pascal}}, len(counted))
+		}
+{{- else if eq (printf "%v" $f.Type) "decimal"}}
+		{
+			var want decimal.Decimal
+			for _, n := range counted {
+				want = want.Add(n.{{.Summed.Pascal}})
+			}
+			if !got.{{$f.Pascal}}.Equal(want) {
+				t.Fatalf("%s: {{$f.Snake}} %v, want %v", when, got.{{$f.Pascal}}, want)
+			}
+		}
+{{- else}}
+		{
+			var want {{goType $f}}
+			for _, n := range counted {
+				want += {{goType $f}}(n.{{.Summed.Pascal}})
+			}
+			if got.{{$f.Pascal}} != want {
+				t.Fatalf("%s: {{$f.Snake}} %v, want %v", when, got.{{$f.Pascal}}, want)
+			}
+		}
+{{- end}}
+{{- end}}
+	}
+	check("none yet", a.ID)
+
+	one := given{{$e.Pascal}}(t, {{$r}}, 1)
+	one.{{$k.Pascal}}ID = a.ID
+	first, err := {{$r}}.Create{{$e.Pascal}}(ctx, one)
+	if err != nil {
+		t.Fatal(err)
+	}
+	two := given{{$e.Pascal}}(t, {{$r}}, 2)
+	two.{{$k.Pascal}}ID = a.ID
+	second, err := {{$r}}.Create{{$e.Pascal}}(ctx, two)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("created", a.ID, one, two)
+
+	two.{{$k.Pascal}}ID = b.ID
+	if _, err := {{$r}}.Update{{$e.Pascal}}(ctx, second.ID, 0, two); err != nil {
+		t.Fatal(err)
+	}
+	check("moved from", a.ID, one)
+	check("moved to", b.ID, two)
+
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, first.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	check("deleted", a.ID)
+{{- if softDeleted $e}}
+	if _, err := {{$r}}.Restore{{$e.Pascal}}(ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	check("restored", a.ID, one)
+{{- end}}
+{{- if importable $e}}
+
+	three := given{{$e.Pascal}}(t, {{$r}}, 3)
+	three.{{$k.Pascal}}ID = b.ID
+	if _, err := {{$r}}.Import{{$e.Plural.Pascal}}(ctx, []{{$p}}.New{{$e.Pascal}}{three}, nil); err != nil {
+		t.Fatal(err)
+	}
+	check("imported", b.ID, two, three)
+{{- end}}
+}
+{{- end}}
+{{- end}}
+{{- if not (softDeleted $e)}}
+{{- range cascades $e}}{{$c := .}}{{$C := .Via.Entity}}{{$P := .Group.Parent}}
+{{- if and (canSample $C) (canSample $P) (ne $C $e) (ne $P $e)}}
+
+// Test{{$e.Pascal}}Uncounts{{$C.Plural.Pascal}}By{{.Via.Pascal}} deletes a {{lower $e.Label}}, and with it its
+// {{$C.Plural.Snake}} ({{$C.Snake}}.{{.Via.Snake}} cascades): the totals of their {{$P.Plural.Snake}} leave
+// them out.
+func Test{{$e.Pascal}}Uncounts{{$C.Plural.Pascal}}By{{.Via.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	x, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := {{$r}}.Create{{$P.Pascal}}(ctx, given{{$P.Pascal}}(t, {{$r}}, 1001))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := given{{$C.Pascal}}(t, {{$r}}, 1)
+	n.{{.Group.Key.Pascal}}ID, n.{{.Via.Pascal}}ID = parent.ID, x.ID
+	if _, err := {{$r}}.Create{{$C.Pascal}}(ctx, n); err != nil {
+		t.Fatal(err)
+	}
+	if err := {{$r}}.Delete{{$e.Pascal}}(ctx, x.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := {{$r}}.Read{{$P.Pascal}}(ctx, parent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- range .Group.Totals}}
+	if {{if eq (printf "%v" .Field.Type) "decimal"}}!got.{{.Field.Pascal}}.IsZero(){{else}}got.{{.Field.Pascal}} != 0{{end}} {
+		t.Fatalf("{{.Field.Snake}} %v after its {{$C.Plural.Snake}} went", got.{{.Field.Pascal}})
+	}
+{{- end}}
+}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- with orders $e}}
+
+// Test{{$e.Plural.Pascal}}InTheirOrders lists {{$e.Plural.Snake}} in each order worked out by an
+// expression, by page: every one, the one direction the other's reverse;
+// by cursor, refused.
+func Test{{$e.Plural.Pascal}}InTheirOrders(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	for i := range 3 {
+		if _, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ids := func(sort string) []uuid.UUID {
+		t.Helper()
+		page, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, {{$p}}.{{$e.Pascal}}Query{Sort: sort, Page: 1, PerPage: 10})
+		if err != nil {
+			t.Fatalf("sort=%s: %v", sort, err)
+		}
+		if page.Total != 3 || len(page.{{$e.Plural.Pascal}}) != 3 {
+			t.Fatalf("sort=%s: %d of %d", sort, len(page.{{$e.Plural.Pascal}}), page.Total)
+		}
+		var out []uuid.UUID
+		for _, x := range page.{{$e.Plural.Pascal}} {
+			out = append(out, x.ID)
+		}
+		return out
+	}
+{{- range .}}
+	if largest, smallest := ids({{quote .Snake}}), ids({{quote (printf "-%s" .Snake)}}); largest[0] != smallest[2] || largest[2] != smallest[0] {
+		t.Fatalf("{{.Snake}} %v, -{{.Snake}} %v: not each other's reverse", largest, smallest)
+	}
+	if _, err := {{$r}}.List{{$e.Plural.Pascal}}(ctx, {{$p}}.{{$e.Pascal}}Query{Sort: {{quote .Snake}}, Limit: 10}); !errors.Is(err, postgres.ErrByNumber) {
+		t.Fatalf("{{.Snake}} by cursor: %v", err)
+	}
+{{- end}}
 }
 {{- end}}
 {{- end}}

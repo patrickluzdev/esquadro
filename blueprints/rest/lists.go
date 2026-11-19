@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -114,10 +115,21 @@ func SortsOf(e *project.Entity, opts map[string]any) []string {
 	for _, s := range store.ListSorts(e, opts) {
 		out = append(out, s.Key, "-"+s.Key)
 	}
+	out = append(out, store.OrderKeys(e)...)
 	if len(store.SearchFields(e)) > 0 {
 		out = append(out, "relevance")
 	}
 	return out
+}
+
+// SortDoc describes the sort of e's list: - is descending, and each order
+// worked out by an expression, by its expression.
+func SortDoc(e *project.Entity) string {
+	doc := []string{"The order; - is descending."}
+	for _, o := range store.Orders(e) {
+		doc = append(doc, fmt.Sprintf("%s is worked out by %s, the largest first (-%s, the smallest), and pages by number only.", o.Snake, o.Expr, o.Snake))
+	}
+	return strings.Join(doc, " ")
 }
 
 // has reports whether list holds s.

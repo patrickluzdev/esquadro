@@ -94,6 +94,8 @@ export interface ResourceMeta<F extends Record<string, FieldMeta> = Record<strin
   fields: F
   filters: readonly FilterMeta[]
   sorts: readonly string[]
+  /** The orders worked out by an expression (@store(order)), largest first: sort=<name>. By page only. */
+  orders?: readonly { name: string; label: string }[]
   pagination: readonly string[]
   /** Deleting puts records in the trash, where they stay days days (0: until emptied). */
   trash?: { days: number }

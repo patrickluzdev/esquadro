@@ -21,6 +21,8 @@ func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"packageName":  PackageName,
 		"inRequest":    rest.InRequest,
+		"inAnswer":     rest.InAnswer,
+		"isTotal":      store.IsTotal,
 		"keys":         rest.Keys,
 		"keyName":      rest.KeyName,
 		"keyInRequest": rest.KeyInRequest,

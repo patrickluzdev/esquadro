@@ -96,6 +96,9 @@ var {{$e.Plural.Camel}}SortLabels = map[string]string{
 	{{quote .Snake}}:  T("orderAsc", "name", {{quote (siteLabel .Ann $n .Label)}}),
 	{{quote (printf "-%s" .Snake)}}: T("orderDesc", "name", {{quote (siteLabel .Ann $n .Label)}}),
 {{- end}}{{end}}{{end}}
+{{- range orders $pg.Entity}}
+	{{quote .Snake}}: {{quote (humanize .Snake)}},
+{{- end}}
 	"relevance": T("orderRelevance"),
 }
 

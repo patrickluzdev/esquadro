@@ -127,7 +127,7 @@ var {{$e.Camel}}Secret = []string{ {{- $n := 0}}{{range $e.Fields}}{{if and (aud
 // {{$e.Camel}}Audited are the fields of x whose changes are kept, by name.
 func {{$e.Camel}}Audited(x {{$e.Pascal}}) map[string]any {
 	return map[string]any{
-{{- range $e.Fields}}{{if and (not .Implicit) (not (auditIgnored .))}}
+{{- range $e.Fields}}{{if and (written .) (not (auditIgnored .))}}
 {{- if eq (printf "%v" .Type) "money"}}
 		{{quote .Snake}}: audit.Money(x.{{.Pascal}}),
 {{- else if or (eq (printf "%v" .Type) "file") (eq (printf "%v" .Type) "image")}}

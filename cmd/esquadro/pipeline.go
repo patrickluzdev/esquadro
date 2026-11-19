@@ -11,6 +11,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/audit"
 	"github.com/patrickluzdev/esquadro/blueprints/branching"
 	clientts "github.com/patrickluzdev/esquadro/blueprints/client_ts"
+	"github.com/patrickluzdev/esquadro/blueprints/domain"
 	"github.com/patrickluzdev/esquadro/blueprints/env"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
@@ -72,6 +73,7 @@ func init() {
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
 var builtinFuncs = map[string]template.FuncMap{
 	"app":           app.TemplateFuncs(),
+	"domain":        domain.TemplateFuncs(),
 	"store":         store.TemplateFuncs(),
 	"rest":          rest.TemplateFuncs(),
 	"client_ts":     clientts.TemplateFuncs(),

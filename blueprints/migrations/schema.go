@@ -72,6 +72,10 @@ type column struct {
 	generated string
 	// check is the column's CHECK expression, or "".
 	check string
+	// fill is the SQL expression that works out the value of a total
+	// (@store(sum) or @store(count)) for each row, when the column is added
+	// or its total changes; "" for other columns.
+	fill string
 }
 
 type foreignKey struct {
@@ -282,6 +286,9 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 		if f.Default != nil {
 			c.def = defaultSQL(f)
 		}
+		if fill := totalFill(l, e, f, entities); fill != "" {
+			c.notNull, c.def, c.fill = true, "0", fill
+		}
 		t.columns = append(t.columns, c)
 		columns[f.Raw] = c.name
 		if f.Type == project.TypeMoney {
@@ -347,6 +354,52 @@ func entityTable(l layout, e project.EntityDescription, entities map[string]proj
 		trash(&t, related, listed)
 	}
 	return t
+}
+
+// totalFill is the SQL expression of a total's value for each row of e's
+// table, over the records of its relation: "" for a field that is none.
+func totalFill(l layout, e project.EntityDescription, f project.FieldDescription, entities map[string]project.EntityDescription) string {
+	what := "count(*)"
+	path, _ := f.Ann["store"]["count"].(string)
+	if sum, ok := f.Ann["store"]["sum"].(string); ok {
+		path = sum
+	}
+	if path == "" {
+		return ""
+	}
+	rel, field, _ := strings.Cut(path, ".")
+	for _, r := range e.Relations {
+		if r.Raw != rel || r.Kind != "one-to-many" {
+			continue
+		}
+		child := entities[r.Target]
+		var key string
+		for _, cr := range child.Relations {
+			if cr.Raw == r.Inverse {
+				key = cr.Snake + "_id"
+			}
+		}
+		if key == "" {
+			return ""
+		}
+		if _, ok := f.Ann["store"]["sum"]; ok {
+			what = ""
+			for _, cf := range child.Fields {
+				if cf.Raw == field {
+					what = "coalesce(sum(c." + postgres.Ident(columnName(cf)) + "), 0)"
+				}
+			}
+			if what == "" {
+				return ""
+			}
+		}
+		where := "c." + postgres.Ident(key) + " = " + tableName(e) + ".id"
+		if SoftDeleted(child) {
+			where += " AND c.deleted_at IS NULL"
+		}
+		return "(SELECT " + what + " FROM " + l.schema(child.Module) + "." + tableName(child) + " c WHERE " + where + ")"
+	}
+	return ""
 }
 
 // Live are the rows of a table with soft delete that are not in the trash.

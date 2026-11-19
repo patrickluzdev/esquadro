@@ -140,6 +140,15 @@ func TestCanaryUpgrades(t *testing.T) {
 		t.Fatal("the canary's Offer has no site page to list its comments on")
 	}
 	deals = withComments
+	// The visitors' votes: an offer's temperature is their sum, and the hot
+	// list orders by it, weighed by time.
+	hot := strings.Replace(deals, "  niche                > Niche @store(filter)\n",
+		"  niche                > Niche @store(filter)\n  temperature          int @store(sum votes.value, sort)\n  votes                < Vote\n"+
+			"  @store(order [hot, \"temperature / power(extract(epoch from now() - created_at) / 3600 + 2, 1.5)\"])\n", 1)
+	if hot == deals {
+		t.Fatal("the canary's Offer has no niche to add its temperature after")
+	}
+	deals = hot + "\n/// A visitor's vote on an offer: +1 or -1.\nentity Vote {\n  value int required min(-1) max(1)\n  offer > Offer required on_delete(cascade)\n  @security(read public, write [user.admin, user.operator])\n}\n"
 	write("esquadro/deals.esq", deals)
 	write("internal/deals/link_rules.go", `package deals
 
@@ -325,6 +334,52 @@ func TestCommentReplies(t *testing.T) {
 	if !strings.Contains(read("internal/deals/create_comment.go"), "func (d *Deals) commentLimit(") || !strings.Contains(read("cmd/promo/api_test.go"), "func TestAPICommentCreateLimit(") {
 		t.Fatal("the comments have no limit of creates, or no test of it")
 	}
+	// The temperature, kept as votes come and go, and the hot list.
+	write("internal/deals/temperature_test.go", `package deals_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/bojanz/currency"
+
+	"example.com/promo/internal/deals"
+	"example.com/promo/internal/platform/postgres/postgrestest"
+)
+
+func TestTemperature(t *testing.T) {
+	ctx := context.Background()
+	m := deals.New(deals.Deps{Pool: postgrestest.Fresh(t)})
+	price, _ := currency.NewAmount("10", "BRL")
+	offer := func(title string) deals.Offer {
+		o, err := m.CreateOffer(ctx, deals.NewOffer{Source: deals.SourceManual, Store: "Loja", Title: title, ProductURL: "https://loja.com.br", Price: price})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+	cold, warm := offer("Fria"), offer("Quente")
+	var last deals.Vote
+	for _, v := range []int{1, 1, -1} {
+		vote, err := m.CreateVote(ctx, deals.NewVote{Value: v, OfferID: warm.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = vote
+	}
+	if err := m.DeleteVote(ctx, last.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	read, err := m.ReadOffer(ctx, warm.ID)
+	if err != nil || read.Temperature != 2 {
+		t.Fatalf("temperature %d, %v", read.Temperature, err)
+	}
+	page, err := m.ListOffers(ctx, deals.OfferQuery{Sort: "hot", Page: 1, PerPage: 10})
+	if err != nil || len(page.Offers) != 2 || page.Offers[0].ID != warm.ID || page.Offers[1].ID != cold.ID {
+		t.Fatalf("hot: %+v, %v", page.Offers, err)
+	}
+}
+`)
 	e.run(nil, "go", "vet", "./...")
 	e.run(nil, "go", "test", "./...")
 	e.esquadro(0, "gen", "-check", dir)

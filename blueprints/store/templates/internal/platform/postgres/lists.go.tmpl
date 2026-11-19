@@ -10,11 +10,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Lists' errors: a cursor that is not one of the list's order, and an
-// order the list does not take.
+// Lists' errors: a cursor that is not one of the list's order, an order
+// the list does not take, and an order worked out by an expression asked
+// for by cursor, which pages by number only.
 var (
 	ErrBadCursor = errors.New("postgres: not a cursor of this list and order")
 	ErrBadSort   = errors.New("postgres: not an order of this list")
+	ErrByNumber  = errors.New("postgres: this order pages by number, not by cursor")
 )
 
 // Opt is v as a parameter, by to, or NULL without it: an optional filter.

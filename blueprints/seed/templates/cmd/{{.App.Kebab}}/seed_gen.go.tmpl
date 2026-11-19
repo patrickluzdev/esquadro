@@ -34,7 +34,7 @@ func seedEntities(d dependencies) []seed.Entity {
 			List:  "{{$e.Plural.Snake}}",
 			Table: "{{$e.Plural.Snake}}",
 			Fields: []seed.Field{
-{{- range $f := $e.Fields}}{{if not $f.Implicit}}
+{{- range $f := $e.Fields}}{{if written $f}}
 				{Name: "{{$f.Snake}}", Kind: seed.{{seedKind $f}}, Required: {{$f.Required}}, Default: {{if $f.Default}}true{{else}}false{{end}}, Unique: {{$f.Unique}}{{if $f.Enum}}, Values: []string{ {{- range $i, $v := $f.Enum.Values}}{{if $i}}, {{end}}"{{$v.Raw}}"{{end -}} }{{end}}{{with $f.Min}}, Min: seedNumber({{.Value}}){{end}}{{with $f.Max}}, Max: seedNumber({{.Value}}){{end}}},
 {{- end}}{{end}}
 {{- range $r := seedKeys $e}}
@@ -43,7 +43,7 @@ func seedEntities(d dependencies) []seed.Entity {
 			},
 			Create: func(ctx context.Context, id uuid.UUID, r *seed.Row) error {
 				n := {{$e.Module.Snake}}.New{{$e.Pascal}}{
-{{- range $f := $e.Fields}}{{if not $f.Implicit}}{{$k := seedKind $f}}{{if ne $k "File"}}
+{{- range $f := $e.Fields}}{{if written $f}}{{$k := seedKind $f}}{{if ne $k "File"}}
 					{{$f.Pascal}}: {{if eq $k "Text"}}r.String("{{$f.Snake}}"){{else if eq $k "String"}}r.String("{{$f.Snake}}"){{else if eq $k "Int"}}r.Int("{{$f.Snake}}"){{else if eq $k "Int64"}}r.Int64("{{$f.Snake}}"){{else if eq $k "Decimal"}}seedDecimal(r, "{{$f.Snake}}"){{else if eq $k "Money"}}seedMoney(r, "{{$f.Snake}}"){{else if eq $k "Bool"}}r.Bool("{{$f.Snake}}"){{else if or (eq $k "Time") (eq $k "Date")}}r.Time("{{$f.Snake}}"){{else if eq $k "UUID"}}r.UUID("{{$f.Snake}}"){{else if eq $k "JSON"}}json.RawMessage(r.JSON("{{$f.Snake}}")){{else if eq $k "Enum"}}{{$e.Module.Snake}}.{{$f.Enum.Pascal}}(r.String("{{$f.Snake}}")){{end}},
 {{- end}}{{end}}{{end}}
 {{- range $r := seedKeys $e}}

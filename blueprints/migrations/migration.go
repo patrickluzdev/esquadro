@@ -49,7 +49,7 @@ func Diff(previous *project.Description, current project.Description) Migration 
 // depend on first and drops in the reverse order.
 type steps struct {
 	createSchemas, createTypes, addValues, createTables []string
-	alterColumns, addConstraints, createIndexes         []string
+	alterColumns, fills, addConstraints, createIndexes  []string
 	dropIndexes, dropConstraints, dropColumns           []string
 	dropTables, dropTypes, dropSchemas                  []string
 	todos                                               []string
@@ -65,7 +65,7 @@ func (s *steps) sql() string {
 	var parts []string
 	for _, group := range [][]string{
 		s.createSchemas, s.createTypes, s.addValues, s.dropIndexes, s.dropConstraints,
-		s.createTables, s.alterColumns, s.dropColumns, s.addConstraints, s.createIndexes,
+		s.createTables, s.alterColumns, s.fills, s.dropColumns, s.addConstraints, s.createIndexes,
 		s.dropTables, s.dropTypes, s.dropSchemas,
 	} {
 		parts = append(parts, group...)
@@ -180,6 +180,10 @@ func alterTable(s *steps, from, to table) {
 	regenerated := map[string]bool{}
 	for _, c := range to.columns {
 		prev := from.column(c.name)
+		if c.fill != "" && (prev == nil || prev.fill != c.fill) {
+			// A total starts as what the records it counts add up to.
+			s.fills = append(s.fills, fmt.Sprintf("UPDATE %s SET %s = %s;", q, postgres.Ident(c.name), c.fill))
+		}
 		if prev != nil && (prev.generated != "" || c.generated != "") && prev.generated != c.generated {
 			s.alterColumns = append(s.alterColumns,
 				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s;", q, postgres.Ident(c.name)),

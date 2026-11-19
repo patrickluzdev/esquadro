@@ -24,8 +24,8 @@ export const resources = {
     api: (api: Api) => api.{{$e.Plural.Camel}} as unknown as import("./kit/meta.ts").RecordsApi,
 {{- end}}
     fields: {
-{{- range $f := inRequest $e}}{{$fa := ann $f}}
-      {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{if richText $f}}, rich: true{{with $f.Max}}, max: {{.Text}}{{end}}{{end}}{{with defaultOf $f}}, default: {{.}}{{end}}{{with $f.Min}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, min: {{.Text}}{{end}}{{end}}{{with $f.Max}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, max: {{.Text}}{{end}}{{end}}{{fileMeta $e $f (optionsOf "storage")}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }, colors: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: "{{enumColor $v (ann $v)}}"{{end}} }{{end}} },
+{{- range $f := inAnswer $e}}{{$fa := ann $f}}
+      {{$f.Snake}}: { name: "{{$f.Snake}}", label: {{printf "%q" (or (index $fa "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{$f.Required}}{{if richText $f}}, rich: true{{with $f.Max}}, max: {{.Text}}{{end}}{{end}}{{with defaultOf $f}}, default: {{.}}{{end}}{{with $f.Min}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, min: {{.Text}}{{end}}{{end}}{{with $f.Max}}{{if or (eq (spaKind $f) "int") (eq (spaKind $f) "decimal") (eq (spaKind $f) "money")}}, max: {{.Text}}{{end}}{{end}}{{fileMeta $e $f (optionsOf "storage")}}{{if isTotal $f}}, readOnly: true{{end}}{{if $f.Enum}}, values: [{{range $i, $v := enumValues $f.Enum}}{{if $i}}, {{end}}"{{$v}}"{{end}}], labels: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }, colors: { {{- range $i, $v := $f.Enum.Values}}{{if $i}},{{end}} {{$v.Raw}}: "{{enumColor $v (ann $v)}}"{{end}} }{{end}} },
 {{- end}}
 {{- range $r := keys $e}}
       {{keyName $r}}: { name: "{{keyName $r}}", label: {{printf "%q" (or (index (ann $r) "label") (humanize $r.Snake))}}, kind: "relation", required: {{$r.Required}}, target: "{{$r.Target.Plural.Camel}}", display: "{{displayOf $r}}" },
@@ -38,6 +38,9 @@ export const resources = {
     },
     filters: [{{range $i, $f := apiFilters $e}}{{if $i}}, {{end}}{ param: "{{$f.Param}}", kind: "{{$f.Kind}}" }{{end}}],
     sorts: [{{range $i, $s := sortsOf $e (optionsOf "postgres")}}{{if $i}}, {{end}}"{{$s}}"{{end}}],
+{{- with orders $e}}
+    orders: [{{range $i, $o := .}}{{if $i}}, {{end}}{ name: "{{$o.Snake}}", label: {{printf "%q" (humanize $o.Snake)}} }{{end}}],
+{{- end}}
     pagination: [{{range $i, $p := pagination $e (optionsOf "rest")}}{{if $i}}, {{end}}"{{$p}}"{{end}}],
 {{- if softDeleted $e}}
     trash: { days: {{or (index (optionsOf "store") "purge_days") 0}} },

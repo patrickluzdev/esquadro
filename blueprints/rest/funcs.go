@@ -32,6 +32,10 @@ func TemplateFuncs() template.FuncMap {
 		"unpagedMax":          UnpagedMax,
 		"apiFilters":          APIFilters,
 		"sortsOf":             SortsOf,
+		"orders":              store.Orders,
+		"inAnswer":            InAnswer,
+		"countedBy":           store.CountedBy,
+		"sortDoc":             SortDoc,
 		"searchFieldsOf":      store.SearchFields,
 		"has":                 has,
 		"accessLine":          accessLine,
@@ -386,7 +390,7 @@ func includedFrom(m *project.Module) []*project.Entity {
 // all but id and version, which always come.
 func AnswerFields(e *project.Entity) []string {
 	var out []string
-	for _, f := range InRequest(e) {
+	for _, f := range InAnswer(e) {
 		out = append(out, jsonName(f))
 	}
 	for _, r := range Keys(e) {
@@ -395,8 +399,21 @@ func AnswerFields(e *project.Entity) []string {
 	return append(out, "created_at", "updated_at")
 }
 
-// InRequest lists the fields a NewX carries: the declared ones.
+// InRequest lists the fields a NewX carries: the declared ones but the
+// totals the store keeps.
 func InRequest(e *project.Entity) []*project.Field {
+	var out []*project.Field
+	for _, f := range e.Fields {
+		if store.Written(f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// InAnswer lists the fields a record's answer carries besides id, its keys
+// and its times: the declared ones, totals among them.
+func InAnswer(e *project.Entity) []*project.Field {
 	var out []*project.Field
 	for _, f := range e.Fields {
 		if !f.Implicit {

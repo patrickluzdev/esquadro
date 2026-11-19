@@ -32,8 +32,8 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	}
 {{- end}}
 {{- end}}
-{{- if $notice}}
-	// What the notices say about it, read before it goes.
+{{- if or $notice (countedBy $e)}}
+	// What {{if $notice}}the notices say about it{{else}}the totals that count it need{{end}}, read before it goes.
 	live, err := q.Get{{$e.Pascal}}(ctx, postgres.UUID(id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Err{{$e.Pascal}}NotFound
@@ -50,6 +50,11 @@ func trash{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID, versi
 	if trashed == 0 {
 		return {{$e.Camel}}Gone(ctx, db, id)
 	}
+{{- if countedBy $e}}
+	if err := {{$e.Camel}}Counted(ctx, db, &stored, nil); err != nil {
+		return err
+	}
+{{- end}}
 {{- if $notice}}
 	if err := {{$e.Camel}}Noticed(ctx, db, "delete", &stored, nil); err != nil {
 		return err
@@ -105,6 +110,12 @@ func restore{{$e.Pascal}}(ctx context.Context, db sqlgen.DBTX, id uuid.UUID) ({{
 	if err != nil {
 		return {{$e.Pascal}}{}, {{$e.Camel}}Refusal(err)
 	}
+{{- if countedBy $e}}
+	restored := {{$e.Camel}}Of(row)
+	if err := {{$e.Camel}}Counted(ctx, db, nil, &restored); err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+{{- end}}
 {{- if $audited}}
 	if err := {{$e.Camel}}Recorded(ctx, db, "restore", id, nil, nil); err != nil {
 		return {{$e.Pascal}}{}, err

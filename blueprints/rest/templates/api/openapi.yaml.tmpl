@@ -98,7 +98,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: The order; - is descending.
+          description: {{if orders $e}}{{quote (sortDoc $e)}}{{else}}The order; - is descending.{{end}}
           schema: {type: string, enum: [{{range $i, $s := sortsOf $e (optionsOf "postgres")}}{{if $i}}, {{end}}{{quote $s}}{{end}}]}
 {{- if searchFieldsOf $e}}
         - name: q
@@ -723,7 +723,7 @@ components:
           type: array
           description: What the request's person may do with it, as the API decides.
           items: {type: string, enum: ["update", "delete"]}
-{{- range inRequest $e}}
+{{- range inAnswer $e}}
         {{jsonName .}}: {{schema .}}
 {{- end}}
 {{- range keys $e}}

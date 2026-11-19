@@ -48,6 +48,16 @@ ORDER BY {{$s.Column}}{{if eq $dir "Desc"}} DESC{{end}}, id{{if eq $dir "Desc"}}
 LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(skip);
 {{- end}}
 {{- end}}
+{{- range orders $e}}{{$o := .}}
+{{- range $dir := list "Desc" "Asc"}}
+
+-- name: List{{$e.Plural.Pascal}}By{{$o.Pascal}}{{$dir}} :many
+SELECT * FROM {{$t}}
+{{$where}}
+ORDER BY ({{$o.Expr}}){{if eq $dir "Desc"}} DESC{{end}}, id{{if eq $dir "Desc"}} DESC{{end}}
+LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(skip);
+{{- end}}
+{{- end}}
 {{- if searchFields $e}}
 
 -- name: List{{$e.Plural.Pascal}}ByRelevance :many
@@ -68,6 +78,26 @@ UPDATE {{$t}}
 SET {{range $ws}}{{.Column}} = @{{.Param}}, {{end}}version = version + 1, updated_at = now()
 WHERE id = @id{{$live}} AND (sqlc.narg(if_version)::integer IS NULL OR version = sqlc.narg(if_version)::integer)
 RETURNING *;
+
+{{- with totalGroups $e}}
+
+-- name: Lock{{$e.Pascal}} :exec
+SELECT 1 FROM {{$t}} WHERE id = @id FOR NO KEY UPDATE;
+{{- range .}}
+
+-- name: Recount{{.Name}} :exec
+UPDATE {{$t}}
+SET {{range $i, $x := .Totals}}{{if $i}}, {{end}}{{pgIdent (pgColumn $x.Field)}} = {{totalSQL $x (optionsOf "postgres")}}{{end}}
+WHERE id = @id;
+{{- end}}
+{{- end}}
+{{- if not $soft}}
+{{- range cascades $e}}
+
+-- name: {{.Name}} :many
+SELECT DISTINCT {{.Group.Column}} FROM {{pgTable .Via.Entity (optionsOf "postgres")}} WHERE {{pgIdent (printf "%s_id" .Via.Snake)}} = @id AND {{.Group.Column}} IS NOT NULL;
+{{- end}}
+{{- end}}
 
 -- name: Touch{{$e.Pascal}} :execrows
 UPDATE {{$t}}

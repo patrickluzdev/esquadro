@@ -637,6 +637,24 @@ function RecordsList({
             />
           </div>
         )}
+        {paged && meta.orders && meta.orders.length > 0 && (
+          <Select
+            value={meta.orders.find((o) => o.name === search.sort)?.name ?? "_"}
+            onValueChange={(v) => set({ sort: v === "_" ? undefined : v, page: undefined, cursor: undefined })}
+          >
+            <SelectTrigger className="w-auto" aria-label={t("defaultOrder")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectItem value="_">{t("defaultOrder")}</SelectItem>
+              {meta.orders.map((o) => (
+                <SelectItem key={o.name} value={o.name}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {filters.length > 0 &&
           (layout === "bar" ? (
             filters.map((f) => <BarFilter key={f.name} field={f} values={values} onChange={setFilters} />)

@@ -211,7 +211,7 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- end}}
 	switch {
 {{- if has $pag "page"}}
-	case {{if has $pag "cursor"}}params.Page.IsSet() || params.PerPage.IsSet(){{else}}true{{end}}:
+	case {{if has $pag "cursor"}}params.Page.IsSet() || params.PerPage.IsSet(){{if orders $e}} || (slices.Contains({{$P}}Orders, q.Sort) && !params.After.IsSet()){{end}}{{else}}true{{end}}:
 		q.Page, q.PerPage = params.Page.Or(1), params.PerPage.Or(25)
 {{- end}}
 {{- if has $pag "cursor"}}
@@ -818,7 +818,7 @@ func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Contex
 {{- else}}
 	a.Can = []apigen.{{$P}}CanItem{"update", "delete"}
 {{- end}}
-{{- range inRequest $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}{{$req := .Required}}
+{{- range inAnswer $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}{{$req := .Required}}
 {{- if or (eq .Type "string") (eq .Type "text")}}
 {{- if not $req}}
 	if {{$x}} != "" {
@@ -1003,7 +1003,7 @@ func {{.Camel}}Only(a *apigen.{{$P}}, fields []apigen.{{$P}}Field) {
 	for _, f := range fields {
 		asked[f] = true
 	}
-{{- range inRequest $e}}
+{{- range inAnswer $e}}
 	if !asked[{{quote (jsonName .)}}] {
 		edge.Unset(&a.{{ogenName (jsonName .)}})
 	}
@@ -1053,7 +1053,7 @@ func problemOf(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, postgres.ErrBadCursor), errors.Is(err, postgres.ErrBadSort):
+	case errors.Is(err, postgres.ErrBadCursor), errors.Is(err, postgres.ErrBadSort), errors.Is(err, postgres.ErrByNumber):
 		return edge.ErrInvalidRequest
 {{- range $m.Entities}}
 	case errors.Is(err, Err{{.Pascal}}Changed):

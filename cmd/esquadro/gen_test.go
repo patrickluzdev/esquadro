@@ -497,3 +497,36 @@ func TestCheckSiteRedirects(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckTotalsAndOrders(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	offer := func(fields string) string {
+		return "entity Offer {\n  title string required\n" + fields + "  votes < Vote\n}\n\n" +
+			"entity Vote {\n  value int required\n  weight decimal\n  note string\n  offer > Offer required\n}\n"
+	}
+	ok := "  temperature int @store(sum votes.value, sort)\n  votes_n int64 @store(count votes)\n  weight decimal @store(sum votes.weight)\n" +
+		"  @store(order [hot, \"temperature / power(extract(epoch from now() - created_at) / 3600 + 2, 1.5)\"])\n"
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":         {offer(ok), ""},
+		"relation":   {offer("  temperature int @store(sum likes.value)\n"), "sum likes.value: Offer has no relation likes"},
+		"one":        {offer("  n int @store(count category)\n  category > Category\n"), "a total counts the records of a one-to-many relation"},
+		"field":      {offer("  temperature int @store(sum votes.score)\n"), "sum votes.score: Vote has no field score"},
+		"number":     {offer("  temperature int @store(sum votes.note)\n"), "Vote.note is string; a sum adds up int, int64 or decimal"},
+		"type":       {offer("  temperature int @store(sum votes.weight)\n"), "Offer.temperature is int; a sum of decimal is decimal"},
+		"count type": {offer("  votes_n decimal @store(count votes)\n"), "Offer.votes_n is decimal; a count is int or int64"},
+		"required":   {offer("  votes_n int required @store(count votes)\n"), "Offer.votes_n is a total the store keeps"},
+		"order name": {offer("  @store(order [title, \"1\"])\n"), "order title of Offer has the name of a field"},
+		"order pair": {offer("  @store(order [hot])\n"), "write a name and its SQL expression for each order"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

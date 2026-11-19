@@ -32,7 +32,7 @@ export const accountRealms: AccountRealm[] = [
     singular: {{printf "%q" (or (index $a "singular") (humanize $e.Snake))}},
     roles: [{{range $i, $role := $r.Roles}}{{if $i}}, {{end}}"{{$role}}"{{end}}],
     admins: [{{range $i, $w := $admins}}{{if $i}}, {{end}}"{{$w}}"{{end}}],
-    fields: [{{$n := 0}}{{range $f := $e.Fields}}{{if not $f.Implicit}}{{if $n}}, {{end}}{{$n = add1 $n}}{ name: "{{$f.Snake}}", label: {{printf "%q" (or (index (ann $f) "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{and $f.Required (not $f.Default)}}{{if $f.Enum}}, values: [{{range $j, $v := $f.Enum.Values}}{{if $j}}, {{end}}"{{$v.Raw}}"{{end}}], labels: { {{- range $j, $v := $f.Enum.Values}}{{if $j}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }{{end}} }{{end}}{{end}}],
+    fields: [{{$n := 0}}{{range $f := $e.Fields}}{{if written $f}}{{if $n}}, {{end}}{{$n = add1 $n}}{ name: "{{$f.Snake}}", label: {{printf "%q" (or (index (ann $f) "label") (humanize $f.Snake))}}, kind: "{{spaKind $f}}", required: {{and $f.Required (not $f.Default)}}{{if $f.Enum}}, values: [{{range $j, $v := $f.Enum.Values}}{{if $j}}, {{end}}"{{$v.Raw}}"{{end}}], labels: { {{- range $j, $v := $f.Enum.Values}}{{if $j}},{{end}} {{$v.Raw}}: {{printf "%q" (or (index (ann $v) "label") $v.Raw)}}{{end}} }{{end}} }{{end}}{{end}}],
   },
 {{- end}}{{end}}
 ]

@@ -65,6 +65,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return {{$e.Camel}}Refusal(err)
 		}
 		updated = {{$e.Camel}}Of(row)
+{{- if countedBy $e}}
+		if err := {{$e.Camel}}Counted(ctx, postgres.Querier(ctx, {{$r}}.Pool), &stored, &updated); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $links}}
 		if err := {{$e.Camel}}Links(ctx, postgres.Querier(ctx, {{$r}}.Pool), id, n); err != nil {
 			return err

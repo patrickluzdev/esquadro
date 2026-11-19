@@ -64,11 +64,11 @@ export interface {{$P}} {
   version: number
   /** What the person may do with it, as the API decides. */
   can: ("update" | "delete")[]
-{{- range inRequest $e}}
+{{- range inAnswer $e}}
 {{- with .Doc}}
   /** {{join " " .}} */
 {{- end}}
-  {{.Snake}}{{if and (not .Required) (not .Default)}}?{{end}}: {{tsType .}}
+  {{.Snake}}{{if and (not .Required) (not .Default) (not (isTotal .))}}?{{end}}: {{tsType .}}
 {{- end}}
 {{- range keys $e}}
   {{keyName .}}{{if not .Required}}?{{end}}: string

@@ -110,7 +110,7 @@ func (c *checker) document(src []byte) {
 // its key's (category, category_id).
 func field(e *project.Entity, name string) (*project.Field, *project.Relation) {
 	for _, f := range e.Fields {
-		if f.Snake == name && (!f.Implicit || name == "created_at" || name == "updated_at") {
+		if f.Snake == name && (store.Written(f) || name == "created_at" || name == "updated_at") {
 			return f, nil
 		}
 	}
@@ -125,7 +125,7 @@ func field(e *project.Entity, name string) (*project.Field, *project.Relation) {
 func names(e *project.Entity) string {
 	var out []string
 	for _, f := range e.Fields {
-		if !f.Implicit {
+		if store.Written(f) {
 			out = append(out, f.Snake)
 		}
 	}

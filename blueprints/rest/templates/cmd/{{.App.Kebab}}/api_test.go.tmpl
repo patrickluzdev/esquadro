@@ -299,6 +299,17 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 		t.Fatal("page and after together passed")
 	}
 {{- end}}
+{{- range orders $e}}
+	// {{.Snake}} is worked out by an expression: by page, even unasked.
+	if ordered, err := c.List{{$e.Plural.Pascal}}(ctx, apigen.List{{$e.Plural.Pascal}}Params{Sort: apigen.NewOptList{{$e.Plural.Pascal}}Sort(apigen.List{{$e.Plural.Pascal}}Sort({{quote .Snake}}))}); err != nil || len(ordered.Items) != 1 || ordered.Total.Or(0) != 1 {
+		t.Fatalf("list by {{.Snake}}: %+v, %v", ordered, err)
+	}
+{{- if has $pag "cursor"}}
+	if _, err := c.List{{$e.Plural.Pascal}}(ctx, apigen.List{{$e.Plural.Pascal}}Params{Sort: apigen.NewOptList{{$e.Plural.Pascal}}Sort(apigen.List{{$e.Plural.Pascal}}Sort({{quote .Snake}})), After: apigen.NewOptString("x")}); err == nil {
+		t.Fatal("{{.Snake}} by cursor passed")
+	}
+{{- end}}
+{{- end}}
 {{- end}}
 	if _, err := c.Update{{$P}}(ctx, givenAPI{{$P}}(t, c, 2), apigen.Update{{$P}}Params{ {{$id}}: created.ID{{if ifMatchRequired $e $.Options}}, IfMatch: apigen.NewOptString("*"){{end}} }); err != nil {
 		t.Fatalf("update: %v", err)
@@ -311,6 +322,32 @@ func TestAPI{{.Plural.Pascal}}(t *testing.T) {
 		t.Fatalf("get after delete: %v", err)
 	}
 }
+{{- range countedBy $e}}{{$g := .}}{{$Pa := .Parent}}
+{{- if and (canSampleAPI $e) .Key.Required (ne $Pa $e)}}
+
+// TestAPI{{$P}}Counted{{.Name}} creates a {{lower $e.Label}}: the {{lower $Pa.Label}} it points at
+// counts it, and answers with its totals.
+func TestAPI{{$P}}Counted{{.Name}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	c := newTestClient(t)
+
+	n := givenAPI{{$P}}(t, c, 1)
+	if _, err := c.Create{{$P}}(ctx, n, apigen.Create{{$P}}Params{}); err != nil {
+		t.Fatal(err)
+	}
+	parent, err := c.Get{{$Pa.Pascal}}(ctx, apigen.Get{{$Pa.Pascal}}Params{ {{- ogenName (printf "%sId" $Pa.Camel)}}: n.{{ogenName (keyName .Key)}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+{{- range .Totals}}
+	if !parent.{{ogenName (jsonName .Field)}}.IsSet(){{if eq .Kind "count"}} || parent.{{ogenName (jsonName .Field)}}.Value != 1{{end}} {
+		t.Fatalf("{{.Field.Snake}}: %+v", parent.{{ogenName (jsonName .Field)}})
+	}
+{{- end}}
+}
+{{- end}}
+{{- end}}
 {{- end}}
 {{- range links $e}}{{if and (canSampleAPI $e) (not .Inferred) (or .CrossesModules (canSampleAPI .Target))}}{{$R := .Pascal}}{{$o := ogenName (linkParam .)}}
 

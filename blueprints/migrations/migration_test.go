@@ -226,3 +226,30 @@ func TestSoftDeleteGivesATrashAndUniquenessAmongTheLive(t *testing.T) {
 		t.Errorf("no change, no migration:\n%s", again.Up)
 	}
 }
+
+// TestATotalStartsAsWhatItCounts adds a total (@store(count)) to a table
+// with rows: the column is not null, 0 by default, and filled with what the
+// records it counts add up to.
+func TestATotalStartsAsWhatItCounts(t *testing.T) {
+	cur := load(t, "testdata/shop/v1")
+	counted := *snapshot(t, cur)
+	total := project.FieldDescription{Type: project.TypeInt, Ann: project.Ann{"store": {"count": "products"}}}
+	total.Raw, total.Snake = "products_n", "products_n"
+	for i, e := range counted.Entities {
+		if e.Raw == "Category" {
+			counted.Entities[i].Fields = append(counted.Entities[i].Fields, total)
+		}
+	}
+	up := Diff(snapshot(t, cur), counted).Up
+	for _, want := range []string{
+		"ALTER TABLE public.categories ADD COLUMN products_n integer NOT NULL DEFAULT 0;",
+		"UPDATE public.categories SET products_n = (SELECT count(*) FROM public.products c WHERE c.category_id = categories.id);",
+	} {
+		if !strings.Contains(up, want) {
+			t.Errorf("misses %q:\n%s", want, up)
+		}
+	}
+	if again := Diff(snapshot(t, counted), counted); strings.TrimSpace(again.Up) != "" {
+		t.Errorf("no change, no migration:\n%s", again.Up)
+	}
+}

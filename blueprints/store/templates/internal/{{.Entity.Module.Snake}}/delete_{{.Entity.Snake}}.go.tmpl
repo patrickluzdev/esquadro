@@ -47,6 +47,13 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		if err := rules.BeforeDelete(ctx, {{$r}}, stored); err != nil {
 			return err
 		}
+{{- range $i, $c := cascades $e}}
+		// The {{lower $c.Group.Parent.Plural.Snake}} whose {{$c.Group.Relation.Snake}} go with it ({{$c.Via.Entity.Snake}}.{{$c.Via.Snake}} cascades), to count them again.
+		parents{{$i}}, err := q.{{$c.Name}}(ctx, postgres.UUID(id))
+		if err != nil {
+			return err
+		}
+{{- end}}
 		deleted, err := q.Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 		if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
 			return Err{{$e.Pascal}}InUse
@@ -57,6 +64,18 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		if deleted == 0 {
 			return {{$e.Camel}}Gone(ctx, postgres.Querier(ctx, {{$r}}.Pool), id)
 		}
+{{- if countedBy $e}}
+		if err := {{$e.Camel}}Counted(ctx, postgres.Querier(ctx, {{$r}}.Pool), &stored, nil); err != nil {
+			return err
+		}
+{{- end}}
+{{- range $i, $c := cascades $e}}
+		for _, parent := range parents{{$i}} {
+			if err := recount{{$c.Group.Name}}(ctx, q, postgres.ID(parent)); err != nil {
+				return err
+			}
+		}
+{{- end}}
 {{- if $audited}}
 		if err := {{$e.Camel}}Recorded(ctx, postgres.Querier(ctx, {{$r}}.Pool), "delete", id, &stored, nil); err != nil {
 			return err

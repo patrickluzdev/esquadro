@@ -9,7 +9,15 @@ const Max{{$e.Pascal}}Page = 100
 
 // {{$e.Pascal}}Sorts are the orders a list of {{$e.Plural.Snake}} takes; - is
 // descending, and -created_at, the newest first, the default.
-var {{$e.Pascal}}Sorts = []string{ {{- range $i, $s := $ss}}{{if $i}}, {{end}}"{{$s.Key}}", "-{{$s.Key}}"{{end}}{{if $search}}, "relevance"{{end -}} }
+var {{$e.Pascal}}Sorts = []string{ {{- range $i, $s := $ss}}{{if $i}}, {{end}}"{{$s.Key}}", "-{{$s.Key}}"{{end}}{{range orders $e}}, "{{.Snake}}", "-{{.Snake}}"{{end}}{{if $search}}, "relevance"{{end -}} }
+{{- with orders $e}}
+
+// {{$e.Pascal}}Orders are the sorts of {{$e.Plural.Snake}} worked out by an expression:
+// {{range $i, $o := .}}{{if $i}}, {{end}}{{$o.Snake}}{{end}}, the largest first, and the same after -, the smallest. A
+// list in one pages by number (Page) or not at all (Unpaged), since their
+// values change with time.
+var {{$e.Pascal}}Orders = []string{ {{- range $i, $o := .}}{{if $i}}, {{end}}"{{$o.Snake}}", "-{{$o.Snake}}"{{end -}} }
+{{- end}}
 
 // {{$e.Pascal}}Filter narrows a list of {{$e.Plural.Snake}}: each field left at its zero
 // value does not.
@@ -122,6 +130,25 @@ func ({{$r}} *{{$m.Pascal}}) List{{$e.Plural.Pascal}}(ctx context.Context, q {{$
 			return {{$e.Pascal}}Page{}, err
 		}
 		page = {{$e.Camel}}PageOf(rows, size, func(x {{$e.Pascal}}) string { return postgres.EncodeCursor(sort, {{$s.Value}}, x.ID) })
+{{- end}}
+{{- end}}
+{{- range orders $e}}{{$o := .}}
+{{- range $dir := list "Desc" "Asc"}}
+	case "{{if eq $dir "Asc"}}-{{end}}{{$o.Snake}}":
+		if q.Page == 0 && !q.Unpaged {
+			return {{$e.Pascal}}Page{}, postgres.ErrByNumber
+		}
+		rows, err := qs.List{{$e.Plural.Pascal}}By{{$o.Pascal}}{{$dir}}(ctx, sqlgen.List{{$e.Plural.Pascal}}By{{$o.Pascal}}{{$dir}}Params{
+{{- template "filters" (dict "fs" $fs "own" $own "search" $search)}}
+			PageSize: int32(size + 1),
+			Skip:     int32(skip),
+		})
+		if err != nil {
+			return {{$e.Pascal}}Page{}, err
+		}
+		// No cursor: by number, Next is left out; unpaged, it only tells
+		// there were more.
+		page = {{$e.Camel}}PageOf(rows, size, func({{$e.Pascal}}) string { return sort })
 {{- end}}
 {{- end}}
 {{- if $search}}

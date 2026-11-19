@@ -33,6 +33,8 @@ func TemplateFuncs() template.FuncMap {
 		"siteHomeModules":        HomeModules,
 		"siteLabel":              func(a project.Ann, instance, fallback string) string { return ui.Label(a, instance, fallback) },
 		"humanize":               ui.Humanize,
+		"orders":                 store.Orders,
+		"written":                store.Written,
 		"uiTheme":                ui.ThemeOf,
 		"uiWords":                ui.Words,
 		"siteWords":              Words,
@@ -159,6 +161,10 @@ func Pages(entities []*project.Entity, instance string) []*Page {
 		pg.Menu, _ = a["menu"].(bool)
 		for _, s := range store.ListSorts(e, nil) {
 			pg.Sorts = append(pg.Sorts, s.Key, "-"+s.Key)
+		}
+		// An order worked out by an expression, the largest first.
+		for _, o := range store.Orders(e) {
+			pg.Sorts = append(pg.Sorts, o.Snake)
 		}
 		pg.Search = len(store.SearchFields(e)) > 0
 		for _, f := range store.ListFilters(e) {

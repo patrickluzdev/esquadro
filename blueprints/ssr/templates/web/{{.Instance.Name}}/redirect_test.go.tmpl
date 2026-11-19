@@ -36,7 +36,7 @@ func TestRedirect{{$e.Pascal}}(t *testing.T) {
 	m := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
 	i := 1
 	n := {{$p}}.New{{$e.Pascal}}{
-{{- range $e.Fields}}{{if not .Implicit}}{{$f := .}}{{with siteSample $f $p "i"}}
+{{- range $e.Fields}}{{if written .}}{{$f := .}}{{with siteSample $f $p "i"}}
 		{{$f.Pascal}}: {{.}},
 {{- end}}{{end}}{{end}}
 	}

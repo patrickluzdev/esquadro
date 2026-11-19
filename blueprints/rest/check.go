@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/patrickluzdev/esquadro/blueprints/store"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -37,6 +38,9 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		}
 		if n, ok := e.Ann["rest"]["unpaged_max"].(int64); ok && n < 1 {
 			diags.Errorf(e.Pos, e.Pos, "%s: unpaged_max %d must be at least 1", e.Raw, n)
+		}
+		if pag := PaginationOf(e, set.Options["rest"]); len(store.Orders(e)) > 0 && len(pag) > 0 && !slices.Contains(pag, "page") {
+			diags.Errorf(e.Pos, e.Pos, "%s has orders, which page by number, and its list pages by %s only: add page to its pagination", e.Raw, strings.Join(pag, " and "))
 		}
 	}
 	for _, e := range p.Entities {

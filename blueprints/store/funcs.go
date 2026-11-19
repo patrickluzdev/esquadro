@@ -149,8 +149,15 @@ func TemplateFuncs() template.FuncMap {
 			}
 			return out
 		},
-		"links":      links,
-		"manyToMany": func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
+		"links":       links,
+		"totalGroups": TotalGroups,
+		"countedBy":   CountedBy,
+		"cascades":    Cascades,
+		"totalSQL":    TotalSQL,
+		"orders":      Orders,
+		"isTotal":     IsTotal,
+		"written":     Written,
+		"manyToMany":  func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}
 }
 
@@ -230,7 +237,7 @@ func sqlcEnum(f *project.Field) string {
 }
 
 // nullable reports whether the field's column accepts NULL.
-func nullable(f *project.Field) bool { return !f.Required && !f.Implicit }
+func nullable(f *project.Field) bool { return !f.Required && !f.Implicit && !IsTotal(f) }
 
 // sqlcIn converts the domain value expr of a field to what sqlc's parameter
 // expects.
@@ -391,7 +398,7 @@ func (w Writable) In(v string) string {
 func writable(e *project.Entity) []Writable {
 	var out []Writable
 	for _, f := range e.Fields {
-		if f.Implicit {
+		if !Written(f) {
 			continue
 		}
 		c := pgColumn(f)
@@ -572,7 +579,7 @@ func SampleImports(fields []*project.Field) []string {
 		}
 	}
 	for _, f := range fields {
-		if f.Implicit {
+		if !Written(f) {
 			continue
 		}
 		s := sample(f, "", "i")

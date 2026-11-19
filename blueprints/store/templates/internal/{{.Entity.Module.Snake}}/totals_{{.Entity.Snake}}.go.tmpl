@@ -1,0 +1,21 @@
+{{- $e := .Entity}}{{$m := $e.Module -}}
+{{- with countedBy $e -}}
+package {{$m.Snake}}
+
+{{importBlock "context" "uuid" (printf "%s/internal/%s/sqlgen" $.App.Module $m.Snake)}}
+// {{$e.Camel}}Counted works out again, in the transaction of db, the totals
+// that count {{$e.Plural.Snake}}{{range $i, $g := .}}{{if $i}},{{end}} ({{range $j, $t := $g.Totals}}{{if $j}}, {{end}}{{$g.Parent.Pascal}}.{{$t.Field.Raw}}{{end}}){{end}}: those of the records
+// before and after point at, after a change of a {{lower $e.Label}}. Either may
+// be nil, for a create or a delete.
+func {{$e.Camel}}Counted(ctx context.Context, db sqlgen.DBTX, before, after *{{$e.Pascal}}) error {
+	q := sqlgen.New(db)
+{{- range .}}
+	for _, id := range countedIDs(before, after, func(x *{{$e.Pascal}}) uuid.UUID { return x.{{.Key.Pascal}}ID }) {
+		if err := recount{{.Name}}(ctx, q, id); err != nil {
+			return err
+		}
+	}
+{{- end}}
+	return nil
+}
+{{- end}}

@@ -17,6 +17,7 @@ func TemplateFuncs() template.FuncMap {
 		"seedKeys":     Keys,
 		"seedKind":     KindOf,
 		"seedUses":     Uses,
+		"written":      store.Written,
 	}
 }
 
@@ -99,6 +100,6 @@ func KindOf(f *project.Field) string {
 // the generated code's imports and helpers.
 func Uses(entities []*project.Entity, t string) bool {
 	return slices.ContainsFunc(entities, func(e *project.Entity) bool {
-		return slices.ContainsFunc(e.Fields, func(f *project.Field) bool { return !f.Implicit && string(f.Type) == t })
+		return slices.ContainsFunc(e.Fields, func(f *project.Field) bool { return store.Written(f) && string(f.Type) == t })
 	})
 }
