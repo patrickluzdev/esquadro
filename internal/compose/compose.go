@@ -547,6 +547,11 @@ func (c *composer) slotParts(name string, data Data) ([]string, error) {
 		d := data
 		d.Options = c.set.Options[ct.bp.Manifest.Name]
 		d.Blueprint = ct.bp.Manifest.Name
+		if ct.bp.Kind != "" {
+			// An instance's contribution is about itself (blueprint
+			// integration shopee).
+			d.Instance = &Instance{Name: ct.bp.Manifest.Name, Kind: ct.bp.Kind, Options: d.Options}
+		}
 		var buf bytes.Buffer
 		if err := ct.tmpl.Execute(&buf, d); err != nil {
 			if inner, ok := errors.AsType[*slotError](err); ok {
@@ -793,6 +798,9 @@ func (c *composer) renderEnv() []*project.EnvVar {
 			name := display(bp, "blueprint.esq")
 			data := Data{App: c.p.App, Entities: c.p.Entities, Enums: c.p.Enums, Modules: c.p.Modules, Jobs: c.p.Jobs, Reports: c.p.Reports,
 				Servers: c.p.Servers, Hosted: c.p.Hosted, Options: c.set.Options[bp.Manifest.Name], Blueprint: bp.Manifest.Name}
+			if bp.Kind != "" {
+				data.Instance = &Instance{Name: bp.Manifest.Name, Kind: bp.Kind, Options: c.set.Options[bp.Manifest.Name]}
+			}
 			execute := func(s string) (string, bool) {
 				t, err := template.New(name).Option("missingkey=error").Funcs(c.funcs(bp)).Parse(s)
 				if err != nil {

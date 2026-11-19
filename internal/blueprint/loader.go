@@ -273,6 +273,7 @@ func (l *Loader) Load(ref *project.BlueprintRef) (*Blueprint, diag.List) {
 		kind = m.Name
 		named := *m
 		named.Name = ref.Instance
+		named.Env = instanceEnv(m.Env, ref.Instance)
 		m = &named
 	}
 	for _, h := range m.Hooks {
@@ -297,4 +298,22 @@ func joinNames(names []string) string {
 		return strings.Join(names, "")
 	}
 	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// instanceEnv are the environment variables of a blueprint used by named
+// instances, as one instance declares them: INSTANCE_URL is SHOPEE_URL for
+// the instance shopee, so that each instance has its own.
+func instanceEnv(env []*project.EnvVar, instance string) []*project.EnvVar {
+	out := make([]*project.EnvVar, len(env))
+	prefix := strings.ToUpper(strings.ReplaceAll(instance, "-", "_")) + "_"
+	for i, v := range env {
+		c := *v
+		c.Blueprint = instance
+		if rest, ok := strings.CutPrefix(c.Name, "INSTANCE_"); ok {
+			c.Name = prefix + rest
+			c.Field = ""
+		}
+		out[i] = &c
+	}
+	return out
 }

@@ -1,0 +1,48 @@
+{{- $n := .Instance.Name}}{{$o := .Instance.Options -}}
+package {{$n}}
+
+// The {{$n}} API's own: how a request is authenticated, and its calls.
+// Yours: esquadro wrote it once and never changes it; client.go, generated,
+// tries again, waits its turn and keeps the secrets out of errors.
+
+import (
+	"context"
+	"net/http"
+)
+
+// Authenticate adds what the API needs to know the app to each request,
+// tried again or not: a header, a signature, a token in the path. It runs
+// on every try, so a signature with the time is made again.
+//
+//	req.Header.Set("Authorization", "Bearer "+s.Key)
+//	req.URL.Path = "/bot" + s.Key + req.URL.Path   // a token in the path
+func Authenticate(req *http.Request, s Secrets) error {
+{{- if $o.key}}
+	req.Header.Set("Authorization", "Bearer "+s.Key)
+{{- else}}
+	_ = s
+{{- end}}
+	return nil
+}
+
+// Check makes a simple call that needs the secrets, for
+// {{.App.Kebab}} {{$n}} check: whether an environment can reach the API.
+func (c *Client) Check(ctx context.Context) error {
+	return c.JSON(ctx, http.MethodGet, "/", nil, nil)
+}
+
+// The API's calls go here, as methods of Client. For instance:
+//
+//	type Offer struct {
+//		Name  string `json:"productName"`
+//		Price string `json:"price"`
+//	}
+//
+//	// Offers are the API's offers of keyword.
+//	func (c *Client) Offers(ctx context.Context, keyword string) ([]Offer, error) {
+//		var answer struct {
+//			Offers []Offer `json:"offers"`
+//		}
+//		err := c.JSON(ctx, http.MethodPost, "/offers", map[string]any{"keyword": keyword}, &answer, Retry)
+//		return answer.Offers, err
+//	}

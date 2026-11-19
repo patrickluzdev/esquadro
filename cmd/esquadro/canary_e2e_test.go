@@ -104,6 +104,13 @@ func TestCanaryUpgrades(t *testing.T) {
 	// And its public site: the offers and the coupons, for visitors.
 	write("esquadro/app.esq", strings.Replace(read("esquadro/app.esq"), "  blueprint api_docs\n",
 		"  blueprint api_docs\n  blueprint workspace\n  blueprint ui\n  blueprint ssr site {\n    auth \"visitor\"\n    locale pt_br\n    name \"Promo do Duro\"\n  }\n", 1))
+	// The APIs it talks to: Shopee's offers and the Telegram bot.
+	app := strings.Replace(read("esquadro/app.esq"), "  blueprint api_docs\n",
+		"  blueprint api_docs\n  blueprint integration shopee {\n    url \"https://open-api.affiliate.shopee.com.br\"\n    rate_limit \"2/s\"\n    key true\n    secret true\n  }\n  blueprint integration telegram {\n    url \"https://api.telegram.org\"\n    rate_limit \"25/s\"\n    key true\n  }\n", 1)
+	if !strings.Contains(app, "blueprint integration shopee") {
+		t.Fatal("the canary's app.esq has no blueprint api_docs to add the integrations after")
+	}
+	write("esquadro/app.esq", app)
 	deals = read("esquadro/deals.esq")
 	deals = strings.Replace(deals, "  @security(read public, write [user.admin, user.operator])\n}\n\n/// A short link",
 		"  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Ofertas\", singular \"Oferta\")\n  @site(page, path \"ofertas\", schema product, menu)\n}\n\n/// A short link", 1)

@@ -1,0 +1,6 @@
+{{- $n := .Instance.Name}}{{$o := .Instance.Options}}
+	d.{{$n}}, err = {{$n}}.New({{$n}}.Config{URL: d.config.{{integrationField $n "URL"}}{{if or $o.key $o.secret}}, Secrets: {{$n}}.Secrets{ {{- if $o.key}}Key: d.config.{{integrationField $n "KEY"}}{{end}}{{if and $o.key $o.secret}}, {{end}}{{if $o.secret}}Secret: d.config.{{integrationField $n "SECRET"}}{{end -}} }{{end}}})
+	if err != nil {
+		release()
+		return d, nil, err
+	}

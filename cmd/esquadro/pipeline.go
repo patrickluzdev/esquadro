@@ -14,6 +14,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/env"
 	"github.com/patrickluzdev/esquadro/blueprints/git"
 	"github.com/patrickluzdev/esquadro/blueprints/i18n"
+	"github.com/patrickluzdev/esquadro/blueprints/integration"
 	"github.com/patrickluzdev/esquadro/blueprints/jobs"
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
 	"github.com/patrickluzdev/esquadro/blueprints/notifications"
@@ -63,6 +64,7 @@ func init() {
 	blueprint.Checks["audit"] = audit.Check
 	blueprint.Checks["notifications"] = notifications.Check
 	blueprint.Checks["storage"] = storage.Check
+	blueprint.Checks["integration"] = integration.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.
@@ -80,6 +82,7 @@ var builtinFuncs = map[string]template.FuncMap{
 	"audit":         audit.TemplateFuncs(),
 	"notifications": notifications.TemplateFuncs(),
 	"storage":       storage.TemplateFuncs(),
+	"integration":   integration.TemplateFuncs(),
 }
 
 // loadedProject is a project read from its folder, with its blueprints

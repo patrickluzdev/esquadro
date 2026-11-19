@@ -1,0 +1,37 @@
+/// A client of an API outside the app (an affiliate program, a messaging
+/// bot, a payment provider), used by name: blueprint integration shopee.
+/// Generated in internal/integrations/<name>: retries with backoff that
+/// respect Retry-After, a rate limit, a timeout, secrets from the
+/// environment kept out of errors and logs, and, with observability, a span
+/// and the client's metrics for each call. Yours, in <name>.go, written
+/// once: how a request is authenticated and the API's calls. Every module
+/// gets the client in its Deps; <name>test serves a fake API for tests, and
+/// <app> <name> check calls the real one with an environment's secrets.
+blueprint integration {
+  version "0.1.0"
+  instances
+  requires app, domain, env
+
+  /// The API's address: https://open-api.affiliate.shopee.com.br. The
+  /// <NAME>_URL variable changes it per environment.
+  option url string
+  /// How many requests at most, in this process: 2/s, 120/min, 1000/h; 0,
+  /// none.
+  option rate_limit string default("0")
+  /// How many more times a call is tried when the API fails for a moment
+  /// (429, 502, 503, 504, a connection lost), waiting longer each time.
+  option retries int default(3)
+  /// How long a call may take, its tries included: 30s, 1m.
+  option timeout string default("30s")
+  /// The API takes a key (an app id, a bot's token): <NAME>_KEY.
+  option key bool default(false)
+  /// The API takes a secret (to sign requests with): <NAME>_SECRET.
+  option secret bool default(false)
+
+  /// The API's address; the url option by default.
+  env INSTANCE_URL string default("{{.Options.url}}")
+  /// The API's key.
+  env INSTANCE_KEY string secret required when("{{if .Options.key}}true{{end}}")
+  /// The API's secret.
+  env INSTANCE_SECRET string secret required when("{{if .Options.secret}}true{{end}}")
+}

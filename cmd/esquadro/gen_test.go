@@ -401,3 +401,39 @@ func TestCheckImports(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckIntegrations(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "promo")
+	if code, _, errOut := esq(t, "new", "-starter", "worker", "-module", "example.com/promo", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	base := read(t, appEsq)
+	at := strings.LastIndex(base, "}")
+	for name, tc := range map[string]struct{ blueprint, want string }{
+		"ok":     {"blueprint integration shopee {\n    url \"https://open-api.affiliate.shopee.com.br\"\n    rate_limit \"2/s\"\n    key true\n    secret true\n  }", ""},
+		"name":   {"blueprint integration Shopee {\n    url \"https://x.com\"\n  }", "Shopee cannot name an integration"},
+		"url":    {"blueprint integration shopee {\n    url \"open-api\"\n  }", `url of shopee: "open-api" is not an http(s) address`},
+		"rate":   {"blueprint integration shopee {\n    url \"https://x.com\"\n    rate_limit \"fast\"\n  }", `rate_limit "fast" is not N/s, N/min or N/h`},
+		"time":   {"blueprint integration shopee {\n    url \"https://x.com\"\n    timeout \"soon\"\n  }", `timeout of shopee: "soon" is not a duration`},
+		"module": {"blueprint integration billing {\n    url \"https://x.com\"\n  }", "integration billing has the name of a module"},
+		"no url": {"blueprint integration shopee\n", "integration shopee needs its url"},
+	} {
+		os.WriteFile(appEsq, []byte(base[:at]+"  "+tc.blueprint+"\n"+base[at:]), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+	// Each integration has its variables: SHOPEE_URL, SHOPEE_KEY, SHOPEE_SECRET.
+	os.WriteFile(appEsq, []byte(base[:at]+"  blueprint integration shopee {\n    url \"https://x.com\"\n    key true\n    secret true\n  }\n  blueprint integration telegram {\n    url \"https://api.telegram.org\"\n    key true\n  }\n"+base[at:]), 0o644)
+	code, out, errOut := esq(t, "env", "list", dir)
+	for _, v := range []string{"SHOPEE_URL", "SHOPEE_KEY", "SHOPEE_SECRET", "TELEGRAM_URL", "TELEGRAM_KEY"} {
+		if code != 0 || !strings.Contains(out, v) {
+			t.Errorf("env list lacks %s (exit %d):\n%s%s", v, code, out, errOut)
+		}
+	}
+	if strings.Contains(out, "TELEGRAM_SECRET") {
+		t.Errorf("env list has TELEGRAM_SECRET, which telegram does not take:\n%s", out)
+	}
+}
