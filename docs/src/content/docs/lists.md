@@ -26,7 +26,8 @@ entity Product {
 
 - `filter`: by a value; numbers and dates also by a range (`_min`, `_max`,
   inclusive); an enum by a list of values. Relations filter by the related
-  record's id. A filter's parameter cannot be one of the list's own
+  record's id, and one that is not `required` also by `null`, for the
+  records without one (`parent_id=null`). A filter's parameter cannot be one of the list's own
   (`page`, `per_page`, `limit`, `after`, `sort`, `q`, `fields`, `include`),
   nor another filter's (a field `price_min` beside `price` filtered by
   range): `esquadro check` says so at the field.
@@ -44,6 +45,7 @@ Every list may also filter by creation: `created_at_min`, `created_at_max`.
 ```sh
 GET /api/v1/products?status=ACTIVE,INACTIVE&price_min=10&price_max=50&sort=-price
 GET /api/v1/products?category_id=0198…&q="board game" -chess
+GET /api/v1/comments?offer_id=0198…&parent_id=null
 ```
 
 - `sort` is `created_at` or a field declared `sort`, with `-` for descending;

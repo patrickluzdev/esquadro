@@ -43,6 +43,55 @@ and operations to add, remove and list: `PUT` and `DELETE`
 `/products/{id}/tags/{tagId}`, `GET /products/{id}/tags`, and the other side,
 `GET /tags/{id}/products`.
 
+## To the same entity
+
+An entity may point at itself: comments that answer comments, categories
+within categories, people and their manager.
+
+```esquadro
+entity Comment {
+  body    text required max(2000)
+  offer   > Offer required on_delete(cascade) @store(filter)
+  parent  > Comment on_delete(cascade) @store(filter)   // the one it answers
+  replies < Comment                                     // the ones that answer it
+}
+```
+
+- The key (`parent_id`) points at the same table, with its `on_delete`:
+  here deleting a comment deletes its replies, and their replies. With
+  `@store(soft_delete)`, a comment goes to the trash with its replies, and
+  they come back with it.
+- `include=parent` answers a comment with the one it answers;
+  `GET /api/v1/comments?parent_id=<id>` lists the replies of one, and
+  `parent_id=null` the comments that answer none, the top ones
+  (see [Lists](/esquadro/lists/)). In Go, `CommentFilter{ParentID: id}` and
+  `CommentFilter{NoParent: true}`.
+- In the admin panel, the parent is picked among the other comments, and a
+  comment's page lists its replies. On a site,
+  `@site(page, relations [replies])` shows them on a comment's page.
+- How deep replies go is the project's: esquadro does not limit it. To keep
+  one level, as most sites do, a rule makes a reply to a reply answer the
+  comment at the top:
+
+```go
+func (CommentRules) BeforeCreate(ctx context.Context, m *Catalog, n *NewComment) error {
+	if n.ParentID == uuid.Nil() {
+		return nil
+	}
+	parent, err := m.ReadComment(ctx, n.ParentID)
+	if err != nil {
+		return err
+	}
+	if parent.ParentID != uuid.Nil() {
+		n.ParentID = parent.ParentID
+	}
+	return nil
+}
+```
+
+Unnamed, the other side of a relation to the same entity is named after
+both (`comments_by_parent`): write the `<` to choose a better name.
+
 ## Across modules
 
 An entity may point at an entity of another module with `>`, `-` or `<>`,
