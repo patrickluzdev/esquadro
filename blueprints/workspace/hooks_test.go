@@ -11,8 +11,8 @@ import (
 	"github.com/patrickluzdev/esquadro/internal/hook"
 )
 
-// The builds stay out of git, their README.md in: a clone builds, its
-// go:embed finding the folder.
+// The builds stay out of git, their README.md in: a clone builds, the
+// folder being there for its embedding.
 func TestIgnoreKeepsTheBuildsReadme(t *testing.T) {
 	for name, before := range map[string]string{
 		"new":      "",
