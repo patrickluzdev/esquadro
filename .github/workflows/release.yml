@@ -9,16 +9,37 @@ on:
 
 permissions:
   contents: write
+  # To find the CI runs of the tagged commit.
+  actions: read
   # The Marketplace and Open VSX check this workflow's identity (OIDC,
   # trusted publishing) instead of a token.
   id-token: write
 
 jobs:
+  # A tag is most often put on a commit of main whose CI already passed:
+  # then the release goes at once, instead of running the same CI again.
+  tested:
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.check.outputs.passed }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --commit "$GITHUB_SHA" --status success --json databaseId --jq length)
+          if [ "$n" -gt 0 ]; then echo "passed=true" >> "$GITHUB_OUTPUT"; else echo "passed=false" >> "$GITHUB_OUTPUT"; fi
+          echo "CI runs of $GITHUB_SHA that passed on main: $n"
+
   ci:
+    needs: tested
+    if: needs.tested.outputs.passed != 'true'
     uses: ./.github/workflows/ci.yml
 
   release:
-    needs: ci
+    needs: [tested, ci]
+    # Once the commit's CI passed, here or on main before.
+    if: ${{ !cancelled() && needs.tested.result == 'success' && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1

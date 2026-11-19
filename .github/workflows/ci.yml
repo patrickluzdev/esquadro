@@ -10,8 +10,45 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    name: lint, tests and e2e (Linux)
+  # Three jobs at once, each on its own runner: the slowest (the tests) sets
+  # how long the CI takes, where one job ran them one after another.
+  lint:
+    name: lint, editor and docs (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - name: Tools
+        run: |
+          go install github.com/go-task/task/v3/cmd/task@v3.54.0
+          go install golang.org/x/tools/gopls@v0.24.0
+      - run: task lint
+      - run: task editor:test
+      - run: task docs:check
+      - run: task docs:build
+
+  test:
+    name: tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - name: Tools
+        run: go install github.com/go-task/task/v3/cmd/task@v3.54.0
+      - run: task test
+
+  e2e:
+    name: e2e (Linux)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -25,15 +62,8 @@ jobs:
         with:
           node-version: 24
       - name: Tools
-        run: |
-          go install github.com/go-task/task/v3/cmd/task@v3.54.0
-          go install golang.org/x/tools/gopls@v0.24.0
-      - run: task lint
-      - run: task test
+        run: go install github.com/go-task/task/v3/cmd/task@v3.54.0
       - run: task e2e
-      - run: task editor:test
-      - run: task docs:check
-      - run: task docs:build
 
   # Windows is not supported yet.
   macos:
