@@ -37,6 +37,30 @@ A code no link has is the site's 404. A link preview (WhatsApp, Telegram,
 a social network) is sent on too, so that it shows what the link leads to;
 the visit says it is a bot.
 
+## A page on the way
+
+With `wait`, a person sees where they are going before they go:
+
+```esquadro
+  @site(redirect, by code, to target_url, wait 3)
+```
+
+`/<code>` then answers a page in the site's layout that says *Taking you to
+shopee.com.br* (the destination's host), counts the seconds down with a
+bar, and goes on by itself; *Go now* leaves at once. Without JavaScript,
+the page's refresh goes on all the same. `wait` is 1 to 10 seconds, and
+only with `redirect`.
+
+Bots, a link's preview among them, still get the `302`, so that the preview
+shows the destination; an address of the site (`/offers/1`, from
+`BeforeRedirect`) is sent on at once too. Neither the page nor the `302` is
+ever cached.
+
+The page is yours: `link_redirect.templ`, written once, with
+`LinkRedirectPage`, which receives a `LinkRedirect` (the `Page`, the
+`Record`, `To`, its `Host` and the `Wait`). Its words are the site's
+(`redirectTitle`, `redirectWait`, `redirectGo`), changed in `messages.go`.
+
 ## What each visit does: the entity's rules
 
 The redirect calls two methods of `LinkRules`, in `link_rules.go`, yours,
@@ -75,8 +99,8 @@ func (LinkRules) Visited(ctx context.Context, m *Deals, l Link, v Visit) error {
   of the site's (`/offers/1`, sent where the site is). `ErrGone` shows the
   site's page of a link that is no longer available (`410`), in its layout,
   with the words `goneTitle` and `goneText` of `messages.go`.
-- `Visited` runs once the visit went on. An error is logged; the visit
-  went on anyway.
+- `Visited` runs once the visit went on, or, with `wait`, once the page on
+  the way was shown. An error is logged; the visit went on anyway.
 - `Visit` has `Bot`, `Visitor`, `Referrer`, `UserAgent` and `At`. `Visitor`
   tells visits apart a day at a time without knowing who they are: an HMAC,
   with `SITE_VISITOR_SECRET`, of the address, the browser and the day, which
@@ -109,7 +133,7 @@ unique field, as the redirect does, is `m.ReadLinkByCode(ctx, code)`.
 
 ## Tests
 
-The site's generated tests visit a link's address, as a person and as a
-preview, and one of no link; they write the link themselves when it needs
+The site's generated tests visit a link's address, as a person (the page on
+the way, with `wait`) and as a preview, and one of no link; they write the link themselves when it needs
 no other record (one with a required relation is tested by hand, as the
 example's, which needs an offer).

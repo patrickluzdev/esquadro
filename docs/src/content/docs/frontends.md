@@ -495,6 +495,7 @@ export default resource(meta, {
     { label: "Home",  key: "1", patch: { status: "APPROVED", niche_id: niches.home }, ask: [f.hook] },
     { label: "Skip",  key: "s", patch: { status: "SKIPPED" }, bulk: true },
     { label: "Copy",  key: "c", copy: (o) => String(o.message) },
+    { label: "Picture", key: "p", copyImage: (o) => String(o.image_url) },
   ],
 })
 ```
@@ -502,6 +503,11 @@ export default resource(meta, {
 An action does any of these, in this order:
 
 - `copy`: copies the text a function makes of the record;
+- `copyImage`: copies the image at the address a function makes of the
+  record, as an image, to paste into WhatsApp ("Image copied."). It goes on
+  the clipboard as PNG, the one type browsers take there; another is drawn
+  as PNG first. A browser that cannot copy images says so and offers to
+  download it (no download, and the action stops there);
 - `patch`: changes those fields, by `PATCH` with `If-Match`, so a business
   rule's refusal shows as its text, and a record someone changed is read
   again. With `ask`, a small dialog asks for some fields of the form first,
@@ -512,7 +518,7 @@ An action does any of these, in this order:
 key given to two actions of a resource is said in the console in
 development. An action that changes fields shows only on records the
 person may change. In the table, `bulk` runs it on the records selected,
-when it asks and copies nothing.
+when it asks and copies nothing (text or image).
 
 The filter of a queue is the API's filters: a field marked
 `@store(filter)`.
