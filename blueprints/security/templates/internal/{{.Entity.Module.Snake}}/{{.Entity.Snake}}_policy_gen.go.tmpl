@@ -79,7 +79,9 @@ func ({{$R}}) {{$f.Pascal}}To(ctx context.Context, x {{$e.Pascal}}, to {{$f.Enum
 // the one stored, so that no {{.Realm}} hands one over to another.
 func ({{$R}}) Claim(ctx context.Context, n *New{{$e.Pascal}}, stored *{{$e.Pascal}}) {
 	p, ok := security.PrincipalIn(ctx, "{{.Realm}}")
-	if !ok {
+	// One who owns every record (the API's tests) keeps the owner the
+	// request names.
+	if !ok || p.OwnsAll {
 		return
 	}
 {{- $c := rulesOf $.Entities $e "create"}}{{$u := rulesOf $.Entities $e "update"}}
