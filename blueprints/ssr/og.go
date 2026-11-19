@@ -34,9 +34,7 @@ func OGColors(b *ui.Brand, opts map[string]any) map[string]string {
 			out[role] = c
 		}
 	}
-	for name, c := range b.Theme.Colors {
-		out[name] = c
-	}
+	maps.Copy(out, b.Theme.Colors)
 	return out
 }
 

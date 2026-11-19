@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -368,9 +369,7 @@ func (b *Brand) CSS(base string) string {
 		}
 	}
 	radius := map[string]float64{"sm": 6, "md": 10, "lg": 14}
-	for k, v := range t.Radius {
-		radius[k] = v
-	}
+	maps.Copy(radius, t.Radius)
 	for _, k := range []string{"sm", "md", "lg"} {
 		fmt.Fprintf(&w, "  --brand-radius-%s: %s;\n", k, px(radius[k]))
 	}

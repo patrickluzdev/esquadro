@@ -35,7 +35,7 @@ func TestKitDrawsItsIconsFromTheSet(t *testing.T) {
 				continue
 			}
 			seen++
-			for _, item := range strings.Split(m[2], ",") {
+			for item := range strings.SplitSeq(m[2], ",") {
 				name, _, _ := strings.Cut(strings.TrimSpace(item), " as ")
 				if name == "" || strings.HasPrefix(name, "type ") || name == "icons" || name == "iconOf" {
 					continue
