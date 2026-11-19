@@ -34,6 +34,6 @@ blueprint mail {
   /// ask of them: Shop Ltd, 1 Main Street, Springfield.
   option address string default("")
   /// The app's name as the emails write it (the footer, the subjects):
-  /// Promo do Duro. By default the app's own, from its name.
+  /// Loja do Bairro. By default the app's own, from its name.
   option name string default("")
 }

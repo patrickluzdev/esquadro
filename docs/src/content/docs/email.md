@@ -139,8 +139,8 @@ Under the card, the footer writes the app's name, why the reader got the
 email ("You are receiving this email from Shop about your account", in
 `locale`: `en`, `pt_br`, or the first frontend's by default) and
 `address`, when there is one (some laws ask for a postal address). The
-app's name there and in the emails' subjects is mail's `name` ("Promo
-do Duro"), by default the app's own from its name. The
+app's name there and in the emails' subjects is mail's `name` ("Loja
+do Bairro"), by default the app's own from its name. The
 text gets the same footer, in plain text. A template changes the reason
 with a `why` of its own:
 

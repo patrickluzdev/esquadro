@@ -25,7 +25,7 @@ blueprint mail
 | `brand` | string | `""` | The project's folder of its brand (brand, the same an ssr site may name), with its theme.json: the emails' layout takes its colors, the names of its fonts, and its logo (identity.logo_email, or a logo that is a PNG, JPEG or GIF), sent with each email. Without one, the emails keep their neutral look. |
 | `locale` | name | `"frontend"` | The language of the emails esquadro writes (security's, welcome, the footer, mail test) and of their dates: en, pt_br, or frontend, the first frontend's (en without one). |
 | `address` | string | `""` | A line the emails' footer ends with, as the postal address some laws ask of them: Shop Ltd, 1 Main Street, Springfield. |
-| `name` | string | `""` | The app's name as the emails write it (the footer, the subjects): Promo do Duro. By default the app's own, from its name. |
+| `name` | string | `""` | The app's name as the emails write it (the footer, the subjects): Loja do Bairro. By default the app's own, from its name. |
 
 ```esquadro
 blueprint mail {
