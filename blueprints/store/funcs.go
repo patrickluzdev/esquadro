@@ -125,6 +125,10 @@ func TemplateFuncs() template.FuncMap {
 		"importBy":        ImportBy,
 		"importKey":       importKey,
 		"importMax":       func() int { return ImportMax },
+		"uniqueKeys":      uniqueKeys,
+		"redirects":       Redirects,
+		"redirectTo":      RedirectTo,
+		"redirectModule":  RedirectModule,
 		"singleID":        func() string { return SingleID },
 		"dependents":      Dependents,
 		"trashedParents":  TrashedParents,
@@ -442,6 +446,10 @@ func refusals(e *project.Entity) []Refusal {
 // pattern), nor when a required relation needs a record it cannot write
 // either, or loops back.
 func canSample(e *project.Entity) bool { return sampleable(e, map[*project.Entity]bool{}) }
+
+// CanSample reports whether esquadro can write a valid NewX for an entity,
+// for other blueprints' generated tests.
+func CanSample(e *project.Entity) bool { return canSample(e) }
 
 func sampleable(e *project.Entity, visiting map[*project.Entity]bool) bool {
 	if visiting[e] {

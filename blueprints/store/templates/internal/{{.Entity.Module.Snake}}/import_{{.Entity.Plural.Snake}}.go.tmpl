@@ -68,7 +68,7 @@ func ({{$r}} *{{$m.Pascal}}) Import{{$e.Plural.Pascal}}(ctx context.Context, row
 // {{lower $e.Label}}.
 func ({{$r}} *{{$m.Pascal}}) import{{$e.Pascal}}(ctx context.Context, n New{{$e.Pascal}}, guard func(stored *{{$e.Pascal}}, n *New{{$e.Pascal}}) error) (bool, error) {
 {{- if $key}}
-	found, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Pascal}}ByImportKey(ctx, {{$key.In "n"}})
+	found, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Pascal}}By{{$key.Field.Pascal}}(ctx, {{$key.In "n"}})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return false, err
 	}

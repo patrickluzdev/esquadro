@@ -665,6 +665,28 @@ func TestImport{{$e.Plural.Pascal}}(t *testing.T) {
 	}
 }
 
+{{end}}{{range uniqueKeys $e -}}
+// TestRead{{$e.Pascal}}By{{.Field.Pascal}} finds a {{lower $e.Label}} by its {{.Field.Snake}}.
+func TestRead{{$e.Pascal}}By{{.Field.Pascal}}(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := {{$r}}.Read{{$e.Pascal}}By{{.Field.Pascal}}(ctx, created.{{.Field.Pascal}})
+	if err != nil || found.ID != created.ID {
+		t.Fatalf("by its {{.Field.Snake}}: %+v, %v", found, err)
+	}
+{{- if or (eq .Field.Type "string") (eq .Field.Type "text")}}
+	if _, err := {{$r}}.Read{{$e.Pascal}}By{{.Field.Pascal}}(ctx, "no such {{.Field.Snake}}"); !errors.Is(err, {{$p}}.Err{{$e.Pascal}}NotFound) {
+		t.Fatalf("by a {{.Field.Snake}} of none: %v", err)
+	}
+{{- end}}
+}
+
 {{end}}func TestRead{{$e.Pascal}}ThatDoesNotExist(t *testing.T) {
 	t.Parallel()
 	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})

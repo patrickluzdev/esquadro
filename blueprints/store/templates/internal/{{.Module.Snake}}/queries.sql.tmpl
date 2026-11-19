@@ -15,9 +15,9 @@ SELECT * FROM {{$t}} WHERE id = @id{{$live}};
 INSERT INTO {{$t}} (id) VALUES (@id) ON CONFLICT (id) DO NOTHING;
 {{- end}}
 
-{{- with importKey $e}}
+{{- range uniqueKeys $e}}
 
--- name: Get{{$e.Pascal}}ByImportKey :one
+-- name: Get{{$e.Pascal}}By{{.Field.Pascal}} :one
 SELECT * FROM {{$t}} WHERE {{.Column}} = @{{.Param}}{{$live}};
 {{- end}}
 

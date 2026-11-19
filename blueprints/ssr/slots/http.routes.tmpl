@@ -7,6 +7,10 @@
 {{- if and (siteImages (sitePages $.Entities $i.Name)) (uses "storage")}}
 		Storage: d.storage,
 {{- end}}
+{{- if siteRedirects $.Entities $i.Name}}
+		VisitorSecret: []byte(d.config.{{siteField $i.Name "VISITOR_SECRET"}}),
+		TrustProxy:    d.config.TrustProxy,
+{{- end}}
 		Logger: d.logger,
 	}), {{$i.Name}}.Domain, {{$i.Name}}.Path)
 {{- end}}

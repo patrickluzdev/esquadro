@@ -33,5 +33,7 @@
   "deleteAccountHint": "Sua conta e o que é seu são apagados para sempre.",
   "deleteAccountConfirm": "Apagar para sempre",
   "noAccountYet": "Ainda não tem conta?",
-  "haveAccount": "Já tem conta?"
+  "haveAccount": "Já tem conta?",
+  "goneTitle": "Este link não está mais disponível",
+  "goneText": "O que ele mostrava acabou. Veja o que tem aqui agora."
 }

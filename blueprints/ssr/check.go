@@ -49,6 +49,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 			}
 			return f.Blueprint.Ref.Pos
 		}
+		diags = append(diags, checkRedirects(p, f.Name)...)
 		if engine, _ := f.Options["engine"].(string); engine != "go" {
 			diags.Errorf(at("engine"), at("engine"), "engine %s is not one esquadro generates yet: go is (the app's binary renders the site)", engine)
 		}

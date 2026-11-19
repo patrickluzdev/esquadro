@@ -45,3 +45,19 @@ func ({{$e.Camel}}Hooks) AfterUpdate(context.Context, *{{$m.Pascal}}, {{$e.Pasca
 func ({{$e.Camel}}Hooks) AfterDelete(context.Context, *{{$m.Pascal}}, {{$e.Pascal}}) error {
 	return nil
 }
+{{- if redirects $e}}
+
+// BeforeRedirect runs when a visit asks for a {{lower $e.Label}}'s address on a site
+// (@site(redirect)): it answers where the visit goes, an address of the site
+// ("/offers/1") or not, or ErrGone, for the page of what is no longer
+// there. By default, its {{with redirectTo $e}}{{.Snake}}{{end}}.
+func ({{$e.Camel}}Hooks) BeforeRedirect(_ context.Context, _ *{{$m.Pascal}}, x {{$e.Pascal}}, _ Visit) (string, error) {
+	return {{with redirectTo $e}}x.{{.Pascal}}{{else}}""{{end}}, nil
+}
+
+// Visited runs once a visit went on to where BeforeRedirect sent it: what
+// is kept of it (a click). An error is logged; the visit went on anyway.
+func ({{$e.Camel}}Hooks) Visited(context.Context, *{{$m.Pascal}}, {{$e.Pascal}}, Visit) error {
+	return nil
+}
+{{- end}}

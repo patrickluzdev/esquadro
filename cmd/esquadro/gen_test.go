@@ -437,3 +437,33 @@ func TestCheckIntegrations(t *testing.T) {
 		t.Errorf("env list has TELEGRAM_SECRET, which telegram does not take:\n%s", out)
 	}
 }
+
+func TestCheckSiteRedirects(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "  blueprint api_docs\n", "  blueprint api_docs\n  blueprint workspace\n  blueprint ui\n  blueprint ssr site\n", 1)), 0o644)
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	link := func(fields, ann string) string {
+		return "entity Link {\n" + fields + "  @site(" + ann + ")\n}\n"
+	}
+	fields := "  code string unique\n  target_url string required\n"
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":    {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string required unique\n  url string\n  @site(redirect, path \"go\", by slug, to url)\n}\n", ""},
+		"no by": {link(fields, "redirect, to target_url"), "@site(redirect) of Link needs by"},
+		"by":    {link("  code string\n  target_url string\n", "redirect, by code, to target_url"), "Link.code must be a unique string"},
+		"no to": {link(fields, "redirect, by code"), "@site(redirect) of Link needs to"},
+		"to":    {link(fields, "redirect, by code, to url"), "to url is not a field of Link"},
+		"page":  {link(fields, "redirect, page, by code, to target_url"), "either redirect or have pages"},
+		"twice": {link(fields, "redirect, by code, to target_url") + "entity Go {\n  slug string unique\n  url string\n  @site(redirect, by slug, to url)\n}\n", "Link and Go both redirect at the root of the site site"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

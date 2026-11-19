@@ -17,21 +17,31 @@ import (
 // TemplateFuncs are the ssr blueprint's template functions.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"sitePages":   Pages,
-		"sitePage":    PageOf,
-		"siteModules": Modules,
-		"siteLabel":   func(a project.Ann, instance, fallback string) string { return ui.Label(a, instance, fallback) },
-		"humanize":    ui.Humanize,
-		"uiTheme":     ui.ThemeOf,
-		"uiWords":     ui.Words,
-		"siteWords":   Words,
-		"realmOf":     realmOf,
-		"lower":       strings.ToLower,
-		"sitePaths":   SystemPaths,
-		"add1":        func(n int) int { return n + 1 },
-		"siteValue":   Value,
-		"siteShown":   Shown,
-		"sitePlain":   Plain,
+		"sitePages":     Pages,
+		"siteRedirects": Redirects,
+		"siteField": func(instance, suffix string) string {
+			return project.FieldName(strings.ToUpper(instance) + "_" + suffix)
+		},
+		"siteSample":             store.Sample,
+		"siteCanSample":          store.CanSample,
+		"canRedirectSample":      canRedirectSample,
+		"redirectSampleImports":  redirectSampleImports,
+		"redirectSamplePackages": redirectSamplePackages,
+		"sitePage":               PageOf,
+		"siteModules":            Modules,
+		"sitePageModules":        PageModules,
+		"siteLabel":              func(a project.Ann, instance, fallback string) string { return ui.Label(a, instance, fallback) },
+		"humanize":               ui.Humanize,
+		"uiTheme":                ui.ThemeOf,
+		"uiWords":                ui.Words,
+		"siteWords":              Words,
+		"realmOf":                realmOf,
+		"lower":                  strings.ToLower,
+		"sitePaths":              SystemPaths,
+		"add1":                   func(n int) int { return n + 1 },
+		"siteValue":              Value,
+		"siteShown":              Shown,
+		"sitePlain":              Plain,
 		"siteImages": func(pages []*Page) bool {
 			return slices.ContainsFunc(pages, func(p *Page) bool { return p.Image != nil })
 		},
@@ -192,6 +202,27 @@ func PageOf(entities []*project.Entity, instance string, e *project.Entity) *Pag
 // Modules are the modules whose entities a site reads, in the model's
 // order.
 func Modules(entities []*project.Entity, modules []*project.Module, instance string) []*project.Module {
+	var out []*project.Module
+	add := func(m *project.Module) {
+		if !slices.Contains(out, m) {
+			out = append(out, m)
+		}
+	}
+	for _, r := range Redirects(entities, instance) {
+		add(r.Entity.Module)
+	}
+	for _, m := range PageModules(entities, modules, instance) {
+		add(m)
+	}
+	slices.SortStableFunc(out, func(a, b *project.Module) int {
+		return slices.Index(modules, a) - slices.Index(modules, b)
+	})
+	return out
+}
+
+// PageModules are the modules whose entities a site's pages read (those it
+// redirects by aside), in the model's order.
+func PageModules(entities []*project.Entity, modules []*project.Module, instance string) []*project.Module {
 	var out []*project.Module
 	add := func(m *project.Module) {
 		if !slices.Contains(out, m) {

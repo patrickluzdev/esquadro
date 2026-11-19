@@ -9,7 +9,7 @@ import (
 	"encoding/xml"
 	"net/http"
 	"strings"
-{{range siteModules .Entities .Modules $n}}
+{{range sitePageModules .Entities .Modules $n}}
 	"{{$.App.Module}}/internal/{{.Snake}}"
 {{- end}}
 )
@@ -29,7 +29,9 @@ type Home struct {
 const homeSize = 8
 
 func (s *Site) home(w http.ResponseWriter, r *http.Request) {
+{{- if $pages}}
 	ctx := r.Context()
+{{- end}}
 	view := Home{Page: s.page(r, Name, "")}
 {{- range $pages}}{{$e := .Entity}}
 	if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).List(ctx).All() {
@@ -89,7 +91,9 @@ type sitemapURL struct {
 }
 
 func (s *Site) sitemap(w http.ResponseWriter, r *http.Request) {
+{{- if $pages}}
 	ctx := r.Context()
+{{- end}}
 	urls := []sitemapURL{ {Loc: s.Abs(r, "/")} }
 {{- range $pages}}{{$e := .Entity}}
 	if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).List(ctx).All() {

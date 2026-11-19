@@ -19,7 +19,8 @@ package {{$m.Snake}}
 //	}
 //
 // The methods are BeforeCreate, BeforeUpdate, BeforeDelete, AfterCreate,
-// AfterUpdate and AfterDelete. Broken refuses with your code and text (the
+// AfterUpdate and AfterDelete; and, when its records redirect on a site
+// (@site(redirect)), BeforeRedirect and Visited. Broken refuses with your code and text (the
 // API answers 422); m.Lock makes two changes of the same key wait for one
 // another, so that what a rule counts is right.
 type {{$e.Pascal}}Rules struct {

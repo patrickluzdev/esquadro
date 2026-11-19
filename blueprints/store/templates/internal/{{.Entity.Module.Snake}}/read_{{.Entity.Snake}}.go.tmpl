@@ -24,12 +24,26 @@ func ensure{{$e.Pascal}}(ctx context.Context, q *sqlgen.Queries) (sqlgen.{{sqlcM
 	}
 	return q.Get{{$e.Pascal}}(ctx, postgres.UUID({{$e.Camel}}ID))
 }
-{{- else}}
+{{- else}}{{$time := false}}{{range uniqueKeys $e}}{{if eq .Field.Type "date"}}{{$time = true}}{{end}}{{end}}
 
-{{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" "errors" (and $time "time") "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Read{{$e.Pascal}} returns the {{lower $e.Label}} with the given id.
 func ({{$r}} *{{$m.Pascal}}) Read{{$e.Pascal}}(ctx context.Context, id uuid.UUID) ({{$e.Pascal}}, error) {
 	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Pascal}}(ctx, postgres.UUID(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return {{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
+	}
+	if err != nil {
+		return {{$e.Pascal}}{}, err
+	}
+	return {{$e.Camel}}Of(row), nil
+}
+{{- end}}
+{{- range uniqueKeys .Entity}}{{$e := $.Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}
+
+// Read{{$e.Pascal}}By{{.Field.Pascal}} returns the {{lower $e.Label}} whose {{.Field.Snake}} is v.
+func ({{$r}} *{{$m.Pascal}}) Read{{$e.Pascal}}By{{.Field.Pascal}}(ctx context.Context, v {{goType .Field}}) ({{$e.Pascal}}, error) {
+	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Get{{$e.Pascal}}By{{.Field.Pascal}}(ctx, {{sqlcIn .Field "v"}})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return {{$e.Pascal}}{}, Err{{$e.Pascal}}NotFound
 	}

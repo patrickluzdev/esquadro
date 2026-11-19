@@ -1,4 +1,4 @@
-{{- $n := .Instance.Name}}{{$o := .Instance.Options -}}
+{{- $n := .Instance.Name -}}
 package {{$n}}
 
 // The {{$n}} API's own: how a request is authenticated, and its calls.
@@ -17,11 +17,9 @@ import (
 //	req.Header.Set("Authorization", "Bearer "+s.Key)
 //	req.URL.Path = "/bot" + s.Key + req.URL.Path   // a token in the path
 func Authenticate(req *http.Request, s Secrets) error {
-{{- if $o.key}}
-	req.Header.Set("Authorization", "Bearer "+s.Key)
-{{- else}}
-	_ = s
-{{- end}}
+	if s.Key != "" {
+		req.Header.Set("Authorization", "Bearer "+s.Key)
+	}
 	return nil
 }
 

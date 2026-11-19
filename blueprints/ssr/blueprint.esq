@@ -51,9 +51,22 @@ blueprint ssr {
   /// How round the corners are, as CSS: 0.75rem, 0.5rem, 0.
   option radius string default("0.75rem")
 
+  /// The key a visit of a redirect is told apart by, a day at a time,
+  /// without keeping who it is (edge.Visitor): with a redirect.
+  env INSTANCE_VISITOR_SECRET string secret required generate(32) when("{{if siteRedirects .Entities .Instance.Name}}true{{end}}")
+
   annotation entity {
     /// The entity has pages: a list at /<path>, and one per record.
     page bool
+    /// Its records redirect: /<path>/<by> (at the root without a path)
+    /// sends to the address in <to>. <entity>_rules.go decides where each
+    /// visit goes (BeforeRedirect) and what is kept of it (Visited).
+    redirect bool
+    /// The unique field a record is found by, with redirect: code.
+    by name
+    /// The field of the address a record sends to, with redirect:
+    /// target_url.
+    to name
     /// The part of the address: ofertas. Its plural, in kebab case, by
     /// default.
     path string

@@ -125,7 +125,52 @@ func TestCanaryUpgrades(t *testing.T) {
 	}
 	// A job posted once per offer and group, ever.
 	deals += "\n/// Posts an offer to a group, once.\njob PostOffer {\n  offer_id       uuid required\n  destination_id uuid required\n  @jobs(unique_by [offer_id, destination_id])\n}\n"
+	// Its short links: the site redirects by the code, which a rule makes up.
+	deals = strings.Replace(deals, "  code        string required unique min(4) max(12)", "  code        string unique min(4) max(12)", 1)
+	deals = strings.Replace(deals, "  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n}",
+		"  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n  @site(redirect, by code, to target_url)\n}", 1)
+	if !strings.Contains(deals, "@site(redirect, by code, to target_url)") || strings.Contains(deals, "code        string required") {
+		t.Fatal("the canary's Link was not made a redirect")
+	}
 	write("esquadro/deals.esq", deals)
+	write("internal/deals/link_rules.go", `package deals
+
+import (
+	"context"
+	"crypto/rand"
+	"strings"
+)
+
+type LinkRules struct {
+	linkHooks
+}
+
+// A link without a code gets one made up.
+func (LinkRules) BeforeCreate(ctx context.Context, m *Deals, n *NewLink) error {
+	if n.Code == "" {
+		n.Code = strings.ToLower(rand.Text()[:7])
+	}
+	return nil
+}
+
+// A link of an offer that expired sends to its page on the site.
+func (LinkRules) BeforeRedirect(ctx context.Context, m *Deals, l Link, v Visit) (string, error) {
+	offer, err := m.ReadOffer(ctx, l.OfferID)
+	if err != nil {
+		return "", err
+	}
+	if offer.Status == OfferStatusExpired {
+		return "/ofertas/" + offer.ID.String(), nil
+	}
+	return l.TargetURL, nil
+}
+
+// Every visit is a click, a bot's told apart.
+func (LinkRules) Visited(ctx context.Context, m *Deals, l Link, v Visit) error {
+	_, err := m.CreateClick(ctx, NewClick{LinkID: l.ID, Bot: v.Bot, UserAgent: v.UserAgent, IPHash: v.Visitor})
+	return err
+}
+`)
 	// And a business rule: an offer that expired is not approved.
 	write("internal/deals/offer_rules.go", `package deals
 
@@ -143,6 +188,67 @@ func (OfferRules) BeforeUpdate(ctx context.Context, m *Deals, stored Offer, n *N
 }
 `)
 	e.esquadro(0, "gen", dir)
+	// The short links, end to end: the code made up, a person and a preview
+	// sent on and counted apart, and an expired offer's link to its page.
+	write("web/site/link_redirect_test.go", `package site
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/bojanz/currency"
+
+	"example.com/promo/internal/deals"
+	"example.com/promo/internal/platform/postgres/postgrestest"
+)
+
+func TestShortLinks(t *testing.T) {
+	ctx := context.Background()
+	pool := postgrestest.Fresh(t)
+	m := deals.New(deals.Deps{Pool: pool})
+	price, _ := currency.NewAmount("89.90", "BRL")
+	offer, err := m.CreateOffer(ctx, deals.NewOffer{Source: deals.SourceShopee, Store: "Shopee", Title: "Panela", ProductURL: "https://shopee.com.br/panela", Price: price})
+	if err != nil {
+		t.Fatal(err)
+	}
+	link, err := m.CreateLink(ctx, deals.NewLink{TargetURL: "https://shopee.com.br/panela", OfferID: offer.ID})
+	if err != nil || len(link.Code) != 7 {
+		t.Fatalf("a link without a code: %+v, %v", link, err)
+	}
+	srv := httptest.NewServer(New(Deps{Deals: m, VisitorSecret: []byte("test"), Logger: slog.New(slog.DiscardHandler)}))
+	defer srv.Close()
+	visit := func(agent string) *http.Response {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/"+link.Code, nil)
+		req.Header.Set("User-Agent", agent)
+		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res
+	}
+	if res := visit("Mozilla/5.0"); res.StatusCode != http.StatusFound || res.Header.Get("Location") != "https://shopee.com.br/panela" {
+		t.Fatalf("a person: %d to %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	if res := visit("WhatsApp/2.24"); res.StatusCode != http.StatusFound {
+		t.Fatalf("a preview: %d", res.StatusCode)
+	}
+	var people, bots int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FILTER (WHERE NOT bot), count(*) FILTER (WHERE bot) FROM clicks").Scan(&people, &bots); err != nil || people != 1 || bots != 1 {
+		t.Fatalf("clicks: %d people, %d bots (%v)", people, bots, err)
+	}
+	expired := deals.OfferStatusExpired
+	if _, err := m.PatchOffer(ctx, offer.ID, 0, deals.OfferChanges{Status: &expired}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if res := visit("Mozilla/5.0"); res.Header.Get("Location") != Path+"/ofertas/"+offer.ID.String() {
+		t.Fatalf("an expired offer's link: %d to %s", res.StatusCode, res.Header.Get("Location"))
+	}
+}
+`)
 	if !strings.Contains(read("web/site/offer_gen.go"), "func (s *Site) listOffers(") || !strings.Contains(read("web/site/coupon_gen.go"), "func (s *Site) readCoupon(") {
 		t.Fatal("the site has no pages of offers and coupons")
 	}

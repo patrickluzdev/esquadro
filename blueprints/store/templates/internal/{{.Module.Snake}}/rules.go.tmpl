@@ -3,7 +3,7 @@
 
 package {{.Module.Snake}}
 
-{{importBlock "context" (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" (and (redirectModule .Module) "errors") (and (redirectModule .Module) "time") (printf "%s/internal/platform/postgres" .App.Module)}}
 // Lock takes the lock of key until the transaction of ctx ends: a rule that
 // counts before it writes ("20 a day per group") locks the group first, and
 // two changes of it at once wait for one another. Outside a transaction (in
@@ -11,4 +11,23 @@ package {{.Module.Snake}}
 func (*{{.Module.Pascal}}) Lock(ctx context.Context, key string) error {
 	return postgres.Lock(ctx, key)
 }
+{{- if redirectModule .Module}}
+
+// Visit is a visit to the address of a record on a site
+// (@site(redirect)), as far as the site may know it: whether it is a bot (a
+// link's preview, a search engine), who it is for today only (an id made
+// from the address and the browser, which are not kept, that changes every
+// day), where it came from, and when.
+type Visit struct {
+	Bot       bool
+	Visitor   string
+	Referrer  string
+	UserAgent string
+	At        time.Time
+}
+
+// ErrGone is what BeforeRedirect answers for a record that is no longer
+// there to visit (an offer that ended): the site shows its page of it.
+var ErrGone = errors.New("{{.Module.Snake}}: no longer available")
+{{- end}}
 {{- end}}

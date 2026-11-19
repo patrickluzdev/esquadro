@@ -28,19 +28,65 @@ func ImportBy(e *project.Entity) *project.Field {
 	return e.Field(name)
 }
 
-// importKey is the column of the field an import knows records by, as the
-// queries write and take it.
+// importKey is the field an import knows records by, as the queries
+// write and take it.
 func importKey(e *project.Entity) *Writable {
 	f := ImportBy(e)
 	if f == nil {
 		return nil
 	}
-	for _, w := range writable(e) {
-		if w.Field == f && !w.Currency {
+	for _, w := range uniqueKeys(e) {
+		if w.Field == f {
 			return &w
 		}
 	}
 	return nil
+}
+
+// uniqueKeys are the fields a record may be read by, being unique, of a
+// type that names a record: Read<Entity>By<Field>. A single entity has
+// none: it is read without.
+func uniqueKeys(e *project.Entity) []Writable {
+	if Single(e) {
+		return nil
+	}
+	var out []Writable
+	for _, w := range writable(e) {
+		if w.Field != nil && !w.Currency && w.Field.Unique && slices.Contains(importKinds, w.Field.Type) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// Redirects reports whether the entity's records redirect on a site
+// (@<site>(redirect)): its rules have BeforeRedirect and Visited.
+func Redirects(e *project.Entity) bool {
+	for _, a := range e.Ann {
+		if on, _ := a["redirect"].(bool); on {
+			return true
+		}
+	}
+	return false
+}
+
+// RedirectTo is the field a redirecting entity's records send to, as its
+// site says (@<site>(redirect, to target_url)).
+func RedirectTo(e *project.Entity) *project.Field {
+	for _, a := range e.Ann {
+		if on, _ := a["redirect"].(bool); on {
+			if name, _ := a["to"].(string); name != "" {
+				return e.Field(name)
+			}
+		}
+	}
+	return nil
+}
+
+// RedirectModule reports whether a module has an entity that redirects:
+// it has Visit and ErrGone.
+func RedirectModule(m *project.Module) bool {
+	return slices.ContainsFunc(m.Entities, Redirects)
 }
 
 // importKinds are the types a field an import knows records by may have.
