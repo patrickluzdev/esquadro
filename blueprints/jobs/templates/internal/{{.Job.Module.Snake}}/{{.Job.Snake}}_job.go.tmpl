@@ -4,12 +4,12 @@
 {{- if and (or (eq .Type "string") (eq .Type "text")) (or .Min .Max)}}{{$utf8 = "unicode/utf8"}}{{end -}}
 {{- if .Pattern}}{{$re = "regexp"}}{{end -}}
 {{- end -}}
-{{- $queue := index (ann $j) "queue"}}{{$attempts := index (ann $j) "max_attempts" -}}
+{{- $queue := index (ann $j) "queue"}}{{$attempts := index (ann $j) "max_attempts"}}{{$unique := uniqueOf $j -}}
 {{- $defaults := false}}
 {{- range $j.Fields}}{{if and .Default (or (eq .Type "string") (eq .Type "text") (eq .Type "enum") (eq .Type "uuid") (eq .Type "json") (eq .Type "time") (eq .Type "date"))}}{{$defaults = true}}{{end}}{{end -}}
 package {{$m.Snake}}
 
-{{importBlock "context" "time" (goImports $j) $re $utf8 "github.com/jackc/pgx/v5" (and (or $queue $attempts) "github.com/riverqueue/river")}}
+{{importBlock "context" "time" (goImports $j) $re $utf8 "github.com/jackc/pgx/v5" (and (or $queue $attempts $unique) "github.com/riverqueue/river") (and $unique $unique.Queued "github.com/riverqueue/river/rivertype")}}
 // {{$j.Pascal}}Args are the arguments of the {{$j.Pascal}} job.
 {{- with $j.Doc}}
 //
@@ -22,17 +22,39 @@ type {{$j.Pascal}}Args struct {
 {{- if .Doc}}
 	{{goDoc .Pascal .Doc ""}}
 {{- end}}
-	{{.Pascal}} {{goType .}} `json:"{{.Snake}}"`
+	{{.Pascal}} {{goType .}} `json:"{{.Snake}}"{{if uniqueBy $j .}} river:"unique"{{end}}`
 {{- end}}
 }
 
 // Kind names the job in the queue.
 func ({{$j.Pascal}}Args) Kind() string { return "{{$m.Snake}}.{{$j.Snake}}" }
-{{- if or $queue $attempts}}
+{{- if or $queue $attempts $unique}}
 
 // InsertOpts are how the job is enqueued, from its @jobs annotation.
+{{- if $unique}}
+// It is unique{{if $unique.By}} by {{join ", " $unique.By}}{{else}} by its arguments{{end}}{{if $unique.For}}, within {{index (ann $j) "unique_for"}}{{end}}{{if $unique.Queued}}, while it waits or runs{{end}}:
+// enqueued again, it is not enqueued twice.
+{{- end}}
 func ({{$j.Pascal}}Args) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{ {{- if $queue}}Queue: {{quote $queue}}{{end}}{{if and $queue $attempts}}, {{end}}{{if $attempts}}MaxAttempts: {{$attempts}}{{end -}} }
+	return river.InsertOpts{
+{{- if $queue}}
+		Queue: {{quote $queue}},
+{{- end}}
+{{- if $attempts}}
+		MaxAttempts: {{$attempts}},
+{{- end}}
+{{- if $unique}}
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+{{- if $unique.For}}
+			ByPeriod: {{$unique.For}},
+{{- end}}
+{{- if $unique.Queued}}
+			ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRetryable, rivertype.JobStateRunning, rivertype.JobStateScheduled},
+{{- end}}
+		},
+{{- end}}
+	}
 }
 {{- end}}
 {{- if $defaults}}

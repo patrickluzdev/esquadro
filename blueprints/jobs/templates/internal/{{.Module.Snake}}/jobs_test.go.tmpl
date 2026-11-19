@@ -64,6 +64,25 @@ func TestEnqueue{{$j.Pascal}}(t *testing.T) {
 	}
 }
 
+{{- if uniqueOf $j}}
+
+// Test{{$j.Pascal}}IsUnique enqueues the job twice with the same arguments:
+// it is in the queue once.
+func Test{{$j.Pascal}}IsUnique(t *testing.T) {
+	ctx := t.Context()
+	m, q, _ := openJobs(t, New(Deps{}).RegisterJobs)
+	args := valid{{$j.Pascal}}Args()
+	for range 2 {
+		if err := m.Enqueue{{$j.Pascal}}(ctx, args); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := q.Count(ctx, {{$j.Pascal}}Args{}.Kind()); err != nil || n != 1 {
+		t.Fatalf("%d {{$j.Snake}} jobs enqueued twice (%v), want 1", n, err)
+	}
+}
+{{- end}}
+
 // Test{{$j.Pascal}}IsWorked runs the queue as the worker does, with a test's
 // work in place of the module's: the job enqueued reaches it, with its
 // arguments.

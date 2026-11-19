@@ -41,6 +41,16 @@ blueprint jobs {
     max_attempts int
     /// The queue it goes to: one of the blueprint's queues.
     queue string
+    /// The job is unique by its arguments: enqueued again, it is not
+    /// enqueued twice (and that is no error).
+    unique bool
+    /// Unique by these arguments only: [offer_id, destination_id].
+    unique_by list
+    /// Unique within this period only: 10m, 24h, 7d; for ever without it.
+    unique_for string
+    /// queued: unique while it waits or runs, and may be enqueued again
+    /// once it is done; ever (the default): once done too.
+    unique_while name
   }
 
   go_require "github.com/riverqueue/river" "v0.50.0"

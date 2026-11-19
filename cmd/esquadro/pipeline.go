@@ -57,6 +57,7 @@ func init() {
 	blueprint.Checks["workspace"] = bpworkspace.Check
 	blueprint.Checks["spa"] = spa.Check
 	blueprint.Checks["ui"] = ui.Check
+	blueprint.Checks["jobs"] = jobs.Check
 	blueprint.Checks["ssr"] = ssr.Check
 	blueprint.Checks["seed"] = seed.Check
 	blueprint.Checks["audit"] = audit.Check

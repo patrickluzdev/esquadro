@@ -15,6 +15,8 @@ func TemplateFuncs() template.FuncMap {
 		"canSample":     canSample,
 		"sampleImports": sampleImports,
 		"refusesEmpty":  refusesEmpty,
+		"uniqueOf":      UniqueOf,
+		"uniqueBy":      UniqueBy,
 	}
 }
 

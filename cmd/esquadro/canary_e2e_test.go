@@ -109,6 +109,8 @@ func TestCanaryUpgrades(t *testing.T) {
 		"  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Ofertas\", singular \"Oferta\")\n  @site(page, path \"ofertas\", schema product, menu)\n}\n\n/// A short link", 1)
 	deals = strings.Replace(deals, "  expires_on date\n  @security(read public, write [user.admin, user.operator])",
 		"  expires_on date\n  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Cupons\", singular \"Cupom\")\n  @site(page, path \"cupons\", menu)", 1)
+	// A job posted once per offer and group, ever.
+	deals += "\n/// Posts an offer to a group, once.\njob PostOffer {\n  offer_id       uuid required\n  destination_id uuid required\n  @jobs(unique_by [offer_id, destination_id])\n}\n"
 	write("esquadro/deals.esq", deals)
 	// And a business rule: an offer that expired is not approved.
 	write("internal/deals/offer_rules.go", `package deals

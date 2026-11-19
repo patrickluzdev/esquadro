@@ -86,6 +86,43 @@ reschedule at once: make the work check, when it runs, that what it was
 enqueued for still holds (the offer is still approved, its time is still
 this one), so that nothing happens twice or too late.
 
+## Once
+
+A job may be unique: enqueued again with the same arguments, it is not
+enqueued twice, and that is no error (`Enqueue…At` answers the id of the
+one already there).
+
+```esquadro
+/// Posts an offer to a group: never the same offer twice to a group.
+job PostOffer {
+  offer_id       uuid required
+  destination_id uuid required
+  note           string
+  @jobs(unique_by [offer_id, destination_id])
+}
+
+/// Looks for new offers: one at a time, at most one an hour.
+job FetchOffers {
+  niche_id uuid required
+  @jobs(unique, unique_for "1h", unique_while queued)
+}
+```
+
+| `@jobs` | What | Default |
+|---|---|---|
+| `unique` | unique by all its arguments | not unique |
+| `unique_by [args]` | unique by these arguments only (a different `note` is the same job) | all of them |
+| `unique_for "24h"` | unique within this period: `10m`, `24h`, `7d` | for ever |
+| `unique_while` | `queued`: while it waits or runs, so that it may be enqueued again once done; `ever`: once done too | `ever` |
+
+The module's tests check it: the same job enqueued twice is in the queue
+once.
+
+Unique is about enqueueing. A job may still run twice: a worker that
+stops while it runs leaves it to be tried again. Make the work check what
+it did, before it does it again (the send is already `POSTED`), and it
+does nothing twice.
+
 ## Running them
 
 The worker's `run` command works the queue, side by side with its other

@@ -335,3 +335,25 @@ func TestGenDescribesThePlanAsJSON(t *testing.T) {
 		t.Fatal("-json without -dry-run")
 	}
 }
+
+func TestCheckUniqueJobs(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "billing")
+	if code, _, errOut := esq(t, "new", "-starter", "worker", "-module", "example.com/billing", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "billing.esq")
+	base := read(t, model)
+	for name, tc := range map[string]struct{ job, want string }{
+		"ok":      {"job Retry {\n  invoice_id uuid required\n  @jobs(unique_by [invoice_id], unique_for \"7d\", unique_while queued)\n}\n", ""},
+		"by":      {"job Retry {\n  invoice_id uuid required\n  @jobs(unique_by [invoice])\n}\n", "unique_by: invoice is not an argument of Retry"},
+		"for":     {"job Retry {\n  invoice_id uuid required\n  @jobs(unique, unique_for \"soon\")\n}\n", `unique_for of Retry: "soon" is not a period`},
+		"while":   {"job Retry {\n  invoice_id uuid required\n  @jobs(unique, unique_while done)\n}\n", "unique_while done of Retry is not ever or queued"},
+		"neither": {"job Retry {\n  invoice_id uuid required\n  @jobs(unique_for \"1h\")\n}\n", "Retry has unique_for or unique_while but is not unique"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.job), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
