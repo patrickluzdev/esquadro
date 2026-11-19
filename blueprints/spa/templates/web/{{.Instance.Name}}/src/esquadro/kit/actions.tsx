@@ -18,11 +18,18 @@ import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import type { Action, Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
 
-/** Whether an action may run on a record: its when, and, to change it, the record's update. */
-export function allowed(a: Action, r: Rec): boolean {
+/**
+ * Whether an action may run on a record: its when, and, to change it, the
+ * record's update; and, for a field with a flow it moves, the state in the
+ * record's can (status:PUBLISHED).
+ */
+export function allowed(a: Action, r: Rec, meta?: Pick<ResourceMeta, "fields">): boolean {
   if (a.when && !a.when(r)) return false
-  if (a.patch && !(r.can ?? []).includes("update")) return false
-  return true
+  if (!a.patch) return true
+  const can = r.can ?? []
+  if (!can.includes("update")) return false
+  const fixed = typeof a.patch === "function" ? a.patch(r) : a.patch
+  return Object.entries(fixed).every(([name, value]) => !meta?.fields[name]?.flow || value === r[name] || can.includes(`${name}:${String(value)}`))
 }
 
 /** The keys of a resource's actions: a key given to two is said, once, in development. */
@@ -85,7 +92,7 @@ export function useActions(resource: Resource) {
   const apply = (a: Action, r: Rec, asked: Record<string, unknown>) => applyAction(meta, a, r, asked)
 
   const perform = async (a: Action, r: Rec): Promise<boolean> => {
-    if (!allowed(a, r)) return false
+    if (!allowed(a, r, meta)) return false
     if (a.confirm && !(await confirm(a.confirm, { destructive: a.destructive }))) return false
     if (a.ask && a.ask.length > 0) {
       return new Promise<boolean>((done) => setAsking({ action: a, record: r, done }))

@@ -149,6 +149,15 @@ func TestCanaryUpgrades(t *testing.T) {
 		t.Fatal("the canary's Offer has no niche to add its temperature after")
 	}
 	deals = hot + "\n/// A visitor's vote on an offer: +1 or -1.\nentity Vote {\n  value int required min(-1) max(1)\n  offer > Offer required on_delete(cascade)\n  @security(read public, write [user.admin, user.operator])\n}\n"
+	// The states of an offer, and who takes it from one to another.
+	flowed := strings.Replace(deals, "  status               OfferStatus default(PENDING) @store(filter)\n",
+		"  status               OfferStatus default(PENDING) @store(filter, flow [\n"+
+			"    \"PENDING -> APPROVED by user.admin, user.operator\",\n    \"PENDING -> SKIPPED by user.admin, user.operator\",\n"+
+			"    \"PENDING -> EXPIRED\",\n    \"APPROVED -> EXPIRED\",\n    \"SKIPPED -> PENDING\",\n  ])\n", 1)
+	if flowed == deals {
+		t.Fatal("the canary's Offer has no status to give a flow")
+	}
+	deals = flowed
 	write("esquadro/deals.esq", deals)
 	write("internal/deals/link_rules.go", `package deals
 
@@ -339,6 +348,7 @@ func TestCommentReplies(t *testing.T) {
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/bojanz/currency"
@@ -377,6 +387,33 @@ func TestTemperature(t *testing.T) {
 	page, err := m.ListOffers(ctx, deals.OfferQuery{Sort: "hot", Page: 1, PerPage: 10})
 	if err != nil || len(page.Offers) != 2 || page.Offers[0].ID != warm.ID || page.Offers[1].ID != cold.ID {
 		t.Fatalf("hot: %+v, %v", page.Offers, err)
+	}
+}
+
+func TestOfferFlow(t *testing.T) {
+	ctx := context.Background()
+	m := deals.New(deals.Deps{Pool: postgrestest.Fresh(t)})
+	price, _ := currency.NewAmount("10", "BRL")
+	n := deals.NewOffer{Source: deals.SourceManual, Store: "Loja", Title: "Panela", ProductURL: "https://loja.com.br", Price: price, Status: deals.OfferStatusApproved}
+	if _, err := m.CreateOffer(ctx, n); err == nil {
+		t.Fatal("an offer created approved")
+	}
+	n.Status = ""
+	offer, err := m.CreateOffer(ctx, n)
+	if err != nil || offer.Status != deals.OfferStatusPending {
+		t.Fatalf("created: %+v, %v", offer, err)
+	}
+	niche, err := m.CreateNiche(ctx, deals.NewNiche{Slug: "casa", Name: "Casa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offer, err = m.ApproveOffer(ctx, offer.ID, niche.ID, "Corre!"); err != nil || offer.Status != deals.OfferStatusApproved {
+		t.Fatalf("approved: %+v, %v", offer, err)
+	}
+	pending := deals.OfferStatusPending
+	_, err = m.PatchOffer(ctx, offer.ID, 0, deals.OfferChanges{Status: &pending}, nil)
+	if invalid, ok := errors.AsType[*deals.InvalidFields](err); !ok || invalid.Fields[0].Code != "not_allowed" {
+		t.Fatalf("approved back to pending: %v", err)
 	}
 }
 `)

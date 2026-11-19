@@ -101,6 +101,11 @@ func (h HTTP) Import{{.Plural.Pascal}}(ctx context.Context, req *apigen.{{$P}}Im
 		if !({{$P}}Policy{}).Read(ctx, *stored) || !({{$P}}Policy{}).Update(ctx, *stored) {
 			return security.Refusal(ctx)
 		}
+{{- range flowsBy $e}}
+		if n.{{.Field.Pascal}} != stored.{{.Field.Pascal}} && !({{$P}}Policy{}).{{.Field.Pascal}}To(ctx, *stored, n.{{.Field.Pascal}}) {
+			return security.Refusal(ctx)
+		}
+{{- end}}
 		return nil
 	}
 	done, err := h.{{$p}}.Import{{.Plural.Pascal}}(ctx, rows, guard)
@@ -301,6 +306,11 @@ func (h HTTP) Update{{$P}}(ctx context.Context, req *apigen.New{{$P}}, params ap
 	if !({{$P}}Policy{}).Update(ctx, stored) {
 		return nil, security.Refusal(ctx)
 	}
+{{- range flowsBy $e}}
+	if n.{{.Field.Pascal}} != stored.{{.Field.Pascal}} && !({{$P}}Policy{}).{{.Field.Pascal}}To(ctx, stored, n.{{.Field.Pascal}}) {
+		return nil, security.Refusal(ctx)
+	}
+{{- end}}
 {{- end}}
 	version, err := edge.IfMatch(params.IfMatch.Value, params.IfMatch.IsSet(), {{ifMatchRequired $e (optionsOf "rest")}})
 	if err != nil {
@@ -340,6 +350,11 @@ func (h HTTP) Patch{{$P}}(ctx context.Context, req *apigen.{{$P}}Changes, params
 		if !({{$P}}Policy{}).Update(ctx, stored) {
 			return security.Refusal(ctx)
 		}
+{{- range flowsBy $e}}
+		if n.{{.Field.Pascal}} != stored.{{.Field.Pascal}} && !({{$P}}Policy{}).{{.Field.Pascal}}To(ctx, stored, n.{{.Field.Pascal}}) {
+			return security.Refusal(ctx)
+		}
+{{- end}}
 		return nil
 	}
 	updated, err := h.{{$p}}.Patch{{$P}}(ctx{{$idArg}}, version, c, guard)
@@ -811,12 +826,29 @@ func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Contex
 	a.Can = []apigen.{{$P}}CanItem{}
 	if ({{$P}}Policy{}).Update(ctx, x) {
 		a.Can = append(a.Can, "update")
+{{- range flows $e}}{{$f := .Field}}
+		// The states its {{$f.Snake}} may go to, by whom asks: {{$f.Snake}}:<STATE>.
+		for _, to := range x.Next{{$f.Pascal}}() {
+{{- if .HasBy}}
+			if ({{$P}}Policy{}).{{$f.Pascal}}To(ctx, x, to) {
+				a.Can = append(a.Can, apigen.{{$P}}CanItem({{quote $f.Snake}}+":"+string(to)))
+			}
+{{- else}}
+			a.Can = append(a.Can, apigen.{{$P}}CanItem({{quote $f.Snake}}+":"+string(to)))
+{{- end}}
+		}
+{{- end}}
 	}
 	if ({{$P}}Policy{}).Delete(ctx, x) {
 		a.Can = append(a.Can, "delete")
 	}
 {{- else}}
 	a.Can = []apigen.{{$P}}CanItem{"update", "delete"}
+{{- range flows $e}}{{$f := .Field}}
+	for _, to := range x.Next{{$f.Pascal}}() {
+		a.Can = append(a.Can, apigen.{{$P}}CanItem({{quote $f.Snake}}+":"+string(to)))
+	}
+{{- end}}
 {{- end}}
 {{- range inAnswer $e}}{{$g := ogenName (jsonName .)}}{{$x := printf "x.%s" .Pascal}}{{$req := .Required}}
 {{- if or (eq .Type "string") (eq .Type "text")}}

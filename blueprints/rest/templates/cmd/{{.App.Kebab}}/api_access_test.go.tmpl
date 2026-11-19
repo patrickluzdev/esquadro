@@ -99,6 +99,17 @@ func TestAPIAccess(t *testing.T) {
 			var wantCan []string
 			if policy.Update(as(who), stored) {
 				wantCan = append(wantCan, "update")
+{{- range flows $e}}{{$f := .Field}}
+				for _, to := range stored.Next{{$f.Pascal}}() {
+{{- if .HasBy}}
+					if policy.{{$f.Pascal}}To(as(who), stored, to) {
+						wantCan = append(wantCan, "{{$f.Snake}}:"+string(to))
+					}
+{{- else}}
+					wantCan = append(wantCan, "{{$f.Snake}}:"+string(to))
+{{- end}}
+				}
+{{- end}}
 			}
 			if policy.Delete(as(who), stored) {
 				wantCan = append(wantCan, "delete")
@@ -143,6 +154,91 @@ func TestAPIAccess(t *testing.T) {
 	})
 {{- end}}{{end}}
 }
+{{- $flowed := false}}{{range .Entities}}{{if and (canSampleAPI .) (flowsBy .)}}{{$flowed = true}}{{end}}{{end}}
+{{- if $flowed}}
+
+// TestAPIFlows checks that the API lets each move of a flow that names who
+// makes it only to those, and that can says so: a record is taken to where
+// the move starts, then each kind of request asks.
+func TestAPIFlows(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv, d := newTestServerOf(t, newTestDependencies(t))
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	patch := func(url, who, body string) int {
+		t.Helper()
+		req, err := http.NewRequest("PATCH", url, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("If-Match", "*")
+		res, err := asTestPrincipal(who).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+{{- range $i, $e := .Entities}}{{if and (canSampleAPI $e) (flowsBy $e)}}{{$P := $e.Pascal}}{{$m := $e.Module}}{{$own := ownerField $.Entities $e}}
+	t.Run("{{$P}}", func(t *testing.T) {
+		policy := {{$m.Snake}}.{{$P}}Policy{}
+		url := srv.URL + "/api/v1/{{$e.Plural.Kebab}}/"
+{{- range $j, $fl := flowsBy $e}}{{$f := $fl.Field}}
+{{- range $k, $mv := $fl.Moves}}{{if $mv.By}}
+		{
+			// {{$mv.From.Raw}} -> {{$mv.To.Raw}}, by {{join ", " $mv.By}}.
+			created, err := c.Create{{$P}}(ctx, givenAPI{{$P}}(t, c, {{$i}}*100+{{$j}}*10+{{$k}}+200), apigen.Create{{$P}}Params{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := uuid.UUID(created.ID)
+			for _, state := range []{{$m.Snake}}.{{$f.Enum.Pascal}}{ {{- range $x, $v := $fl.PathTo $mv.From}}{{if $x}}, {{end}}{{$m.Snake}}.{{$f.Enum.Pascal}}{{$v.Pascal}}{{end -}} } {
+				if _, err := d.{{$m.Camel}}.Patch{{$P}}(ctx, id, 0, {{$m.Snake}}.{{$P}}Changes{ {{- $f.Pascal}}: &state}, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			stored, err := d.{{$m.Camel}}.Read{{$P}}(ctx, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			to := {{$m.Snake}}.{{$f.Enum.Pascal}}{{$mv.To.Pascal}}
+			for _, who := range []string{
+{{- range whosOf $.Entities $e (index (optionsOf "security") "services")}}
+{{- if .Owns}} "{{.Realm}}@" + stored.{{$own}}.String(),
+{{- else if .Realm}} {{printf "%q" .Name}},
+{{- else}} "nobody",
+{{- end}}
+{{- end}} } {
+				if !policy.Read(as(who), stored) {
+					continue
+				}
+				may := policy.Update(as(who), stored) && policy.{{$f.Pascal}}To(as(who), stored, to)
+				if _, _, can := call(t, "GET", url+id.String(), who); strings.Contains(","+can+",", ",{{$f.Snake}}:{{$mv.To.Raw}},") != may {
+					t.Errorf("can as %s: %q, {{$f.Snake}}:{{$mv.To.Raw}} %v", who, can, may)
+				}
+				if !may {
+					if got := patch(url+id.String(), who, `{"{{$f.Snake}}": "{{$mv.To.Raw}}"}`); got != refused(who) {
+						t.Errorf("{{$mv.From.Raw}} -> {{$mv.To.Raw}} as %s: %d, want %d", who, got, refused(who))
+					}
+				}
+			}
+			// One it names makes it.
+			if who := {{printf "%q" (index $mv.By 0)}}; policy.Update(as(who), stored) && policy.{{$f.Pascal}}To(as(who), stored, to) {
+				if got := patch(url+id.String(), who, `{"{{$f.Snake}}": "{{$mv.To.Raw}}"}`); got != http.StatusOK {
+					t.Errorf("{{$mv.From.Raw}} -> {{$mv.To.Raw}} as %s: %d", who, got)
+				}
+			}
+		}
+{{- end}}{{end}}
+{{- end}}
+	})
+{{- end}}{{end}}
+}
+{{- end}}
 {{- range .Reports}}{{if not (reportPublic .)}}
 
 // TestAPIReport{{.Pascal}}Access refuses the report to no one signed in.

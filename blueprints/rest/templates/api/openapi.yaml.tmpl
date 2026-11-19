@@ -716,13 +716,19 @@ components:
 {{- end}}
         Every field comes unless `fields` asks for some: then only those, with
         `id` and `version`.
+{{- range flows $e}}
+
+        `{{.Field.Snake}}` changes only as its flow says, from its first state,
+        {{.Field.Default.Text}}: {{.Text}}. Another change is refused
+        (`not_allowed`); one the person may not make, with 403.
+{{- end}}
       required: [id, version, can]
       properties:
         id: {type: string, format: uuid}
         can:
           type: array
-          description: What the request's person may do with it, as the API decides.
-          items: {type: string, enum: ["update", "delete"]}
+          description: What the request's person may do with it, as the API decides{{if flows $e}}; `<field>:<STATE>`, the states they may take a field with a flow to{{end}}.
+          items: {type: string, enum: ["update", "delete"{{range canNames $e}}, {{quote .}}{{end}}]}
 {{- range inAnswer $e}}
         {{jsonName .}}: {{schema .}}
 {{- end}}

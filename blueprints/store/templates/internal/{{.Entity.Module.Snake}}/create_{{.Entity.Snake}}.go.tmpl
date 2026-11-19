@@ -33,6 +33,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 		if err := n.Validate(); err != nil {
 			return err
 		}
+{{- if flows $e}}
+		if err := n.Follows(nil); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $ws}}
 		row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params({{$r}}.NewID(), n))
 {{- else}}

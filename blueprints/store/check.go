@@ -22,6 +22,7 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 	checkSingle(p, &diags)
 	checkImports(p, &diags)
 	checkTotals(p, &diags)
+	checkFlows(p, set, &diags)
 	for _, e := range p.Entities {
 		for _, f := range e.Fields {
 			a := f.Ann["store"]

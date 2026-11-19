@@ -62,8 +62,8 @@ export interface {{$P}} {
   id: string
   /** Goes up with each change: send it back as ifMatch. */
   version: number
-  /** What the person may do with it, as the API decides. */
-  can: ("update" | "delete")[]
+  /** What the person may do with it, as the API decides{{if canNames $e}}; <field>:<STATE>, where they may take a field with a flow{{end}}. */
+  can: ("update" | "delete"{{range canNames $e}} | {{tsString .}}{{end}})[]
 {{- range inAnswer $e}}
 {{- with .Doc}}
   /** {{join " " .}} */

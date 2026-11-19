@@ -123,7 +123,7 @@ export function QueueView({ resource }: { resource: Resource }) {
                 )}
                 <div className="mt-1 flex flex-wrap gap-2">
                   {(resource.actions ?? [])
-                    .filter((a) => allowed(a, r))
+                    .filter((a) => allowed(a, r, meta))
                     .map((a) => (
                       <Button
                         key={a.label}

@@ -5,6 +5,7 @@ package domain
 import (
 	"text/template"
 
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/store"
 )
 
@@ -14,5 +15,7 @@ func TemplateFuncs() template.FuncMap {
 		// written reports whether a record is written with a field:
 		// declared, and not a total the store keeps.
 		"written": store.Written,
+		// flows are the flows of an entity's enum fields (@store(flow)).
+		"flows": security.Flows,
 	}
 }

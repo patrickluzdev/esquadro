@@ -409,7 +409,7 @@ function RecordsList({
         cell: ({ row }) => {
           const r = row.original
           const can = r.can ?? []
-          const own = actions.filter((a) => allowed(a, r))
+          const own = actions.filter((a) => allowed(a, r, meta))
           return (
             <div className="flex justify-end gap-0.5 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
               {can.includes("update") && (
@@ -727,7 +727,7 @@ function RecordsList({
               <Download /> {t("export")}
             </Button>
             {bulkActions.map((a) => {
-              const records = selected.filter((r) => allowed(a, r))
+              const records = selected.filter((r) => allowed(a, r, meta))
               return (
                 <Button
                   key={a.label}

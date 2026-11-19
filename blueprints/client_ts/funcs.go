@@ -23,6 +23,7 @@ func TemplateFuncs() template.FuncMap {
 		"inRequest":    rest.InRequest,
 		"inAnswer":     rest.InAnswer,
 		"isTotal":      store.IsTotal,
+		"canNames":     security.CanNames,
 		"keys":         rest.Keys,
 		"keyName":      rest.KeyName,
 		"keyInRequest": rest.KeyInRequest,
@@ -52,7 +53,7 @@ func TemplateFuncs() template.FuncMap {
 			case project.TypeUUID:
 				return "crypto.randomUUID()"
 			case project.TypeEnum:
-				return strconv.Quote(f.Enum.Values[0].Raw)
+				return strconv.Quote(security.FirstValue(f).Raw)
 			}
 			return `"x"`
 		},
@@ -221,7 +222,7 @@ func sample(f *project.Field, i int) string {
 	case project.TypeUUID:
 		return "crypto.randomUUID()"
 	case project.TypeEnum:
-		return strconv.Quote(f.Enum.Values[0].Raw)
+		return strconv.Quote(security.FirstValue(f).Raw)
 	case project.TypeJSON:
 		return "{}"
 	}

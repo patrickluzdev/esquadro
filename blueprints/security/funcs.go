@@ -24,6 +24,7 @@ func TemplateFuncs() template.FuncMap {
 		"allowed":       Allowed,
 		"listScope":     ListScope,
 		"allowExpr":     AllowExpr,
+		"flowsBy":       FlowsBy,
 		"list":          func(items ...string) []string { return items },
 		"lower":         strings.ToLower,
 		"goList": func(items []string) string {

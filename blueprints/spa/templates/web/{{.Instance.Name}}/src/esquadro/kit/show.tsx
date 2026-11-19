@@ -167,7 +167,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
         </Button>
       )}
       {resource.actions
-        ?.filter((a) => allowed(a, r))
+        ?.filter((a) => allowed(a, r, meta))
         .map((a) => (
           <Button key={a.label} variant={a.destructive ? "destructive-outline" : "outline"} onClick={() => perform(a, r)}>
             {a.icon && <a.icon />} {a.label}

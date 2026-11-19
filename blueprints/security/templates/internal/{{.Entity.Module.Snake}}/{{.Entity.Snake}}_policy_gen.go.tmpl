@@ -56,6 +56,21 @@ func ({{$R}}) Create(ctx context.Context, n New{{$e.Pascal}}) bool {
 	return {{allowExpr (rulesOf .Entities $e "create") "false"}}
 {{- end}}
 }
+{{- range flowsBy $e}}{{$f := .Field}}
+
+// {{$f.Pascal}}To reports whether the request of ctx may take x's {{$f.Snake}} to to, as
+// the flow's by says; a move without one, or off the flow (which the
+// module refuses), is left to Update.
+func ({{$R}}) {{$f.Pascal}}To(ctx context.Context, x {{$e.Pascal}}, to {{$f.Enum.Pascal}}) bool {
+	switch {
+{{- range .Moves}}{{if .By}}
+	case x.{{$f.Pascal}} == {{$f.Enum.Pascal}}{{.From.Pascal}} && to == {{$f.Enum.Pascal}}{{.To.Pascal}}:
+		return security.Allows(ctx, {{goList .By}})
+{{- end}}{{end}}
+	}
+	return true
+}
+{{- end}}
 {{- with $o}}
 {{- if .Relation}}
 

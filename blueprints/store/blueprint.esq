@@ -56,6 +56,12 @@ blueprint store {
     /// How many records a one-to-many relation has, kept as a sum is:
     /// count comments.
     count name
+    /// The changes an enum field may go through, each "FROM -> TO",
+    /// optionally "by" whom, as @security's rules: flow ["DRAFT -> REVIEW",
+    /// "REVIEW -> PUBLISHED by user.admin, user.moderator"]. Records start
+    /// in its default; another change is refused (not_allowed), whoever
+    /// makes it, and the API lets only those of by make theirs.
+    flow list
   }
   annotation relation {
     /// Lists may filter by the related record's id.

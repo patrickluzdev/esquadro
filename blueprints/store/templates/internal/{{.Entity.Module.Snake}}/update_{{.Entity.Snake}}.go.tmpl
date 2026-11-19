@@ -51,6 +51,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		if err := n.Validate(); err != nil {
 			return err
 		}
+{{- if flows $e}}
+		if err := n.Follows(&stored); err != nil {
+			return err
+		}
+{{- end}}
 {{- if $ws}}
 		params := update{{$e.Pascal}}Params(id, n)
 		params.IfVersion = postgres.Version(version)

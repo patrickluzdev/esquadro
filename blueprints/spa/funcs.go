@@ -21,18 +21,23 @@ import (
 // TemplateFuncs are the template helpers of the spa blueprint.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"spaKind":     Kind,
-		"humanize":    ui.Humanize,
-		"keys":        rest.Keys,
-		"keyName":     rest.KeyName,
-		"apiFilters":  rest.APIFilters,
-		"sortsOf":     rest.SortsOf,
-		"pagination":  rest.PaginationOf,
-		"inRequest":   rest.InRequest,
-		"inAnswer":    rest.InAnswer,
-		"isTotal":     store.IsTotal,
-		"orders":      store.Orders,
-		"written":     store.Written,
+		"spaKind":    Kind,
+		"humanize":   ui.Humanize,
+		"keys":       rest.Keys,
+		"keyName":    rest.KeyName,
+		"apiFilters": rest.APIFilters,
+		"sortsOf":    rest.SortsOf,
+		"pagination": rest.PaginationOf,
+		"inRequest":  rest.InRequest,
+		"inAnswer":   rest.InAnswer,
+		"isTotal":    store.IsTotal,
+		"orders":     store.Orders,
+		"written":    store.Written,
+		// hasFlow reports whether a field has a flow (@store(flow)).
+		"hasFlow": func(f *project.Field) bool {
+			_, ok := security.FlowOf(f)
+			return ok
+		},
 		"realms":      security.RealmsOf,
 		"softDeleted": store.SoftDeleted,
 		"single":      store.Single,

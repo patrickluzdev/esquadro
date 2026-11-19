@@ -37,6 +37,8 @@ export interface FieldMeta {
   rich?: boolean
   /** Shown, never edited (created_at). */
   readOnly?: boolean
+  /** An enum with a flow (@store(flow)): a record's can says where it may go, as <field>:<STATE>. */
+  flow?: boolean
 }
 
 /** A filter of the list, as the API takes it. */

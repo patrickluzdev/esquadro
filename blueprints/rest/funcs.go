@@ -35,6 +35,9 @@ func TemplateFuncs() template.FuncMap {
 		"orders":              store.Orders,
 		"inAnswer":            InAnswer,
 		"countedBy":           store.CountedBy,
+		"flows":               security.Flows,
+		"flowsBy":             security.FlowsBy,
+		"canNames":            security.CanNames,
 		"sortDoc":             SortDoc,
 		"searchFieldsOf":      store.SearchFields,
 		"has":                 has,
@@ -575,7 +578,7 @@ func apiSample(f *project.Field, i string) string {
 	case project.TypeJSON:
 		return "jx.Raw(`{}`)"
 	case project.TypeEnum:
-		return "apigen." + enumName(f.Enum) + "(" + fmt.Sprintf("%q", f.Enum.Values[0].Raw) + ")"
+		return "apigen." + enumName(f.Enum) + "(" + fmt.Sprintf("%q", security.FirstValue(f).Raw) + ")"
 	}
 	return `""`
 }

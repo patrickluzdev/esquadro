@@ -6,7 +6,7 @@
 {{- end}}{{end -}}
 package {{$e.Module.Snake}}
 
-{{importBlock (goImports $e) $re $utf8}}
+{{importBlock (goImports $e) $re $utf8 (and (flows $e) "slices")}}
 {{goDoc $e.Pascal $e.Doc (printf "%s is %s %s of %s." $e.Pascal (or (and (eq (slice (lower $e.Label) 0 1) "a" "e" "i" "o") "an") "a") (lower $e.Label) $e.Module.Snake)}}
 type {{$e.Pascal}} struct {
 {{- range $e.Fields}}{{if eq .Snake "id"}}
@@ -231,3 +231,38 @@ func (n New{{$e.Pascal}}) Validate() error {
 	}
 	return nil
 }
+{{- with flows $e}}
+{{- range .}}{{$f := .Field}}
+
+// Next{{$f.Pascal}} are the states x's {{$f.Snake}} may go to, as its flow says.
+func (x {{$e.Pascal}}) Next{{$f.Pascal}}() []{{$f.Enum.Pascal}} {
+	switch x.{{$f.Pascal}} {
+{{- range .Steps}}
+	case {{$f.Enum.Pascal}}{{.From.Pascal}}:
+		return []{{$f.Enum.Pascal}}{ {{- range $i, $m := .Moves}}{{if $i}}, {{end}}{{$f.Enum.Pascal}}{{$m.To.Pascal}}{{end -}} }
+{{- end}}
+	}
+	return nil
+}
+{{- end}}
+
+// Follows checks n against the flows of {{$e.Plural.Snake}} ({{range $i, $fl := .}}{{if $i}}, {{end}}{{$fl.Field.Snake}}{{end}}): a new
+// {{lower $e.Label}} (stored nil) starts in the first state, and a change goes only
+// where the stored state may go. Whoever makes it, a move off the flow is
+// refused: not_allowed.
+func (n New{{$e.Pascal}}) Follows(stored *{{$e.Pascal}}) error {
+	var invalid []FieldError
+{{- range .}}{{$f := .Field}}
+	switch {
+	case stored == nil && n.{{$f.Pascal}} != {{$f.Enum.Pascal}}{{$f.Default.EnumValue.Pascal}}:
+		invalid = append(invalid, FieldError{Field: {{quote $f.Snake}}, Code: "not_allowed"})
+	case stored != nil && n.{{$f.Pascal}} != stored.{{$f.Pascal}} && !slices.Contains(stored.Next{{$f.Pascal}}(), n.{{$f.Pascal}}):
+		invalid = append(invalid, FieldError{Field: {{quote $f.Snake}}, Code: "not_allowed"})
+	}
+{{- end}}
+	if len(invalid) > 0 {
+		return &InvalidFields{Fields: invalid}
+	}
+	return nil
+}
+{{- end}}

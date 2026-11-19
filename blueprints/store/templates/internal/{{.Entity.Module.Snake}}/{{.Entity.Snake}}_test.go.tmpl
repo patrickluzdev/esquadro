@@ -931,6 +931,43 @@ func Test{{$e.Pascal}}Uncounts{{$C.Plural.Pascal}}By{{.Via.Pascal}}(t *testing.T
 {{- end}}
 {{- end}}
 {{- end}}
+{{- range flows $e}}{{$f := .Field}}{{$start := .Start}}{{$next := index (.Next $start) 0}}
+
+// Test{{$e.Pascal}}{{$f.Pascal}}Flow creates a {{lower $e.Label}} in the first state of
+// its {{$f.Snake}} only, and moves it only as its flow says.
+func Test{{$e.Pascal}}{{$f.Pascal}}Flow(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+	notAllowed := func(when string, err error) {
+		t.Helper()
+		invalid, ok := errors.AsType[*{{$p}}.InvalidFields](err)
+		if !ok || len(invalid.Fields) != 1 || invalid.Fields[0] != ({{$p}}.FieldError{Field: {{quote $f.Snake}}, Code: "not_allowed"}) {
+			t.Fatalf("%s: %v, want {{$f.Snake}} not_allowed", when, err)
+		}
+	}
+
+	ahead := given{{$e.Pascal}}(t, {{$r}}, 1)
+	ahead.{{$f.Pascal}} = {{$p}}.{{$f.Enum.Pascal}}{{$next.Pascal}}
+	_, err := {{$r}}.Create{{$e.Pascal}}(ctx, ahead)
+	notAllowed("created in {{$next.Raw}}", err)
+
+	created, err := {{$r}}.Create{{$e.Pascal}}(ctx, given{{$e.Pascal}}(t, {{$r}}, 2))
+	if err != nil || created.{{$f.Pascal}} != {{$p}}.{{$f.Enum.Pascal}}{{$start.Pascal}} {
+		t.Fatalf("created: %+v, %v", created, err)
+	}
+{{- with .Off $start}}
+	off := {{$p}}.{{$f.Enum.Pascal}}{{.Pascal}}
+	_, err = {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &off}, nil)
+	notAllowed("{{$start.Raw}} -> {{.Raw}}", err)
+{{- end}}
+	next := {{$p}}.{{$f.Enum.Pascal}}{{$next.Pascal}}
+	moved, err := {{$r}}.Patch{{$e.Pascal}}(ctx, created.ID, 0, {{$p}}.{{$e.Pascal}}Changes{ {{- $f.Pascal}}: &next}, nil)
+	if err != nil || moved.{{$f.Pascal}} != next {
+		t.Fatalf("{{$start.Raw}} -> {{$next.Raw}}: %+v, %v", moved, err)
+	}
+}
+{{- end}}
 {{- with orders $e}}
 
 // Test{{$e.Plural.Pascal}}InTheirOrders lists {{$e.Plural.Snake}} in each order worked out by an

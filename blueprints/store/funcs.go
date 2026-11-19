@@ -157,6 +157,7 @@ func TemplateFuncs() template.FuncMap {
 		"orders":      Orders,
 		"isTotal":     IsTotal,
 		"written":     Written,
+		"flows":       security.Flows,
 		"manyToMany":  func(r *project.Relation) bool { return r.Kind == project.ManyToMany },
 	}
 }
@@ -543,6 +544,10 @@ func sample(f *project.Field, pkg, i string) string {
 	case project.TypeJSON:
 		return `json.RawMessage("{}")`
 	case project.TypeEnum:
+		// A field with a flow starts in its first state.
+		if fl, ok := security.FlowOf(f); ok && fl.Start() != nil {
+			return pkg + "." + f.Enum.Pascal + fl.Start().Pascal
+		}
 		return pkg + "." + f.Enum.Pascal + f.Enum.Values[0].Pascal
 	}
 	return ""

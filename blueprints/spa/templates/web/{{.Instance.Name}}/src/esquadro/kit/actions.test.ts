@@ -21,6 +21,15 @@ describe("actions", () => {
     expect(allowed({ label: "Copy", copy: () => "x" }, { ...offer, can: [] })).toBe(true)
     expect(allowed({ label: "Late", run: () => {}, when: (r) => r.status === "APPROVED" }, offer)).toBe(false)
   })
+  it("move a field with a flow only where the record's can says", () => {
+    const status: FieldMeta = { name: "status", label: "Status", kind: "enum", required: false, flow: true }
+    const meta = { fields: { status } }
+    const review = { ...offer, status: "REVIEW", can: ["update", "status:PUBLISHED"] }
+    expect(allowed({ label: "Publish", patch: { status: "PUBLISHED" } }, review, meta)).toBe(true)
+    expect(allowed({ label: "Refuse", patch: { status: "REFUSED" } }, review, meta)).toBe(false)
+    expect(allowed({ label: "Keep", patch: { status: "REVIEW" } }, review, meta)).toBe(true)
+    expect(allowed({ label: "Refuse", patch: { status: "REFUSED" } }, review)).toBe(true)
+  })
   it("run in bulk only when they ask and copy nothing", () => {
     expect(bulk({ label: "Skip", bulk: true, patch: { status: "SKIPPED" } })).toBe(true)
     expect(bulk({ label: "Casa", bulk: true, patch: {}, ask: [hook] })).toBe(false)

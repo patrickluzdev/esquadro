@@ -432,6 +432,36 @@ func TestCheckCreateLimits(t *testing.T) {
 	}
 }
 
+func TestCheckFlows(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	offer := func(field string) string {
+		return "enum OfferStatus { DRAFT REVIEW PUBLISHED REFUSED EXPIRED }\n\nentity Offer {\n  title string required\n" + field + "}\n"
+	}
+	flow := func(moves ...string) string { return "[\"" + strings.Join(moves, "\", \"") + "\"]" }
+	ok := flow("DRAFT -> REVIEW", "REVIEW -> PUBLISHED by user.admin, user.staff", "REVIEW -> REFUSED by user.admin", "PUBLISHED -> EXPIRED")
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":      {offer("  status OfferStatus default(DRAFT) @store(flow " + ok + ")\n"), ""},
+		"value":   {offer("  status OfferStatus default(DRAFT) @store(flow " + flow("DRAFT -> PENDING") + ")\n"), "PENDING is not a value of OfferStatus"},
+		"move":    {offer("  status OfferStatus default(DRAFT) @store(flow " + flow("DRAFT REVIEW") + ")\n"), "\"DRAFT REVIEW\" is not a move"},
+		"default": {offer("  status OfferStatus @store(flow " + flow("DRAFT -> REVIEW") + ")\n"), "Offer.status has no default"},
+		"start":   {offer("  status OfferStatus default(REVIEW) @store(flow " + flow("DRAFT -> REVIEW") + ")\n"), "its records start in REVIEW, its default, which no move leaves"},
+		"role":    {offer("  status OfferStatus default(DRAFT) @store(flow " + flow("DRAFT -> REVIEW by user.moderator") + ")\n"), "moderator is not a role of user"},
+		"realm":   {offer("  status OfferStatus default(DRAFT) @store(flow " + flow("DRAFT -> REVIEW by editor") + ")\n"), "by editor is not a realm"},
+		"enum":    {offer("  title_n int default(0) @store(flow " + flow("0 -> 1") + ")\n"), "a flow is of an enum field's values"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
 func TestCheckIntegrations(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "promo")
 	if code, _, errOut := esq(t, "new", "-starter", "worker", "-module", "example.com/promo", "-no-git", "-no-gen", dir); code != 0 {
