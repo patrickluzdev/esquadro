@@ -1,1 +1,1 @@
-{{if uses "security"}}{{file "verify_email.html"}}{{end}}
+{{if uses "security"}}{{file (mailLocalized "verify_email.html" .Options (frontends))}}{{end}}

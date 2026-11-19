@@ -1,3 +1,5 @@
 {
+  "testSubject": "{app}: email works",
+  "testText": "This email was sent by mail test, in {env}: the configuration of this environment works.",
   "why": "You are receiving this email from {app} about your account."
 }

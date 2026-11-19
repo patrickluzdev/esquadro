@@ -1,0 +1,6 @@
+Subject: Você foi convidado para {{.App}}
+{{if .From}}{{.From}} convidou você{{else}}Você foi convidado{{end}} para {{.App}}. Abra este link para escolher sua senha e entrar:
+
+{{.Link}}
+
+Ele vale até {{.Expires}}. Se você não esperava por isso, ignore este e-mail.

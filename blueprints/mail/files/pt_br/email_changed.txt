@@ -1,0 +1,3 @@
+Subject: Seu e-mail foi trocado
+O e-mail da sua conta foi trocado. Se não foi você, troque sua senha
+agora.

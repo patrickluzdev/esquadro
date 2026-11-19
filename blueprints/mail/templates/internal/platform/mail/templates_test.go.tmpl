@@ -1,3 +1,4 @@
+{{- $pt := eq (mailLocale .Options (frontends)) "pt_br" -}}
 package mail
 
 import (
@@ -5,6 +6,7 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestTemplates writes every email of the app with its <name>.json, so
@@ -73,8 +75,8 @@ func TestButton(t *testing.T) {
 // The logo goes along with an email that shows it, once; never with one
 // that does not.
 func TestLogo(t *testing.T) {
-	if strings.Contains(word("why"), "{app}") || !strings.Contains(word("why"), App) {
-		t.Errorf("the footer's word without the app's name: %s", word("why"))
+	if strings.Contains(Word("why"), "{app}") || !strings.Contains(Word("why"), App) {
+		t.Errorf("the footer's word without the app's name: %s", Word("why"))
 	}
 	shows := Message{HTML: `<img src="cid:` + logoCID + `">`}
 	if logo() == nil {
@@ -92,9 +94,31 @@ func TestLogo(t *testing.T) {
 	}
 }
 
+// A date is written in the emails' language, in UTC.
+func TestDate(t *testing.T) {
+	at := time.Date(2026, time.January, 2, 12, 4, 0, 0, time.FixedZone("BRT", -3*60*60))
+	if got := Date(at); got != "{{if $pt}}2 de janeiro, 15:04 UTC{{else}}January 2, 15:04 UTC{{end}}" {
+		t.Errorf("Date = %s", got)
+	}
+}
+
+// A message of one's own goes in the layouts too, its text as it is.
+func TestWrap(t *testing.T) {
+	msg, err := Wrap("Hi", "a {{"{{"}}.X{{"}}"}} <b>", "<p>a &lt;b&gt;</p>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Subject != "Hi" || !strings.HasPrefix(msg.Text, "a {{"{{"}}.X{{"}}"}} <b>") || !strings.Contains(msg.HTML, "<p>a &lt;b&gt;</p>") || !strings.Contains(msg.HTML, "<html") {
+		t.Fatalf("%+v", msg)
+	}
+	if msg, err := Wrap("Hi", "text", ""); err != nil || msg.HTML != "" {
+		t.Fatalf("no HTML: %+v %v", msg, err)
+	}
+}
+
 func TestWriteAndSend(t *testing.T) {
 	msg, err := Write("welcome", map[string]any{"Name": "<Ana>"})
-	if err != nil || msg.Subject != "Welcome, <Ana>" || !strings.Contains(msg.HTML, "Hi &lt;Ana&gt;") || !strings.Contains(msg.Text, "Hi <Ana>,") {
+	if err != nil || msg.Subject != "{{if $pt}}Boas-vindas{{else}}Welcome{{end}}, <Ana>" || !strings.Contains(msg.HTML, "{{if $pt}}Olá,{{else}}Hi{{end}} &lt;Ana&gt;") || !strings.Contains(msg.Text, "{{if $pt}}Olá,{{else}}Hi{{end}} <Ana>,") {
 		t.Fatalf("%+v %v", msg, err)
 	}
 	if _, err := Write("welcome", map[string]any{}); err == nil {

@@ -11,13 +11,13 @@ import (
 // securityMail sends security's emails by the mail blueprint, from the
 // templates named after their kind: verify_email, reset_password,
 // confirm_email_change, email_changed and invitation, in
-// internal/platform/mail/templates.
+// internal/platform/mail/templates, in the emails' language.
 type securityMail struct{ mail *mail.Mailer }
 
 func (s securityMail) Send(ctx context.Context, m security.Message) error {
 	data := map[string]string{"Realm": m.Realm, "To": m.To, "Link": m.Link, "App": "{{.App.Label}}", "From": m.From}
 	if !m.Expires.IsZero() {
-		data["Expires"] = m.Expires.Format("January 2, 15:04 MST")
+		data["Expires"] = mail.Date(m.Expires)
 	}
 	return s.mail.Send(ctx, mail.Email{To: []string{m.To}, Template: m.Kind, Data: data})
 }

@@ -1,0 +1,6 @@
+Subject: Confirme seu novo e-mail
+Abra este link para usar este e-mail na sua conta:
+
+{{.Link}}
+
+Ele vale até {{.Expires}}.

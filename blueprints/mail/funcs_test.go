@@ -7,8 +7,8 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/ui"
 )
 
-// Every locale a frontend has writes every word of the layout, each with
-// the app's name.
+// Every locale a frontend has writes every word of the layout, with the
+// app's name where English has it.
 func TestWordsInEveryLocale(t *testing.T) {
 	en := Words("en")
 	if len(en) == 0 {
@@ -20,7 +20,7 @@ func TestWordsInEveryLocale(t *testing.T) {
 			t.Fatalf("%s has %d words, en %d", locale, len(got), len(en))
 		}
 		for i, w := range got {
-			if w.Key != en[i].Key || !strings.Contains(w.Text, "{app}") {
+			if w.Key != en[i].Key || w.Text == "" || strings.Contains(en[i].Text, "{app}") != strings.Contains(w.Text, "{app}") {
 				t.Errorf("%s: word %d is %q (%q), en's %q", locale, i, w.Key, w.Text, en[i].Key)
 			}
 		}

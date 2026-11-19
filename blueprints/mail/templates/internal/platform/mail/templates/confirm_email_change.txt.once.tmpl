@@ -1,1 +1,1 @@
-{{if uses "security"}}{{file "confirm_email_change.txt"}}{{end}}
+{{if uses "security"}}{{file (mailLocalized "confirm_email_change.txt" .Options (frontends))}}{{end}}

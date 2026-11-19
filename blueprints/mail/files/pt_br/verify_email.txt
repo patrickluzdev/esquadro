@@ -1,0 +1,6 @@
+Subject: Confirme seu e-mail
+Abra este link para confirmar seu e-mail:
+
+{{.Link}}
+
+Ele vale até {{.Expires}}.

@@ -6,11 +6,13 @@ import (
 	"embed"
 	"encoding/json"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/patrickluzdev/esquadro/blueprints/ui"
+	"github.com/patrickluzdev/esquadro/internal/compose"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -29,7 +31,43 @@ func TemplateFuncs() template.FuncMap {
 		"mailLogo":     func(b *ui.Brand) string { f, _ := b.EmailLogo(); return f },
 		"mailLogoType": func(b *ui.Brand) string { _, t := b.EmailLogo(); return t },
 		"mailBase":     path.Base,
+		"mailLocale":   Locale,
+		"mailMonths":   Months,
+		// mailLocalized is the file of the blueprint's files/ that writes
+		// an email in the emails' locale: pt_br/invitation.html.
+		"mailLocalized": func(name string, opts map[string]any, frontends []*compose.Instance) string {
+			return Locale(opts, frontends) + "/" + name
+		},
 	}
+}
+
+// Months are the months' names in a locale, from January; English's for
+// one esquadro does not know.
+func Months(locale string) []string {
+	if locale == "pt_br" {
+		return []string{"janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"}
+	}
+	return []string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+}
+
+// Locale is the language of the emails: mail's locale option, or with
+// frontend (its default) the first frontend's, else en; en for one
+// esquadro has no emails in.
+func Locale(opts map[string]any, frontends []*compose.Instance) string {
+	loc, _ := opts["locale"].(string)
+	if loc == "frontend" || loc == "" {
+		loc = ""
+		for _, f := range frontends {
+			if l, _ := f.Options["locale"].(string); l != "" {
+				loc = l
+				break
+			}
+		}
+	}
+	if !slices.Contains(ui.Locales, loc) {
+		return "en"
+	}
+	return loc
 }
 
 // ColorRoles are the brand's colors an email's layout takes.

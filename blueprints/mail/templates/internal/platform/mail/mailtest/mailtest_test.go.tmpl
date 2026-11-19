@@ -12,7 +12,7 @@ func TestCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := c.Last("ana@example.com")
-	if got.Subject != "Welcome, Ana" || len(c.Sent()) != 1 {
+	if got.Subject != "{{if eq (mailLocale .Options (frontends)) "pt_br"}}Boas-vindas{{else}}Welcome{{end}}, Ana" || len(c.Sent()) != 1 {
 		t.Fatalf("%+v", got)
 	}
 }

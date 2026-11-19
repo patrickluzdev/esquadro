@@ -26,8 +26,9 @@ blueprint mail {
   /// is a PNG, JPEG or GIF), sent with each email. Without one, the emails
   /// keep their neutral look.
   option brand string default("")
-  /// The language of the words the layout writes (its footer): en, pt_br,
-  /// or frontend, the first frontend's (en without one).
+  /// The language of the emails esquadro writes (security's, welcome,
+  /// the footer, mail test) and of their dates: en, pt_br, or frontend,
+  /// the first frontend's (en without one).
   option locale name default(frontend)
   /// A line the emails' footer ends with, as the postal address some laws
   /// ask of them: Shop Ltd, 1 Main Street, Springfield.

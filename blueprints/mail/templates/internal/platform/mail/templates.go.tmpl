@@ -119,3 +119,34 @@ func textOf(name, body string) (*template.Template, error) {
 	}
 	return t, nil
 }
+
+// Wrap writes a message of your own in the layouts, as the templates'
+// emails are: its subject, its text and, when html is not empty, its HTML,
+// which is trusted (escape what it takes from others).
+func Wrap(subject, text, html string) (Message, error) {
+	data := map[string]any{"Text": text, "HTML": htmltemplate.HTML(html)}
+	t, err := textOf("wrap", `{{"{{"}}.Text{{"}}"}}`)
+	if err != nil {
+		return Message{}, fmt.Errorf("mail: %w", err)
+	}
+	var tb, hb bytes.Buffer
+	if err := t.Execute(&tb, data); err != nil {
+		return Message{}, fmt.Errorf("mail: %w", err)
+	}
+	msg := Message{Subject: subject, Text: strings.TrimSpace(tb.String()) + "\n"}
+	if html == "" {
+		return msg, nil
+	}
+	h, err := htmltemplate.New("wrap").Funcs(layoutFuncs(true)).Option("missingkey=error").ParseFS(templates, "templates/_layout.html")
+	if err == nil {
+		_, err = h.New("content").Parse(`{{"{{"}}.HTML{{"}}"}}`)
+	}
+	if err == nil {
+		err = h.ExecuteTemplate(&hb, "_layout.html", data)
+	}
+	if err != nil {
+		return Message{}, fmt.Errorf("mail: _layout.html: %w", err)
+	}
+	msg.HTML = hb.String()
+	return msg, nil
+}

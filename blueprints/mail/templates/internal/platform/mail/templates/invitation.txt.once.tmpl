@@ -1,1 +1,1 @@
-{{if uses "security"}}{{file "invitation.txt"}}{{end}}
+{{if uses "security"}}{{file (mailLocalized "invitation.txt" .Options (frontends))}}{{end}}

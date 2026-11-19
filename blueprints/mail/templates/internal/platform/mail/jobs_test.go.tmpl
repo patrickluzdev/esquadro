@@ -29,7 +29,7 @@ func TestTheQueueSealsEmails(t *testing.T) {
 	if err := db.QueryRow(ctx, `SELECT args FROM river_job WHERE kind = 'mail_send'`).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(raw), "ana@example.com") || strings.Contains(string(raw), "Welcome") {
+	if strings.Contains(string(raw), "ana@example.com") || strings.Contains(string(raw), "{{if eq (mailLocale .Options (frontends)) "pt_br"}}Boas-vindas{{else}}Welcome{{end}}") {
 		t.Fatalf("the queue shows the email: %s", raw)
 	}
 	if len(delivered) != 0 {

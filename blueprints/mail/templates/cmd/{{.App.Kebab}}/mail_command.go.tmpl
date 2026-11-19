@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
+	"strings"
 
 	"{{.App.Module}}/internal/platform/mail"
 )
@@ -20,11 +22,13 @@ func mailCommand(ctx context.Context, args []string) error {
 		return err
 	}
 	defer release()
-	msg := mail.Message{
-		To:      []string{args[1]},
-		Subject: "{{.App.Label}}: email works",
-		Text:    "This email was sent by {{.App.Kebab}} mail test, in " + d.config.Env + ".\n",
+	// In the layouts, as every email: what the readers will see.
+	text := strings.ReplaceAll(mail.Word("testText"), "{env}", d.config.Env)
+	msg, err := mail.Wrap(mail.Word("testSubject"), text, "<p>"+html.EscapeString(text)+"</p>")
+	if err != nil {
+		return err
 	}
+	msg.To = []string{args[1]}
 	if err := d.mail.Deliver(ctx, msg); err != nil {
 		return err
 	}
