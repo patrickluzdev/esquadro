@@ -996,6 +996,16 @@ func problemOf(err error) error {
 		return edge.Conflict("in_use", {{quote (printf "Other records still point at the %s." (lower .Label))}})
 {{- end}}
 	}
+	if broken, ok := errors.AsType[*RuleError](err); ok {
+		fields := make([]edge.FieldProblem, 0, len(broken.Fields))
+		for _, name := range broken.Fields {
+			if api, ok := apiFields[name]; ok {
+				name = api
+			}
+			fields = append(fields, edge.FieldProblem{Field: name, Code: broken.Code})
+		}
+		return edge.Broken(broken.Code, broken.Text, fields)
+	}
 	if invalid, ok := errors.AsType[*InvalidFields](err); ok {
 		fields := make([]edge.FieldProblem, 0, len(invalid.Fields))
 		for _, f := range invalid.Fields {

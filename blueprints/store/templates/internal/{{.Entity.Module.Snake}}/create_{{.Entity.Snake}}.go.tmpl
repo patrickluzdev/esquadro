@@ -1,9 +1,10 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "create"}}{{end}}{{$links := idLinks $e}}{{$tx := or $files $audited $links $notice -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "create"}}{{end}}{{$links := idLinks $e}}{{$tx := true -}}
 package {{$m.Snake}}
 
 {{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Create{{$e.Pascal}} stores a new {{lower $e.Label}}, with its defaults, once it
-// passes the rules declared for {{$e.Plural.Snake}}.
+// passes the rules declared for {{$e.Plural.Snake}} and those of
+// {{$e.Snake}}_rules.go, which run in the same transaction.
 func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
 	n = n.WithDefaults()
 	if err := n.Validate(); err != nil {
@@ -15,9 +16,17 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	}
 {{- end}}
 {{- if $tx}}
-	// The record{{if $files}}, its files{{end}}{{if $audited}} and the change kept{{end}}, together.
+	// The rules, the record{{if $files}}, its files{{end}}{{if $audited}} and the change kept{{end}}, together.
 	var created {{$e.Pascal}}
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+		rules := {{$e.Pascal}}Rules{}
+		if err := rules.BeforeCreate(ctx, {{$r}}, &n); err != nil {
+			return err
+		}
+		// What the rules changed is checked again.
+		if err := n.Validate(); err != nil {
+			return err
+		}
 {{- if $ws}}
 		row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params({{$r}}.NewID(), n))
 {{- else}}
@@ -43,10 +52,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 		}
 {{- end}}
 {{- if $files}}
-		return {{$r}}.{{$e.Camel}}Files(ctx, created.ID, nil, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}}))
-{{- else}}
-		return nil
+		if err := {{$r}}.{{$e.Camel}}Files(ctx, created.ID, nil, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}})); err != nil {
+			return err
+		}
 {{- end}}
+		return rules.AfterCreate(ctx, {{$r}}, created)
 	})
 	if err != nil {
 		return {{$e.Pascal}}{}, err

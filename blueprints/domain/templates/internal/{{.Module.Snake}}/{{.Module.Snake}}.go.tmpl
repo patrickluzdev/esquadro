@@ -35,6 +35,22 @@ type InvalidFields struct{ Fields []FieldError }
 
 func (e *InvalidFields) Error() string { return "{{.Module.Snake}}: invalid fields" }
 
+// RuleError is a business rule of the app that refuses a change (in
+// <entity>_rules.go): its own code, what it tells people, and the fields it
+// is about. The API answers it as 422, with the code and the text.
+type RuleError struct {
+	Code, Text string
+	Fields     []string
+}
+
+func (e *RuleError) Error() string { return "{{.Module.Snake}}: " + e.Code + ": " + e.Text }
+
+// Broken is the refusal of a rule: Broken("daily_limit", "This group got 20
+// offers today.", "destination_id").
+func Broken(code, text string, fields ...string) error {
+	return &RuleError{Code: code, Text: text, Fields: fields}
+}
+
 // Deps are what {{.Module.Snake}} needs, given by main.
 type Deps struct {
 	// NewID makes the IDs of new records: uuid.NewV7 when nil, so IDs sort

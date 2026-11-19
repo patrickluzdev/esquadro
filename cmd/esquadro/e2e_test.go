@@ -161,6 +161,27 @@ SELECT count(*)::bigint AS products FROM products LIMIT sqlc.arg(row_limit);
 		t.Fatal("gen changed a file of the user's")
 	}
 
+	// A business rule of the project's, in its rules file: every way of
+	// writing a product runs it.
+	e.write(filepath.Join(dir, "internal", "catalog", "product_rules.go"), `package catalog
+
+import "context"
+
+type ProductRules struct {
+	productHooks
+}
+
+func (ProductRules) BeforeCreate(ctx context.Context, m *Catalog, n *NewProduct) error {
+	if err := m.Lock(ctx, "products"); err != nil {
+		return err
+	}
+	if n.Name == "Forbidden" {
+		return Broken("forbidden_name", "No product may be called that.", "name")
+	}
+	return nil
+}
+`)
+
 	// 5. The database with records follows the model, and the service runs.
 	e.run(db, "go", "run", "./cmd/shop", "migrate")
 	e.run(nil, "go", "vet", "./...")
@@ -178,6 +199,10 @@ SELECT count(*)::bigint AS products FROM products LIMIT sqlc.arg(row_limit);
 		t.Fatalf("the new product does not follow the new model: %v", added)
 	}
 	refused := e.call("POST", "/products", fmt.Sprintf(`{"name":"Copy","price":"1","category_id":%q,"sku":"EM-1"}`, category["id"]), 422)
+	broken := e.call("POST", "/products", fmt.Sprintf(`{"name":"Forbidden","price":"1","category_id":%q,"sku":"FB-1"}`, category["id"]), 422)
+	if broken["code"] != "forbidden_name" || broken["title"] != "No product may be called that." || !strings.Contains(fmt.Sprint(broken["errors"]), "name") {
+		t.Fatalf("the project's rule did not refuse: %v", broken)
+	}
 	// Lists as the model declares: ordered, filtered, searched, by page.
 	names := func(page map[string]any) []string {
 		var out []string

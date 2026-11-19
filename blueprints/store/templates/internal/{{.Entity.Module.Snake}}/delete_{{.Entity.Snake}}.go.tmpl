@@ -1,4 +1,4 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "delete"}}{{end}}{{$tx := or $files $audited $notice -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "delete"}}{{end}}{{$tx := true -}}
 package {{$m.Snake}}
 {{if softDeleted $e}}
 {{importBlock "context" "time" "uuid" (printf "%s/internal/platform/postgres" .App.Module)}}
@@ -9,14 +9,25 @@ package {{$m.Snake}}
 // changed it since.
 func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
 	return postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
-		return trash{{$e.Pascal}}(ctx, postgres.Querier(ctx, {{$r}}.Pool), id, version, time.Now())
+		stored, err := {{$r}}.Read{{$e.Pascal}}(ctx, id)
+		if err != nil {
+			return err
+		}
+		rules := {{$e.Pascal}}Rules{}
+		if err := rules.BeforeDelete(ctx, {{$r}}, stored); err != nil {
+			return err
+		}
+		if err := trash{{$e.Pascal}}(ctx, postgres.Querier(ctx, {{$r}}.Pool), id, version, time.Now()); err != nil {
+			return err
+		}
+		return rules.AfterDelete(ctx, {{$r}}, stored)
 	})
 }
 {{- else}}
 
 {{importBlock "context" (and $tx "errors") "uuid" (and $tx "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Delete{{$e.Pascal}} deletes the {{lower $e.Label}} with the given id, unless
-// other records still point at it. With a version (not 0), only that
+// other records still point at it or the rules of {{$e.Snake}}_rules.go refuse. With a version (not 0), only that
 // version: Err{{$e.Pascal}}Changed when someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int) error {
 {{- if $tx}}
@@ -31,6 +42,10 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return err
 		}
 		stored := {{$e.Camel}}Of(before)
+		rules := {{$e.Pascal}}Rules{}
+		if err := rules.BeforeDelete(ctx, {{$r}}, stored); err != nil {
+			return err
+		}
 		deleted, err := q.Delete{{$e.Pascal}}(ctx, sqlgen.Delete{{$e.Pascal}}Params{ID: postgres.UUID(id), IfVersion: postgres.Version(version)})
 		if _, kind, ok := postgres.Violation(err); ok && kind == "foreign_key" {
 			return Err{{$e.Pascal}}InUse
@@ -52,11 +67,11 @@ func ({{$r}} *{{$m.Pascal}}) Delete{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		}
 {{- end}}
 {{- if $files}}
-		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil)
-{{- else}}
-		_ = stored
-		return nil
+		if err := {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), nil); err != nil {
+			return err
+		}
 {{- end}}
+		return rules.AfterDelete(ctx, {{$r}}, stored)
 	})
 }
 {{- else}}

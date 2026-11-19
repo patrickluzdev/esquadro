@@ -1,9 +1,10 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "update"}}{{end}}{{$links := idLinks $e}}{{$tx := or $files $audited $links $notice -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "update"}}{{end}}{{$links := idLinks $e}}{{$tx := true -}}
 package {{$m.Snake}}
 
 {{importBlock "context" "errors" "uuid" "github.com/jackc/pgx/v5" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
 // Update{{$e.Pascal}} replaces the {{lower $e.Label}} with the given id by n, with
-// its defaults, once it passes the rules declared for {{$e.Plural.Snake}}. With a
+// its defaults, once it passes the rules declared for {{$e.Plural.Snake}} and those
+// of {{$e.Snake}}_rules.go, in the same transaction. With a
 // version (not 0), only that version is replaced: Err{{$e.Pascal}}Changed when
 // someone changed it since.
 func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UUID, version int, n New{{$e.Pascal}}) ({{$e.Pascal}}, error) {
@@ -29,6 +30,14 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 			return err
 		}
 		stored := {{$e.Camel}}Of(before)
+		rules := {{$e.Pascal}}Rules{}
+		if err := rules.BeforeUpdate(ctx, {{$r}}, stored, &n); err != nil {
+			return err
+		}
+		// What the rules changed is checked again.
+		if err := n.Validate(); err != nil {
+			return err
+		}
 {{- if $ws}}
 		params := update{{$e.Pascal}}Params(id, n)
 		params.IfVersion = postgres.Version(version)
@@ -59,11 +68,11 @@ func ({{$r}} *{{$m.Pascal}}) Update{{$e.Pascal}}(ctx context.Context, id uuid.UU
 		}
 {{- end}}
 {{- if $files}}
-		return {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}}))
-{{- else}}
-		_ = stored
-		return nil
+		if err := {{$r}}.{{$e.Camel}}Files(ctx, id, {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}stored.{{$f.Pascal}}{{end}}), {{$e.Camel}}FileIDs({{range $i, $f := $files}}{{if $i}}, {{end}}n.{{$f.Pascal}}{{end}})); err != nil {
+			return err
+		}
 {{- end}}
+		return rules.AfterUpdate(ctx, {{$r}}, stored, updated)
 	})
 	if err != nil {
 		return {{$e.Pascal}}{}, err

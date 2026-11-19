@@ -4,8 +4,18 @@ import { isApiError } from "@api"
 import { t } from "./i18n.ts"
 import type { FieldMeta } from "./meta.ts"
 
+/**
+ * Whether an error is a business rule of the app's refusing (Broken, in
+ * <entity>_rules.go): its title is the project's own text, in its
+ * language.
+ */
+export function isRule(e: unknown): boolean {
+  return isApiError(e) && e.status === 422 && e.code !== "invalid_fields" && e.code !== "too_many_records"
+}
+
 /** The message of an error, for a notice. */
 export function describe(e: unknown): string {
+  if (isApiError(e) && isRule(e)) return e.title
   // The frontend's own words, in its language: the API's titles are in
   // English.
   if (isApiError(e)) {
@@ -28,6 +38,7 @@ export function describe(e: unknown): string {
 
 /** What is wrong with a field, as people read it, from the API's code. */
 export function fieldMessage(field: FieldMeta, code: string): string {
+  if (code.startsWith(ruleMark)) return code.slice(ruleMark.length)
   switch (code) {
     case "required":
       return field.kind === "enum" || field.kind === "relation" ? t("fieldChoose") : t("fieldRequired")
@@ -58,10 +69,14 @@ export function fieldMessage(field: FieldMeta, code: string): string {
 export function fieldErrors(e: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   if (isApiError(e)) {
-    for (const f of e.fields) out[f.field] = f.code
+    // A rule's refusal shows its own text on its fields.
+    for (const f of e.fields) out[f.field] = isRule(e) ? ruleMark + e.title : f.code
   }
   return out
 }
+
+/** Marks a field's error as a rule's text, not a code. */
+const ruleMark = "rule:"
 
 /**
  * Whether a query is tried again after an error: a refusal is final (400,

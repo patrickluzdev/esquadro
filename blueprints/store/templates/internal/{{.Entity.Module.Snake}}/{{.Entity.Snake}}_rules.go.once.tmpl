@@ -1,0 +1,27 @@
+{{- $e := .Entity}}{{$m := $e.Module -}}
+package {{$m.Snake}}
+
+// {{$e.Pascal}}Rules are the business rules of {{$e.Plural.Snake}}: what the model
+// cannot say ("20 a day at most", "not once it expired"). Yours: esquadro
+// wrote it once. Every change of a {{lower $e.Label}} runs them, from the API,
+// the frontends, the jobs and your code, in the change's transaction; an
+// error undoes it. Write a method here to replace the one of
+// {{$e.Snake}}_rules_gen.go, which does nothing:
+//
+//	func ({{$e.Pascal}}Rules) BeforeUpdate(ctx context.Context, m *{{$m.Pascal}}, stored {{$e.Pascal}}, n *New{{$e.Pascal}}) error {
+//		if err := m.Lock(ctx, "{{$e.Snake}}:"+stored.ID.String()); err != nil {
+//			return err
+//		}
+//		if ... {
+//			return Broken("some_rule", "What people are told.", "field")
+//		}
+//		return nil
+//	}
+//
+// The methods are BeforeCreate, BeforeUpdate, BeforeDelete, AfterCreate,
+// AfterUpdate and AfterDelete. Broken refuses with your code and text (the
+// API answers 422); m.Lock makes two changes of the same key wait for one
+// another, so that what a rule counts is right.
+type {{$e.Pascal}}Rules struct {
+	{{$e.Camel}}Hooks
+}

@@ -110,6 +110,22 @@ func TestCanaryUpgrades(t *testing.T) {
 	deals = strings.Replace(deals, "  expires_on date\n  @security(read public, write [user.admin, user.operator])",
 		"  expires_on date\n  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Cupons\", singular \"Cupom\")\n  @site(page, path \"cupons\", menu)", 1)
 	write("esquadro/deals.esq", deals)
+	// And a business rule: an offer that expired is not approved.
+	write("internal/deals/offer_rules.go", `package deals
+
+import "context"
+
+type OfferRules struct {
+	offerHooks
+}
+
+func (OfferRules) BeforeUpdate(ctx context.Context, m *Deals, stored Offer, n *NewOffer) error {
+	if stored.Status == OfferStatusExpired && n.Status == OfferStatusApproved {
+		return Broken("offer_expired", "Esta oferta expirou e não pode ser aprovada.", "status")
+	}
+	return nil
+}
+`)
 	e.esquadro(0, "gen", dir)
 	if !strings.Contains(read("web/site/offer_gen.go"), "func (s *Site) listOffers(") || !strings.Contains(read("web/site/coupon_gen.go"), "func (s *Site) readCoupon(") {
 		t.Fatal("the site has no pages of offers and coupons")

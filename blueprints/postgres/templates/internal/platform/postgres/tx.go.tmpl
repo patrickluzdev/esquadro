@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -44,6 +45,23 @@ func InTx(ctx context.Context, db DB, fn func(context.Context) error) error {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// ErrNoTx is a lock asked for outside a transaction, where it would hold
+// nothing.
+var ErrNoTx = errors.New("postgres: a lock needs a transaction")
+
+// Lock takes the lock of key until the transaction of ctx ends: another
+// transaction that asks for the same key waits for this one. A rule that
+// counts before it writes ("20 a day at most") locks first, so that two
+// writes at once both count right.
+func Lock(ctx context.Context, key string) error {
+	tx, ok := TxOf(ctx)
+	if !ok {
+		return ErrNoTx
+	}
+	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", key)
+	return err
 }
 
 // Querier is what a use case runs its queries on: the transaction of ctx,

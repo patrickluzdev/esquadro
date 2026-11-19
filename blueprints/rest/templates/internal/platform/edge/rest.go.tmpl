@@ -28,6 +28,12 @@ var (
 // Conflict is a request the current state of the records refuses.
 func Conflict(code, title string) *Problem { return &Problem{Status: 409, Code: code, Title: title} }
 
+// Broken is a business rule of the app that refuses a request: its own
+// code (daily_limit), what it tells people, and the fields it is about.
+func Broken(code, title string, fields []FieldProblem) *Problem {
+	return &Problem{Status: 422, Code: code, Title: title, Errors: fields}
+}
+
 // InvalidFields lists every field refused at once.
 func InvalidFields(fields []FieldProblem) *Problem {
 	return &Problem{Status: 422, Code: "invalid_fields", Title: "Some fields are not valid.", Errors: fields}
