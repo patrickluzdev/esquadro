@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+{{- if uses "rate_limit"}}
+	"time"
+{{- end}}
 )
 
 var (
@@ -150,6 +153,16 @@ func SetETag(ctx context.Context, version int) {
 		h.Set("ETag", `"`+strconv.Itoa(version)+`"`)
 	}
 }
+{{- if uses "rate_limit"}}
+
+// SetRetryAfter sets Retry-After of the response to the request of ctx:
+// the seconds, rounded up, to wait before trying again.
+func SetRetryAfter(ctx context.Context, wait time.Duration) {
+	if h, ok := ctx.Value(headersKey{}).(http.Header); ok {
+		h.Set("Retry-After", strconv.Itoa(int((wait+time.Second-1)/time.Second)))
+	}
+}
+{{- end}}
 
 // IfMatch is the version an If-Match header asks for: 0 for any (absent,
 // or *), or ErrPreconditionRequired when required and absent. A weak or

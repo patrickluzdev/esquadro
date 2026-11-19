@@ -123,8 +123,8 @@ func TestAudit{{$e.Pascal}}(t *testing.T) {
 {{- end}}
 {{- else}}
 
-{{- $texts := textFields $e}}
-{{importBlock "context" "errors" (and (audited $e (optionsOf "audit")) "strings") "testing" (and (softDeleted $e) "time") "uuid" (and (audited $e (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and $texts "reflect") (and (gt (len $texts) 1) "sync") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module)}}
+{{- $texts := textFields $e}}{{$limit := createLimit .Entities $e}}
+{{importBlock "context" "errors" (and (audited $e (optionsOf "audit")) "strings") "testing" (and (or (softDeleted $e) $limit) "time") "uuid" (and (audited $e (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and $texts "reflect") (and (gt (len $texts) 1) "sync") (sampleImports $e) (printf "%s/internal/%s" .App.Module $p) (printf "%s/internal/platform/postgres" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and $limit (printf "%s/internal/platform/security" .App.Module))}}
 // given{{$e.Pascal}} returns a valid New{{$e.Pascal}}, creating the records it needs
 // first; i tells records apart. Change the values freely: esquadro wrote
 // them from the rules in the .esq file.
@@ -629,7 +629,69 @@ func Test{{$e.Pascal}}Writes{{.Pascal}}WithIt(t *testing.T) {
 }
 {{- end}}{{end}}
 
-{{if importable $e}}{{$key := importBy $e -}}
+{{with $limit}}{{$own := printf "%sID" .Relation.Pascal -}}
+// TestCreate{{$e.Pascal}}Limit creates as many {{$e.Plural.Snake}} as a {{.Realm}} may {{.Per}}: the
+// next is refused, with when to try again, and another {{.Realm}} still
+// creates.{{if importable $e}} An import counts each one it creates.{{end}}
+func TestCreate{{$e.Pascal}}Limit(t *testing.T) {
+	t.Parallel()
+	{{$r}} := {{$p}}.New({{$p}}.Deps{Pool: postgrestest.Fresh(t)})
+	// A person: a {{.Realm}}{{if ne .Relation.Target.Module $m}} of another module (no foreign key){{end}}.
+	person := func({{if eq .Relation.Target.Module $m}}i {{end}}int) uuid.UUID {
+{{- if ne .Relation.Target.Module $m}}
+		return uuid.NewV7()
+{{- else if .Relation.Required}}
+		return given{{$e.Pascal}}(t, {{$r}}, i).{{$own}}
+{{- else}}
+		x, err := {{$r}}.Create{{.Relation.Target.Pascal}}(context.Background(), given{{.Relation.Target.Pascal}}(t, {{$r}}, i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return x.ID
+{{- end}}
+	}
+	as := func(id uuid.UUID) context.Context {
+		return security.WithPrincipal(context.Background(), security.Principal{ID: id, Realm: "{{.Realm}}"})
+	}
+	given := func(owner uuid.UUID, i int) {{$p}}.New{{$e.Pascal}} {
+		n := given{{$e.Pascal}}(t, {{$r}}, i)
+		n.{{$own}} = owner
+		return n
+	}
+	someone, other := person(1000), person(1001)
+	for i := range {{.Max}} {
+		if _, err := {{$r}}.Create{{$e.Pascal}}(as(someone), given(someone, i+1)); err != nil {
+			t.Fatalf("create %d: %v", i+1, err)
+		}
+	}
+	_, err := {{$r}}.Create{{$e.Pascal}}(as(someone), given(someone, {{.Max}}+1))
+	if limited, ok := errors.AsType[*{{$p}}.CreateLimited](err); !ok || limited.Wait <= 0 || limited.Wait > {{.Seconds}}*time.Second {
+		t.Fatalf("past the limit: %v", err)
+	}
+	if _, err := {{$r}}.Create{{$e.Pascal}}(as(other), given(other, {{.Max}}+2)); err != nil {
+		t.Fatalf("another {{.Realm}}: %v", err)
+	}
+	// Not signed in as a {{.Realm}} (the app's own code): not limited.
+	if _, err := {{$r}}.Create{{$e.Pascal}}(context.Background(), given(someone, {{.Max}}+3)); err != nil {
+		t.Fatalf("the app's own: %v", err)
+	}
+{{- if importable $e}}
+	third := person(1002)
+	rows := make([]{{$p}}.New{{$e.Pascal}}, {{.Max}}+1)
+	for i := range rows {
+		rows[i] = given(third, 2000+i)
+	}
+	_, err = {{$r}}.Import{{$e.Plural.Pascal}}(as(third), rows, nil)
+	if _, ok := errors.AsType[*{{$p}}.CreateLimited](err); !ok {
+		t.Fatalf("an import past the limit: %v", err)
+	}
+	if done, err := {{$r}}.Import{{$e.Plural.Pascal}}(as(third), rows[:{{.Max}}], nil); err != nil || done.Created != {{.Max}} {
+		t.Fatalf("an import within the limit: %+v, %v", done, err)
+	}
+{{- end}}
+}
+
+{{end}}{{if importable $e}}{{$key := importBy $e -}}
 // TestImport{{$e.Plural.Pascal}} imports rows: each is stored{{if $key}}, importing them again
 // updates them{{end}}, and one refused row stores none.
 func TestImport{{$e.Plural.Pascal}}(t *testing.T) {

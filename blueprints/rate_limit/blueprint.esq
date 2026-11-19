@@ -1,6 +1,7 @@
 /// A limit of requests a minute per client, answered with rate_limited (429)
 /// and Retry-After past it. It counts in memory: it holds for one instance
-/// of the service.
+/// of the service. An entity may also limit how many records each person
+/// creates (@rate_limit(create "10/h")), counted in the database.
 blueprint rate_limit {
   version "0.1.0"
 
@@ -12,4 +13,14 @@ blueprint rate_limit {
   /// Requests a minute each client may make; 0 turns the limit off.
   /// <APP>_RATE_LIMIT overrides it.
   option per_minute int default(120)
+
+  annotation entity {
+    /// How many records each person may create, as N/min, N/h or N/d:
+    /// @rate_limit(create "10/h"). A person is a principal of the realm that
+    /// owns the records (the owner rule of security), and what they created
+    /// is what they own, created in the period, counted in the database:
+    /// it holds for every instance of the service. Past it, rate_limited
+    /// (429) with Retry-After; an import counts each record it creates.
+    create string
+  }
 }

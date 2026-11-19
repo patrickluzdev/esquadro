@@ -19,6 +19,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/migrations"
 	"github.com/patrickluzdev/esquadro/blueprints/notifications"
 	"github.com/patrickluzdev/esquadro/blueprints/platform/apps"
+	ratelimit "github.com/patrickluzdev/esquadro/blueprints/rate_limit"
 	"github.com/patrickluzdev/esquadro/blueprints/rest"
 	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/seed"
@@ -65,6 +66,7 @@ func init() {
 	blueprint.Checks["notifications"] = notifications.Check
 	blueprint.Checks["storage"] = storage.Check
 	blueprint.Checks["integration"] = integration.Check
+	blueprint.Checks["rate_limit"] = ratelimit.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

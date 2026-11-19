@@ -125,6 +125,8 @@ func TestCanaryUpgrades(t *testing.T) {
 	}
 	// A job posted once per offer and group, ever.
 	deals += "\n/// Posts an offer to a group, once.\njob PostOffer {\n  offer_id       uuid required\n  destination_id uuid required\n  @jobs(unique_by [offer_id, destination_id])\n}\n"
+	// What visitors say of the offers: each visitor at most 30 an hour.
+	deals += "\n/// What a visitor says of an offer.\nentity Comment {\n  body    text required min(2) max(500)\n  offer   > Offer required on_delete(cascade)\n  visitor > Visitor required\n  @security(read public, write owner)\n  @rate_limit(create \"30/h\")\n}\n"
 	// Its short links: the site redirects by the code, which a rule makes up.
 	deals = strings.Replace(deals, "  code        string required unique min(4) max(12)", "  code        string unique min(4) max(12)", 1)
 	deals = strings.Replace(deals, "  destination > Destination\n  @security(read user, write [user.admin, user.operator])\n}",
@@ -320,6 +322,9 @@ func TestCommentReplies(t *testing.T) {
 `)
 	if !strings.Contains(read("web/site/offer_gen.go"), "func (s *Site) listOffers(") || !strings.Contains(read("web/site/coupon_gen.go"), "func (s *Site) readCoupon(") {
 		t.Fatal("the site has no pages of offers and coupons")
+	}
+	if !strings.Contains(read("internal/deals/create_comment.go"), "func (d *Deals) commentLimit(") || !strings.Contains(read("cmd/promo/api_test.go"), "func TestAPICommentCreateLimit(") {
+		t.Fatal("the comments have no limit of creates, or no test of it")
 	}
 	e.run(nil, "go", "vet", "./...")
 	e.run(nil, "go", "test", "./...")

@@ -40,7 +40,7 @@ func NewHTTP(m *{{$m.Pascal}}) HTTP {
 }
 {{- end}}
 {{- range $m.Entities}}{{$e := .}}{{$P := .Pascal}}{{$id := ogenName (printf "%sId" .Camel)}}{{$idArg := printf ", uuid.UUID(params.%s)" $id}}{{if single $e}}{{$idArg = ""}}{{end}}
-{{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}
+{{- $pol := policies $.Entities}}{{$claims := and $pol (claims $.Entities $e)}}{{$limit := createLimit $.Entities $e}}
 {{- if not (single $e)}}
 
 func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.Create{{$P}}Params) (*apigen.{{$P}}, error) {
@@ -58,6 +58,9 @@ func (h HTTP) Create{{$P}}(ctx context.Context, req *apigen.New{{$P}}, _ apigen.
 {{- end}}
 	created, err := h.{{$p}}.Create{{$P}}(ctx, n)
 	if err != nil {
+{{- if $limit}}
+		retryAfter(ctx, err)
+{{- end}}
 		return nil, problemOf(err)
 	}
 	edge.SetETag(ctx, created.Version)
@@ -105,6 +108,9 @@ func (h HTTP) Import{{.Plural.Pascal}}(ctx context.Context, req *apigen.{{$P}}Im
 	done, err := h.{{$p}}.Import{{.Plural.Pascal}}(ctx, rows, nil)
 {{- end}}
 	if err != nil {
+{{- if $limit}}
+		retryAfter(ctx, err)
+{{- end}}
 		return nil, problemOf(err)
 	}
 	return &apigen.Imported{Created: done.Created, Updated: done.Updated}, nil
@@ -1079,6 +1085,11 @@ func problemOf(err error) error {
 		return edge.ImportRefused(fields)
 	}
 {{- end}}
+{{- if limitedModule .Entities $m}}
+	if _, ok := errors.AsType[*CreateLimited](err); ok {
+		return edge.ErrRateLimited
+	}
+{{- end}}
 	if broken, ok := errors.AsType[*RuleError](err); ok {
 		fields := make([]edge.FieldProblem, 0, len(broken.Fields))
 		for _, name := range broken.Fields {
@@ -1102,6 +1113,16 @@ func problemOf(err error) error {
 	}
 	return err
 }
+{{- if limitedModule .Entities $m}}
+
+// retryAfter tells, with Retry-After, when a create past its limit may be
+// tried again.
+func retryAfter(ctx context.Context, err error) {
+	if limited, ok := errors.AsType[*CreateLimited](err); ok {
+		edge.SetRetryAfter(ctx, limited.Wait)
+	}
+}
+{{- end}}
 {{end -}}
 {{- if or (needsType $m "file") (needsType $m "image")}}
 

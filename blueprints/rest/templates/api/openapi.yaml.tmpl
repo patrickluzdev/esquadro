@@ -136,6 +136,10 @@ paths:
 {{- with accessLine $.Entities $e "create"}}
         {{.}}
 {{- end}}
+{{- with createLimit $.Entities $e}}
+        Each {{.Realm}} creates at most {{.Max}} {{.Per}}: past that, `rate_limited` (429)
+        with Retry-After.
+{{- end}}
       tags: [{{.Module.Snake}}]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -168,6 +172,10 @@ paths:
         with its `row` (from 1); `too_many_rows` (422); `invalid_request` (400).
 {{- with accessLine $.Entities $e "create"}}
         {{.}}
+{{- end}}
+{{- with createLimit $.Entities $e}}
+        Each record it creates counts toward the limit of creates: each {{.Realm}}
+        creates at most {{.Max}} {{.Per}}; past that, `rate_limited` (429) with Retry-After.
 {{- end}}
       tags: [{{.Module.Snake}}]
       parameters:

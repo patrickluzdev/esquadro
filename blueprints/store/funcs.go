@@ -129,6 +129,8 @@ func TemplateFuncs() template.FuncMap {
 		"redirects":       Redirects,
 		"redirectTo":      RedirectTo,
 		"redirectModule":  RedirectModule,
+		"createLimit":     CreateLimitOf,
+		"limitedModule":   LimitedModule,
 		"singleID":        func() string { return SingleID },
 		"dependents":      Dependents,
 		"trashedParents":  TrashedParents,

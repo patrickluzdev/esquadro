@@ -1,8 +1,8 @@
-{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "create"}}{{end}}{{$links := idLinks $e}}{{$tx := true -}}
+{{- $e := .Entity}}{{$m := $e.Module}}{{$ws := writable $e}}{{$r := lower (slice $m.Camel 0 1)}}{{$files := fileFields $e}}{{$audited := audited $e (optionsOf "audit")}}{{$rule := noticeRule $e}}{{$notice := false}}{{if $rule}}{{$notice = $rule.Has "create"}}{{end}}{{$links := idLinks $e}}{{$limit := createLimit .Entities $e}}{{$tx := true -}}
 {{- if not (single $e) -}}
 package {{$m.Snake}}
 
-{{importBlock "context" (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module)}}
+{{importBlock "context" (and $limit "errors") (and $limit "time") (and $limit "github.com/jackc/pgx/v5") (printf "%s/internal/%s/sqlgen" .App.Module $m.Snake) (printf "%s/internal/platform/postgres" .App.Module) (and $limit (printf "%s/internal/platform/security" .App.Module))}}
 // Create{{$e.Pascal}} stores a new {{lower $e.Label}}, with its defaults, once it
 // passes the rules declared for {{$e.Plural.Snake}} and those of
 // {{$e.Snake}}_rules.go, which run in the same transaction.
@@ -20,6 +20,11 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	// The rules, the record{{if $files}}, its files{{end}}{{if $audited}} and the change kept{{end}}, together.
 	var created {{$e.Pascal}}
 	err := postgres.InTx(ctx, {{$r}}.Pool, func(ctx context.Context) error {
+{{- if $limit}}
+		if err := {{$r}}.{{$e.Camel}}Limit(ctx); err != nil {
+			return err
+		}
+{{- end}}
 		rules := {{$e.Pascal}}Rules{}
 		if err := rules.BeforeCreate(ctx, {{$r}}, &n); err != nil {
 			return err
@@ -64,6 +69,34 @@ func ({{$r}} *{{$m.Pascal}}) Create{{$e.Pascal}}(ctx context.Context, n New{{$e.
 	}
 	return created, nil
 }
+{{- with $limit}}
+
+// {{$e.Camel}}Limit refuses, with *CreateLimited, a create past the limit of
+// {{$e.Plural.Snake}}: each {{.Realm}} creates at most {{.Max}} {{.Per}} (@rate_limit(create "{{.Text}}")).
+// It counts the {{$e.Plural.Snake}} the {{.Realm}} of ctx owns, created in the last
+// {{.Unit}}, once it holds their lock: two creates at once count one after the
+// other. Anyone else (another realm, a service, the app's own code, the
+// API's tests signed in as everyone) is not limited.
+func ({{$r}} *{{$m.Pascal}}) {{$e.Camel}}Limit(ctx context.Context) error {
+	p, ok := security.PrincipalIn(ctx, "{{.Realm}}")
+	if !ok || p.OwnsAll {
+		return nil
+	}
+	if err := postgres.Lock(ctx, "{{$e.Plural.Snake}}.create:"+p.ID.String()); err != nil {
+		return err
+	}
+	wait, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).{{$e.Pascal}}CreateWait(ctx, sqlgen.{{$e.Pascal}}CreateWaitParams{
+		Owner: postgres.UUID(p.ID), Seconds: {{.Seconds}}, Skip: {{.Max}} - 1,
+	})
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return nil
+	case err != nil:
+		return err
+	}
+	return &CreateLimited{Wait: time.Duration(wait) * time.Second}
+}
+{{- end}}
 {{- else}}
 {{- if $ws}}
 	row, err := sqlgen.New(postgres.Querier(ctx, {{$r}}.Pool)).Create{{$e.Pascal}}(ctx, create{{$e.Pascal}}Params({{$r}}.NewID(), n))

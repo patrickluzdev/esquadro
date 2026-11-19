@@ -112,6 +112,8 @@ func TemplateFuncs() template.FuncMap {
 		"importable":       store.Importable,
 		"importBy":         store.ImportBy,
 		"importMax":        func() int { return store.ImportMax },
+		"createLimit":      store.CreateLimitOf,
+		"limitedModule":    store.LimitedModule,
 		"idLinks":          store.IDLinks,
 		"html":             HTML,
 		"anyHTML": func(entities []*project.Entity) bool {

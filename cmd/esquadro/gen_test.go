@@ -402,6 +402,36 @@ func TestCheckImports(t *testing.T) {
 	}
 }
 
+func TestCheckCreateLimits(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	base := read(t, model)
+	review := func(security, limit string) string {
+		return "entity Review {\n  body text required\n  customer > Customer required\n  @security(" + security + ")\n  @rate_limit(create " + limit + ")\n}\n"
+	}
+	for name, tc := range map[string]struct{ entity, want string }{
+		"ok":        {review("read public, write owner", `"10/h"`), ""},
+		"minutes":   {review("read public, write owner", `"30/min"`), ""},
+		"days":      {review("read public, write owner", `"100/d"`), ""},
+		"period":    {review("read public, write owner", `"10/week"`), `"10/week" is not N/min, N/h or N/d`},
+		"zero":      {review("read public, write owner", `"0/h"`), "must be more than 0"},
+		"no rule":   {review("read public, write customer", `"10/h"`), "Review counts what each person created by the records they own: give it an owner rule"},
+		"no owner":  {"entity Coupon {\n  code string required\n  @rate_limit(create \"10/h\")\n}\n", "the owner rule needs a relation of Coupon to a principal"},
+		"public":    {review("read public, create public, update owner, delete owner", `"10/h"`), "anyone may create reviews (public)"},
+		"single":    {"entity SiteSettings {\n  note string\n  @store(single)\n  @rate_limit(create \"1/d\")\n}\n", "SiteSettings is single and has @rate_limit(create)"},
+		"principal": {"entity Seller {\n  name string required\n  @security(principal)\n  @rate_limit(create \"1/d\")\n}\n", "Seller is a principal and has @rate_limit(create)"},
+	} {
+		os.WriteFile(model, []byte(base+"\n"+tc.entity), 0o644)
+		code, _, errOut := esq(t, "check", dir)
+		if tc.want == "" && code != 0 || tc.want != "" && (code == 0 || !strings.Contains(errOut, tc.want)) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
 func TestCheckIntegrations(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "promo")
 	if code, _, errOut := esq(t, "new", "-starter", "worker", "-module", "example.com/promo", "-no-git", "-no-gen", dir); code != 0 {

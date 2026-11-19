@@ -6,6 +6,18 @@
 INSERT INTO {{$t}} (id{{range $ws}}, {{.Column}}{{end}})
 VALUES (@id{{range $ws}}, @{{.Param}}{{end}})
 RETURNING *;
+{{- with createLimit $.Entities $e}}
+
+-- name: {{$e.Pascal}}CreateWait :one
+-- The seconds until the owner may create again, past the limit: when the
+-- last allowed of what they created in the period leaves it. No row when
+-- they may create now. A record deleted for good no longer counts.
+SELECT greatest(1, ceil(extract(epoch FROM created_at + sqlc.arg(seconds)::int * interval '1 second' - now())))::int AS wait
+FROM {{$t}}
+WHERE {{.Column}} = sqlc.arg(owner) AND created_at > now() - sqlc.arg(seconds)::int * interval '1 second'
+ORDER BY created_at DESC
+OFFSET sqlc.arg(skip)::int LIMIT 1;
+{{- end}}
 
 -- name: Get{{$e.Pascal}} :one
 SELECT * FROM {{$t}} WHERE id = @id{{$live}};

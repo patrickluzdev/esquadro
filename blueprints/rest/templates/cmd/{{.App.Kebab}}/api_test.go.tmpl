@@ -1,7 +1,8 @@
 {{- if and .Entities (uses "testcontainers") -}}
+{{- $limits := false}}{{range .Entities}}{{if and (createLimit $.Entities .) (canSampleAPI .)}}{{$limits = true}}{{end}}{{end -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (linkTests .Entities) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and (hasFiles .Entities) (printf "%s/internal/platform/storage" .App.Module)) (modulePaths .App.Module .Modules true)}}
+{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (or (linkTests .Entities) $limits) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and (hasFiles .Entities) (printf "%s/internal/platform/storage" .App.Module)) (modulePaths .App.Module .Modules true)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {
@@ -653,4 +654,73 @@ func TestAPIReports(t *testing.T) {
 	}
 }
 {{- end}}
+{{- range .Entities}}{{$e := .}}{{with createLimit $.Entities $e}}{{$rel := .Relation}}{{$same := eq $rel.Target.Module $e.Module}}
+{{- if and (canSampleAPI $e) (or (not $same) (canSampleAPI $rel.Target))}}
+
+// TestAPI{{$e.Pascal}}CreateLimit creates as many {{$e.Plural.Snake}} as a {{.Realm}} may {{.Per}}:
+// the next answers rate_limited (429) with Retry-After, and another
+// {{.Realm}} still creates.
+func TestAPI{{$e.Pascal}}CreateLimit(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	// Signed in as everyone, for the records it needs.
+	setup, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	person := func({{if $same}}i {{end}}int) uuid.UUID {
+{{- if $same}}
+		x, err := setup.Create{{$rel.Target.Pascal}}(ctx, givenAPI{{$rel.Target.Pascal}}(t, setup, i), apigen.Create{{$rel.Target.Pascal}}Params{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return uuid.UUID(x.ID)
+{{- else}}
+		return uuid.NewV7() // another module: no foreign key
+{{- end}}
+	}
+	// create posts a {{$e.Snake}} as the {{.Realm}} who owns it, and answers the status,
+	// the problem's code and Retry-After.
+	create := func(owner uuid.UUID, i int) (int, string, string) {
+		t.Helper()
+		n := givenAPI{{$e.Pascal}}(t, setup, i)
+		n.{{ogenName (keyName $rel)}} = {{if keyInRequest $.Entities $e $rel}}ogenuuid.UUID(owner){{else}}apigen.NewOptUUID(ogenuuid.UUID(owner)){{end}}
+		body, err := n.MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.URL+"/api/v1/{{$e.Plural.Kebab}}", strings.NewReader(string(body)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+			r = r.Clone(r.Context())
+			r.Header.Set("X-Test-Principal", "{{.Realm}}@"+owner.String())
+			return idempotentTransport{}.RoundTrip(r)
+		})}
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var doc edge.Document
+		_ = json.NewDecoder(res.Body).Decode(&doc)
+		return res.StatusCode, doc.Code, res.Header.Get("Retry-After")
+	}
+	someone, other := person(1000), person(1001)
+	for i := range {{.Max}} {
+		if status, code, _ := create(someone, i+1); status != http.StatusCreated {
+			t.Fatalf("create %d: %d %s", i+1, status, code)
+		}
+	}
+	if status, code, retry := create(someone, {{.Max}}+1); status != http.StatusTooManyRequests || code != "rate_limited" || retry == "" {
+		t.Fatalf("past the limit: %d %s, Retry-After %q", status, code, retry)
+	}
+	if status, code, _ := create(other, {{.Max}}+2); status != http.StatusCreated {
+		t.Fatalf("another {{.Realm}}: %d %s", status, code)
+	}
+}
+{{- end}}{{end}}{{end}}
 {{end -}}
