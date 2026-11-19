@@ -9,7 +9,7 @@ import (
 	"encoding/xml"
 	"net/http"
 	"strings"
-{{range sitePageModules .Entities .Modules $n}}
+{{range siteHomeModules .Entities .Modules $n}}
 	"{{$.App.Module}}/internal/{{.Snake}}"
 {{- end}}
 )

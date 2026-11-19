@@ -30,6 +30,7 @@ func TemplateFuncs() template.FuncMap {
 		"sitePage":               PageOf,
 		"siteModules":            Modules,
 		"sitePageModules":        PageModules,
+		"siteHomeModules":        HomeModules,
 		"siteLabel":              func(a project.Ann, instance, fallback string) string { return ui.Label(a, instance, fallback) },
 		"humanize":               ui.Humanize,
 		"uiTheme":                ui.ThemeOf,
@@ -221,8 +222,9 @@ func Modules(entities []*project.Entity, modules []*project.Module, instance str
 }
 
 // PageModules are the modules whose entities a site's pages read (those it
-// redirects by aside), in the model's order.
-func PageModules(entities []*project.Entity, modules []*project.Module, instance string) []*project.Module {
+// redirects by aside), in the model's order: of the pages of the entities
+// given, or of all of them.
+func PageModules(entities []*project.Entity, modules []*project.Module, instance string, of ...*project.Entity) []*project.Module {
 	var out []*project.Module
 	add := func(m *project.Module) {
 		if !slices.Contains(out, m) {
@@ -230,6 +232,9 @@ func PageModules(entities []*project.Entity, modules []*project.Module, instance
 		}
 	}
 	for _, pg := range Pages(entities, instance) {
+		if len(of) > 0 && !slices.Contains(of, pg.Entity) {
+			continue
+		}
 		add(pg.Entity.Module)
 		for _, l := range pg.Lists {
 			add(l.Target.Module)
@@ -237,10 +242,30 @@ func PageModules(entities []*project.Entity, modules []*project.Module, instance
 		for _, r := range pg.Keys {
 			add(r.Target.Module)
 		}
+		for _, f := range pg.Filters {
+			if f.Enum != nil {
+				add(f.Enum.Module)
+			}
+		}
 	}
 	slices.SortStableFunc(out, func(a, b *project.Module) int {
 		return slices.Index(modules, a) - slices.Index(modules, b)
 	})
+	return out
+}
+
+// HomeModules are the modules of the entities with pages on a site, which
+// its first page, search and sitemap read, in the model's order.
+func HomeModules(entities []*project.Entity, modules []*project.Module, instance string) []*project.Module {
+	var out []*project.Module
+	for _, m := range modules {
+		for _, pg := range Pages(entities, instance) {
+			if pg.Entity.Module == m {
+				out = append(out, m)
+				break
+			}
+		}
+	}
 	return out
 }
 

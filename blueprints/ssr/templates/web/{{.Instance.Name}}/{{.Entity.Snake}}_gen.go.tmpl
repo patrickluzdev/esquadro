@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 	"uuid"
-{{range $mod := sitePageModules .Entities .Modules $n}}
+{{range $mod := sitePageModules .Entities .Modules $n $e}}
 	"{{$.App.Module}}/internal/{{$mod.Snake}}"
 {{- end}}
 )
