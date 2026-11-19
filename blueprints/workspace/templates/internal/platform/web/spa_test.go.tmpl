@@ -57,8 +57,8 @@ func TestMountUnderAPathAndUnbuilt(t *testing.T) {
 	if err := Mount(unbuilt, fstest.MapFS{"dist/README.md": {Data: []byte("build me")}}, "", "/admin"); err != nil {
 		t.Fatal(err)
 	}
-	if rec := serve(t, unbuilt, "app.example.com", "/admin/"); rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("not built: %d", rec.Code)
+	if rec := serve(t, unbuilt, "app.example.com", "/admin/"); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "http://localhost:5173/admin/") {
+		t.Fatalf("not built: %d %s", rec.Code, rec.Body)
 	}
 }
 {{end -}}

@@ -43,6 +43,14 @@ const securityUsage = `usage: {{.App.Kebab}} security <command>
 realms: {{range $i, $r := realms .Entities}}{{if $i}}, {{end}}{{$r.Name}}{{end}}`
 
 // securityCommand runs {{.App.Kebab}} security <command>.
+// resetPages are the pages that set a password, by realm: those of the
+// frontend that signs it in, on the app's domain.
+var resetPages = map[string]string{
+{{- range $realm, $page := resetPages .Entities frontends}}
+	{{quote $realm}}: {{quote $page}},
+{{- end}}
+}
+
 func securityCommand(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return errors.New(securityUsage)
@@ -128,7 +136,11 @@ func createAccount(ctx context.Context, d dependencies, args []string, stdin io.
 	var roles roleList
 	fs.Var(&roles, "role", "a role of the account; repeat it for more")
 	fromStdin := fs.Bool("password-stdin", false, "read the password from stdin, instead of answering a link to set it")
-	redirect := fs.String("redirect", "/", "the page of the app the link opens, which sets the password")
+	page := resetPages[realm.Name]
+	if page == "" {
+		page = "/"
+	}
+	redirect := fs.String("redirect", page, "the page of the app the link opens, which sets the password")
 	// Fields come before the flags: name=Ana -role admin.
 	fields := map[string]any{}
 	rest := args[2:]

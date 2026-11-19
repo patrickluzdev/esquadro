@@ -1,6 +1,7 @@
 package spa
 
 import (
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"github.com/patrickluzdev/esquadro/blueprints/ui"
 	"slices"
 	"strings"
@@ -203,7 +204,7 @@ func strs(v any) []string {
 // OwnPages are the pages of the frontend itself, at the first part of a
 // path: a resource there would be hidden by them.
 var OwnPages = []string{"settings", "audit", "notifications", "service-keys", "accounts", "dashboards",
-	"login", "forbidden", "confirm-email", "forgot-password", "reset-password"}
+	"login", "forbidden", "confirm-email", "forgot-password", security.PanelResetPage}
 
 // ownPages refuses a resource of the frontend whose path is one of its own
 // pages'.

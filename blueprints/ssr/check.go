@@ -2,6 +2,7 @@ package ssr
 
 import (
 	"fmt"
+	"github.com/patrickluzdev/esquadro/blueprints/security"
 	"net/url"
 	"slices"
 	"strings"
@@ -22,10 +23,10 @@ var Schemas = []string{"product", "article", "organization"}
 func SystemPaths(locale string) map[string]string {
 	if locale == "pt_br" {
 		return map[string]string{"search": "busca", "signin": "entrar", "signup": "cadastro", "forgot": "esqueci-a-senha",
-			"reset": "nova-senha", "account": "conta", "confirm": "confirmar-email", "assets": "assets", "sitemap": "sitemap.xml"}
+			"reset": security.SiteResetPage("pt_br"), "account": "conta", "confirm": "confirmar-email", "assets": "assets", "sitemap": "sitemap.xml"}
 	}
 	return map[string]string{"search": "search", "signin": "sign-in", "signup": "sign-up", "forgot": "forgot-password",
-		"reset": "new-password", "account": "account", "confirm": "confirm-email", "assets": "assets", "sitemap": "sitemap.xml"}
+		"reset": security.SiteResetPage("en"), "account": "account", "confirm": "confirm-email", "assets": "assets", "sitemap": "sitemap.xml"}
 }
 
 // Check checks each site: its options, as every frontend's, its engine and

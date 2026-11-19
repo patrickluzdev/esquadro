@@ -49,21 +49,22 @@ func TestSSRGeneratesASite(t *testing.T) {
 	}
 	site := filepath.Join(dir, "web", "shop")
 	for path, want := range map[string]string{
-		"site_gen.go":        `Path   = "/shop"`,
-		"product_gen.go":     `m.Read`,
-		"category_gen.go":    `q.Filter.CategoryID = x.ID`,
-		"product.templ":      "templ ProductListPage(v ProductList)",
-		"kit.templ":          `<meta property="og:title"`,
-		"layout.templ":       "templ Layout(p Page)",
-		"pages_gen.go":       "func (s *Site) sitemap(",
-		"account_gen.go":     `identity = "/identity/customer"`,
-		"theme.gen.css":      "--primary-foreground:",
-		"product_templ.go":   "func ProductListPage(",
-		"package.json":       `"htmx.org"`,
-		"messages.go":        "var ownWords",
-		"routes.go":          "func (s *Site) ownRoutes(",
-		"dist/README.md":     "dist/assets",
-		"../../package.json": `"web/shop"`,
+		"site_gen.go":                        `Path   = "/shop"`,
+		"product_gen.go":                     `m.Read`,
+		"category_gen.go":                    `q.Filter.CategoryID = x.ID`,
+		"product.templ":                      "templ ProductListPage(v ProductList)",
+		"kit.templ":                          `<meta property="og:title"`,
+		"layout.templ":                       "templ Layout(p Page)",
+		"pages_gen.go":                       "func (s *Site) sitemap(",
+		"account_gen.go":                     `identity = "/identity/customer"`,
+		"theme.gen.css":                      "--primary-foreground:",
+		"product_templ.go":                   "func ProductListPage(",
+		"package.json":                       `"htmx.org"`,
+		"messages.go":                        "var ownWords",
+		"routes.go":                          "func (s *Site) ownRoutes(",
+		"dist/README.md":                     "dist/assets",
+		"../../package.json":                 `"web/shop"`,
+		"../../cmd/shop/security_command.go": `"customer": "/shop/nova-senha",`,
 	} {
 		got := read(t, filepath.Join(site, path))
 		if path == "product_gen.go" {

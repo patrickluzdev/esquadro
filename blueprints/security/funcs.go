@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/patrickluzdev/esquadro/internal/compose"
 	"github.com/patrickluzdev/esquadro/internal/project"
 )
 
@@ -13,6 +14,7 @@ import (
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"securityTable": Table,
+		"resetPages":    ResetPages,
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
@@ -106,6 +108,64 @@ func Admins(entities []*project.Entity, e *project.Entity) []string {
 	for _, w := range RulesOf(entities, e, "update").Others {
 		if w != "public" {
 			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// PanelResetPage is the page of a panel (spa) that sets a password.
+const PanelResetPage = "reset-password"
+
+// SiteResetPage is the page of a site (ssr) that sets a password, in its
+// language.
+func SiteResetPage(locale string) string {
+	if locale == "pt_br" {
+		return "nova-senha"
+	}
+	return "new-password"
+}
+
+// ResetPage is the page of a frontend that sets a password, as a path of
+// the app's domain: /admin/reset-password; "" for a frontend on a domain
+// of its own, or of a kind that has none.
+func ResetPage(kind, name string, opts map[string]any) string {
+	if domain, _ := opts["domain"].(string); domain != "" {
+		return ""
+	}
+	path, _ := opts["path"].(string)
+	if path == "" {
+		path = "/" + name
+	}
+	path = strings.TrimSuffix(path, "/")
+	switch kind {
+	case "spa":
+		return path + "/" + PanelResetPage
+	case "ssr":
+		locale, _ := opts["locale"].(string)
+		return path + "/" + SiteResetPage(locale)
+	}
+	return ""
+}
+
+// ResetPages are the pages that set a password, by realm: those of the
+// first frontend that signs each realm in (its auth, or the first realm),
+// on the app's domain.
+func ResetPages(entities []*project.Entity, frontends []*compose.Instance) map[string]string {
+	realms := RealmsOf(entities)
+	if len(realms) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for _, f := range frontends {
+		realm, _ := f.Options["auth"].(string)
+		if realm == "" {
+			realm = realms[0].Name
+		}
+		if _, ok := out[realm]; ok {
+			continue
+		}
+		if page := ResetPage(f.Kind, f.Name, f.Options); page != "" {
+			out[realm] = page
 		}
 	}
 	return out

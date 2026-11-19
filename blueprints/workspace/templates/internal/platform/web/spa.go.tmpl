@@ -18,11 +18,11 @@ func Mount(mux *http.ServeMux, files fs.FS, domain, prefix string) error {
 	if err != nil {
 		return err
 	}
-	Handle(mux, handler(app), domain, prefix)
+	Handle(mux, handler(app, prefix), domain, prefix)
 	return nil
 }
 
-func handler(app fs.FS) http.Handler {
+func handler(app fs.FS, prefix string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Security-Policy", CSP)
@@ -44,7 +44,9 @@ func handler(app fs.FS) http.Handler {
 			h.Set("Content-Type", "text/plain; charset=utf-8")
 			h.Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = w.Write([]byte("This frontend is not built: run task web:build, then build the app.\n"))
+			_, _ = w.Write([]byte("This frontend is not built into the app.\n\n" +
+				"In development, task dev serves it with Vite: open the address it prints, http://localhost:5173" + prefix + "/ by default.\n" +
+				"To serve it from the app, run task web:build, then build the app again.\n"))
 			return
 		}
 		h.Set("Content-Type", "text/html; charset=utf-8")
