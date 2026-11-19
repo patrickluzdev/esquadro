@@ -3,4 +3,4 @@ Abra este link para usar este e-mail na sua conta:
 
 {{.Link}}
 
-Ele vale até {{.Expires}}.
+O link vale até {{.Expires}}.

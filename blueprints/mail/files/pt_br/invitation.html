@@ -1,5 +1,5 @@
 {{define "content"}}
 <p>{{if .From}}{{.From}} convidou você{{else}}Você foi convidado{{end}} para {{.App}}.</p>
 {{button .Link "Escolher minha senha"}}
-<p>Ele vale até {{.Expires}}. Se você não esperava por isso, ignore este e-mail.</p>
+<p>O link vale até {{.Expires}}. Se você não esperava por isso, ignore este e-mail.</p>
 {{end}}

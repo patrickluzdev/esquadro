@@ -3,4 +3,4 @@ Subject: Você foi convidado para {{.App}}
 
 {{.Link}}
 
-Ele vale até {{.Expires}}. Se você não esperava por isso, ignore este e-mail.
+O link vale até {{.Expires}}. Se você não esperava por isso, ignore este e-mail.

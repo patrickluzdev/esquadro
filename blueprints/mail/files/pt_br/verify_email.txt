@@ -3,4 +3,4 @@ Abra este link para confirmar seu e-mail:
 
 {{.Link}}
 
-Ele vale até {{.Expires}}.
+O link vale até {{.Expires}}.
