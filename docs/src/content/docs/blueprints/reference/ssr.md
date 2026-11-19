@@ -41,11 +41,22 @@ blueprint ssr {
 }
 ```
 
+## Environment variables
+
+Read when the app starts; see [Environment variables](/esquadro/language/environment/).
+
+| Variable | Type | Value | |
+|---|---|---|---|
+| `INSTANCE_VISITOR_SECRET` | string, secret, required outside development | generated in development | The key a visit of a redirect is told apart by, a day at a time, without keeping who it is (edge.Visitor): with a redirect. |
+
 ## Annotations
 
 | Where | Key | Type | |
 |---|---|---|---|
 | entity | `page` | bool | The entity has pages: a list at /&lt;path>, and one per record. |
+| entity | `redirect` | bool | Its records redirect: /&lt;path>/&lt;by> (at the root without a path) sends to the address in &lt;to>. &lt;entity>_rules.go decides where each visit goes (BeforeRedirect) and what is kept of it (Visited). |
+| entity | `by` | name | The unique field a record is found by, with redirect: code. |
+| entity | `to` | name | The field of the address a record sends to, with redirect: target_url. |
 | entity | `path` | string | The part of the address: ofertas. Its plural, in kebab case, by default. |
 | entity | `title` | name | The field a record is called by, in titles and its address; the first text field by default. |
 | entity | `description` | name | The field of a record's description, for search engines and shared links. |
