@@ -8,6 +8,11 @@
 // selected (bulk):
 //   actions: [{ label: "Approve", icon: Check, bulk: true,
 //               run: (r) => api.request("POST", `/api/v1/{{.Entity.Plural.Kebab}}/${r.id}/approve`) }],
+// An action that changes fields, with its key (asking some first), or copies:
+//   actions: [{ label: "Approve", key: "a", patch: { status: "APPROVED" }, ask: [f.note] },
+//             { label: "Copy", key: "c", copy: (r) => String(r.message) }],
+// A queue beside the table, the records of a filter worked with those keys:
+//   queue: { filter: { status: ["PENDING"] }, card: { title: f.name, fields: [f.price] } },
 import { {{- $rel := false}}{{range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}{{$rel = true}}{{end}}{{end}}{{if $rel}} relation,{{end}} resource } from "../esquadro/kit/resource.ts"
 import { resources } from "../esquadro/resources.gen.ts"
 {{- range $r := .Entity.Relations}}{{if and (hasMany $r) (ne $r.Target.Raw $.Entity.Raw) (index (ann $r.Target) "resource") (filterable $r.Target (inverseKey $r))}}

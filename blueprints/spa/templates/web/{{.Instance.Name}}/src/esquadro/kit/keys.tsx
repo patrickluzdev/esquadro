@@ -68,6 +68,16 @@ export function ShortcutsHelp() {
       [
         ["e", t("edit")],
         ["Esc  u", t("goBack")],
+        ["1  s…", t("keyAction")],
+      ],
+    ],
+    [
+      t("shortcutsQueue"),
+      [
+        ["j  ↓", t("keyNext")],
+        ["k  ↑", t("keyPrevious")],
+        ["Enter", t("view")],
+        ["1  s…", t("keyAction")],
       ],
     ],
   ]

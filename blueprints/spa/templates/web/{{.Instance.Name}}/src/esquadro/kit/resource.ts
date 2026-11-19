@@ -17,19 +17,46 @@ export interface ColumnOptions {
 /** A column of the list: a field, or a field with options. */
 export type Column = FieldMeta | ({ field: FieldMeta } & ColumnOptions)
 
-/** An action of yours, on a record: approve, publish. */
+/**
+ * An action of yours, on a record: approve, publish, copy its message. It
+ * changes fields (patch, after the fields of ask), copies text (copy),
+ * runs your code (run), or more than one, in that order: copy, patch, run.
+ */
 export interface Action {
   label: string
   icon?: LucideIcon
   /** Shown only when this answers true; the API still decides. */
   when?: (record: Rec) => boolean
-  run: (record: Rec) => Promise<unknown> | unknown
+  /** Your code. */
+  run?: (record: Rec) => Promise<unknown> | unknown
+  /** The fields it sets, by PATCH (If-Match): { status: "APPROVED" }, or what a function makes of the record. */
+  patch?: Record<string, unknown> | ((record: Rec) => Record<string, unknown>)
+  /** Fields of the form asked for first, in a small dialog, sent with the patch. */
+  ask?: FieldMeta[]
+  /** Text to copy: a message to paste elsewhere. */
+  copy?: (record: Rec) => string
+  /** Its key, on the record in focus (the queue) or open: "1", "s". */
+  key?: string
   /** Ask first, with this question. */
   confirm?: string
   /** Also on the records selected in the list, each in turn. */
   bulk?: boolean
   /** Shown in red: what removes or cannot be undone. */
   destructive?: boolean
+}
+
+/**
+ * A resource's queue: the records of a filter as cards, one in focus, worked
+ * with the keys of the actions; one an action takes out of the filter
+ * leaves, and the next comes.
+ */
+export interface Queue {
+  /** The records in it, by the API's filters: { status: "PENDING" }. */
+  filter: Record<string, unknown>
+  /** What each card shows: its picture, its title and some fields. */
+  card?: { image?: FieldMeta; title?: FieldMeta; fields?: FieldMeta[] }
+  /** Its tab's name: "Queue" by default. */
+  label?: string
 }
 
 /** Records of another resource that point at this one: a category's products. */
@@ -71,6 +98,8 @@ export interface ResourceDef {
   /** The fields beside the picture on a record's page: the first short ones (not the title) by default. */
   summary?: FieldMeta[]
   actions?: Action[]
+  /** A queue of the records of a filter, beside the table, worked with the keys of the actions. */
+  queue?: Queue
   /** The field a record is called by (in titles and pickers). */
   title?: FieldMeta
   /**

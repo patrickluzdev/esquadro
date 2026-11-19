@@ -28,6 +28,8 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  ListChecks,
+  Rows3,
   Trash2,
   Upload,
   X,
@@ -59,6 +61,9 @@ import { useKeys } from "./keys.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { download, fileName, toCsv } from "./export.ts"
 import { ImportDialog } from "./import.tsx"
+import { QueueView, useQueue } from "./queue.tsx"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { allowed, applyAction, bulk, useActions } from "./actions.tsx"
 import { ask } from "./confirm.tsx"
 import { describe } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
@@ -164,7 +169,59 @@ export function ResourceList(props: { resource: Resource; description?: string; 
   const search = useSearch({ strict: false }) as ListSearch
   // A resource with a trash shows it at ?trash=1.
   if (props.resource.meta.trash && !props.scope && search.trash) return <TrashList resource={props.resource} />
+  if (props.resource.queue && !props.scope) return <WithQueue {...props} />
   return <RecordsList {...props} />
+}
+
+type View = "table" | "queue"
+
+/** The view of a resource with a queue, remembered by the browser. */
+function useView(name: string): [View, (v: View) => void] {
+  const key = `esquadro.view.${name}`
+  const [view, setView] = useState<View>(() => {
+    try {
+      return localStorage.getItem(key) === "queue" ? "queue" : "table"
+    } catch {
+      return "table"
+    }
+  })
+  const choose = (v: View) => {
+    setView(v)
+    try {
+      localStorage.setItem(key, v)
+    } catch {
+      // Not remembered: the table again next time.
+    }
+  }
+  return [view, choose]
+}
+
+/** A resource's list with its queue beside it, a tab each. */
+function WithQueue(props: { resource: Resource; description?: string }) {
+  const { meta, queue } = props.resource
+  const [view, setView] = useView(meta.name)
+  const pending = useQueue(props.resource)
+  const count = pending.data?.total ?? pending.data?.items.length
+  return (
+    <Tabs value={view} onValueChange={(v) => setView(v as View)} className="flex flex-col gap-4">
+      <TabsList className="self-start">
+        <TabsTrigger value="table">
+          <Rows3 /> {t("queueTable")}
+        </TabsTrigger>
+        <TabsTrigger value="queue">
+          <ListChecks /> {queue?.label ?? t("queue")}
+          {Boolean(count) && <span className="rounded-full bg-muted px-1.5 text-xs font-semibold tabular-nums">{count}</span>}
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="table">
+        <RecordsList {...props} />
+      </TabsContent>
+      <TabsContent value="queue" className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+        <PageHeader title={meta.label} description={props.description} />
+        <QueueView resource={props.resource} />
+      </TabsContent>
+    </Tabs>
+  )
 }
 
 function RecordsList({
@@ -241,7 +298,7 @@ function RecordsList({
   const canCreate = page?.can.includes("create") ?? false
   const duplicate = useDuplicate(meta)
   const actions = resource.actions ?? []
-  const bulkActions = actions.filter((a) => a.bulk)
+  const bulkActions = actions.filter(bulk)
   const canDeleteAny = items.some((r) => (r.can ?? []).includes("delete"))
   const selectable = resource.table.select !== false && (bulkActions.length > 0 || canDeleteAny)
 
@@ -255,16 +312,8 @@ function RecordsList({
 
   const remove = (r: Rec) => meta.api(api as never).delete(r.id, { ifMatch: r })
   const trashCount = useTrashCount(meta, !embedded)
-  const runOne = async (a: Action, r: Rec) => {
-    if (a.confirm && !(await ask(a.confirm, { destructive: a.destructive }))) return
-    try {
-      await a.run(r)
-      toast(t("done"))
-    } catch (e) {
-      toast(describe(e), "error")
-    }
-    queryClient.invalidateQueries({ queryKey: [meta.name] })
-  }
+  const { perform, dialog: actionDialog } = useActions(resource)
+  const runOne = (a: Action, r: Rec) => perform(a, r)
 
   // What a record is called, in bold and with its picture: the resource's title, or its first column.
   const titleColumn = resource.title?.name ?? (tableColumns[0] && columnField(tableColumns[0]).name)
@@ -360,7 +409,7 @@ function RecordsList({
         cell: ({ row }) => {
           const r = row.original
           const can = r.can ?? []
-          const own = actions.filter((a) => !a.when || a.when(r))
+          const own = actions.filter((a) => allowed(a, r))
           return (
             <div className="flex justify-end gap-0.5 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
               {can.includes("update") && (
@@ -660,14 +709,14 @@ function RecordsList({
               <Download /> {t("export")}
             </Button>
             {bulkActions.map((a) => {
-              const records = selected.filter((r) => !a.when || a.when(r))
+              const records = selected.filter((r) => allowed(a, r))
               return (
                 <Button
                   key={a.label}
                   size="sm"
                   variant={a.destructive ? "destructive-outline" : "outline"}
                   disabled={records.length === 0}
-                  onClick={() => runBulk(a.label, records, a.run, a.confirm, a.destructive)}
+                  onClick={() => runBulk(a.label, records, (r) => applyAction(meta, a, r), a.confirm, a.destructive)}
                 >
                   {a.icon && <a.icon />} {a.label}
                 </Button>
@@ -827,6 +876,7 @@ function RecordsList({
         </div>
       )}
       {meta.import && <ImportDialog meta={meta} open={importing} onOpenChange={setImporting} />}
+      {actionDialog}
     </div>
   )
 }

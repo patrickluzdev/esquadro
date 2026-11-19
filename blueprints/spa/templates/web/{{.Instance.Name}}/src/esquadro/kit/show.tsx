@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "../api.ts"
 import { resources } from "../resources.gen.ts"
-import { ask } from "./confirm.tsx"
 import { CopyButton } from "./copy.tsx"
 import { FileValue } from "./files.tsx"
 import { StatusValue } from "./status.tsx"
@@ -24,6 +23,7 @@ import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { ResourceList } from "./list.tsx"
 import { DetailSkeleton, ErrorState } from "./states.tsx"
 import { useKeys } from "./keys.tsx"
+import { actionKeys, allowed, useActions } from "./actions.tsx"
 import { Highlight } from "./search.tsx"
 import type { Resource } from "./resource.ts"
 import { toast } from "./toast.tsx"
@@ -99,8 +99,14 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const { meta } = resource
   const record = useRecord(resource, id)
   const duplicate = useDuplicate(meta)
-  // The keyboard: e edits, Esc or u goes back to the list.
+  const { perform, dialog: actionDialog } = useActions(resource)
+  // The keyboard: e edits, Esc or u goes back to the list, and each
+  // action's key runs it on the record.
+  const own = Object.fromEntries(
+    [...actionKeys(resource)].map(([key, a]) => [key, () => record.data && perform(a, record.data)]),
+  )
   useKeys({
+    ...own,
     e: () => (record.data?.can ?? []).includes("update") && navigate({ to: `/${meta.name}/${id}/edit` as never }),
     Escape: () => navigate({ to: `/${meta.name}` as never }),
     u: () => navigate({ to: `/${meta.name}` as never }),
@@ -161,23 +167,11 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
         </Button>
       )}
       {resource.actions
-        ?.filter((a) => !a.when || a.when(r))
+        ?.filter((a) => allowed(a, r))
         .map((a) => (
-          <Button
-            key={a.label}
-            variant={a.destructive ? "destructive-outline" : "outline"}
-            onClick={async () => {
-              if (a.confirm && !(await ask(a.confirm, { destructive: a.destructive }))) return
-              try {
-                await a.run(r)
-                toast(t("done"))
-                queryClient.invalidateQueries({ queryKey: [meta.name] })
-              } catch (e) {
-                toast(describe(e), "error")
-              }
-            }}
-          >
+          <Button key={a.label} variant={a.destructive ? "destructive-outline" : "outline"} onClick={() => perform(a, r)}>
             {a.icon && <a.icon />} {a.label}
+            {a.key && <kbd className="ml-auto rounded border border-border px-1.5 text-xs text-muted-foreground">{a.key}</kbd>}
           </Button>
         ))}
       <Button variant="outline" onClick={() => duplicate(r)}>
@@ -196,6 +190,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   )
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      {actionDialog}
       <Card className="relative">
         {can.includes("update") && (
           <Button asChild variant="ghost" size="icon-sm" className="absolute top-4 right-4 text-muted-foreground" aria-label={t("edit")}>
