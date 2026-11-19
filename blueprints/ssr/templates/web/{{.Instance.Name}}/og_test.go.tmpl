@@ -117,7 +117,12 @@ func TestOG{{$e.Pascal}}(t *testing.T) {
 
 	// The page's og:image is it.
 	page, body := fetchOG(t, srv.URL+{{$e.Pascal}}Path(x), "")
-	if page.StatusCode != http.StatusOK || !strings.Contains(string(body), `property="og:image" content="`+srv.URL+URL({{$e.Pascal}}OGPath(x))) {
+	// The site's own address: its domain's, or the test server's.
+	base := srv.URL
+	if Domain != "" {
+		base = "https://" + Domain
+	}
+	if page.StatusCode != http.StatusOK || !strings.Contains(string(body), `property="og:image" content="`+base+URL({{$e.Pascal}}OGPath(x))) {
 		t.Fatalf("the page (%d) has no og:image of %s:\n%s", page.StatusCode, {{$e.Pascal}}OGPath(x), body)
 	}
 {{- end}}

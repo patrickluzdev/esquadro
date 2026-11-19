@@ -299,3 +299,25 @@ func TestSSRDrawsOGImages(t *testing.T) {
 		t.Fatalf("go vet: %v\n%s", err, out)
 	}
 }
+
+// TestSSRDrawsOGImagesOnADomain runs the generated test of the Open Graph
+// images of a site on a domain of its own, whose pages point at it.
+func TestSSRDrawsOGImagesOnADomain(t *testing.T) {
+	dir, code, errOut := ssrProject(t, func(s string) string {
+		return withImages(strings.Replace(s, "    name \"Loja\"\n", "    name \"Loja\"\n    domain \"shop.test\"\n", 1))
+	}, func(s string) string {
+		s = strings.Replace(s, "sort \"-price\", menu)", "sort \"-price\", menu, og_image)", 1)
+		return strings.Replace(s, "  status      Status  default(ACTIVE)\n", "  status      Status  default(ACTIVE)\n  photo       image\n", 1)
+	})
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	if !strings.Contains(read(t, filepath.Join(dir, "web", "shop", "site_gen.go")), `Domain = "shop.test"`) {
+		t.Fatal("the site has no domain")
+	}
+	test := exec.Command("go", "test", "./web/shop/", "-run", "TestOG")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
+}
