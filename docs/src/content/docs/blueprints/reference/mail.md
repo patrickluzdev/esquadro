@@ -23,7 +23,7 @@ blueprint mail
 | Option | Type | Default | |
 |---|---|---|---|
 | `brand` | string | `""` | The project's folder of its brand (brand, the same an ssr site may name), with its theme.json: the emails' layout takes its colors, the names of its fonts, and its logo (identity.logo_email, or a logo that is a PNG, JPEG or GIF), sent with each email. Without one, the emails keep their neutral look. |
-| `locale` | name | `"frontend"` | The language of the words the layout writes (its footer): en, pt_br, or frontend, the first frontend's (en without one). |
+| `locale` | name | `"frontend"` | The language of the emails esquadro writes (security's, welcome, the footer, mail test) and of their dates: en, pt_br, or frontend, the first frontend's (en without one). |
 | `address` | string | `""` | A line the emails' footer ends with, as the postal address some laws ask of them: Shop Ltd, 1 Main Street, Springfield. |
 
 ```esquadro

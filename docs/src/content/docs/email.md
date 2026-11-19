@@ -27,7 +27,8 @@ emails go to **Mailpit**, which `task up` starts: read them at
 http://localhost:8025. Without compose, they go into the log.
 
 Check a provider with `go run ./cmd/<app> mail test you@example.com`: it sends
-an email now, with the environment's configuration.
+an email now, with the environment's configuration, in the layout (below)
+as every email.
 
 ## Templates
 
@@ -61,6 +62,29 @@ Each email is a template of the project, in
 `confirm_email_change`, `email_changed` and `invitation` are security's,
 which you change like any other.
 
+### In the emails' language
+
+esquadro writes its emails (`welcome` and security's) in mail's `locale`:
+`en` or `pt_br`, or, by default, the language of the first frontend (an
+ssr site's or an admin panel's `locale`), else `en`. The dates they write,
+when a link stops working, come in it too (`mail.Date`, in UTC: *9 de
+janeiro, 15:04 UTC*).
+
+The templates are still yours: esquadro writes the chosen language's into
+the project, and on a change of the locale (or of esquadro's text):
+
+- a copy you never changed takes the new text on `esquadro gen`;
+- a copy you changed has the new text merged into yours, as any file of
+  yours: lines only one side changed merge, and a line both changed (a
+  sentence you rewrote, now in another language) is marked as a conflict,
+  `<<<<<<< yours` / `>>>>>>> esquadro`, for you to resolve; until you do,
+  `esquadro gen` merges nothing more into it;
+- a copy you deleted stays deleted.
+
+So a project that translated these emails by hand and then sets `locale`
+gets conflicts on the lines it translated: keep yours, or take esquadro's.
+Emails of your own are not touched; write them in your language.
+
 ## The layout
 
 Every HTML email is written inside `_layout.html`, and every text inside
@@ -75,7 +99,7 @@ and then yours. They write the look with the functions of the generated
 | `font "body"` | a font family: `display` or `body` |
 | `logo` | the logo's address (`cid:brand-logo`), empty without one |
 | `app`, `address` | the app's name, and the footer's last line |
-| `word "why"` | a word of the layout, in mail's `locale` |
+| `word "why"` | a word of the layout, in mail's `locale` (`mail.Word` in Go) |
 | `button .Link "Choose a password"` | a link as a button, a paragraph of its own; in a text, the label and the link |
 
 Without a brand, emails keep their neutral look: a white card on a light
@@ -133,6 +157,10 @@ anew, and esquadro keeps them. While yours is still as esquadro wrote it,
 are merged into it. To leave the brand out, write a layout without its
 functions (or with colors of its own); to leave the text's footer out,
 delete `_layout.txt`, which esquadro does not bring back.
+
+A message your code writes without a template goes in the layouts too
+with `mail.Wrap(subject, text, html)`, then `Mailer.Deliver`: `mail test`
+sends one.
 
 ## Sending
 
