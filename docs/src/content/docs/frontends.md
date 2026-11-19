@@ -471,7 +471,51 @@ export default resource(meta, {
 | `subtitle` | A second line under each name in the list: a field or a function | the first relation |
 | `image` | A record's picture, in lists and atop its page | its first image field, else its initials |
 | `relations` | Lists of related records on its page | those the API filters by |
-| `actions` | Your actions: `{label, icon, run, when, confirm, bulk, destructive}` | none |
+| `actions` | Your actions: `{label, icon, key, patch, ask, copy, run, when, confirm, bulk, destructive}` | none |
+| `queue` | A queue beside the table: `{filter, card: {image, title, fields}, label}` | none |
+
+### Queues and actions
+
+Some lists are worked rather than read: offers to approve or skip, posts to
+moderate, messages to copy and mark as sent. A resource's `queue` puts the
+records of a filter beside its table, in a **Queue** tab (the browser
+remembers which one was open), as cards: one in focus, `j`/`k` (or the
+arrows) to move, `Enter` to open, and each action's key to run it. A record
+an action takes out of the filter leaves, and the next takes its place; the
+tab counts what is left.
+
+```tsx
+export default resource(meta, {
+  // ...
+  queue: {
+    filter: { status: ["PENDING"] },
+    card: { image: f.image_url, title: f.title, fields: [f.price, f.niche_id] },
+  },
+  actions: [
+    { label: "Home",  key: "1", patch: { status: "APPROVED", niche_id: niches.home }, ask: [f.hook] },
+    { label: "Skip",  key: "s", patch: { status: "SKIPPED" }, bulk: true },
+    { label: "Copy",  key: "c", copy: (o) => String(o.message) },
+  ],
+})
+```
+
+An action does any of these, in this order:
+
+- `copy`: copies the text a function makes of the record;
+- `patch`: changes those fields, by `PATCH` with `If-Match`, so a business
+  rule's refusal shows as its text, and a record someone changed is read
+  again. With `ask`, a small dialog asks for some fields of the form first,
+  with their rules, and sends them along;
+- `run`: your own code.
+
+`key` runs it on the record in focus in the queue, or open on its page; a
+key given to two actions of a resource is said in the console in
+development. An action that changes fields shows only on records the
+person may change. In the table, `bulk` runs it on the records selected,
+when it asks and copies nothing.
+
+The filter of a queue is the API's filters: a field marked
+`@store(filter)`.
 
 ### Fields of your own
 
