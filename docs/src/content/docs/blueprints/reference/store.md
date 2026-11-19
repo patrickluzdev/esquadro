@@ -46,6 +46,7 @@ blueprint store {
 | field | `sum` | name | The sum of a field of the records of a one-to-many relation, kept by the store in the transaction of every change of one of them: sum votes.value. Read only: creates and changes leave it out. |
 | field | `count` | name | How many records a one-to-many relation has, kept as a sum is: count comments. |
 | field | `flow` | list | The changes an enum field may go through, each "FROM -> TO", optionally "by" whom, as @security's rules: flow ["DRAFT -> REVIEW", "REVIEW -> PUBLISHED by user.admin, user.moderator"]. Records start in its default; another change is refused (not_allowed), whoever makes it, and the API lets only those of by make theirs. |
+| field | `history` | bool | Every value it takes is kept, with when, in a table of its own: added in the transaction of the create or the change that sets it (an empty one is not). Read by &lt;Entity>&lt;Field>History and Range (how low and how high it went since a time), and by the API. Of int, int64, decimal or money fields. |
 | relation | `filter` | bool | Lists may filter by the related record's id. |
 
 An annotation is written `@store(key value)` on the element.
