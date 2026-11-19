@@ -36,6 +36,7 @@ blueprint store {
 | Where | Key | Type | |
 |---|---|---|---|
 | entity | `soft_delete` | bool | Deleting a record puts it in the trash (deleted_at), from which it may be restored or deleted for good; reads and lists leave it out. |
+| entity | `single` | bool | One record only, which always exists, with its defaults until someone changes it: read and changed, never listed, created or deleted (settings the team tunes without a deploy). |
 | field | `filter` | bool | Lists may filter by it: by value, by range (numbers and dates), or by a list of values (enums). |
 | field | `sort` | bool | Lists may be ordered by it; only a required field, so that pages keep every record. |
 | field | `search` | bool | Lists may search its text (q). |

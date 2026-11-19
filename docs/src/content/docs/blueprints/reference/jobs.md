@@ -47,6 +47,10 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | job | `every` | string | When to enqueue the job, as cron: "0 3 * * *" (every day at 3:00), or "@every 10m", "@hourly", "@daily". Its arguments are then their defaults. |
 | job | `max_attempts` | int | Attempts before the job is given up (River's default: 25). |
 | job | `queue` | string | The queue it goes to: one of the blueprint's queues. |
+| job | `unique` | bool | The job is unique by its arguments: enqueued again, it is not enqueued twice (and that is no error). |
+| job | `unique_by` | list | Unique by these arguments only: [offer_id, destination_id]. |
+| job | `unique_for` | string | Unique within this period only: 10m, 24h, 7d; for ever without it. |
+| job | `unique_while` | name | queued: unique while it waits or runs, and may be enqueued again once it is done; ever (the default): once done too. |
 
 An annotation is written `@jobs(key value)` on the element.
 

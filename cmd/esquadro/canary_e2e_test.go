@@ -109,6 +109,8 @@ func TestCanaryUpgrades(t *testing.T) {
 		"  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Ofertas\", singular \"Oferta\")\n  @site(page, path \"ofertas\", schema product, menu)\n}\n\n/// A short link", 1)
 	deals = strings.Replace(deals, "  expires_on date\n  @security(read public, write [user.admin, user.operator])",
 		"  expires_on date\n  @security(read public, write [user.admin, user.operator])\n  @ui(label \"Cupons\", singular \"Cupom\")\n  @site(page, path \"cupons\", menu)", 1)
+	// What the team tunes without a deploy: one record only.
+	deals += "\n/// What the team tunes without a deploy.\nentity SiteSettings {\n  daily_limit   int    required default(20) min(1) max(100)\n  sending_hours string required default(\"08:00-22:00\")\n  @store(single)\n  @security(read public, write user.admin)\n}\n"
 	// A job posted once per offer and group, ever.
 	deals += "\n/// Posts an offer to a group, once.\njob PostOffer {\n  offer_id       uuid required\n  destination_id uuid required\n  @jobs(unique_by [offer_id, destination_id])\n}\n"
 	write("esquadro/deals.esq", deals)
