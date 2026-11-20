@@ -138,7 +138,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const summary = resource.summary ?? fields.filter((f) => f !== resource.title && !long.includes(f.kind)).slice(0, 4)
   const groups: { title?: string; fields: FieldMeta[] }[] = []
   for (const sec of resource.sections ?? []) {
-    const own = sec.fields.filter((f) => fields.includes(f))
+    const own = (sec.fields ?? []).filter((f) => fields.includes(f))
     if (own.length) groups.push({ title: sec.title, fields: own })
   }
   const rest = fields.filter((f) => !groups.some((g) => g.fields.includes(f)))

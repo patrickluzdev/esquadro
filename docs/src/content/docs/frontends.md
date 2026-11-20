@@ -452,6 +452,7 @@ export default resource(meta, {
     { title: "Details", fields: [f.name, f.description, f.price] },
     { title: "Photo", fields: [f.photo], side: true },
     { title: "Filing", description: "Where it shows up.", fields: [f.status, f.category_id], side: true },
+    { title: "Preview", side: true, render: (p) => <ProductCard product={p} /> },
   ],
   show: [f.name, f.price, f.status, f.category_id, f.created_at],
   title: f.name,
@@ -474,7 +475,7 @@ export default resource(meta, {
 | `table.columnFilters` | A funnel in the header of each column the list filters by | off |
 | `table.search`, `table.sort`, `table.select` | The search box, the first order, the checkboxes | as the API allows, `-created_at`, on |
 | `form` | The fields of the form | every field |
-| `sections` | The form's cards: `{title, description, fields, side}`; `side` puts one in the narrower column at the right | details at the left; media and filing at the right |
+| `sections` | The form's cards: `{title, description, fields, side, render}`; `side` puts one in the narrower column at the right; `render` shows what you make of the form's values as they are typed (a preview), under the card's fields or in place of them | details at the left; media and filing at the right |
 | `show` | The fields of a record's page, in its Details tab (in the form's sections, when it has them) | every field but images, and when it was created and changed |
 | `summary` | The fields beside the picture, atop the buttons | the first four short ones but the title |
 | `title` | What a record is called, in titles, the breadcrumb and pickers | the first field |

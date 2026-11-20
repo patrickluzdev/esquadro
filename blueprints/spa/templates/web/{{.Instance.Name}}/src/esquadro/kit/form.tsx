@@ -32,7 +32,7 @@ import { describe, fieldErrors, fieldMessage } from "./errors.ts"
 import { capitalize, format, t } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { PageFoot, PageHeader } from "./page.tsx"
-import type { Resource } from "./resource.ts"
+import type { FormSection, Resource } from "./resource.ts"
 import { RecordHistory, seesHistory } from "./history.tsx"
 import { BackToList, useRecord } from "./show.tsx"
 import { ErrorState, FormSkeleton } from "./states.tsx"
@@ -178,14 +178,22 @@ function initial(fields: FieldMeta[], record?: Rec, given: Record<string, unknow
   return out
 }
 
-/** A card of the form. */
-type FormSection = { title: string; description?: string; fields: FieldMeta[]; side?: boolean }
 
 /**
  * The form's cards when the resource names none: the details (texts,
  * numbers, dates) at the left; at the right, the media (images and files)
  * and how the record is filed (choices, related records, yes or no).
  */
+/**
+ * The form's columns: its main cards, and those of the side; with no main
+ * card, the side's go in the main column.
+ */
+export function columns(sections: FormSection[]): { main: FormSection[]; side: FormSection[] } {
+  const main = sections.filter((s) => !s.side)
+  const side = sections.filter((s) => s.side)
+  return main.length > 0 ? { main, side } : { main: side, side: [] }
+}
+
 export function defaultSections(form: FieldMeta[]): FormSection[] {
   const media = form.filter((f) => f.kind === "image" || f.kind === "file")
   const filed = form.filter((f) => f.kind === "enum" || f.kind === "relation" || f.kind === "many" || f.kind === "bool")
@@ -296,7 +304,7 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                 </CardHeader>
                 <CardContent>
                   <FieldGroup className="gap-7">
-                    {section.fields
+                    {(section.fields ?? [])
                       .filter((f) => !f.readOnly)
                       .map((f) => {
                         const error = errors[f.name]
@@ -341,17 +349,17 @@ function Form({ resource, record }: { resource: Resource; record?: Rec }) {
                         )
                       })}
                   </FieldGroup>
+                  {section.render && <div className={cn((section.fields ?? []).length > 0 && "mt-6")}>{section.render(values as Rec)}</div>}
                 </CardContent>
               </Card>
         )
         // The main cards at the left; those of the side (an image, how a
-        // record is filed) in a narrower column at the right.
-        const main = sections.filter((s) => !s.side)
-        const side = sections.filter((s) => s.side)
+        // record is filed, a preview) in a narrower column at the right.
+        const { main, side } = columns(sections)
         return (
-          <div className={cn("grid items-start gap-4", side.length > 0 && main.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_380px]" : "max-w-[1080px]")}>
-            <div className="flex min-w-0 flex-col gap-4">{(main.length > 0 ? main : side).map(card)}</div>
-            {side.length > 0 && main.length > 0 && <div className="flex min-w-0 flex-col gap-4">{side.map(card)}</div>}
+          <div className={cn("grid items-start gap-4", side.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_380px]" : "max-w-[1080px]")}>
+            <div className="flex min-w-0 flex-col gap-4">{main.map(card)}</div>
+            {side.length > 0 && <div className="flex min-w-0 flex-col gap-4">{side.map(card)}</div>}
             {/* A single resource has no page of its own: its history is here. */}
             {meta.single && record && seesHistory(meta, record, session) && (
               <Card>

@@ -4,6 +4,17 @@ import type { IconComponent } from "../icons.gen.ts"
 import type { ReactNode } from "react"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 
+/** A card of a resource's form. */
+export type FormSection = {
+  title: string
+  description?: string
+  fields?: FieldMeta[]
+  /** In the narrower column at the right. */
+  side?: boolean
+  /** What the card shows of the form's values, as they are typed. */
+  render?: (values: Rec) => ReactNode
+}
+
 export interface ColumnOptions {
   label?: string
   /** Your own cell. */
@@ -95,8 +106,12 @@ export interface ResourceDef {
     columnFilters?: boolean
   }
   form: FieldMeta[]
-  /** The form in cards: a title, and the fields of each (of those in form). */
-  sections?: { title: string; description?: string; fields: FieldMeta[]; side?: boolean }[]
+  /**
+   * The form in cards: a title, and the fields of each (of those in form);
+   * render adds what you make of the form's values as they are typed (a
+   * preview), under the card's fields or in place of them.
+   */
+  sections?: FormSection[]
   show?: FieldMeta[]
   /** The fields beside the picture on a record's page: the first short ones (not the title) by default. */
   summary?: FieldMeta[]
