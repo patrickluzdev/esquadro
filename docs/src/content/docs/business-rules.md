@@ -89,3 +89,23 @@ func (OfferRules) BeforeUpdate(ctx context.Context, m *Deals, stored Offer, n *N
 
 Who may change it at all is the [policy](/esquadro/security/)'s; the rules
 come after it, for everyone it lets in.
+
+## The generated tests
+
+The API's generated tests (`cmd/<app>/api_test.go`) create records with
+their required fields only. A rule that wants more (an affiliate link, a
+description) refuses them: give them what it wants in a test file of yours,
+by entity, and every generated test that makes one sends it.
+
+```go
+// cmd/shop/given_test.go
+package main
+
+import "example.com/shop/internal/apigen"
+
+func init() {
+	apiGiven["Offer"] = func(req any, i int) {
+		req.(*apigen.NewOffer).AffiliateURL = apigen.NewOptString("https://shop.example/a")
+	}
+}
+```

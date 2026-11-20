@@ -46,6 +46,17 @@ func newTestServerOf(t *testing.T, d dependencies) (*httptest.Server, dependenci
 // should: a retry of the same operation would send the same one again.
 var testClient = &http.Client{Transport: idempotentTransport{}}
 
+// apiGiven are your changes to the requests these tests make, by entity
+// (Offer): what a business rule of yours needs besides the required
+// fields. Set them in a test file of yours, in the package's init:
+//
+//	func init() {
+//		apiGiven["Offer"] = func(req any, i int) {
+//			req.(*apigen.NewOffer).AffiliateURL = apigen.NewOptString("https://shop.example/a")
+//		}
+//	}
+var apiGiven = map[string]func(req any, i int){}
+
 type idempotentTransport struct{}
 
 func (idempotentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -120,7 +131,7 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 		t.Fatal(err)
 	}
 {{- end}}
-	return &apigen.New{{$P}}{
+	req := &apigen.New{{$P}}{
 {{- range inRequest $e}}{{if .Required}}
 		{{ogenName (jsonName .)}}: {{apiSample . "i"}},
 {{- end}}{{end}}
@@ -132,6 +143,10 @@ func givenAPI{{$P}}(t *testing.T, {{if apiParents $e}}c{{else}}_{{end}} *apigen.
 {{- end}}
 {{- end}}{{end}}
 	}
+	if given, ok := apiGiven["{{$P}}"]; ok {
+		given(req, i)
+	}
+	return req
 }
 
 {{if importable $e -}}
