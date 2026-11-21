@@ -39,5 +39,10 @@
   "goneText": "O que ele mostrava acabou. Veja o que tem aqui agora.",
   "redirectTitle": "Levando você para {host}",
   "redirectWait": "Abrindo em {n} s",
-  "redirectGo": "Ir agora"
+  "redirectGo": "Ir agora",
+  "breadcrumb": "Caminho",
+  "browseTitle": "{list} de {name}",
+  "browseDescription": "{list} de {name}, em {site}.",
+  "recordDescription": "{title}, em {site}.",
+  "recordPriceDescription": "{title}, por {price}, em {site}."
 }

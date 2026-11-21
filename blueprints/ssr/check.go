@@ -147,6 +147,7 @@ func checkPages(p *project.Project, set *blueprint.Set, f *ui.Frontend, system m
 				Suggestion = "add blueprint storage and blueprint images to app.esq"
 		}
 	}
+	diags = append(diags, checkAddresses(p, name)...)
 	// og_image is of a record's page: an entity without pages has none.
 	for _, e := range p.Entities {
 		a := e.Ann[name]
@@ -157,6 +158,141 @@ func checkPages(p *project.Project, set *blueprint.Set, f *ui.Frontend, system m
 		}
 	}
 	return diags
+}
+
+// checkAddresses checks what a site's addresses and structured data are
+// made of: key, seller, browse and available.
+func checkAddresses(p *project.Project, name string) diag.List {
+	var diags diag.List
+	text := []project.Type{project.TypeString, project.TypeText}
+	pages := map[*project.Entity]*Page{}
+	for _, pg := range Pages(p.Entities, name) {
+		pages[pg.Entity] = pg
+	}
+	for _, e := range p.Entities {
+		a, pg := e.Ann[name], pages[e]
+		if k, ok := a["key"]; ok {
+			f := fieldNamed(e, k)
+			switch {
+			case pg == nil:
+				diags.Errorf(e.Pos, e.Pos, "key of %s ends the address of its records' pages on %s, which it has not: @%s(page, key %v)", e.Raw, name, name, k)
+			case f == nil:
+				diags.Errorf(e.Pos, e.Pos, "key %v of @%s is not a field of %s", k, name, e.Raw)
+			case !f.Unique || !slices.Contains(text, f.Type):
+				diags.Errorf(f.Pos, f.Pos, "key of @%s: %s.%s must be a unique string, for a record's page to be found by it", name, e.Raw, f.Raw).
+					Suggestion = f.Raw + " string unique"
+			}
+		}
+		if s, ok := a["seller"]; ok {
+			f := fieldNamed(e, s)
+			switch {
+			case pg == nil || pg.Schema != "product":
+				diags.Errorf(e.Pos, e.Pos, "seller of %s is of a product's structured data: @%s(page, schema product, seller %v)", e.Raw, name, s)
+			case f == nil:
+				diags.Errorf(e.Pos, e.Pos, "seller %v of @%s is not a field of %s", s, name, e.Raw)
+			case f.Enum == nil && !slices.Contains(text, f.Type):
+				diags.Errorf(f.Pos, f.Pos, "seller of @%s: %s.%s is %s; who sells a product is a text or an enum", name, e.Raw, f.Raw, f.Type)
+			}
+		}
+		available := 0
+		for _, f := range e.Fields {
+			fa := f.Ann[name]
+			if values, ok := fa["available"]; ok {
+				available++
+				switch {
+				case pg == nil || pg.Schema != "product":
+					diags.Errorf(f.Pos, f.Pos, "available of %s.%s is of a product's structured data: @%s(page, schema product) on %s", e.Raw, f.Raw, name, e.Raw)
+				case f.Enum == nil:
+					diags.Errorf(f.Pos, f.Pos, "available of @%s: %s.%s is %s; a product is in stock by the values of an enum", name, e.Raw, f.Raw, f.Type)
+				case len(ui.Strings(values)) == 0:
+					diags.Errorf(f.Pos, f.Pos, "available of %s.%s names no value of %s: available [%s]", e.Raw, f.Raw, f.Enum.Raw, f.Enum.Values[0].Raw)
+				case available > 1:
+					diags.Errorf(f.Pos, f.Pos, "available of %s.%s: %s is in stock by one field at most", e.Raw, f.Raw, e.Raw)
+				default:
+					for _, v := range ui.Strings(values) {
+						if f.Enum.Value(v) == nil {
+							diags.Errorf(f.Pos, f.Pos, "available of %s.%s: %s is not a value of %s", e.Raw, f.Raw, v, f.Enum.Raw)
+						}
+					}
+				}
+			}
+			diags = append(diags, checkBrowse(name, e, pg, f.Ann[name], f.Pos, e.Raw+"."+f.Raw, f, nil)...)
+		}
+		for _, r := range e.Relations {
+			diags = append(diags, checkBrowse(name, e, pg, r.Ann[name], r.Pos, e.Raw+"."+r.Raw, nil, r)...)
+		}
+		if pg == nil {
+			continue
+		}
+		bare, segments := 0, map[string]bool{}
+		for _, b := range pg.Browses {
+			if b.Segment == "" {
+				bare++
+				if bare > 1 {
+					diags.Errorf(e.Pos, e.Pos, "%s has more than one browse page with no path on %s: give each but one a path, the segment of its address", e.Raw, name)
+				}
+				continue
+			}
+			if segments[b.Segment] {
+				diags.Errorf(e.Pos, e.Pos, "%s has two browse pages at the same path on %s: %s", e.Raw, name, b.Segment)
+			}
+			segments[b.Segment] = true
+		}
+	}
+	return diags
+}
+
+// checkBrowse checks browse and path of a field or a relation (rel): a
+// filter of a list with pages, of an enum or a related record with a
+// title; its path, a segment of an address.
+func checkBrowse(name string, e *project.Entity, pg *Page, a map[string]any, pos diag.Pos, what string, fld *project.Field, rel *project.Relation) diag.List {
+	var diags diag.List
+	on, _ := a["browse"].(bool)
+	path, hasPath := a["path"].(string)
+	if hasPath && !on {
+		diags.Errorf(pos, pos, "path of %s is the segment of a browse page's address: @%s(browse, path %q)", what, name, path)
+	}
+	if !on {
+		return diags
+	}
+	switch {
+	case pg == nil:
+		diags.Errorf(pos, pos, "browse of %s is a page of %s's list on %s, which it has not: @%s(page) on %s", what, e.Raw, name, name, e.Raw)
+	case fld != nil && fld.Enum == nil:
+		diags.Errorf(pos, pos, "browse of %s: a browse page is of an enum's value or a related record", what)
+	case rel != nil && !rel.OwnsForeignKey():
+		diags.Errorf(pos, pos, "browse of %s: a browse page is of the one record a relation points at (written > %s)", what, rel.Target.Raw)
+	case !slices.ContainsFunc(pg.Filters, func(f Filter) bool {
+		return (rel != nil && f.Relation == rel) || (fld != nil && f.Kind == "in" && f.Field == fld.Pascal)
+	}):
+		diags.Errorf(pos, pos, "browse of %s: its page lists %s by it, which needs @store(filter)", what, e.Plural.Raw)
+	case rel != nil && TitleOf(rel.Target, name) == nil:
+		diags.Errorf(pos, pos, "browse of %s: %s has no text field its pages' addresses are made of", what, rel.Target.Raw).
+			Suggestion = "add one, or name it with @" + name + "(title ...) on " + rel.Target.Raw
+	}
+	if hasPath && on && (path == "" || Slug(path) != path) {
+		diags.Errorf(pos, pos, "path %q of %s is no segment of an address: lowercase letters, digits and hyphens, e.g. %q", path, what, Slug(path))
+	}
+	return diags
+}
+
+// Slug is a title as an address, as the site writes it: lowercase
+// letters and digits, joined by hyphens.
+func Slug(s string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			dash = false
+			b.WriteRune(r)
+			continue
+		}
+		dash = true
+	}
+	return b.String()
 }
 
 // filters reports whether e's list filters by a field (CategoryID).

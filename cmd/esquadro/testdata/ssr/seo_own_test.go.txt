@@ -1,0 +1,153 @@
+package shop
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/bojanz/currency"
+
+	"example.com/shop/internal/catalog"
+	"example.com/shop/internal/platform/postgres/postgrestest"
+)
+
+// The addresses and what search engines and AI agents read of a site
+// whose products end their addresses with a key (@shop(page, key code))
+// and have pages by category and by status (@shop(browse)), as
+// TestSSRAddressesForSearchEngines writes it beside the site.
+func TestAddressesForSearchEngines(t *testing.T) {
+	ctx := context.Background()
+	m := catalog.New(catalog.Deps{Pool: postgrestest.Fresh(t)})
+	beauty, err := m.CreateCategory(ctx, catalog.NewCategory{Name: "Beleza e Cuidados"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := m.CreateCategory(ctx, catalog.NewCategory{Name: "Casa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price := func(n string) currency.Amount {
+		a, err := currency.NewAmount(n, "BRL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a
+	}
+	bottle, err := m.CreateProduct(ctx, catalog.NewProduct{Name: "Garrafa Térmica Inox", Description: "Mantém o café quente.", Price: price("59.90"),
+		Code: "k7Qp2", Brand: "Loja X", Status: "ACTIVE", CategoryID: beauty.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cup, err := m.CreateProduct(ctx, catalog.NewProduct{Name: "Copo", Price: price("10"), Status: "INACTIVE", CategoryID: home.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dashed, err := m.CreateProduct(ctx, catalog.NewProduct{Name: "Prato", Price: price("20"), Code: "a-b", Status: "ACTIVE", CategoryID: home.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(New(Deps{Catalog: m, Logger: slog.New(slog.DiscardHandler)}))
+	t.Cleanup(srv.Close)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	get := func(path string) (*http.Response, string) {
+		t.Helper()
+		res, err := client.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res, string(body)
+	}
+	has := func(what, body string, want ...string) {
+		t.Helper()
+		for _, w := range want {
+			if !strings.Contains(body, w) {
+				t.Errorf("%s lacks %s", what, w)
+			}
+		}
+	}
+
+	// A product with a key: its slug, then its key.
+	if got := ProductPath(bottle); got != "/produtos/garrafa-termica-inox-k7Qp2" {
+		t.Fatalf("ProductPath = %s", got)
+	}
+	// Without one, or with one that cannot end an address: by id.
+	if got := ProductPath(cup); got != "/produtos/"+cup.ID.String()+"/copo" {
+		t.Errorf("ProductPath of none = %s", got)
+	}
+	if got := ProductPath(dashed); got != "/produtos/"+dashed.ID.String()+"/prato" {
+		t.Errorf("ProductPath of a key with a hyphen = %s", got)
+	}
+
+	res, body := get("/produtos/garrafa-termica-inox-k7Qp2")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the page: %d", res.StatusCode)
+	}
+	at := srv.URL + "/shop/produtos/garrafa-termica-inox-k7Qp2"
+	has("the page", body, `<link rel="canonical" href="`+at+`"`, `<meta property="og:url" content="`+at+`"`,
+		`<meta property="og:type" content="product"`, `<meta name="description" content="Mantém o café quente."`,
+		`"availability":"https://schema.org/InStock"`, `"seller":{"@type":"Organization","name":"Loja X"}`,
+		`"description":"Mantém o café quente."`, `"@type":"BreadcrumbList"`,
+		`"item":"`+srv.URL+`/shop/produtos/beleza-e-cuidados","name":"Beleza e Cuidados","position":3`,
+		`href="/shop/produtos/beleza-e-cuidados"`, `aria-current="page"`)
+
+	// The old addresses, a wrong slug and the key alone move to it.
+	for _, old := range []string{"/produtos/" + bottle.ID.String(), "/produtos/" + bottle.ID.String() + "/garrafa-termica-inox",
+		"/produtos/garrafa-velha-k7Qp2", "/produtos/k7Qp2"} {
+		if res, _ := get(old); res.StatusCode != http.StatusMovedPermanently || res.Header.Get("Location") != "/shop/produtos/garrafa-termica-inox-k7Qp2" {
+			t.Errorf("%s: %d to %s", old, res.StatusCode, res.Header.Get("Location"))
+		}
+	}
+	if res, _ := get("/produtos/garrafa-zzzzz"); res.StatusCode != http.StatusNotFound {
+		t.Errorf("a key of none: %d", res.StatusCode)
+	}
+
+	// A page without a description: its title and price; out of stock.
+	res, body = get(ProductPath(cup))
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the cup's page: %d", res.StatusCode)
+	}
+	has("the cup's page", body, `<meta name="description" content="Copo, por R$`, `"availability":"https://schema.org/OutOfStock"`)
+
+	// The list of a category, and of a status.
+	res, body = get("/produtos/beleza-e-cuidados")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the list of a category: %d", res.StatusCode)
+	}
+	has("the list of a category", body, "<title>Produtos de Beleza e Cuidados · Loja</title>",
+		`<link rel="canonical" href="`+srv.URL+`/shop/produtos/beleza-e-cuidados"`, "Garrafa Térmica Inox", `"@type":"BreadcrumbList"`)
+	if strings.Contains(body, ">Copo<") || strings.Contains(body, `content="noindex"`) {
+		t.Error("the list of a category shows another's, or is out of search engines")
+	}
+	res, body = get("/produtos/estado/active")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the list of a status: %d", res.StatusCode)
+	}
+	has("the list of a status", body, "Produtos de ACTIVE", "Prato")
+	if res, _ := get("/produtos/estado/none"); res.StatusCode != http.StatusNotFound {
+		t.Errorf("a status of none: %d", res.StatusCode)
+	}
+
+	// Filtered by the category's parameter: that page is its address.
+	_, body = get("/produtos?category_id=" + beauty.ID.String())
+	has("the list filtered by category", body, `<link rel="canonical" href="`+srv.URL+`/shop/produtos/beleza-e-cuidados"`)
+	_, body = get("/produtos?category_id=" + beauty.ID.String() + "&status=ACTIVE")
+	has("the list filtered twice", body, `content="noindex"`)
+
+	_, body = get("/sitemap.xml")
+	has("the sitemap", body, at, srv.URL+"/shop/produtos/beleza-e-cuidados", srv.URL+"/shop/produtos/casa",
+		srv.URL+"/shop/produtos/estado/active", srv.URL+"/shop/produtos/"+cup.ID.String()+"/copo")
+
+	res, body = get("/llms.txt")
+	if !strings.HasPrefix(res.Header.Get("Content-Type"), "text/markdown") {
+		t.Errorf("llms.txt is %s", res.Header.Get("Content-Type"))
+	}
+	has("llms.txt", body, "# Loja\n\n> Os produtos da loja.\n", "\n## Produtos\n\n- [Produtos]("+srv.URL+"/shop/produtos)\n",
+		"- [Produtos de Beleza e Cuidados]("+srv.URL+"/shop/produtos/beleza-e-cuidados)\n",
+		"- [Garrafa Térmica Inox]("+at+"): Mantém o café quente.\n", "\n## Categorias\n")
+}

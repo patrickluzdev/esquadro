@@ -34,10 +34,11 @@ templ {{$e.Camel}}Card(x {{$m}}.{{$e.Pascal}}) {
 }
 
 // {{$e.Pascal}}ListPage is the list of {{lower $e.Plural.Label}}: its controls, the cards and
-// the pages.
+// the pages. The list of a filter's value has its title, and the steps to it.
 templ {{$e.Pascal}}ListPage(v {{$e.Pascal}}List) {
 	@Layout(v.Page) {
-		<h1 class="t-section mb-6 text-2xl font-semibold tracking-tight">{ {{$e.Plural.Pascal}}Label }</h1>
+		@Breadcrumbs(v.Crumbs)
+		<h1 class="t-section mb-6 text-2xl font-semibold tracking-tight">{ v.Title }</h1>
 		@Controls({{$e.Plural.Pascal}}URL(), v.Filters, v.Sorts, {{$pg.Search}}, v.Query)
 		<div id="results" class="mt-6">
 			<p class="mb-4 text-sm text-muted-foreground" aria-live="polite">{ T("count", "count", Number(v.Pager.Total)) }</p>
@@ -59,9 +60,7 @@ templ {{$e.Pascal}}ListPage(v {{$e.Pascal}}List) {
 // relates to, and sharing it.
 templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
 	@Layout(v.Page) {
-		<nav class="mb-6 text-sm text-muted-foreground">
-			<a href={ templ.URL({{$e.Plural.Pascal}}URL()) } class="hover:text-foreground">{ {{$e.Plural.Pascal}}Label }</a>
-		</nav>
+		@Breadcrumbs(v.Crumbs)
 		<article class="grid gap-8 md:grid-cols-2">
 {{- if $images}}
 			if img := {{$e.Pascal}}Image(v.Item); img != "" {
@@ -75,7 +74,11 @@ templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
 					if {{siteShown . "v.Item"}} {
 						<div>
 							<dt class="text-sm text-muted-foreground">{{quote (siteLabel .Ann $n .Label) | printf "{ %s }"}}</dt>
+{{- $f := .}}{{with siteBrowseOf $pg $f}}
+							<dd class="mt-1"><a href={ templ.URL({{$e.Plural.Pascal}}By{{.Pascal}}URL(v.Item.{{.Field}})) } class="underline">{{siteValue $f "v.Item"}}</a></dd>
+{{- else}}
 							<dd class="mt-1">{{siteValue . "v.Item"}}</dd>
+{{- end}}
 						</div>
 					}
 {{- end}}{{end}}
@@ -85,9 +88,11 @@ templ {{$e.Pascal}}Page(v {{$e.Pascal}}View) {
 							<dt class="text-sm text-muted-foreground">{{quote (siteLabel .Ann $n .Label) | printf "{ %s }"}}</dt>
 {{- if $tp}}
 							<dd class="mt-1"><a href={ templ.URL({{.Target.Pascal}}URL(*v.{{.Pascal}})) } class="underline">{ {{.Target.Pascal}}Title(*v.{{.Pascal}}) }</a></dd>
+{{- else}}{{$r := .}}{{with siteBrowseOf $pg $r}}
+							<dd class="mt-1"><a href={ templ.URL({{$e.Plural.Pascal}}By{{.Pascal}}URL(*v.{{.Relation.Pascal}})) } class="underline">{ v.{{.Relation.Pascal}}.{{.Title.Pascal}} }</a></dd>
 {{- else}}
-							<dd class="mt-1">{ v.{{.Pascal}}.ID.String() }</dd>
-{{- end}}
+							<dd class="mt-1">{ v.{{$r.Pascal}}.ID.String() }</dd>
+{{- end}}{{end}}
 						</div>
 					}
 {{- end}}

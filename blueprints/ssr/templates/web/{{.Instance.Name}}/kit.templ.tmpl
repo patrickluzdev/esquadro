@@ -29,7 +29,7 @@ templ Head(p Page) {
 	<meta property="og:site_name" content={ Name }/>
 	<meta property="og:title" content={ p.Title }/>
 	<meta property="og:url" content={ p.Canonical }/>
-	<meta property="og:type" content="website"/>
+	<meta property="og:type" content={ p.Type }/>
 	<meta property="og:locale" content={ ogLocale() }/>
 	if p.Description != "" {
 		<meta property="og:description" content={ p.Description }/>
@@ -46,6 +46,9 @@ templ Head(p Page) {
 	}
 	if p.Schema != "" {
 		@templ.Raw(`<script type="application/ld+json">` + p.Schema + `</script>`)
+	}
+	if crumbs := p.BreadcrumbSchema(); crumbs != "" {
+		@templ.Raw(`<script type="application/ld+json">` + crumbs + `</script>`)
 	}
 {{- with siteBrand .App .Options}}{{$b := .}}
 {{- if .HasIcon "favicon.ico"}}
@@ -128,6 +131,29 @@ templ Controls(action string, filters []Filter, sorts []Option, search bool, q s
 		}
 		<noscript><button type="submit" class="h-10 rounded-lg border border-border px-4">{ T("filter") }</button></noscript>
 	</form>
+}
+
+// Breadcrumbs are the steps from the first page to this one, the last
+// this one: what the page's structured data says too.
+templ Breadcrumbs(crumbs []Crumb) {
+	if len(crumbs) > 1 {
+		<nav aria-label={ T("breadcrumb") } class="mb-6 text-sm text-muted-foreground">
+			<ol class="flex flex-wrap items-center gap-1">
+				for i, c := range crumbs {
+					<li class="flex items-center gap-1">
+						if i > 0 {
+							@Icon("chevron-right")
+						}
+						if i == len(crumbs)-1 {
+							<span aria-current="page" class="text-foreground">{ c.Name }</span>
+						} else {
+							<a href={ templ.URL(c.Link) } class="hover:text-foreground">{ c.Name }</a>
+						}
+					</li>
+				}
+			</ol>
+		</nav>
+	}
 }
 
 // Pagination is the links to a list's pages: previous, the page of all,

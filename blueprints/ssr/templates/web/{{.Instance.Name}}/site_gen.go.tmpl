@@ -65,10 +65,13 @@ const (
 	Path   = {{if $o.domain}}""{{else}}{{quote (or $o.path (printf "/%s" $n))}}{{end}}
 )
 
-// Name is the site's name, in every title; Locale, its language.
+// Name is the site's name, in every title; Description, what it is, in a
+// sentence (the first page's description, and llms.txt's); Locale, its
+// language.
 const (
-	Name   = {{quote (or $o.name .App.Label)}}
-	Locale = {{quote (or (and (eq $o.locale "pt_br") "pt-BR") "en")}}
+	Name        = {{quote (or $o.name .App.Label)}}
+	Description = {{quote $o.description}}
+	Locale      = {{quote (or (and (eq $o.locale "pt_br") "pt-BR") "en")}}
 )
 
 // realm is the realm whose people sign in to the site.
@@ -254,6 +257,7 @@ func (s *Site) routes() {
 	}))
 	m.HandleFunc("GET /{{$sys.sitemap}}", s.sitemap)
 	m.HandleFunc("GET /robots.txt", s.robots)
+	m.HandleFunc("GET /llms.txt", s.llms)
 {{- if siteSearch $pages}}
 	m.HandleFunc("GET /{{$sys.search}}", s.search)
 {{- end}}
@@ -304,8 +308,12 @@ type Page struct {
 	ImageWidth, ImageHeight int
 	// Canonical is the page's absolute address; Path, its path on the site.
 	Canonical, Path string
-	// Schema is its structured data (JSON-LD), "" for none.
+	// Schema is its structured data (JSON-LD), "" for none; Crumbs, the
+	// steps from the first page to it, shown and in structured data.
 	Schema string
+	Crumbs []Crumb
+	// Type is what Open Graph calls it: website, product, article.
+	Type string
 	// NoIndex keeps it out of search engines: an empty search, an error.
 	NoIndex bool
 	// SignedIn is whether the reader signed in to the site's realm.
@@ -321,18 +329,47 @@ type Page struct {
 
 // page is a page of a request, with the title and description given.
 func (s *Site) page(r *http.Request, title, description string) Page {
-	p := Page{Site: s, Title: title, Description: description, Path: r.URL.Path, Status: http.StatusOK,
+	p := Page{Site: s, Title: title, Description: description, Path: r.URL.Path, Status: http.StatusOK, Type: "website",
 		SignedIn: realm != "" && security.SignedIn(r.Context(), realm), Query: r.URL.Query().Get("q")}
-	canonical := r.URL.Path
-	if page := r.URL.Query().Get("page"); page != "" && page != "1" {
-		canonical += "?page=" + url.QueryEscape(page)
-	}
-	p.Canonical = s.Abs(r, canonical)
+	p.Canonical = s.canonical(r, r.URL.Path)
 {{- with $brand}}{{with .Theme.Identity.OGImage}}
 	// The brand's picture, for a page whose own does not set one.
 	p.Image = s.Abs(r, URL("/brand/{{.}}"))
 {{- end}}{{end}}
 	return p
+}
+
+// canonical is the absolute address of the page at path: of the page of a
+// list the request asks for, past the first.
+func (s *Site) canonical(r *http.Request, path string) string {
+	if page := r.URL.Query().Get("page"); page != "" && page != "1" {
+		path += "?page=" + url.QueryEscape(page)
+	}
+	return s.Abs(r, path)
+}
+
+// Crumb is a step of a page's breadcrumb: what it is called, its address
+// as links write it, and its absolute address.
+type Crumb struct {
+	Name, Link, Abs string
+}
+
+// crumb is the step of the page at path, called name.
+func (s *Site) crumb(r *http.Request, name, path string) Crumb {
+	return Crumb{Name: name, Link: URL(path), Abs: s.Abs(r, path)}
+}
+
+// BreadcrumbSchema is the structured data (JSON-LD) of the page's
+// breadcrumb, "" without one.
+func (p Page) BreadcrumbSchema() string {
+	if len(p.Crumbs) < 2 {
+		return ""
+	}
+	items := make([]any, len(p.Crumbs))
+	for i, c := range p.Crumbs {
+		items[i] = map[string]any{"@type": "ListItem", "position": i + 1, "name": c.Name, "item": c.Abs}
+	}
+	return schema(map[string]any{"@type": "BreadcrumbList", "itemListElement": items})
 }
 
 // FullTitle is the title of the page's tab: its own, then the site's name.
@@ -668,6 +705,50 @@ var unaccent = strings.NewReplacer(
 	"ú", "u", "ù", "u", "û", "u", "ü", "u",
 	"ç", "c", "ñ", "n",
 )
+
+{{- if siteKeys $pages}}
+// keyed reports whether a record's key can end its address: not empty,
+// and letters, digits and _ only (a hyphen ends the slug before it).
+func keyed(key string) bool {
+	if key == "" || len(key) > 64 {
+		return false
+	}
+	for _, r := range key {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// keyPath is the last part of a keyed record's address: the slug of its
+// title, then its key (garrafa-termica-k7Qp2); the key alone without a
+// title.
+func keyPath(title, key string) string {
+	if slug := Slug(title); slug != "-" {
+		return slug + "-" + key
+	}
+	return key
+}
+
+// keyOf is the key at the end of an address's last part: what follows its
+// last hyphen, or all of it.
+func keyOf(part string) string {
+	return part[strings.LastIndexByte(part, '-')+1:]
+}
+
+{{end -}}
+// browse is a list's page of one value of a filter, at an address of its
+// own (/offers/beauty): the filter's parameter and value, what the value
+// is called, and the page's path.
+type browse struct {
+	Param, Value, Name, Path string
+}
+
+// browseMax is the most related records whose pages a list has, by its
+// filter of them.
+const browseMax = 1000
+
 
 // readID is the record id of a request's path, false when it is no id.
 func readID(r *http.Request) (uuid.UUID, bool) {

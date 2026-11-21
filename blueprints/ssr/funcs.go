@@ -73,6 +73,20 @@ func TemplateFuncs() template.FuncMap {
 		"ogSampleImports": ogSampleImports,
 		"ogTested":        ogTested,
 		"ogPackages":      ogPackages,
+		"siteKeys": func(pages []*Page) bool {
+			return slices.ContainsFunc(pages, func(p *Page) bool { return p.Key != nil })
+		},
+		"siteBrowseOf": func(pg *Page, of any) *Browse {
+			for _, b := range pg.Browses {
+				if f, ok := of.(*project.Field); ok && b.Kind == "in" && b.Field == f.Pascal {
+					return b
+				}
+				if r, ok := of.(*project.Relation); ok && b.Relation == r {
+					return b
+				}
+			}
+			return nil
+		},
 		"siteSearch": func(pages []*Page) bool {
 			return slices.ContainsFunc(pages, func(p *Page) bool { return p.Search })
 		},
@@ -83,11 +97,20 @@ func TemplateFuncs() template.FuncMap {
 		},
 		"siteEnums": func(pages []*Page) []*project.Enum {
 			var out []*project.Enum
+			add := func(e *project.Enum) {
+				if e != nil && !slices.Contains(out, e) {
+					out = append(out, e)
+				}
+			}
 			for _, p := range pages {
 				for _, f := range p.Fields {
-					if f.Enum != nil && !slices.Contains(out, f.Enum) {
-						out = append(out, f.Enum)
-					}
+					add(f.Enum)
+				}
+				for _, b := range p.Browses {
+					add(b.Enum)
+				}
+				if p.Seller != nil {
+					add(p.Seller.Enum)
 				}
 			}
 			return out
@@ -125,6 +148,35 @@ type Page struct {
 	Fields []*project.Field
 	// Keys are its relations to one record the site shows.
 	Keys []*project.Relation
+	// Key is the unique field that ends a record's address
+	// (/<path>/<slug>-<key>), nil for the address by id.
+	Key *project.Field
+	// Browses are its list's pages of one filter's value: an enum's, a
+	// related record's.
+	Browses []*Browse
+	// Available is the enum field a record is in stock by, with the values
+	// it is in stock with (schema product); nil for none.
+	Available       *project.Field
+	AvailableValues []*project.EnumValue
+	// Seller is the field of who sells a record (schema product), nil for
+	// none.
+	Seller *project.Field
+	// Price is the money field of a product's offer, nil for none.
+	Price *project.Field
+}
+
+// Browse is a list's page of one value of a filter (@site(browse)): of a
+// related record, /<path>/<slug>, or of an enum's value,
+// /<path>/<segment>/<slug>.
+type Browse struct {
+	Filter
+	// Pascal names it in Go: Category, Status.
+	Pascal string
+	// Segment is the part of the address before the value's slug, "" for
+	// none (a relation's only).
+	Segment string
+	// Title is the field the related record is called by (its slug).
+	Title *project.Field
 }
 
 // Filter is a filter of a list on a site.
@@ -210,6 +262,25 @@ func Pages(entities []*project.Entity, instance string) []*Page {
 				pg.Keys = append(pg.Keys, r)
 			}
 		}
+		pg.Key = fieldNamed(e, a["key"])
+		pg.Seller = fieldNamed(e, a["seller"])
+		for _, f := range pg.Fields {
+			if pg.Price == nil && f.Type == project.TypeMoney {
+				pg.Price = f
+				break
+			}
+		}
+		for _, f := range e.Fields {
+			if values := ui.Strings(f.Ann[instance]["available"]); len(values) > 0 && f.Enum != nil && pg.Available == nil {
+				pg.Available = f
+				for _, v := range values {
+					if ev := f.Enum.Value(v); ev != nil {
+						pg.AvailableValues = append(pg.AvailableValues, ev)
+					}
+				}
+			}
+		}
+		pg.Browses = browsesOf(pg, instance)
 		byEntity[e] = pg
 		out = append(out, pg)
 	}
@@ -302,6 +373,51 @@ func HomeModules(entities []*project.Entity, modules []*project.Module, instance
 		}
 	}
 	return out
+}
+
+// browsesOf are the browse pages of a page's filters, in its filters'
+// order: those of an enum or a related record with a title marked
+// @<instance>(browse).
+func browsesOf(pg *Page, instance string) []*Browse {
+	var out []*Browse
+	for _, f := range pg.Filters {
+		if on, _ := f.Ann[instance]["browse"].(bool); !on {
+			continue
+		}
+		b := &Browse{Filter: f}
+		b.Segment, _ = f.Ann[instance]["path"].(string)
+		b.Segment = strings.Trim(b.Segment, "/")
+		switch f.Kind {
+		case "in":
+			for _, fld := range pg.Entity.Fields {
+				if fld.Pascal == f.Field {
+					b.Pascal = fld.Pascal
+					if b.Segment == "" {
+						b.Segment = fld.Kebab
+					}
+				}
+			}
+		case "id":
+			b.Pascal = f.Relation.Pascal
+			b.Title = TitleOf(f.Relation.Target, instance)
+			if b.Title == nil {
+				continue
+			}
+		default:
+			continue
+		}
+		out = append(out, b)
+	}
+	return out
+}
+
+// TitleOf is the field a record of e is called by on a site: its pages'
+// title, or its first text field; nil for none.
+func TitleOf(e *project.Entity, instance string) *project.Field {
+	if f := fieldNamed(e, e.Ann[instance]["title"]); f != nil {
+		return f
+	}
+	return firstText(e)
 }
 
 func filtersOf(e *project.Entity, f store.ListFilter) []Filter {
@@ -438,4 +554,19 @@ func brandOf(app *project.App, opts map[string]any) *ui.Brand {
 		return nil
 	}
 	return b
+}
+
+// CrumbBrowse is the browse page a record's breadcrumb goes through, after
+// its list: of its first related record with one, or else of its first
+// enum with one; nil for none.
+func (p *Page) CrumbBrowse() *Browse {
+	for _, b := range p.Browses {
+		if b.Relation != nil {
+			return b
+		}
+	}
+	if len(p.Browses) > 0 {
+		return p.Browses[0]
+	}
+	return nil
 }

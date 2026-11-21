@@ -321,3 +321,86 @@ func TestSSRDrawsOGImagesOnADomain(t *testing.T) {
 		t.Fatalf("go test: %v\n%s", err, out)
 	}
 }
+
+// seoProducts gives the shop's products a key, a price, a seller, and pages
+// by category and by status, with the status they are in stock with.
+func seoProducts(s string) string {
+	s = strings.Replace(s, `schema product, sort "-price", menu)`, `schema product, key code, seller brand, menu)`, 1)
+	return strings.Replace(s, "  price       decimal required min(0) @store(filter, sort)\n  status      Status  default(ACTIVE)\n  category    > Category required @store(filter)\n",
+		"  price       money   required @store(sort)\n  code        string  unique max(12)\n  brand       string\n"+
+			"  status      Status  default(ACTIVE) @store(filter) @shop(browse, path \"estado\", available [ACTIVE])\n"+
+			"  category    > Category required @store(filter) @shop(browse)\n", 1)
+}
+
+// withCurrency gives the app the currency of its money, and the site a
+// description.
+func withCurrency(s string) string {
+	s = strings.Replace(s, "    name \"Loja\"\n", "    name \"Loja\"\n    description \"Os produtos da loja.\"\n", 1)
+	return strings.Replace(s, "  module \"example.com/shop\"\n", "  module \"example.com/shop\"\n  currency BRL\n", 1)
+}
+
+// TestSSRAddressesForSearchEngines runs, beside the site, a test of its
+// addresses by key and their moves, its pages by category and by status,
+// the structured data, the sitemap and llms.txt (seo_own_test.go).
+func TestSSRAddressesForSearchEngines(t *testing.T) {
+	dir, code, errOut := ssrProject(t, withCurrency, seoProducts)
+	if code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "shop")
+	for path, want := range map[string][]string{
+		"product_gen.go": {"func ProductsByCategoryPath(x catalog.Category) string", `return "/produtos/estado/" + Slug(StatusLabel(v))`,
+			"x, err = s.deps.Catalog.ReadProductByCode(ctx, key)", `offer["availability"] = "https://schema.org/InStock"`},
+		"site_gen.go":   {"func keyed(key string) bool", "type browse struct", `m.HandleFunc("GET /llms.txt", s.llms)`, `Description = "Os produtos da loja."`},
+		"pages_gen.go":  {"func (s *Site) llms(", "s.productsBrowses(ctx)"},
+		"kit.templ":     {"templ Breadcrumbs(crumbs []Crumb)", `<meta property="og:type" content={ p.Type }/>`},
+		"product.templ": {"@Breadcrumbs(v.Crumbs)", "ProductsByStatusURL(v.Item.Status)"},
+	} {
+		got := read(t, filepath.Join(site, path))
+		for _, w := range want {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s lacks %q", path, w)
+			}
+		}
+	}
+	os.WriteFile(filepath.Join(site, "seo_own_test.go"), []byte(read(t, filepath.Join("testdata", "ssr", "seo_own_test.go.txt"))), 0o644)
+	test := exec.Command("go", "test", "./web/shop/", "-run", "TestAddressesForSearchEngines", "-count", "1")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
+}
+
+func TestSSRChecksItsAddresses(t *testing.T) {
+	for name, tc := range map[string]struct {
+		model func(string) string
+		want  string
+	}{
+		"key not unique": {func(s string) string {
+			return strings.Replace(seoProducts(s), "code        string  unique max(12)", "code        string  max(12)", 1)
+		}, "key of @shop: Product.code must be a unique string"},
+		"key of none": {func(s string) string { return strings.Replace(seoProducts(s), "key code", "key sku", 1) }, "key sku of @shop is not a field of Product"},
+		"browse no filter": {func(s string) string {
+			return strings.Replace(seoProducts(s), "@store(filter) @shop(browse)", "@shop(browse)", 1)
+		}, "browse of Product.category: its page lists products by it, which needs @store(filter)"},
+		"browse text": {func(s string) string {
+			return strings.Replace(seoProducts(s), "  brand       string\n", "  brand       string @shop(browse)\n", 1)
+		}, "browse of Product.brand: a browse page is of an enum's value or a related record"},
+		"path alone": {func(s string) string {
+			return strings.Replace(seoProducts(s), "  brand       string\n", "  brand       string @shop(path \"marca\")\n", 1)
+		}, `path of Product.brand is the segment of a browse page's address`},
+		"bad path": {func(s string) string { return strings.Replace(seoProducts(s), `path "estado"`, `path "Estado X"`, 1) },
+			`path "Estado X" of Product.status is no segment of an address`},
+		"available": {func(s string) string {
+			return strings.Replace(seoProducts(s), "available [ACTIVE]", "available [ON]", 1)
+		},
+			"available of Product.status: ON is not a value of Status"},
+		"seller no product": {func(s string) string { return strings.Replace(seoProducts(s), "schema product, ", "", 1) },
+			"seller of Product is of a product's structured data"},
+	} {
+		_, code, errOut := ssrProject(t, withCurrency, tc.model)
+		if code == 0 || !strings.Contains(errOut, tc.want) {
+			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}

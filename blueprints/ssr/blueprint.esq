@@ -1,9 +1,10 @@
 /// A site rendered on the server, for people and search engines (a store's
 /// shop window, a site of offers), used by name: blueprint ssr site. Each
 /// entity marked @<name>(page) gets a list (/<path>, with the filters,
-/// order, search and pages the store allows) and a page per record
-/// (/<path>/<id>/<slug>), with titles, descriptions, Open Graph, structured
-/// data, a sitemap and robots.txt. People read what @security(read ...)
+/// order, search and pages the store allows), a page per record
+/// (/<path>/<id>/<slug>, or /<path>/<slug>-<key> with key) and a page per
+/// value of the filters marked browse, with titles, descriptions, Open
+/// Graph, structured data, a sitemap, robots.txt and llms.txt. People read what @security(read ...)
 /// lets them: everyone what is public, and who signs in to the realm of
 /// auth what that realm may. What is generated is regenerated; the
 /// layout, the pages, the words and the styles are yours, written once and
@@ -38,6 +39,9 @@ blueprint ssr {
   /// The site's name: in every title and in Open Graph; the app's label by
   /// default.
   option name string default("")
+  /// What the site is, in a sentence: the first page's description, and
+  /// the summary of its llms.txt.
+  option description string default("")
   /// The site's address, for canonical links, Open Graph and the sitemap:
   /// https://shop.com; https://<domain> by default.
   option url string default("")
@@ -83,6 +87,15 @@ blueprint ssr {
     /// The field a record is called by, in titles and its address; the
     /// first text field by default.
     title name
+    /// The unique text field that ends a record's address, after the
+    /// slug of its title: /<path>/<slug>-<key>, the record found by the
+    /// key. Its value may not have a hyphen (letters, digits and _); a
+    /// record without one has the address by id. The project fills it, in
+    /// the entity's rules.
+    key name
+    /// The field of who sells a record, with schema product: a text, or
+    /// an enum, by its label.
+    seller name
     /// The field of a record's description, for search engines and
     /// shared links.
     description name
@@ -113,10 +126,26 @@ blueprint ssr {
     label string
     /// Leave the field out of the site.
     hidden bool
+    /// An enum the list filters by (@store(filter)) gets a page per value:
+    /// /<path>/<segment>/<slug of the value's label>.
+    browse bool
+    /// The segment of a browse page's address, before the value's slug:
+    /// shop. The field's name, in kebab case, by default.
+    path string
+    /// With schema product, the values of this enum a record is in stock
+    /// with: [ACTIVE]. Out of stock with the others.
+    available list
   }
   annotation relation {
     /// What this site calls the relation, when not what @ui says.
     label string
+    /// A related record the list filters by (@store(filter)) gets a page
+    /// of its own: /<path>/<slug of the record's title>, or
+    /// /<path>/<segment>/<slug> with path.
+    browse bool
+    /// The segment of a browse page's address, before the record's slug:
+    /// category. None by default.
+    path string
   }
   annotation value {
     /// What this site calls the value, when not what @ui says.
