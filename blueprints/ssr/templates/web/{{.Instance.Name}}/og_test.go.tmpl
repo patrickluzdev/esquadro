@@ -81,6 +81,13 @@ func TestOG{{$e.Pascal}}(t *testing.T) {
 	srv := httptest.NewServer(New(Deps{ {{- $e.Module.Pascal}}: m, Storage: store, Logger: slog.New(slog.DiscardHandler)}))
 	t.Cleanup(srv.Close)
 	at := srv.URL + "/{{$pg.Path}}/" + x.ID.String() + "/og.png"
+	if !shown{{$e.Pascal}}(x) {
+		// shown.go hides it: its picture is not found, as its page.
+		if res, _ := fetchOG(t, at, ""); res.StatusCode != http.StatusNotFound {
+			t.Fatalf("the picture of a {{lower $e.Label}} shown.go hides: %d, want 404", res.StatusCode)
+		}
+		t.Skip("shown.go hides the {{lower $e.Label}} this test makes: its drawing is left to your tests")
+	}
 
 	res, first := fetchOG(t, at, "")
 	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "image/png" {
