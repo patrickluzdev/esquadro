@@ -1,0 +1,32 @@
+{{- $n := .Instance.Name -}}
+{{- $pages := sitePages .Entities $n -}}
+package {{$n}}
+{{- if $pages}}
+
+import (
+{{- range siteHomeModules .Entities .Modules $n}}
+	"{{$.App.Module}}/internal/{{.Snake}}"
+{{- end}}
+)
+{{- end}}
+
+// What the {{$n}} site shows of the records everyone may read: all of them,
+// until you narrow it here. Yours. listed<Entities> narrows the query of
+// every list of the site (an entity's list and its pages by a filter, the
+// first page, the search, the sitemap and llms.txt); shown<Entity> decides
+// whether a record's page, and its picture, are there (not found, else).
+// A shop showing only what is on sale:
+//
+//	func listedProducts(q *catalog.ProductQuery) {
+//		q.Filter.Status = []catalog.ProductStatus{catalog.ProductStatusActive}
+//	}
+//
+//	func shownProduct(x catalog.Product) bool { return x.Status == catalog.ProductStatusActive }
+{{- range $pages}}{{$e := .Entity}}
+
+// listed{{$e.Plural.Pascal}} narrows the site's lists of {{lower $e.Plural.Label}}.
+func listed{{$e.Plural.Pascal}}(*{{$e.Module.Snake}}.{{$e.Pascal}}Query) {}
+
+// shown{{$e.Pascal}} reports whether the site shows a {{lower $e.Label}}'s page.
+func shown{{$e.Pascal}}({{$e.Module.Snake}}.{{$e.Pascal}}) bool { return true }
+{{- end}}

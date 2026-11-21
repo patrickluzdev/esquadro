@@ -320,6 +320,7 @@ func (s *Site) show{{$e.Plural.Pascal}}(w http.ResponseWriter, r *http.Request, 
 	}
 {{- end}}
 {{- end}}
+	listed{{$e.Plural.Pascal}}(&q)
 	page, err := s.deps.{{$M}}.List{{$e.Plural.Pascal}}(ctx, q)
 	if err != nil {
 		s.fail(w, r, err)
@@ -461,7 +462,7 @@ func (s *Site) read{{$e.Pascal}}(w http.ResponseWriter, r *http.Request) {
 		s.NotFound(w, r)
 		return
 	}
-	if errors.Is(err, {{$m}}.Err{{$e.Pascal}}NotFound) || (err == nil && !({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x)) {
+	if errors.Is(err, {{$m}}.Err{{$e.Pascal}}NotFound) || (err == nil && (!({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x) || !shown{{$e.Pascal}}(x))) {
 		s.NotFound(w, r)
 		return
 	}
@@ -598,7 +599,7 @@ func (s *Site) image{{$e.Pascal}}(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	x, err := s.deps.{{$M}}.Read{{$e.Pascal}}(ctx, id)
-	if err != nil || !({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x) || x.{{$pg.Image.Pascal}} == uuid.Nil() {
+	if err != nil || !({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x) || !shown{{$e.Pascal}}(x) || x.{{$pg.Image.Pascal}} == uuid.Nil() {
 		s.NotFound(w, r)
 		return
 	}
@@ -657,7 +658,7 @@ func (s *Site) og{{$e.Pascal}}(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	x, err := s.deps.{{$M}}.Read{{$e.Pascal}}(ctx, id)
-	if errors.Is(err, {{$m}}.Err{{$e.Pascal}}NotFound) || (err == nil && !({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x)) {
+	if errors.Is(err, {{$m}}.Err{{$e.Pascal}}NotFound) || (err == nil && (!({{$m}}.{{$e.Pascal}}Policy{}).Read(ctx, x) || !shown{{$e.Pascal}}(x))) {
 		http.NotFound(w, r)
 		return
 	}

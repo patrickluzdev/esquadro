@@ -369,6 +369,22 @@ func TestSSRAddressesForSearchEngines(t *testing.T) {
 	if out, err := test.CombinedOutput(); err != nil {
 		t.Fatalf("go test: %v\n%s", err, out)
 	}
+
+	// shown.go, the project's, narrows what the site shows: to the active.
+	if got := read(t, filepath.Join(site, "shown.go")); !strings.Contains(got, "func listedProducts(*catalog.ProductQuery) {}") || !strings.Contains(got, "func shownProduct(catalog.Product) bool { return true }") {
+		t.Fatalf("shown.go:\n%s", got)
+	}
+	os.Remove(filepath.Join(site, "seo_own_test.go"))
+	shown := read(t, filepath.Join(site, "shown.go"))
+	shown = strings.Replace(shown, "func listedProducts(*catalog.ProductQuery) {}", "func listedProducts(q *catalog.ProductQuery) {\n\tq.Filter.Status = []catalog.Status{catalog.StatusActive}\n}", 1)
+	shown = strings.Replace(shown, "func shownProduct(catalog.Product) bool { return true }", "func shownProduct(x catalog.Product) bool { return x.Status == catalog.StatusActive }", 1)
+	os.WriteFile(filepath.Join(site, "shown.go"), []byte(shown), 0o644)
+	os.WriteFile(filepath.Join(site, "shown_own_test.go"), []byte(read(t, filepath.Join("testdata", "ssr", "shown_own_test.go.txt"))), 0o644)
+	test = exec.Command("go", "test", "./web/shop/", "-run", "TestShowsWhatTheProjectSays", "-count", "1")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
 }
 
 func TestSSRChecksItsAddresses(t *testing.T) {

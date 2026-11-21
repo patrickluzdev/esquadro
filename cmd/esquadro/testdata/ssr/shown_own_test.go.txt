@@ -1,0 +1,74 @@
+package shop
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/bojanz/currency"
+
+	"example.com/shop/internal/catalog"
+	"example.com/shop/internal/platform/postgres/postgrestest"
+)
+
+// What a site shows when shown.go narrows it to the active products, as
+// TestSSRShowsWhatTheProjectSays writes it beside the site: the inactive
+// one is in no list, no sitemap, no llms.txt, and has no page.
+func TestShowsWhatTheProjectSays(t *testing.T) {
+	ctx := context.Background()
+	m := catalog.New(catalog.Deps{Pool: postgrestest.Fresh(t)})
+	home, err := m.CreateCategory(ctx, catalog.NewCategory{Name: "Casa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	price, err := currency.NewAmount("10", "BRL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plate, err := m.CreateProduct(ctx, catalog.NewProduct{Name: "Prato", Price: price, Code: "pr4to", Status: "ACTIVE", CategoryID: home.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cup, err := m.CreateProduct(ctx, catalog.NewProduct{Name: "Copo", Price: price, Code: "c0po", Status: "INACTIVE", CategoryID: home.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(New(Deps{Catalog: m, Logger: slog.New(slog.DiscardHandler)}))
+	t.Cleanup(srv.Close)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	get := func(path string) (*http.Response, string) {
+		t.Helper()
+		res, err := client.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res, string(body)
+	}
+
+	for _, path := range []string{"/", "/produtos", "/produtos/casa", "/produtos?status=INACTIVE", "/sitemap.xml", "/llms.txt"} {
+		res, body := get(path)
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("%s: %d", path, res.StatusCode)
+		}
+		if !strings.Contains(body, "Prato") && !strings.Contains(body, ProductPath(plate)) {
+			t.Errorf("%s lacks the active product", path)
+		}
+		if strings.Contains(body, "Copo") || strings.Contains(body, ProductPath(cup)) {
+			t.Errorf("%s shows the inactive product", path)
+		}
+	}
+	if res, _ := get(ProductPath(plate)); res.StatusCode != http.StatusOK {
+		t.Errorf("the active product's page: %d", res.StatusCode)
+	}
+	for _, path := range []string{ProductPath(cup), "/produtos/" + cup.ID.String()} {
+		if res, _ := get(path); res.StatusCode != http.StatusNotFound {
+			t.Errorf("%s of the inactive product: %d, want 404", path, res.StatusCode)
+		}
+	}
+}

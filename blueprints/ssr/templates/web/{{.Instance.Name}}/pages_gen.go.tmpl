@@ -36,7 +36,9 @@ func (s *Site) home(w http.ResponseWriter, r *http.Request) {
 	view := Home{Page: s.page(r, Name, Description)}
 {{- range $pages}}{{$e := .Entity}}
 	if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).List(ctx).All() {
-		page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: 1, PerPage: homeSize, Sort: {{quote .Sort}}})
+		q := {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: 1, PerPage: homeSize, Sort: {{quote .Sort}}}
+		listed{{$e.Plural.Pascal}}(&q)
+		page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, q)
 		if err != nil {
 			s.fail(w, r, err)
 			return
@@ -66,7 +68,9 @@ func (s *Site) search(w http.ResponseWriter, r *http.Request) {
 		view.Title = T("resultsFor", "q", q)
 {{- range $pages}}{{if .Search}}{{$e := .Entity}}
 		if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).List(ctx).All() {
-			page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, {{$e.Module.Snake}}.{{$e.Pascal}}Query{Search: q, Page: 1, PerPage: homeSize})
+			query := {{$e.Module.Snake}}.{{$e.Pascal}}Query{Search: q, Page: 1, PerPage: homeSize}
+			listed{{$e.Plural.Pascal}}(&query)
+			page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, query)
 			if err != nil {
 				s.fail(w, r, err)
 				return
@@ -112,13 +116,15 @@ func (s *Site) sitemap(w http.ResponseWriter, r *http.Request) {
 		}
 {{- end}}
 		for number := 1; len(urls) < sitemapMax; number++ {
-			page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: number, PerPage: 100})
+			q := {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: number, PerPage: 100}
+			listed{{$e.Plural.Pascal}}(&q)
+			page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, q)
 			if err != nil {
 				s.fail(w, r, err)
 				return
 			}
 			for _, x := range page.{{$e.Plural.Pascal}} {
-				if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).Read(ctx, x) {
+				if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).Read(ctx, x) && shown{{$e.Pascal}}(x) {
 					urls = append(urls, sitemapURL{Loc: s.Abs(r, {{$e.Pascal}}Path(x)), LastMod: x.UpdatedAt.UTC().Format("2006-01-02")})
 				}
 			}
@@ -189,13 +195,15 @@ func (s *Site) llms(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 {{- end}}
-		page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: 1, PerPage: llmsMax})
+		q := {{$e.Module.Snake}}.{{$e.Pascal}}Query{Page: 1, PerPage: llmsMax}
+		listed{{$e.Plural.Pascal}}(&q)
+		page, err := s.deps.{{$e.Module.Pascal}}.List{{$e.Plural.Pascal}}(ctx, q)
 		if err != nil {
 			s.fail(w, r, err)
 			return
 		}
 		for _, x := range page.{{$e.Plural.Pascal}} {
-			if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).Read(ctx, x) {
+			if ({{$e.Module.Snake}}.{{$e.Pascal}}Policy{}).Read(ctx, x) && shown{{$e.Pascal}}(x) {
 				link({{$e.Pascal}}Title(x), {{$e.Pascal}}Path(x), {{if $pg.Description}}summary(x.{{$pg.Description.Pascal}}){{else}}""{{end}})
 			}
 		}

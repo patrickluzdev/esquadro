@@ -833,6 +833,25 @@ cases, with `@security(read ...)`. What everyone may read (`read public`)
 everyone sees; what only the site's realm may read, those who signed in.
 What the reader may not see is not found, and stays out of the sitemap.
 
+**What the site shows** of what everyone may read is all of it, until
+`shown.go`, yours, narrows it: `listed<Entities>` narrows the query of
+every list of the site (an entity's list and its pages by a filter, the
+first page, the search, the sitemap and llms.txt), and `shown<Entity>`
+decides whether a record's page and its picture are there. A shop showing
+only what is on sale:
+
+```go
+// shown.go
+func listedProducts(q *catalog.ProductQuery) {
+	q.Filter.Status = []catalog.Status{catalog.StatusActive}
+}
+
+func shownProduct(x catalog.Product) bool { return x.Status == catalog.StatusActive }
+```
+
+A list may show fewer than its pages: offers listed while on sale, whose
+page stays, saying it ended, once they end.
+
 **The visitor's account** comes with `auth`: signing in, the providers the
 realm has, signing up when it is `signup open`, the forgotten password,
 the email confirmed and an account page (signing out, deleting the
@@ -866,7 +885,7 @@ var ownIcons = map[string]string{
 |---|---|---|
 | Routes, reading, SEO, the sitemap, llms.txt, the account, the words, the formats, the kit's icons | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
 | The frame (header, menu, footer), the first page, the search, each entity's list, card and page | `layout.templ`, `home.templ`, `search.templ`, `<entity>.templ` | yours |
-| Your pages; the words you change; the styles; your icons | `routes.go`, `messages.go`, `site.css`, `icons.go` | yours |
+| Your pages; the words you change; the styles; your icons; what the site shows | `routes.go`, `messages.go`, `site.css`, `icons.go`, `shown.go` | yours |
 
 With `engine go`, the app's binary renders the site: [templ](https://templ.guide)
 for the pages (`esquadro gen` writes their Go, and `task dev` writes it

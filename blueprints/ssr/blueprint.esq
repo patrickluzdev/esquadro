@@ -6,7 +6,8 @@
 /// value of the filters marked browse, with titles, descriptions, Open
 /// Graph, structured data, a sitemap, robots.txt and llms.txt. People read what @security(read ...)
 /// lets them: everyone what is public, and who signs in to the realm of
-/// auth what that realm may. What is generated is regenerated; the
+/// auth what that realm may; shown.go, yours, narrows what the site shows
+/// of it. What is generated is regenerated; the
 /// layout, the pages, the words and the styles are yours, written once and
 /// merged with esquadro's changes. With engine go, the app's binary renders
 /// it (templ, htmx and Tailwind).
