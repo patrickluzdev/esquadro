@@ -686,6 +686,7 @@ app shop {
     auth   "customer"        // the realm whose people sign in to it
     locale pt_br
     name   "Shop"            // in every title and in shared links
+    description "Kitchen things, delivered."  // the first page's, and llms.txt's
   }
 }
 
@@ -716,18 +717,23 @@ Each entity marked `@site(page)` gets:
   fields and related records marked `@store(filter)`) and orders the store
   allows, in the address (`?status=ACTIVE&sort=-price&page=2`); with htmx,
   a choice changes only the list;
-- **a page per record**, at `/products/<id>/<slug>`: the slug comes from
-  its title, and an address with another slug (an old title) moves to the
-  right one; with its related records (`relations`) and a button to share
-  it;
+- **a page per record**, at `/products/<id>/<slug>`, or
+  `/products/<slug>-<key>` with `key` (see [Addresses](#addresses)): the
+  slug comes from its title, and an address with another slug (an old
+  title) moves to the right one; with its related records (`relations`),
+  the steps to it (a breadcrumb) and a button to share it;
+- **a page per value of a filter** marked `browse`, `/products/kitchen`
+  or `/products/status/on-sale`: the list of those records, a page of its
+  own for search engines;
 - what search engines and shared links read: the title, a description
-  (`description`), the canonical address, Open Graph and its picture
-  (`image`, or its first image field), structured data (`schema`:
-  `product`, with its price, `article` or `organization`); with
-  `og_image` and the `images` blueprint, a picture the app draws of the
-  record, 1200x630 ([Drawn images](/esquadro/images/));
-- a place in `/sitemap.xml`, and `robots.txt` keeps the account's pages
-  out.
+  (`description`, or, without one, its title and price), the canonical
+  address, Open Graph and its picture (`image`, or its first image field),
+  structured data (`schema`: `product`, with its price, stock and seller,
+  `article` or `organization`; and the breadcrumb); with `og_image` and the
+  `images` blueprint, a picture the app draws of the record, 1200x630
+  ([Drawn images](/esquadro/images/));
+- a place in `/sitemap.xml` and in `/llms.txt`, and `robots.txt` keeps the
+  account's pages out.
 
 | `@site` | On | What | Default |
 |---|---|---|---|
@@ -737,10 +743,90 @@ Each entity marked `@site(page)` gets:
 | `schema` | entity | `product`, `article` or `organization` | none |
 | `sort` | entity | Its list's first order: `-price` | the newest first |
 | `relations` | entity | Related records its page lists: `[products]` | none |
+| `key` | entity | The unique text field that ends a record's address: `/<path>/<slug>-<key>` | the address by id |
+| `seller` | entity | With `schema product`, the field of who sells it: a text, or an enum by its label | none |
 | `menu` | entity | An entry in the site's menu | every page, when none is marked |
 | `og_image` | entity | An Open Graph image drawn of each record, `/<path>/<id>/og.png` ([Drawn images](/esquadro/images/)) | none |
 | `label`, `singular` | entity, field, relation, enum value | What this site calls it, over `@ui`'s | `@ui`'s |
 | `hidden` | field | Left out of the site | shown |
+| `browse` | field (enum), relation | A page of the list per value of this filter (`@store(filter)`) | none |
+| `path` | field, relation | With `browse`, the segment before the value's slug: `/<path>/<segment>/<slug>` | the field's name for an enum, none for a relation |
+| `available` | field (enum) | With `schema product`, the values a record is in stock with: `[ACTIVE]` | none |
+
+### Addresses
+
+A record's page is at `/<path>/<id>/<slug>`. With `key`, a unique text
+field of the entity, it is at the slug of its title, then the key:
+
+```esquadro
+entity Product {
+  name     string required
+  code     string unique max(12)
+  category > Category required @store(filter) @site(browse)
+  status   Status default(ACTIVE) @store(filter) @site(browse, path "status", available [ACTIVE])
+  @site(page, path "products", schema product, key code)
+}
+```
+
+`/products/thermal-bottle-1-litre-k7Qp2`: the page is found by the key,
+what follows the last hyphen, so the key has none (letters, digits and
+`_`). An address with another slug, an old title, moves (`301`) to the
+right one, and so do the addresses by id, `/products/<id>/<slug>` and
+`/products/<id>`, so that links already shared keep working. A record
+whose key is empty, or has a character an address cannot end with, keeps
+its address by id. `ProductPath`, `ProductURL`, the canonical address,
+Open Graph, the structured data, the sitemap, llms.txt and the share
+button all use it.
+
+esquadro does not make the key up: the project fills it in the entity's
+rules, as a [short link's code](/esquadro/short-links/) is.
+
+```go
+// product_rules.go: a product without a code gets one.
+func (ProductRules) BeforeCreate(ctx context.Context, m *Catalog, n *NewProduct) error {
+	if n.Code == "" {
+		n.Code = rand.Text()[:7] // crypto/rand: letters and digits
+	}
+	return nil
+}
+```
+
+Records written before the key was added keep their addresses by id until
+the project gives them one (a migration, or a job of its own).
+
+**Pages by a filter.** `browse`, on a relation the list filters by
+(`@store(filter)`) whose entity has a text field to call its records by,
+gives the list a page per related record: `/products/kitchen`, at the
+slug of its title (`/products/<segment>/kitchen` with `path`). On an enum
+the list filters by, a page per value: `/products/status/on-sale`, the
+slug of its label, after `path` (the field's name by default). Each is the
+list, filtered, with its title (`browseTitle`: "Products: Kitchen", in
+`messages.go`), its description (`browseDescription`), its canonical
+address and its breadcrumb, and has its place in the sitemap and in
+llms.txt (all of them; one with no records is out of search engines).
+`ProductsByCategoryURL(category)` and `ProductsByStatusURL(status)` are
+their addresses, which a record's page links its category and status to.
+
+At `/products/<x>`, a related record whose slug is exactly `x` comes
+first, then a record's key. One `browse` of an entity at most has no
+`path`. The list filtered by the address's parameters
+(`/products?category_id=...`) still works; filtered by one of them only,
+its canonical address is that page's.
+
+**Structured data.** A page of `schema product` says, beside its name,
+price and address: its description, its picture (its own, or the one
+drawn of it), whether it is in stock (`available`: `InStock` with those
+values, `OutOfStock` with the others), and who sells it (`seller`). Open
+Graph calls it a `product` (an `article`, with `schema article`). A
+record's page and a filter's page have a `BreadcrumbList` too, the steps
+the page shows (`@Breadcrumbs(v.Crumbs)`): the first page, the list, the
+page of its first related record with one (or of its first enum), and it.
+
+**llms.txt.** `/llms.txt` is the site for AI agents, in
+[llms.txt](https://llmstxt.org)'s Markdown: its `name` and `description`,
+then a section per list, with the list's address, those of its filters'
+pages, and its 50 latest records, with their descriptions. As the
+sitemap, it has only what everyone may read.
 
 **Who reads what** is the model's: a page reads through the module's use
 cases, with `@security(read ...)`. What everyone may read (`read public`)
@@ -778,7 +864,7 @@ var ownIcons = map[string]string{
 
 | | Where | Whose |
 |---|---|---|
-| Routes, reading, SEO, the sitemap, the account, the words, the formats, the kit's icons | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
+| Routes, reading, SEO, the sitemap, llms.txt, the account, the words, the formats, the kit's icons | `web/<name>/*_gen.go`, `kit.templ`, `kit.js` | generated |
 | The frame (header, menu, footer), the first page, the search, each entity's list, card and page | `layout.templ`, `home.templ`, `search.templ`, `<entity>.templ` | yours |
 | Your pages; the words you change; the styles; your icons | `routes.go`, `messages.go`, `site.css`, `icons.go` | yours |
 
