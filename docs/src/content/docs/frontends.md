@@ -521,8 +521,11 @@ An action does any of these, in this order:
 - `copyImage`: copies the image at the address a function makes of the
   record, as an image, to paste into a chat or a post ("Image copied."). It goes on
   the clipboard as PNG, the one type browsers take there; another is drawn
-  as PNG first. A browser that cannot copy images says so and offers to
-  download it (no download, and the action stops there);
+  as PNG first. An image of another site, which the panel's CSP does not
+  let it fetch (a store's photo), is loaded as an image and drawn instead:
+  that site must send CORS headers, as stores' image servers do. A browser
+  that cannot copy images says so and offers to download it (no download,
+  and the action stops there);
 - `patch`: changes those fields, by `PATCH` with `If-Match`, so a business
   rule's refusal shows as its text, and a record someone changed is read
   again. With `ask`, a small dialog asks for some fields of the form first,

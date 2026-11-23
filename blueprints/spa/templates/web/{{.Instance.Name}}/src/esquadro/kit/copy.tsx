@@ -32,13 +32,15 @@ export async function copy(text: string): Promise<void> {
  * says so: as PNG, the one type browsers put on the clipboard, drawn on a
  * canvas when it is not one. A browser that cannot copy it offers to download
  * it instead. It answers false when the person chose neither.
+ *
+ * An image of another site the frontend's CSP does not let it fetch
+ * (connect-src 'self'; a store's photo) is loaded as an image instead, which
+ * img-src allows, and drawn: that site must send CORS headers, as stores'
+ * image servers do.
  */
 export async function copyImage(url: string): Promise<boolean> {
   // Fetched once, for the clipboard or the download.
-  const blob = fetch(url).then((res) => {
-    if (!res.ok) throw new Error(`${res.status} ${url}`)
-    return res.blob()
-  })
+  const blob = fetchImage(url)
   blob.catch(() => {})
   if (canCopyImages()) {
     try {
@@ -54,6 +56,37 @@ export async function copyImage(url: string): Promise<boolean> {
   if (!(await ask(t("imageNotCopied"), { confirm: t("download") }))) return false
   download(await blob.catch(() => null), url)
   return true
+}
+
+/** An image by its address: fetched, or else loaded as an image and drawn as PNG. */
+export function fetchImage(url: string): Promise<Blob> {
+  return fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`${res.status} ${url}`)
+      return res.blob()
+    })
+    .catch(() => loadImage(url))
+}
+
+/** An image loaded by an img element (CORS anonymous) and drawn on a canvas, as PNG. */
+function loadImage(url: string): Promise<Blob> {
+  return new Promise((done, fail) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      try {
+        canvas.getContext("2d")!.drawImage(img, 0, 0)
+        canvas.toBlob((b) => (b ? done(b) : fail(new Error("png"))), "image/png")
+      } catch (e) {
+        fail(e)
+      }
+    }
+    img.onerror = () => fail(new Error(`load ${url}`))
+    img.src = url
+  })
 }
 
 /** Whether the browser puts images on the clipboard. */
