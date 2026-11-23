@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -284,5 +285,40 @@ entity Note {
 	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "  blueprint security\n", withServices, 1)), 0o644)
 	if code, _, errOut := esq(t, "check", dir); code != 1 || !strings.Contains(errOut, "service is the realm of the service keys") {
 		t.Fatalf("a realm named service: exit %d\n%s", code, errOut)
+	}
+}
+
+// TestAPIListsWhatThePolicyNarrows writes a policy of products that narrows
+// what no one signed in lists (Narrow) and reads (Read), beside a test of
+// what the API then answers, and runs it with the generated TestAPIAccess.
+func TestAPIListsWhatThePolicyNarrows(t *testing.T) {
+	if testing.Short() {
+		t.Skip("generates the api starter, which needs sqlc or Docker")
+	}
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	catalogEsq := filepath.Join(dir, "esquadro", "catalog.esq")
+	os.WriteFile(catalogEsq, []byte(strings.Replace(read(t, catalogEsq), "default(ACTIVE)", "default(ACTIVE) @store(filter)", 1)), 0o644)
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	catalog := filepath.Join(dir, "internal", "catalog")
+	for path, want := range map[string]string{
+		"product_policy_gen.go": "func (productRules) Narrow(ctx context.Context, q *ProductQuery) {}",
+		"product_policy.go":     "//	func (ProductPolicy) Narrow(ctx context.Context, q *ProductQuery) {",
+		"http.go":               "ProductPolicy{}.Narrow(ctx, &q)",
+	} {
+		if got := read(t, filepath.Join(catalog, path)); !strings.Contains(got, want) {
+			t.Errorf("%s lacks %q", path, want)
+		}
+	}
+	os.WriteFile(filepath.Join(catalog, "product_policy.go"), []byte(read(t, filepath.Join("testdata", "security", "product_policy.go.txt"))), 0o644)
+	os.WriteFile(filepath.Join(dir, "cmd", "shop", "narrow_own_test.go"), []byte(read(t, filepath.Join("testdata", "security", "narrow_own_test.go.txt"))), 0o644)
+	cmd := exec.Command("go", "test", "./cmd/shop/", "-run", "TestListsWhatThePolicyNarrows|TestAPIAccess|TestAPIInclude", "-count", "1")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
 	}
 }

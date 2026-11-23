@@ -859,6 +859,12 @@ func shownProduct(x catalog.Product) bool { return x.Status == catalog.StatusAct
 A list may show fewer than its pages: offers listed while on sale, whose
 page stays, saying it ended, once they end.
 
+The policy's `Narrow`, which narrows the API's lists to what each request
+may see ([Policies](/esquadro/security/#policies)), is not asked here:
+`shown.go` says what the site lists, and the policy's `Read`, as
+`shown<Entity>`, whether a record's page is there. Write both when the API
+hides from the public what the site hides too.
+
 **The visitor's account** comes with `auth`: signing in, the providers the
 realm has, signing up when it is `signup open`, the forgotten password,
 the email confirmed and an account page (signing out, deleting the

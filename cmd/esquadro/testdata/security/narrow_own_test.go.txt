@@ -1,0 +1,71 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"testing"
+
+	"github.com/shopspring/decimal"
+
+	"example.com/shop/internal/catalog"
+)
+
+// The API's list of products as product_policy.go narrows it, as
+// TestAPIListsWhatThePolicyNarrows writes it: no one signed in lists only
+// the active ones (Narrow), whatever the filter asks, and not the dear one
+// either (Read); staff list them all.
+func TestListsWhatThePolicyNarrows(t *testing.T) {
+	ctx := context.Background()
+	srv, d := newTestServerOf(t, newTestDependencies(t))
+	home, err := d.catalog.CreateCategory(ctx, catalog.NewCategory{Name: "Casa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	product := func(name string, price int64, status catalog.Status) string {
+		t.Helper()
+		x, err := d.catalog.CreateProduct(ctx, catalog.NewProduct{Name: name, Price: decimal.NewFromInt(price), Status: status, CategoryID: home.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return x.ID.String()
+	}
+	plate := product("Prato", 10, catalog.StatusActive)
+	cup := product("Copo", 10, catalog.StatusInactive)
+	vase := product("Vaso", 5000, catalog.StatusActive)
+	url := srv.URL + "/api/v1/products"
+
+	for _, query := range []string{"", "?status=INACTIVE", "?status=ACTIVE,INACTIVE", "?page=1", "?category_id=" + home.ID.String()} {
+		got, ids, _ := call(t, "GET", url+query, "nobody")
+		if got != http.StatusOK || len(ids) != 1 || !ids[plate] {
+			t.Errorf("list%s as no one: %d %v, want only the active one", query, got, ids)
+		}
+	}
+	if got, ids, _ := call(t, "GET", url, "user.staff"); got != http.StatusOK || len(ids) != 3 {
+		t.Errorf("list as staff: %d %v, want them all", got, ids)
+	}
+	if got, ids, _ := call(t, "GET", url+"?status=INACTIVE", "user.staff"); got != http.StatusOK || len(ids) != 1 || !ids[cup] {
+		t.Errorf("list of the inactive as staff: %d %v, want the inactive one", got, ids)
+	}
+
+	// The total is the narrowed query's: the dear one Read leaves out
+	// still counts.
+	res, err := asTestPrincipal("nobody").Get(url + "?page=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var page struct{ Total int64 }
+	if err := json.NewDecoder(res.Body).Decode(&page); err != nil || page.Total != 2 {
+		t.Errorf("total as no one: %d (%v), want 2", page.Total, err)
+	}
+
+	for id, want := range map[string]int{plate: http.StatusOK, cup: http.StatusNotFound, vase: http.StatusNotFound} {
+		if got, _, _ := call(t, "GET", url+"/"+id, "nobody"); got != want {
+			t.Errorf("get %s as no one: %d, want %d", id, got, want)
+		}
+		if got, _, _ := call(t, "GET", url+"/"+id, "user.staff"); got != http.StatusOK {
+			t.Errorf("get %s as staff: %d", id, got)
+		}
+	}
+}

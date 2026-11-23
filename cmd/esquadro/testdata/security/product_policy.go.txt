@@ -1,0 +1,29 @@
+package catalog
+
+import (
+	"context"
+
+	"github.com/shopspring/decimal"
+
+	"example.com/shop/internal/platform/security"
+)
+
+// ProductPolicy, as TestAPIListsWhatThePolicyNarrows writes it: no one
+// signed in lists only the active products, and reads neither the inactive
+// nor, past what Narrow says, the dear ones.
+type ProductPolicy struct {
+	productRules
+}
+
+func (ProductPolicy) Narrow(ctx context.Context, q *ProductQuery) {
+	if !security.Allows(ctx, "user") {
+		q.Filter.Status = []Status{StatusActive}
+	}
+}
+
+func (p ProductPolicy) Read(ctx context.Context, x Product) bool {
+	if security.Allows(ctx, "user") {
+		return p.productRules.Read(ctx, x)
+	}
+	return p.productRules.Read(ctx, x) && x.Status == StatusActive && x.Price.LessThan(decimal.NewFromInt(1000))
+}

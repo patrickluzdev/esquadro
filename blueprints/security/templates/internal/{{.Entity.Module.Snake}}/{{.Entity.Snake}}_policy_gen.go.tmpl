@@ -31,6 +31,14 @@ func ({{$R}}) List(ctx context.Context) security.Scope {
 {{- end}}
 	return security.Nobody()
 }
+{{- if and (uses "store") (listed $e)}}
+
+// Narrow narrows q, a list of {{$e.Plural.Snake}} the request of ctx may list (List),
+// to those it may see; the model's rules narrow none. The API's list asks it
+// before reading, so that its pages and totals hold only those; it also
+// leaves out any one Read refuses.
+func ({{$R}}) Narrow(ctx context.Context, q *{{$e.Pascal}}Query) {}
+{{- end}}
 {{range $op := list "Read" "Update" "Delete"}}
 // {{$op}} reports whether the request of ctx may {{lower $op}} x.
 func ({{$R}}) {{$op}}(ctx context.Context, x {{$e.Pascal}}) bool {

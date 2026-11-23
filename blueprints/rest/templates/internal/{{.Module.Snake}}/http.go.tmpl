@@ -242,6 +242,7 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 		return nil, security.Refusal(ctx)
 	}
 {{- end}}
+	{{$P}}Policy{}.Narrow(ctx, &q)
 {{- end}}
 	page, err := h.{{$p}}.List{{.Plural.Pascal}}(ctx, q)
 	if err != nil {
@@ -260,6 +261,13 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 	}
 {{- else}}
 	answer.Can = []apigen.{{$P}}PageCanItem{"create"}
+{{- end}}
+{{- if $pol}}
+	// A record Read refuses stays out, though the query (Narrow) let it in:
+	// the page holds fewer, and its total still counts it.
+	page.{{.Plural.Pascal}} = slices.DeleteFunc(page.{{.Plural.Pascal}}, func(x {{$P}}) bool {
+		return !({{$P}}Policy{}).Read(ctx, x)
+	})
 {{- end}}
 	for _, listed := range page.{{.Plural.Pascal}} {
 		answer.Items = append(answer.Items, {{.Camel}}Answer(ctx, listed))
@@ -616,6 +624,11 @@ func (h HTTP) List{{$P}}{{$R}}(ctx context.Context, params apigen.List{{$P}}{{$R
 {{- else}}
 	answer := apigen.{{.Target.Pascal}}Page{Items: make([]apigen.{{.Target.Pascal}}, 0, len(page.{{.Target.Plural.Pascal}}))}
 	for _, listed := range page.{{.Target.Plural.Pascal}} {
+{{- if $pol}}
+		if !({{.Target.Pascal}}Policy{}).Read(ctx, listed) {
+			continue
+		}
+{{- end}}
 		answer.Items = append(answer.Items, {{.Target.Camel}}Answer(ctx, listed))
 	}
 {{- end}}

@@ -45,6 +45,13 @@ func TemplateFuncs() template.FuncMap {
 			return nil
 		},
 		"has": slices.Contains[[]string],
+		// listed reports whether the store lists e's records with a query
+		// (<Entity>Query): all but an entity of one record, as the store
+		// blueprint's Single says (store imports this package).
+		"listed": func(e *project.Entity) bool {
+			single, _ := e.Ann["store"]["single"].(bool)
+			return !single
+		},
 		// goElems is a []string literal without its type, for the values of
 		// a map: {"a", "b"}.
 		"goElems": func(items []string) string {

@@ -137,6 +137,41 @@ func (p OrderPolicy) Update(ctx context.Context, o Order) bool {
 }
 ```
 
+`List` says whether a request lists an entity's records (all of them, or
+its owner's); `Narrow`, which of those it sees. The model's narrows none;
+write it in your policy and the API's list asks it before reading, in its
+query, so that pages, totals and cursors hold only those. Offers everyone
+may read, but only the approved ones unless a user (the staff) signed in:
+
+```go
+func (OfferPolicy) Narrow(ctx context.Context, q *OfferQuery) {
+	if !security.Allows(ctx, "user") {
+		q.Filter.Status = []OfferStatus{OfferStatusApproved}
+	}
+}
+
+func (p OfferPolicy) Read(ctx context.Context, x Offer) bool {
+	return p.offerRules.Read(ctx, x) && (x.Status == OfferStatusApproved || security.Allows(ctx, "user"))
+}
+```
+
+- `Narrow` changes the query after the request's own filters, so it has the
+  last word: `?status=PENDING` from no one signed in lists the approved
+  ones. The field it sets must be one the store filters by
+  (`@store(filter)`).
+- Write `Read` to agree, for a record asked by its id: one it refuses
+  answers `404`, as if it did not exist.
+- A list also leaves out each record `Read` refuses, though the query let it
+  in. The page then holds fewer than asked, and its `total` still counts
+  them; the next cursor goes on after them. Narrow in the query what you can,
+  for pages and totals to be right.
+- The records a list includes (`include=`) and a many-to-many relation's
+  list (`GET /products/{id}/tags`) are the other entity's: only those its
+  `Read` lets in.
+- The sites (blueprint `ssr`) do not ask it: what a site shows is its
+  `shown.go`'s, which narrows its lists of the records everyone may read
+  (see [Frontends](/esquadro/frontends/#sites-rendered-on-the-server)).
+
 Ask the policy in your own code too: `sales.OrderPolicy{}.Update(ctx, order)`.
 The generated tests check the model's rules; `TestAPIAccess` checks that the
 API answers as the policy that runs says, yours included.

@@ -13,6 +13,19 @@ package {{$m.Snake}}
 // The API asks it before each operation on {{$e.Plural.Snake}}, and tells clients
 // what each person may do (can); ask it in your own code too. Writing
 // Create, write CanCreate too, so that clients offer what Create allows.
+{{- if and (uses "store") (listed $e)}}
+//
+// Narrow, written here, narrows the API's list of {{$e.Plural.Snake}} to those the
+// request may see, in its query, so that pages and totals stay right;
+// write Read to agree, for one asked by its id. Only the published, unless
+// signed in:
+//
+//	func ({{$e.Pascal}}Policy) Narrow(ctx context.Context, q *{{$e.Pascal}}Query) {
+//		if !security.Allows(ctx, "{{(index (realms .Entities) 0).Name}}") {
+//			q.Filter.Status = []Status{StatusPublished}
+//		}
+//	}
+{{- end}}
 type {{$e.Pascal}}Policy struct {
 	{{$e.Camel}}Rules
 }

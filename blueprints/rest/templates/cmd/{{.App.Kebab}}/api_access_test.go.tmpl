@@ -1,7 +1,7 @@
 {{- if and (policies .Entities) (uses "testcontainers") -}}
 package main
 
-{{importBlock "context" "encoding/json" "io" "net/http" "strings" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
+{{importBlock "context" "encoding/json" "io" "net/http" "slices" "strings" "testing" "uuid" (printf "%s/internal/apigen" .App.Module) (modulePaths .App.Module .Modules) (printf "%s/internal/platform/security" .App.Module)}}
 // call answers the status of a request as who, the IDs of the list it
 // answered, if any, and the actions it says who may take (can).
 func call(t *testing.T, method, url, who string) (int, map[string]bool, string) {
@@ -120,6 +120,14 @@ func TestAPIAccess(t *testing.T) {
 
 			scope := policy.List(as(who))
 			owner, owned := scope.Owner()
+			// Listed, too, only when Narrow keeps it and Read lets it.
+			narrowed := {{$m.Snake}}.{{$P}}Query{Limit: {{$m.Snake}}.Max{{$P}}Page}
+			policy.Narrow(as(who), &narrowed)
+			kept, err := d.{{$m.Camel}}.List{{$e.Plural.Pascal}}(ctx, narrowed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seen := read && slices.ContainsFunc(kept.{{$e.Plural.Pascal}}, func(x {{$m.Snake}}.{{$P}}) bool { return x.ID == stored.ID })
 			got, ids, can := call(t, "GET", url, who)
 			if wantCreate := policy.CanCreate(as(who)); got == http.StatusOK && (can == "create") != wantCreate {
 				t.Errorf("the list's can as %s: %q, want create %v", who, can, wantCreate)
@@ -131,7 +139,7 @@ func TestAPIAccess(t *testing.T) {
 				}
 			case got != http.StatusOK:
 				t.Errorf("list as %s: %d", who, got)
-			case ids[stored.ID.String()] != (scope.All(){{with $own}} || owner == stored.{{.}}{{end}}):
+			case ids[stored.ID.String()] != (seen && {{with $own}}(scope.All() || owner == stored.{{.}}){{else}}scope.All(){{end}}):
 				t.Errorf("list as %s: the {{$e.Snake}} listed %v", who, ids[stored.ID.String()])
 			}
 {{- if not $own}}
