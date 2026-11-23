@@ -10,16 +10,16 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import { api } from "../api.ts"
-import { base, pageURL, realmKey } from "../config.ts"
+import { base, pageURL, passwordPolicy, realmKey } from "../config.ts"
 import { signOut } from "./auth.tsx"
 import { ask } from "./confirm.tsx"
-import { describe, fieldErrors, fieldMessage } from "./errors.ts"
+import { describe, fieldErrors, fieldMessage, passwordRefusal } from "./errors.ts"
 import { format, t } from "./i18n.ts"
 import type { FieldMeta } from "./meta.ts"
 import { toast } from "./toast.tsx"
@@ -105,11 +105,18 @@ export function PasswordCard() {
       toast(t("passwordChanged"))
     },
     onError: (e) => {
-      setErrors(fieldErrors(e))
-      if (Object.keys(fieldErrors(e)).length === 0) toast(describe(e), "error")
+      // The messages by field: the new password's says why the policy
+      // refused it (the API names it password).
+      const byField: Record<string, string> = {}
+      for (const [name, code] of Object.entries(fieldErrors(e))) {
+        byField[name === "password" ? "new_password" : name] = fieldMessage({ name, label: "", kind: "text", required: true }, code)
+      }
+      const refused = passwordRefusal(e)
+      if (refused) byField.new_password = refused
+      setErrors(byField)
+      if (!byField.current_password && !byField.new_password) toast(describe(e), "error")
     },
   })
-  const field = (name: string): FieldMeta => ({ name, label: "", kind: "text", required: true })
   return (
     <Card>
       <form
@@ -131,12 +138,12 @@ export function PasswordCard() {
             <Field data-invalid={errors.current_password ? true : undefined}>
               <FieldLabel htmlFor="current">{t("currentPassword")}</FieldLabel>
               <Input id="current" name="current" type="password" autoComplete="current-password" required aria-invalid={!!errors.current_password} />
-              {errors.current_password && <FieldError>{fieldMessage(field("current_password"), errors.current_password)}</FieldError>}
+              {errors.current_password && <FieldError>{errors.current_password}</FieldError>}
             </Field>
             <Field data-invalid={errors.new_password ? true : undefined}>
               <FieldLabel htmlFor="new">{t("newPassword")}</FieldLabel>
-              <Input id="new" name="new" type="password" autoComplete="new-password" required aria-invalid={!!errors.new_password} />
-              {errors.new_password && <FieldError>{fieldMessage(field("new_password"), errors.new_password)}</FieldError>}
+              <Input id="new" name="new" type="password" autoComplete="new-password" required aria-invalid={!!errors.new_password} aria-describedby="new-hint" />
+              {errors.new_password ? <FieldError id="new-hint">{errors.new_password}</FieldError> : <FieldDescription id="new-hint">{t("passwordRule", { min: passwordPolicy.min })}</FieldDescription>}
             </Field>
           </FieldGroup>
         </CardContent>

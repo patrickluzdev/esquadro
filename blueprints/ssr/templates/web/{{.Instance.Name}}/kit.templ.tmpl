@@ -258,6 +258,12 @@ templ field(name, label, kind, autocomplete string) {
 	</label>
 }
 
+// passwordRule is the hint under a new password's field: the realm's
+// minimum.
+templ passwordRule() {
+	<p class="-mt-2 text-xs text-muted-foreground">{ PasswordRule() }</p>
+}
+
 // formMessage is where an account's form tells how it went.
 templ formMessage() {
 	<p data-message role="status" class="notice notice-info hidden rounded-lg bg-muted p-3 text-sm"></p>
@@ -302,6 +308,7 @@ templ SignUpPage(p Page, a Account) {
 			}
 			@field("email", T("email"), "email", "email")
 			@field("password", T("password"), "password", "new-password")
+			@passwordRule()
 			@formMessage()
 			@submit(T("signUp"))
 		</form>
@@ -333,6 +340,7 @@ templ ResetPage(p Page, a Account) {
 	@AuthFrame(p, T("newPassword"), T("resetHint")) {
 		<form data-identity={ a.Identity + "/password/reset" } data-token={ a.Token } data-done={ T("passwordSet") } class="grid gap-4">
 			@field("new_password", T("newPassword"), "password", "new-password")
+			@passwordRule()
 			@formMessage()
 			@submit(T("setPassword"))
 		</form>

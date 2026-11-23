@@ -238,6 +238,9 @@ func realmNamed(d dependencies, name string) (security.Realm, bool) {
 // describe is an error of the model as a line: its fields refused.
 func describe(err error) error {
 	if weak, ok := errors.AsType[*security.WeakPassword](err); ok {
+		if weak.Limit > 0 {
+			return fmt.Errorf("the password is refused: %s (%d characters)", weak.Reason, weak.Limit)
+		}
 		return fmt.Errorf("the password is refused: %s", weak.Reason)
 	}
 	if p, ok := errors.AsType[*edge.Problem](err); ok {

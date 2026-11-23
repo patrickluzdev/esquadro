@@ -21,11 +21,12 @@ var (
 	ErrBadRequest         = &edge.Problem{Status: http.StatusBadRequest, Code: "bad_request", Title: "The request is not valid JSON of the expected shape."}
 )
 
-// weakPassword is a password the policy refuses, saying why.
-func weakPassword(reason string) *edge.Problem {
+// weakPassword is a password the policy refuses, saying why: too short or
+// too long with the policy's limit, so that a frontend can say it.
+func weakPassword(weak *WeakPassword) *edge.Problem {
 	return &edge.Problem{
 		Status: http.StatusUnprocessableEntity, Code: "invalid_fields", Title: "Some fields are not valid.",
-		Errors: []edge.FieldProblem{ {Field: "password", Code: reason} },
+		Errors: []edge.FieldProblem{ {Field: "password", Code: weak.Reason, Limit: weak.Limit} },
 	}
 }
 

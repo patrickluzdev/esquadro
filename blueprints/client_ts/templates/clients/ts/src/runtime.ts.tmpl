@@ -36,6 +36,8 @@ export interface FieldProblem {
   code: string
   /** In an import refused (import_refused), the row (from 1) it is in. */
   row?: number
+  /** Too short or too long (too_short, too_long), the length to reach or not pass: a password's minimum or maximum. */
+  limit?: number
 }
 
 /** A response that is not a success: its status, and the API's code. */

@@ -28,6 +28,15 @@ export const providers: readonly string[] = [{{range $realms}}{{if eq .Name $rea
 /** The buttons of the providers on the sign-in page, and the accounts connected. */
 export const socialLogin: boolean = {{.Options.social_login}}
 
+/**
+ * The realm's password policy: how many characters a new password has at
+ * least and at most (each character counts once, as the API counts them).
+ */
+{{- $min := 12}}{{$max := 128}}
+{{- with $sec := optionsOf "security"}}{{with $sec.password_min}}{{$min = .}}{{end}}{{with $sec.password_max}}{{$max = .}}{{end}}{{end}}
+{{- range $realms}}{{if eq .Name $realm}}{{with .PasswordMin}}{{$min = .}}{{end}}{{with .PasswordMax}}{{$max = .}}{{end}}{{end}}{{end}}
+export const passwordPolicy: { min: number; max: number } = { min: {{$min}}, max: {{$max}} }
+
 /** The bell of the notices: how often it asks (seconds), how many it shows; null without it. */
 export const notifications: { poll: number; size: number } | null = {{if and (uses "notifications") .Options.notifications}}{ poll: {{index (optionsOf "notifications") "poll_seconds"}}, size: {{index (optionsOf "notifications") "page_size"}} }{{else}}null{{end}}
 

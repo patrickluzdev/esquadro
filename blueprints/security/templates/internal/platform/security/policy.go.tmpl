@@ -36,8 +36,12 @@ type PasswordPolicy struct {
 
 // WeakPassword is a password the policy refuses, and why: too_short,
 // too_long, common (in a list, or made of a sequence, a repetition or a
-// name) or breached.
-type WeakPassword struct{ Reason string }
+// name) or breached. Limit is, too short or too long, the policy's minimum
+// or maximum.
+type WeakPassword struct {
+	Reason string
+	Limit  int
+}
 
 func (e *WeakPassword) Error() string { return "security: weak password: " + e.Reason }
 
@@ -48,9 +52,9 @@ func (p PasswordPolicy) Check(ctx context.Context, password string, context ...s
 	n := utf8.RuneCountInString(norm.NFC.String(password))
 	switch {
 	case n < p.Min:
-		return &WeakPassword{Reason: "too_short"}
+		return &WeakPassword{Reason: "too_short", Limit: p.Min}
 	case n > p.Max:
-		return &WeakPassword{Reason: "too_long"}
+		return &WeakPassword{Reason: "too_long", Limit: p.Max}
 	}
 	if p.Blocklist == "none" {
 		return nil

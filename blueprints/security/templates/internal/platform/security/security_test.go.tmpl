@@ -79,6 +79,12 @@ func TestPasswordPolicy(t *testing.T) {
 			t.Errorf("%q: got %v, want %s", password, err, reason)
 		}
 	}
+	// Too short or too long, it says the limit, for the person to read.
+	for password, limit := range map[string]int{"short": 12, strings.Repeat("a", 129): 128} {
+		if weak, ok := errors.AsType[*WeakPassword](p.Check(context.Background(), password)); !ok || weak.Limit != limit {
+			t.Errorf("%q: got %+v, want the limit %d", password, weak, limit)
+		}
+	}
 	if err := p.Check(context.Background(), "correct horse battery staple"); err != nil {
 		t.Fatalf("a good passphrase: %v", err)
 	}

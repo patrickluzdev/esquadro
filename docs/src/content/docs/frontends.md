@@ -218,6 +218,10 @@ The pages before signing in (signing in, a forgotten password, a new one,
 an email confirmed, no access) share one frame, `src/components/auth-frame.tsx`:
 the brand, or how it ended (`tone`: success, error, info, forbidden), a
 title, a hint and a way back to signing in. A link that expired says so.
+A new password's field shows the realm's minimum ("At least 12
+characters", `passwordPolicy` in `src/esquadro/config.ts`), and a password
+refused says why: too short or too long (with the limit), too common, or
+found in a data breach. An email that is not one says so too.
 
 When the security blueprint declares `services`, Administration has a
 Service keys page too, for those who administer them (the `service_admins`
@@ -855,7 +859,9 @@ page stays, saying it ended, once they end.
 **The visitor's account** comes with `auth`: signing in, the providers the
 realm has, signing up when it is `signup open`, the forgotten password,
 the email confirmed and an account page (signing out, deleting the
-account). Their forms call the app's identity routes. With sign-in by
+account). Their forms call the app's identity routes; a new password's
+field shows the realm's minimum, and a password refused says why, as the
+panel does. With sign-in by
 Google or GitHub and the site on a domain of its own, set `PUBLIC_URL` to
 the site's address.
 

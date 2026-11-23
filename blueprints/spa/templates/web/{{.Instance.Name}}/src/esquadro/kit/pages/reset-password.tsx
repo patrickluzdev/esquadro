@@ -4,12 +4,12 @@ import { Link, useSearch } from "@tanstack/react-router"
 import { Eye, EyeOff } from "../../icons.gen.ts"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { AuthFrame, BackToSignIn } from "@/components/auth-frame"
 import { api } from "../../api.ts"
-import { realmKey } from "../../config.ts"
+import { passwordPolicy, realmKey } from "../../config.ts"
 import { describe } from "../errors.ts"
 import { t } from "../i18n.ts"
 
@@ -66,6 +66,7 @@ export function ResetPasswordPage() {
                 required
                 autoFocus
                 aria-invalid={error !== "" || undefined}
+                aria-describedby="password-hint"
               />
               <button
                 type="button"
@@ -76,7 +77,7 @@ export function ResetPasswordPage() {
                 {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
-            {error && <FieldError>{error}</FieldError>}
+            {error ? <FieldError id="password-hint">{error}</FieldError> : <FieldDescription id="password-hint">{t("passwordRule", { min: passwordPolicy.min })}</FieldDescription>}
           </Field>
           <Button type="submit" size="lg" className="w-full" disabled={busy}>
             {busy && <Spinner />}

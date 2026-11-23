@@ -203,6 +203,19 @@ Passwords follow NIST SP 800-63B and the OWASP Password Storage Cheat Sheet:
   name and the person's email; `pwned` also asks Pwned Passwords, which only
   sees the first five characters of the password's SHA-1.
 
+A password refused answers `invalid_fields` (422) on the field `password`
+(also when the request sends it as `new_password`), with why: `too_short` or
+`too_long`, with `limit` the realm's minimum or maximum, `common` or
+`breached`:
+
+```json
+{"code": "invalid_fields", "errors": [{"field": "password", "code": "too_short", "limit": 12}]}
+```
+
+The frontends say it in their language ("The password needs at least 12
+characters.", "This password showed up in a data breach. Choose another.")
+and show the minimum under a new password's field before it is sent.
+
 ## Google and GitHub
 
 Add `google` or `github` to a realm's `providers`, and register the app at the

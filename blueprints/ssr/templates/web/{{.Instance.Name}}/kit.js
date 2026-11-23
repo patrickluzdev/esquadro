@@ -13,7 +13,9 @@
     }
   }
 
-  // The words of an answer's problem: its code's, or its title.
+  // The words of an answer's problem: a password refused says why (too
+  // short or too long with its limit), an email that is not one says so,
+  // else its code's, or its title.
   const problem = async (res) => {
     const w = words()
     let body = {}
@@ -21,6 +23,13 @@
       body = await res.json()
     } catch {}
     const code = body.code || ""
+    const fields = Array.isArray(body.errors) ? body.errors : []
+    const password = fields.find((f) => f.field === "password" || f.field === "new_password")
+    if (code === "invalid_fields" && password && w["password_" + password.code]) {
+      const limit = (key) => String(password.limit || w[key] || "")
+      return w["password_" + password.code].replace("{min}", limit("min")).replace("{max}", limit("max"))
+    }
+    if (code === "invalid_fields" && fields.length === 1 && w[fields[0].field + "_" + fields[0].code]) return w[fields[0].field + "_" + fields[0].code]
     return w["error_" + code] || body.title || w.somethingWrong || "Error"
   }
 

@@ -712,6 +712,7 @@ components:
         field: {type: string}
         code: {type: string}
         row: {type: integer, description: "With `import_refused`, the row (from 1) the field is in."}
+        limit: {type: integer, description: "With `too_short` or `too_long`, the length the value must reach or not pass: a password's minimum or maximum."}
 {{- $money := false}}{{range .Entities}}{{range .Fields}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- range .Reports}}{{range .Columns}}{{if eq .Type "money"}}{{$money = true}}{{end}}{{end}}{{end}}
 {{- $files := false}}{{range .Entities}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$files = true}}{{end}}{{end}}{{end}}

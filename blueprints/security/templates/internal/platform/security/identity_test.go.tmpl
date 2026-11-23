@@ -131,7 +131,7 @@ func TestSignUpAndSignIn(t *testing.T) {
 	f.expect(f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana", "password": password}), 422, "invalid_fields")
 	weak := f.call("POST", "/identity/person/sign-up", map[string]string{"email": "ana@example.com", "password": "short"})
 	f.expect(weak, 422, "invalid_fields")
-	if !strings.Contains(strings.ToLower(f.callBody(weak)), "too_short") {
+	if body := f.callBody(weak); !strings.Contains(body, `"code":"too_short"`) || !strings.Contains(body, `"limit":12`) {
 		t.Fatalf("weak: %v", weak.body)
 	}
 

@@ -78,9 +78,11 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 		"src/esquadro/kit/i18n.ts":            "export function roleLabel(",
 		"src/esquadro/kit/accounts-admin.tsx": "accounts.resendVerification(a.id, verifyRedirect())",
 		"src/esquadro/kit/errors.ts":          `if (e.code === "too_soon") return t("tooSoon")`,
-		"src/components/user-menu.tsx":        "session?.roles.map(roleLabel)",
-		"src/messages.ts":                     `// role_order_desk: "Balcão de pedidos",`,
-		"../../clients/ts/src/identity.ts":    "resendVerification: async (id: string, redirect?: string)",
+		// A new password's page shows the realm's minimum.
+		"src/esquadro/kit/pages/reset-password.tsx": `t("passwordRule", { min: passwordPolicy.min })`,
+		"src/components/user-menu.tsx":              "session?.roles.map(roleLabel)",
+		"src/messages.ts":                           `// role_order_desk: "Balcão de pedidos",`,
+		"../../clients/ts/src/identity.ts":          "resendVerification: async (id: string, redirect?: string)",
 	} {
 		if got := read(t, filepath.Join(web, path)); !strings.Contains(got, want) {
 			t.Errorf("%s lacks %q:\n%s", path, want, got)
@@ -88,6 +90,13 @@ func TestSPAGeneratesAPanel(t *testing.T) {
 	}
 	if words := read(t, filepath.Join(web, "src/esquadro/kit/messages.ts")); !strings.Contains(words, `role_admin: "Administração",`) || !strings.Contains(words, `role_admin: "Admin",`) {
 		t.Error("the common roles have no words of their own")
+	}
+	// A password refused says why, with the realm's policy, in pt_br.
+	if config := read(t, filepath.Join(web, "src/esquadro/config.ts")); !strings.Contains(config, `export const passwordPolicy: { min: number; max: number } = { min: 12, max: 128 }`) {
+		t.Errorf("config.ts has no password policy:\n%s", config)
+	}
+	if words := read(t, filepath.Join(web, "src/esquadro/kit/messages.ts")); !strings.Contains(words, `passwordTooShort: "A senha precisa ter pelo menos {min} caracteres.",`) {
+		t.Error("a password too short has no words in pt_br")
 	}
 	if gen := read(t, filepath.Join(web, "src/esquadro/resources.gen.ts")); !strings.Contains(gen, `name: { name: "name", label: "Nome"`) || !strings.Contains(gen, `labels: { ACTIVE: "Ativo", INACTIVE: "INACTIVE" }`) || !strings.Contains(gen, `default: "ACTIVE"`) || !strings.Contains(gen, "categories:") {
 		t.Errorf("resources.gen.ts:\n%s", gen)

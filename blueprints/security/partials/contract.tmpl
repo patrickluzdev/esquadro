@@ -18,6 +18,9 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
       description: |
         Answers 202 whether the email had an account or not, so that sign-up
         does not tell who has one.{{if ne $r.VerifyEmail "off"}} Sends the verification link to the email.{{end}}
+        A password the policy refuses answers `invalid_fields` (422) on `password`, with
+        its code: `too_short` or `too_long` (and `limit`, the minimum or the maximum),
+        `common` or `breached`.
       requestBody:
         required: true
         content:
@@ -126,7 +129,11 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
     post:
       tags: [{{$r.Name}}]
       summary: Change the password; ends the other sessions
-      description: Without a password yet (signed in with a provider), current_password is left out and a recent sign-in is needed.
+      description: |
+        Without a password yet (signed in with a provider), current_password is left out and a recent sign-in is needed.
+        A password the policy refuses answers `invalid_fields` (422) on `password`, with
+        its code: `too_short` or `too_long` (and `limit`, the minimum or the maximum),
+        `common` or `breached`.
       requestBody:
         required: true
         content:
@@ -136,7 +143,7 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
               required: [new_password]
               properties:
                 current_password: {type: string}
-                new_password: {type: string}
+                new_password: {type: string, minLength: {{or $r.PasswordMin $.Options.password_min}}, maxLength: {{or $r.PasswordMax $.Options.password_max}}}
       responses:
         "204": {description: Changed.}
         default: {$ref: "#/components/responses/Problem"}
@@ -182,6 +189,10 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
     post:
       tags: [{{$r.Name}}]
       summary: Set a new password with the token of its link; ends every session
+      description: |
+        A password the policy refuses answers `invalid_fields` (422) on `password`, with
+        its code: `too_short` or `too_long` (and `limit`, the minimum or the maximum),
+        `common` or `breached`.
       requestBody:
         required: true
         content:
@@ -191,7 +202,7 @@ without the rest blueprint, part of api/openapi.yaml with it. */ -}}
               required: [token, new_password]
               properties:
                 token: {type: string}
-                new_password: {type: string}
+                new_password: {type: string, minLength: {{or $r.PasswordMin $.Options.password_min}}, maxLength: {{or $r.PasswordMax $.Options.password_max}}}
       responses:
         "204": {description: Set.}
         default: {$ref: "#/components/responses/Problem"}

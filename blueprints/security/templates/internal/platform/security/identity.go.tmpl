@@ -570,7 +570,7 @@ func (s *Security) freshPrincipal(w http.ResponseWriter, r *http.Request, realm 
 // refusePassword answers a password the policy refuses.
 func (s *Security) refusePassword(w http.ResponseWriter, r *http.Request, err error) {
 	if weak, ok := errors.AsType[*WeakPassword](err); ok {
-		edge.Write(w, r, weakPassword(weak.Reason))
+		edge.Write(w, r, weakPassword(weak))
 		return
 	}
 	s.fail(w, r, err)

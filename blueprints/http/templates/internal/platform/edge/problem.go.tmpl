@@ -21,6 +21,9 @@ type FieldProblem struct {
 	Code  string `json:"code"`
 	// Row is, in an import refused, the row (from 1) the field is in.
 	Row int `json:"row,omitempty"`
+	// Limit is, with too_short or too_long, the length the value must
+	// reach or not pass: a password's minimum or maximum.
+	Limit int `json:"limit,omitempty"`
 }
 
 func (p *Problem) Error() string { return p.Code + ": " + p.Title }
