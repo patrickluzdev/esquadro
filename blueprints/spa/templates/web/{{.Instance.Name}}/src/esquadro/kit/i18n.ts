@@ -71,6 +71,15 @@ export function roleLabelIn(table: Record<string, string>, role: string): string
   return table[`role_${role}`] ?? capitalize(role.replaceAll("_", " "))
 }
 
+/**
+ * A record's title as people read it: an option's label, a number or a date
+ * formatted, text as it is; "" without one.
+ */
+export function titleText(field: FieldMeta, value: unknown): string {
+  if (value === null || value === undefined || value === "") return ""
+  return field.kind === "relation" ? String(value) : format(field, value)
+}
+
 /** A value of a field, as people read it. */
 export function format(field: FieldMeta, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—"

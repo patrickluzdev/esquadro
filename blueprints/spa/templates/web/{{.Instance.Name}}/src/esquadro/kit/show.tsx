@@ -18,7 +18,7 @@ import { StatusValue } from "./status.tsx"
 import { imageOf, Picture } from "./picture.tsx"
 import { useDuplicate } from "./duplicate.ts"
 import { describe } from "./errors.ts"
-import { capitalize, format, t } from "./i18n.ts"
+import { capitalize, format, t, titleText } from "./i18n.ts"
 import type { FieldMeta, Rec, ResourceMeta } from "./meta.ts"
 import { ResourceList } from "./list.tsx"
 import { DetailSkeleton, ErrorState } from "./states.tsx"
@@ -129,7 +129,7 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const r = record.data
   const history = seesHistory(meta, r, session)
   const can = r.can ?? []
-  const title = resource.title ? String(r[resource.title.name] ?? "") : meta.singular
+  const title = resource.title ? titleText(resource.title, r[resource.title.name]) : meta.singular
   const fields = resource.show ?? resource.form
   const relations = resource.relations?.(resource) ?? []
   // Beside the picture, a few short fields; every field in the Details tab,
@@ -144,9 +144,9 @@ export function ResourceShow({ resource, id }: { resource: Resource; id: string 
   const rest = fields.filter((f) => !groups.some((g) => g.fields.includes(f)))
   if (rest.length) groups.push({ title: groups.length ? t("other") : undefined, fields: rest })
   const value = (f: FieldMeta) => (
-    <div key={f.name} className="group/value flex flex-col gap-1">
+    <div key={f.name} className="group/value flex min-w-0 flex-col gap-1">
       <dt className="text-sm font-medium text-muted-foreground">{f.label}</dt>
-      <dd className="flex min-h-6 items-center gap-1 text-sm font-semibold text-foreground">
+      <dd className="flex min-h-6 min-w-0 items-center gap-1 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
         <FieldValue field={f} record={r} />
         {r[f.name] !== null && r[f.name] !== undefined && r[f.name] !== "" && (
           <CopyButton

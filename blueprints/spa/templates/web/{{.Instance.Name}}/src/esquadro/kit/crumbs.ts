@@ -10,7 +10,7 @@ import { menu, isGroup } from "@/menu.ts"
 import type { MenuItem } from "@/menu.ts"
 import { base } from "../config.ts"
 import { resources } from "../resources.gen.ts"
-import { capitalize, t } from "./i18n.ts"
+import { capitalize, t, titleText } from "./i18n.ts"
 import type { Rec, ResourceMeta } from "./meta.ts"
 
 export interface Crumb {
@@ -72,7 +72,8 @@ export function crumbsOf(pathname: string, title?: string, record?: Rec, missing
   if (parts.length === 1 && trash && meta?.trash) out.push({ label: t("trash") })
   else if (parts[1] === "new") out.push({ label: t("new") })
   else if (parts[1]) {
-    const name = meta && record ? String(record[meta.title] ?? "").trim() : ""
+    const field = meta?.fields[meta.title]
+    const name = meta && record ? (field ? titleText(field, record[meta.title]) : String(record[meta.title] ?? "")).trim() : ""
     // A record that is not there is not called by its id.
     out.push({ label: missing ? t("missing") : name || (meta ? parts[1] : capitalize(parts[1])), to: `/${parts[0]}/${parts[1]}` })
     if (parts[2] === "edit") out.push({ label: t("edit") })

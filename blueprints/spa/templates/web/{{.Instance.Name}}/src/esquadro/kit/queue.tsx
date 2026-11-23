@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { api } from "../api.ts"
 import { actionKeys, allowed, useActions } from "./actions.tsx"
-import { t } from "./i18n.ts"
+import { t, titleText } from "./i18n.ts"
 import type { Rec } from "./meta.ts"
 import { Picture } from "./picture.tsx"
 import type { Resource } from "./resource.ts"
@@ -93,7 +93,7 @@ export function QueueView({ resource }: { resource: Resource }) {
         {items.map((r, i) => {
           const focused = i === at
           const image = card.image ? (r[card.image.name] as string | null | undefined) : undefined
-          const title = card.title ? String(r[card.title.name] ?? "") : String(r[resource.title?.name ?? ""] ?? meta.singular)
+          const title = card.title ? titleText(card.title, r[card.title.name]) : resource.title ? titleText(resource.title, r[resource.title.name]) || meta.singular : meta.singular
           return (
             <div
               key={r.id}
