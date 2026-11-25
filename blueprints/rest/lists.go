@@ -92,7 +92,7 @@ func enumOf(e *project.Entity, field string) string {
 func schemaOfGo(goType, sqlType string) string {
 	switch {
 	case goType == "decimal.Decimal":
-		return `{type: string, description: 'A decimal number, e.g. "19.90".'}`
+		return `{type: string, format: decimal, description: 'A decimal number, e.g. "19.90".'}`
 	case goType == "int":
 		return "{type: integer}"
 	case goType == "int64":

@@ -51,11 +51,21 @@ func Ogen(ctx context.Context, in hook.Input) (hook.Output, error) {
 // apiBase is where the API's operations are mounted.
 const apiBase = "/api/v1"
 
+// dateTime is how the contract writes the schema of a time.
+const dateTime = "type: string, format: date-time"
+
+// timeLayout is RFC 3339 with the microseconds the database keeps, where
+// ogen would write whole seconds: a time that a client reads and sends
+// back, in a filter or in a PUT, is the one that is stored.
+const timeLayout = "2006-01-02T15:04:05.999999Z07:00"
+
 // ServerDocument is the part of the published contract ogen generates the
 // API's server from: its paths under /api/v1, relative to it again; no
 // identity routes or components, which are written by hand; and no model
 // rules, so that the domain checks them and answers invalid_fields with
-// every field at once, where ogen would refuse the first with a 400.
+// every field at once, where ogen would refuse the first with a 400. Nor
+// does it say which texts are decimals, for the same reason. Its times
+// are written as timeLayout.
 //
 // The published contract is esquadro's own YAML, so its parts are found
 // by their lines: top-level keys at column 0, paths at two spaces,
@@ -69,6 +79,8 @@ func ServerDocument(published []byte) []byte {
 		if strings.HasSuffix(line, ruleMark) {
 			continue
 		}
+		line = strings.ReplaceAll(line, ", format: decimal", "")
+		line = strings.ReplaceAll(line, dateTime, dateTime+`, x-ogen-time-format: "`+timeLayout+`"`)
 		indent := len(line) - len(strings.TrimLeft(line, " "))
 		trimmed := strings.TrimSpace(line)
 		switch {

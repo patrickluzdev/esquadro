@@ -23,6 +23,8 @@ components:
         name:
           type: string
           minLength: 2` + ruleMark + `
+        placed: {type: string, format: date-time, nullable: true}
+        weight: {type: string, format: decimal, nullable: true}
     IdentitySession:
       type: object
     Problem:
@@ -41,6 +43,8 @@ components:
       properties:
         name:
           type: string
+        placed: {type: string, format: date-time, x-ogen-time-format: "2006-01-02T15:04:05.999999Z07:00", nullable: true}
+        weight: {type: string, nullable: true}
     Problem:
       type: object
 `

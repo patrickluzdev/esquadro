@@ -23,7 +23,7 @@ func ReportSchema(f *project.Field, nullable bool) string {
 	case project.TypeInt64:
 		s = "type: integer, format: int64"
 	case project.TypeDecimal:
-		s = `type: string, description: 'A decimal number, e.g. "19.90".'`
+		s = `type: string, format: decimal, description: 'A decimal number, e.g. "19.90".'`
 	case project.TypeBool:
 		s = "type: boolean"
 	case project.TypeTime:

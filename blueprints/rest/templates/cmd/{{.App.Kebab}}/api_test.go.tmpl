@@ -597,6 +597,57 @@ func TestAPIIdempotency(t *testing.T) {
 	}
 }
 {{- end}}{{end}}
+{{- $timed := ""}}{{range .Entities}}{{if and (not $timed) (canSampleAPI .)}}{{$e := .}}{{range apiFilters .}}{{if eq .Param "created_at_max"}}{{$timed = $e.Pascal}}{{end}}{{end}}{{end}}{{end}}
+{{- range .Entities}}{{if eq .Pascal $timed}}
+
+// TestAPITimes asks for a {{lower .Label}} by the time it was answered with: an
+// inclusive bound holds it, since the answer has all the time it keeps.
+func TestAPITimes(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := c.Create{{.Pascal}}(context.Background(), givenAPI{{.Pascal}}(t, c, 1), apigen.Create{{.Pascal}}Params{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := func(query string) []string {
+		t.Helper()
+		res, err := http.Get(srv.URL + "/api/v1/{{.Plural.Kebab}}?fields=created_at" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var body struct {
+			Items []struct {
+				ID string `json:"id"`
+				At string `json:"created_at"`
+			} `json:"items"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil || res.StatusCode != 200 {
+			t.Fatalf("a list%s: %d %v", query, res.StatusCode, err)
+		}
+		var out []string
+		for _, one := range body.Items {
+			if one.ID == created.ID.String() {
+				out = append(out, strings.ReplaceAll(one.At, "+", "%2B"))
+			}
+		}
+		return out
+	}
+	found := list("")
+	if len(found) != 1 {
+		t.Fatalf("the one created is not in its list: %v", found)
+	}
+	for _, bound := range []string{"min", "max"} {
+		if got := list("&created_at_" + bound + "=" + found[0]); len(got) != 1 {
+			t.Errorf("created_at_%s=%s leaves it out", bound, found[0])
+		}
+	}
+}
+{{- end}}{{end}}
 {{- $uniq := ""}}{{range .Entities}}{{if and (not $uniq) (canSampleAPI .)}}{{$e := .}}{{range .Fields}}{{if and .Unique .Required}}{{$uniq = $e.Pascal}}{{end}}{{end}}{{end}}{{end}}
 {{- range .Entities}}{{if eq .Pascal $uniq}}
 

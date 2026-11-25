@@ -734,8 +734,13 @@ components:
       description: An exact amount of money and its currency.
       required: [amount]
       properties:
-        amount: {type: string, description: 'The amount, a decimal number written as a string, e.g. "19.90"; up to four places.'}
-        currency: {type: string, description: 'Its currency, an ISO 4217 code{{with .App.Currency}}; {{.}} when not sent{{end}}.'}
+        amount: {type: string, format: decimal, description: 'The amount, a decimal number written as a string, e.g. "19.90"; up to four places.'}
+        currency:
+          type: string
+          description: 'Its currency, an ISO 4217 code{{with .App.Currency}}; {{.}} when not sent{{end}}.'
+{{- with .App.Currency}}
+          default: {{.}} # model rule
+{{- end}}
 {{- end}}
 {{- range .Enums}}{{if .Module.Entities}}
     {{enumName .}}:

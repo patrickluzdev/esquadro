@@ -216,7 +216,7 @@ func schema(f *project.Field) string {
 	case project.TypeInt64:
 		return "{type: integer, format: int64}"
 	case project.TypeDecimal:
-		return `{type: string, description: 'A decimal number written as a string, e.g. "19.90".'}`
+		return `{type: string, format: decimal, description: 'A decimal number written as a string, e.g. "19.90".'}`
 	case project.TypeBool:
 		return "{type: boolean}"
 	case project.TypeTime:
@@ -314,6 +314,8 @@ func writeSchema(f *project.Field, changes bool) string {
 		lines = append(lines, pad+"type: integer")
 	case project.TypeInt64:
 		lines = append(lines, pad+"type: integer", pad+"format: int64")
+	case project.TypeDecimal:
+		lines = append(lines, pad+"type: string", pad+"format: decimal"+ruleMark)
 	default:
 		lines = append(lines, pad+"type: string")
 	}
@@ -362,7 +364,7 @@ func changeSchema(f *project.Field) string {
 	}
 	if f.Type == project.TypeMoney {
 		// nullable beside a $ref is ignored: the object, written out.
-		return "{type: object, required: [amount], properties: {amount: {type: string}, currency: {type: string}}, nullable: true}"
+		return "{type: object, required: [amount], properties: {amount: {type: string, format: decimal}, currency: {type: string}}, nullable: true}"
 	}
 	s := schema(f)
 	return strings.TrimSuffix(s, "}") + ", nullable: true}"
