@@ -129,11 +129,27 @@ func (i Idempotency) serve(w http.ResponseWriter, r *http.Request, next http.Han
 		return
 	}
 
+	// The operation's own savepoint: refused by the database (a unique value
+	// taken, a related record that does not exist), it leaves nothing, and
+	// the key can still keep the answer.
+	savepoint, err := tx.Begin(ctx)
+	if err != nil {
+		i.answerError(w, r, err)
+		return
+	}
 	rec := &answerRecorder{header: http.Header{}, status: http.StatusOK}
-	next.ServeHTTP(rec, r.WithContext(postgres.WithTx(ctx, tx)))
+	next.ServeHTTP(rec, r.WithContext(postgres.WithTx(ctx, savepoint)))
 	if rec.status >= 500 {
 		// The transaction rolls back, key included: the retry runs.
 		rec.writeTo(w)
+		return
+	}
+	end := savepoint.Commit
+	if rec.status >= 400 {
+		end = savepoint.Rollback
+	}
+	if err := end(ctx); err != nil {
+		i.answerError(w, r, err)
 		return
 	}
 	headers := map[string]string{}

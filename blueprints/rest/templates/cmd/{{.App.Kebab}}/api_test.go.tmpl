@@ -597,6 +597,46 @@ func TestAPIIdempotency(t *testing.T) {
 	}
 }
 {{- end}}{{end}}
+{{- $uniq := ""}}{{range .Entities}}{{if and (not $uniq) (canSampleAPI .)}}{{$e := .}}{{range .Fields}}{{if and .Unique .Required}}{{$uniq = $e.Pascal}}{{end}}{{end}}{{end}}{{end}}
+{{- range .Entities}}{{if eq .Pascal $uniq}}
+
+// TestAPIIdempotencyRefused sends a {{lower .Label}} the database refuses, with an
+// Idempotency-Key: it is refused as without one, and the same to a retry.
+func TestAPIIdempotencyRefused(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := newTestServer(t)
+	c, err := apigen.NewClient(srv.URL+"/api/v1", apigen.WithClient(testClient))
+	if err != nil {
+		t.Fatal(err)
+	}
+	made := givenAPI{{.Pascal}}(t, c, 1)
+	if _, err := c.Create{{.Pascal}}(ctx, made, apigen.Create{{.Pascal}}Params{}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(made)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, again := range []string{"", "true"} {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/{{.Plural.Kebab}}", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", "taken")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var answer struct {
+			Code string `json:"code"`
+		}
+		_ = json.NewDecoder(res.Body).Decode(&answer)
+		_ = res.Body.Close()
+		if res.StatusCode != 422 || answer.Code != "invalid_fields" || res.Header.Get("Idempotent-Replayed") != again {
+			t.Fatalf("a value taken: %d %s, replayed %q; want 422 invalid_fields, replayed %q", res.StatusCode, answer.Code, res.Header.Get("Idempotent-Replayed"), again)
+		}
+	}
+}
+{{- end}}{{end}}
 {{- $inc := ""}}{{range .Entities}}{{if and (not $inc) (canSampleAPI .) (includable .)}}{{$inc = .Pascal}}{{end}}{{end}}
 {{- range .Entities}}{{if eq .Pascal $inc}}{{$e := .}}
 
