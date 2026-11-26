@@ -7,6 +7,7 @@ blueprint i18n {
   version "0.1.0"
   requires http
 
-  /// Languages of the answers, the first being the default.
+  /// Languages of the answers, the first being the default, as language
+  /// tags: "en", "pt-BR", "es-419".
   option languages list default(["en"])
 }
