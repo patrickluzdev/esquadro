@@ -142,6 +142,15 @@ func TestSocialRefusals(t *testing.T) {
 	if !f.s.allowedRedirect("/app?x=1") || !f.s.allowedRedirect("https://app.example/signed-in") || f.s.allowedRedirect("/\t/evil.example") {
 		t.Error("allowedRedirect")
 	}
+	// A frontend on this machine, only in development.
+	if f.s.allowedRedirect("http://localhost:5173/reset-password") {
+		t.Error("allowedRedirect: localhost outside development")
+	}
+	f.s.cfg.Development = true
+	if !f.s.allowedRedirect("http://localhost:5173/reset-password") || f.s.allowedRedirect("https://evil.example/") {
+		t.Error("allowedRedirect: in development")
+	}
+	f.s.cfg.Development = false
 
 	// The callback finishes only in the browser that started, once.
 	start := f.call("GET", "/identity/person/oauth/fake?redirect=/app", nil)

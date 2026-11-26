@@ -432,6 +432,11 @@ its alias on the app's port (`http://site.localhost:8080/nova-senha`, from
 the development `PUBLIC_URL`). The same holds where a provider sends the
 browser back to.
 
+A frontend the app does not make (in a folder or repository of its own) is
+listed in `redirect_urls` with its domains, and sends its page's full address
+as the `redirect`. In development the app also lets in any address on this
+machine (`http://localhost:5173/reset-password`), where such a frontend runs.
+
 `create` prints a link that sets the password; with `-password-stdin` it reads
 the password instead, never from the arguments. `reset` prints a new link
 for an account that has one already, or lost it. The link, and `invite`'s,

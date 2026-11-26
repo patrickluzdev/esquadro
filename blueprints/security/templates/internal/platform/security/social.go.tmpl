@@ -346,7 +346,8 @@ func (s *Security) oauthConfig(realm Realm, name string) (*oauth2.Config, error)
 }
 
 // allowedRedirect reports whether the app may send a browser to target:
-// one of its own paths, or an address of RedirectURLs.
+// one of its own paths, an address of RedirectURLs, or in development one
+// on this machine, where the frontends run.
 func (s *Security) allowedRedirect(target string) bool {
 	// Browsers drop tabs and newlines from addresses and read \ as /:
 	// "/\t/evil.example" would be "//evil.example", another site.
@@ -359,6 +360,9 @@ func (s *Security) allowedRedirect(target string) bool {
 	u, err := url.Parse(target)
 	if err != nil || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return false
+	}
+	if s.cfg.Development && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1") {
+		return true
 	}
 	for _, allowed := range s.cfg.RedirectURLs {
 		a, err := url.Parse(allowed)
