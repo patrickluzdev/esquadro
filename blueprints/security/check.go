@@ -236,6 +236,37 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 		}
 	}
 
+	// A field only some may read: who they are, and nothing that would
+	// tell its value to the others.
+	for _, e := range p.Entities {
+		for _, f := range e.Fields {
+			who := names(f.Ann["security"]["read"])
+			if who == nil {
+				continue
+			}
+			end := diag.Pos{File: f.Pos.File, Line: f.Pos.Line, Col: f.Pos.Col + len(f.Raw), Offset: f.Pos.Offset + len(f.Raw)}
+			if f.Ann["store"]["search"] == true {
+				diags.Errorf(f.Pos, end, "%s.%s: a field only some may read cannot be in the search, which everyone who lists %s uses", e.Raw, f.Raw, e.Raw).
+					Suggestion = "remove @store(search) from it, or its @security(read ...)"
+			}
+			for _, w := range who {
+				if w == "public" {
+					continue
+				}
+				realm, role, hasRole := strings.Cut(w, ".")
+				r := byName[realm]
+				switch {
+				case w == "owner":
+					diags.Errorf(f.Pos, end, "%s.%s: owner is for records; say a realm or realm.role", e.Raw, f.Raw)
+				case r == nil:
+					diags.Errorf(f.Pos, end, "%s.%s: %s is not public nor a realm (an entity marked @security(principal))", e.Raw, f.Raw, w)
+				case hasRole && !slices.Contains(r.Roles, role):
+					diags.Errorf(f.Pos, end, "%s.%s: %s is not a role of %s, whose roles are %s", e.Raw, f.Raw, role, realm, strings.Join(r.Roles, ", "))
+				}
+			}
+		}
+	}
+
 	options(p, set, &diags)
 	maintenance(p, set, realms, &diags)
 	needs(p, set, realms, &diags)

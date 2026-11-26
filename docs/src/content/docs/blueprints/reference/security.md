@@ -100,6 +100,7 @@ Read when the app starts; see [Environment variables](/esquadro/language/environ
 | entity | `delete` | list |  |
 | entity | `write` | list |  |
 | entity | `owner` | name | The relation to the principal a record belongs to, for the owner rule, when the entity has more than one; a principal owns itself. |
+| field | `read` | list | Who may read the field, as the entity's read: public, a realm or realm.role. The API answers the record to the others without it, and refuses them a filter, a sort or the history by it. |
 
 An annotation is written `@security(key value)` on the element.
 

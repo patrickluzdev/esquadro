@@ -2,7 +2,7 @@
 {{- if $m.Entities -}}
 package {{$p}}
 
-{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (and (anyHistory $m.Entities) "time") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (policies .Entities) (printf "%s/internal/platform/security" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) "encoding/json") (and (auditedOf $m.Entities (optionsOf "audit")) "github.com/go-faster/jx")}}
+{{importBlock "context" "errors" "slices" (and $inc "strings") "uuid" "ogenuuid github.com/google/uuid" (and (needsType $m "decimal") "github.com/shopspring/decimal") (and (needsType $m "money") "github.com/bojanz/currency") (and (or (needsType $m "file") (needsType $m "image")) (printf "%s/internal/platform/storage" .App.Module)) (and (needsType $m "json") "github.com/go-faster/jx") (and (needsType $m "json") "encoding/json") (and (anyHistory $m.Entities) "time") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres" .App.Module) (and (or (policies .Entities) (anyReadLimited $m.Entities)) (printf "%s/internal/platform/security" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) (printf "%s/internal/platform/audit" .App.Module)) (and (auditedOf $m.Entities (optionsOf "audit")) "encoding/json") (and (auditedOf $m.Entities (optionsOf "audit")) "github.com/go-faster/jx")}}
 // HTTP exposes the {{$p}} module's use cases as the API's operations. It only
 // translates between the contract and the module; the rules live in the
 // module.
@@ -207,6 +207,13 @@ func (h HTTP) List{{.Plural.Pascal}}(ctx context.Context, params apigen.List{{.P
 {{- if $dec}}
 	if invalid != nil {
 		return nil, edge.InvalidFields(invalid)
+	}
+{{- end}}
+{{- range readLimits $e (optionsOf "postgres")}}
+	// {{.Field.Snake}} is read only by {{join ", " .Rules}}: the others cannot
+	// learn it from a filter or a sort.
+	if !security.Allows(ctx{{range .Rules}}, {{quote .}}{{end}}) && ({{range $i, $p := .Params}}{{if $i}} || {{end}}{{if $p.Array}}len(params.{{ogenName $p.Param}}) > 0{{else}}params.{{ogenName $p.Param}}.IsSet(){{end}}{{else}}false{{end}}{{range .Sorts}} || q.Sort == {{quote .}}{{end}}) {
+		return nil, security.Refusal(ctx)
 	}
 {{- end}}
 {{- if and (has $pag "cursor") (has $pag "page")}}
@@ -557,6 +564,12 @@ func (h HTTP) History{{$P}}(ctx context.Context, params apigen.History{{$P}}Para
 {{- range histories $e}}{{$N := printf "%s%s" $P .Pascal}}
 
 func (h HTTP) Get{{$N}}History(ctx context.Context, params apigen.Get{{$N}}HistoryParams) (*apigen.{{$N}}History, error) {
+{{- with readRules .}}
+	// Its history tells the value, read only by {{join ", " .}}.
+	if !security.Allows(ctx{{range .}}, {{quote .}}{{end}}) {
+		return nil, security.Refusal(ctx)
+	}
+{{- end}}
 {{- if $pol}}
 	if _, err := h.readable{{$P}}(ctx{{$idArg}}); err != nil {
 {{- else}}
@@ -865,7 +878,7 @@ func refuse{{$P}}(n New{{$P}}, unread []FieldError) error {
 // {{.Camel}}Answer writes a {{$P}} as the contract does, with what the
 // request of ctx may do with it.
 {{- $hasFiles := false}}{{range .Fields}}{{if or (eq .Type "file") (eq .Type "image")}}{{$hasFiles = true}}{{end}}{{end}}
-func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Context, x {{$P}}) apigen.{{$P}} {
+func {{.Camel}}Answer({{if or $pol $hasFiles (readLimited $e)}}ctx{{else}}_{{end}} context.Context, x {{$P}}) apigen.{{$P}} {
 	a := apigen.{{$P}}{
 		ID:        ogenuuid.UUID(x.ID),
 		Version:   x.Version,
@@ -963,6 +976,12 @@ func {{.Camel}}Answer({{if or $pol $hasFiles}}ctx{{else}}_{{end}} context.Contex
 {{- if not .Required}}
 	}
 {{- end}}
+{{- end}}
+{{- range readLimits $e (optionsOf "postgres")}}
+	// Read only by {{join ", " .Rules}}.
+	if !security.Allows(ctx{{range .Rules}}, {{quote .}}{{end}}) {
+		edge.Unset(&a.{{ogenName (jsonName .Field)}})
+	}
 {{- end}}
 	return a
 }

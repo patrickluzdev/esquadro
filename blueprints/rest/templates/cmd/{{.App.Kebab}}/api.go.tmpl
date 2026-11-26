@@ -144,6 +144,10 @@ func problemOf(err error) *edge.Problem {
 	if p, ok := errors.AsType[*edge.Problem](err); ok {
 		return p
 	}
+	// The client gave up: not a failure of the app, nor worth an error.
+	if errors.Is(err, context.Canceled) {
+		return edge.ErrCanceled
+	}
 	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 		return edge.ErrRequestTooLarge
 	}

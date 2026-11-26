@@ -756,6 +756,12 @@ components:
 {{- end}}
         Every field comes unless `fields` asks for some: then only those, with
         `id` and `version`.
+{{- range readLimits $e (optionsOf "postgres")}}
+
+        `{{.Field.Snake}}` comes only to {{join ", " .Rules}}; the others get the
+        record without it, and cannot filter, sort or see its history by it
+        (403).
+{{- end}}
 {{- range flows $e}}
 
         `{{.Field.Snake}}` changes only as its flow says, from its first state,

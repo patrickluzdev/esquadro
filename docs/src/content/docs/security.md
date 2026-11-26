@@ -89,6 +89,30 @@ principal (`Customer` itself) owns its own record. With `owner`:
   such as an admin, chooses the owner, creating on someone's behalf;
 - an owner cannot hand a record over to someone else on update.
 
+### Fields only some may read
+
+A record everyone may read can hold a field that only some may: what the
+store pays, a cost, a note of the team. Say who, on the field:
+
+```esquadro
+entity Offer {
+  title      string  required
+  commission decimal @security(read [user.admin, user.operator])
+  @security(read public, write user.admin)
+}
+```
+
+The API answers the others the record without the field, as if `fields`
+had left it out, and refuses them, with 403 (401 when nobody signed in),
+what would tell its value: a filter by it, a sort by it, its history. The
+contract says it, and the project's access tests check it, as each one who
+may and may not. A field only some may read cannot be in the search
+(`@store(search)`), which everyone who lists uses.
+
+Your own code reads the record whole: it is the API that leaves the field
+out. A page of a site, or a route of your own, that shows records to
+everyone decides by itself what it shows.
+
 ### Limits of creates
 
 With the [rate_limit](/esquadro/blueprints/reference/rate_limit/)

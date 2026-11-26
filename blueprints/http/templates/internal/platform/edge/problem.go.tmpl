@@ -34,6 +34,10 @@ var (
 	// ErrNotReady is a service that cannot serve yet: a dependency, such as
 	// the database, does not answer.
 	ErrNotReady = &Problem{Status: 503, Code: "not_ready", Title: "The service is not ready."}
+	// ErrCanceled is a request its client gave up on before the answer (a
+	// person who left the page): nobody reads it, and it is no failure of
+	// the app. 499, as proxies say it.
+	ErrCanceled = &Problem{Status: 499, Code: "canceled", Title: "The request was canceled."}
 	// ErrInternal is anything else, logged on the server.
 	ErrInternal = &Problem{Status: 500, Code: "internal", Title: "Something went wrong on our side."}
 )

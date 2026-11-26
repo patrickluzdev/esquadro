@@ -130,6 +130,13 @@ blueprint security {
     read list
   }
 
+  annotation field {
+    /// Who may read the field, as the entity's read: public, a realm or
+    /// realm.role. The API answers the record to the others without it, and
+    /// refuses them a filter, a sort or the history by it.
+    read list
+  }
+
   annotation entity {
     /// The entity signs in: a realm named after it.
     principal bool

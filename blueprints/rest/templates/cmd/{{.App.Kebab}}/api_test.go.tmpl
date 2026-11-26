@@ -2,7 +2,7 @@
 {{- $limits := false}}{{range .Entities}}{{if and (createLimit $.Entities .) (canSampleAPI .)}}{{$limits = true}}{{end}}{{end -}}
 package main
 
-{{importBlock "context" "errors" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (or (linkTests .Entities) $limits) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and (hasFiles .Entities) (printf "%s/internal/platform/storage" .App.Module)) (modulePaths .App.Module .Modules true)}}
+{{importBlock "context" "errors" "fmt" "log/slog" "net/http" "net/http/httptest" "slices" "strings" "testing" (apiSampleImports .Entities) "encoding/json" "uuid" "sync" (and (or (linkTests .Entities) $limits) "ogenuuid github.com/google/uuid") (printf "%s/internal/apigen" .App.Module) (printf "%s/internal/platform/edge" .App.Module) (printf "%s/internal/platform/postgres/postgrestest" .App.Module) (and (hasFiles .Entities) (printf "%s/internal/platform/storage" .App.Module)) (modulePaths .App.Module .Modules true)}}
 // newTestDependencies are the service's dependencies on a database of its
 // own; settings left at zero turn limits off.
 func newTestDependencies(t *testing.T) dependencies {
@@ -80,6 +80,15 @@ func newTestClient(t *testing.T) *apigen.Client {
 
 // TestAPIEdge checks what every request gets from package edge: problems
 // for what the contract does not have, and the headers of an API.
+// TestProblemOfCanceled: a request its client gave up on is no failure of
+// the app, and is not answered or logged as one.
+func TestProblemOfCanceled(t *testing.T) {
+	t.Parallel()
+	if got := problemOf(fmt.Errorf("list: %w", context.Canceled)); got != edge.ErrCanceled {
+		t.Errorf("a canceled request: %v, want %v", got, edge.ErrCanceled)
+	}
+}
+
 func TestAPIEdge(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)
