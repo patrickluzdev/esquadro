@@ -139,6 +139,10 @@ type Data struct {
 	Blueprint string
 }
 
+// Unbuilt are, by blueprint, what tells by its options a frontend Node
+// does not build: a site whose styles are plain CSS (ssr, styles css).
+var Unbuilt = map[string]func(options map[string]any) bool{}
+
 // Instance is a named instance of a blueprint: Name is the instance's
 // (admin), Kind the blueprint's (spa).
 type Instance struct {
@@ -429,6 +433,21 @@ func (c *composer) baseFuncs(self string) template.FuncMap {
 				if b.Kind != "" && c.requiresUI(b.Manifest.Name) {
 					out = append(out, &Instance{Name: b.Manifest.Name, Kind: b.Kind, Options: c.set.Options[b.Manifest.Name]})
 				}
+			}
+			return out
+		},
+		// built are the frontends a Node build makes (npm run build): every
+		// one but those whose blueprint says it needs none (Unbuilt).
+		"built": func() []*Instance {
+			var out []*Instance
+			for _, b := range c.set.Blueprints {
+				if b.Kind == "" || !c.requiresUI(b.Manifest.Name) {
+					continue
+				}
+				if plain := Unbuilt[b.Kind]; plain != nil && plain(c.set.Options[b.Manifest.Name]) {
+					continue
+				}
+				out = append(out, &Instance{Name: b.Manifest.Name, Kind: b.Kind, Options: c.set.Options[b.Manifest.Name]})
 			}
 			return out
 		},

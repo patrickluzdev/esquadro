@@ -41,7 +41,7 @@ import "embed"
 //go:embed git/blueprint.esq
 //go:embed deploy/blueprint.esq deploy/slots
 //go:embed workspace/blueprint.esq all:workspace/templates workspace/slots
-//go:embed ui/blueprint.esq
+//go:embed ui/blueprint.esq all:ui/templates
 //go:embed spa/blueprint.esq all:spa/templates
 //go:embed ssr/blueprint.esq all:ssr/templates ssr/slots
 //go:embed platform/server/blueprint.esq all:platform/server/templates

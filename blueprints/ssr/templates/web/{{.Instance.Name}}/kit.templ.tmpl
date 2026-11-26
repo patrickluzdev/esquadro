@@ -68,8 +68,13 @@ templ Head(p Page) {
 	<link rel="preload" href={ URL("/brand/{{$file}}") } as="font" crossorigin/>
 {{- end}}{{end}}
 {{- end}}
+{{- if siteCSSOnly .Options}}
+	<link rel="stylesheet" href={ templ.URL(Asset("theme.gen.css")) }/>
+	<link rel="stylesheet" href={ templ.URL(Asset("site.css")) }/>
+{{- else}}
 	<link rel="stylesheet" href={ templ.URL(Asset("site.css")) }/>
 	<script src={ Asset("htmx.min.js") } defer></script>
+{{- end}}
 	<script src={ Asset("kit.js") } defer></script>
 }
 

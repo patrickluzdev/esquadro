@@ -32,6 +32,7 @@ import (
 	"github.com/patrickluzdev/esquadro/blueprints/ui"
 	bpworkspace "github.com/patrickluzdev/esquadro/blueprints/workspace"
 	"github.com/patrickluzdev/esquadro/internal/blueprint"
+	"github.com/patrickluzdev/esquadro/internal/compose"
 	"github.com/patrickluzdev/esquadro/internal/diag"
 	"github.com/patrickluzdev/esquadro/internal/hook"
 	"github.com/patrickluzdev/esquadro/internal/project"
@@ -72,6 +73,7 @@ func init() {
 	blueprint.Checks["mail"] = mailbp.Check
 	blueprint.Checks["git"] = git.Check
 	blueprint.Checks["i18n"] = i18n.Check
+	compose.Unbuilt["ssr"] = ssr.Unbuilt
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

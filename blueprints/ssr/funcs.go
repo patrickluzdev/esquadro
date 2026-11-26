@@ -27,6 +27,7 @@ func TemplateFuncs() template.FuncMap {
 			return "brand"
 		},
 		"siteRedirects": Redirects,
+		"siteCSSOnly":   CSSOnly,
 		"siteRedirect":  RedirectOf,
 		"siteField": func(instance, suffix string) string {
 			return project.FieldName(strings.ToUpper(instance) + "_" + suffix)
@@ -570,3 +571,14 @@ func (p *Page) CrumbBrowse() *Browse {
 	}
 	return nil
 }
+
+// CSSOnly reports whether a site's styles are plain CSS (styles css):
+// site.css, yours, served as written, with no Node, Tailwind or htmx, and
+// no blueprint workspace.
+func CSSOnly(options map[string]any) bool {
+	styles, _ := options["styles"].(string)
+	return styles == "css"
+}
+
+// Unbuilt is compose's Unbuilt of ssr: a site whose styles are plain CSS.
+func Unbuilt(options map[string]any) bool { return CSSOnly(options) }
