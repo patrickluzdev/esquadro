@@ -467,7 +467,7 @@ func TestSiteInPlainCSS(t *testing.T) {
 	templs, _ := filepath.Glob(filepath.Join(site, "*.templ"))
 	for _, f := range templs {
 		for _, m := range regexp.MustCompile(`class="([^"]*)"`).FindAllStringSubmatch(read(t, f), -1) {
-			for _, c := range strings.Fields(m[1]) {
+			for c := range strings.FieldsSeq(m[1]) {
 				if slices.ContainsFunc(kitPieces, func(p string) bool { return strings.HasPrefix(c, p) }) && !strings.Contains(c, ":") {
 					continue
 				}
