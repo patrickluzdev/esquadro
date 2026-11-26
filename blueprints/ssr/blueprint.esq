@@ -10,11 +10,13 @@
 /// of it. What is generated is regenerated; the
 /// layout, the pages, the words and the styles are yours, written once and
 /// merged with esquadro's changes. With engine go, the app's binary renders
-/// it (templ, htmx and Tailwind).
+/// it (templ, with htmx and Tailwind by default, built by blueprint
+/// workspace; styles css for none of them).
 blueprint ssr {
   version "0.1.0"
   instances
-  requires app, http, store, security, workspace, ui
+  requires app, http, store, security, ui
+  optional workspace
   go_require "github.com/a-h/templ" "v0.3.1118"
   hook post-gen "templ" writes "web/**/*_templ.go"
 
@@ -35,6 +37,11 @@ blueprint ssr {
   /// en or pt_br: the language of its words and of dates, numbers and
   /// money.
   option locale name default(en)
+  /// How its styles are written: tailwind, built with Node (npm run
+  /// build, blueprint workspace), with htmx for its lists; or css, plain
+  /// CSS (site.css, yours) that the binary serves as written, with no
+  /// Node, Tailwind, htmx or workspace: a link shortener, a small site.
+  option styles name default(tailwind)
   /// app: the app's binary serves it.
   option serve name default(app)
   /// The site's name: in every title and in Open Graph; the app's label by

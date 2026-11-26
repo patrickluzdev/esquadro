@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -417,6 +419,74 @@ func TestSSRChecksItsAddresses(t *testing.T) {
 		_, code, errOut := ssrProject(t, withCurrency, tc.model)
 		if code == 0 || !strings.Contains(errOut, tc.want) {
 			t.Errorf("%s: exit %d, want %q in:\n%s", name, code, tc.want, errOut)
+		}
+	}
+}
+
+// A site with styles css is plain CSS, served as written: no Node, no
+// Tailwind, no htmx, no workspace; and site.css names every class of the
+// pages esquadro writes.
+func TestSiteInPlainCSS(t *testing.T) {
+	if testing.Short() {
+		t.Skip("generates the api starter, which needs sqlc or Docker")
+	}
+	dir := filepath.Join(t.TempDir(), "shop")
+	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	appEsq := filepath.Join(dir, "esquadro", "app.esq")
+	os.WriteFile(appEsq, []byte(strings.Replace(read(t, appEsq), "  blueprint api_docs\n",
+		"  blueprint api_docs\n  blueprint ui\n  blueprint ssr links {\n    domain \"go.shop.test\"\n    styles css\n    locale pt_br\n  }\n", 1)), 0o644)
+	model := filepath.Join(dir, "esquadro", "catalog.esq")
+	os.WriteFile(model, []byte(read(t, model)+"\nentity Link {\n  code string unique\n  target_url string required\n  @security(read public, write user.admin)\n  @ui(label \"Links\", singular \"Link\")\n  @links(redirect, by code, to target_url, wait 2)\n}\n"), 0o644)
+	if code, _, errOut := esq(t, "gen", dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	site := filepath.Join(dir, "web", "links")
+	for _, f := range []string{"package.json", filepath.Join("web", "links", "package.json"), filepath.Join("web", "links", "dist", "README.md")} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			t.Errorf("%s was written, which a site in plain CSS needs not", f)
+		}
+	}
+	for _, f := range []string{"Dockerfile", filepath.Join(".github", "workflows", "api.yml"), "Taskfile.yml"} {
+		if b, err := os.ReadFile(filepath.Join(dir, f)); err == nil && (strings.Contains(string(b), "node") || strings.Contains(string(b), "npm")) {
+			t.Errorf("%s builds with Node:\n%s", f, b)
+		}
+	}
+	kit := read(t, filepath.Join(site, "kit.templ"))
+	if strings.Contains(kit, "htmx.min.js") || !strings.Contains(kit, `Asset("theme.gen.css")`) {
+		t.Errorf("kit.templ's Head is not plain CSS's:\n%s", kit)
+	}
+	css := read(t, filepath.Join(site, "site.css"))
+	if strings.Contains(css, "tailwind") {
+		t.Errorf("site.css imports Tailwind:\n%s", css)
+	}
+	// Every class of the pages has its rule; the kit's own pieces (btn,
+	// field, notice, progress, t-*, state-picture) are the brand's.
+	kitPieces := []string{"btn", "field", "notice", "progress", "t-", "state-picture", "group"}
+	templs, _ := filepath.Glob(filepath.Join(site, "*.templ"))
+	for _, f := range templs {
+		for _, m := range regexp.MustCompile(`class="([^"]*)"`).FindAllStringSubmatch(read(t, f), -1) {
+			for c := range strings.FieldsSeq(m[1]) {
+				if slices.ContainsFunc(kitPieces, func(p string) bool { return strings.HasPrefix(c, p) }) && !strings.Contains(c, ":") {
+					continue
+				}
+				sel := "." + regexp.MustCompile(`([:/.\[\]])`).ReplaceAllString(c, `\$1`)
+				if !strings.Contains(css, sel+" ") && !strings.Contains(css, sel+":") && !strings.Contains(css, sel+",") {
+					t.Errorf("%s: class %s has no rule in site.css (%s)", filepath.Base(f), c, sel)
+				}
+			}
+		}
+	}
+	test := exec.Command("go", "test", "./web/links/", "./internal/platform/web/", "-count", "1")
+	test.Dir = dir
+	if out, err := test.CombinedOutput(); err != nil {
+		t.Fatalf("go test: %v\n%s", err, out)
+	}
+	// It serves its styles as written, theme first.
+	for _, want := range []string{"//go:embed theme.gen.css site.css", `assetsDir = "."`} {
+		if !strings.Contains(read(t, filepath.Join(site, "site_gen.go")), want) {
+			t.Errorf("site_gen.go lacks %q", want)
 		}
 	}
 }

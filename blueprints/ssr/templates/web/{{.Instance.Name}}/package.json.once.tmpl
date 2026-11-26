@@ -1,3 +1,4 @@
+{{- if not (siteCSSOnly .Options) -}}
 {
   "name": "{{.Instance.Name}}",
   "private": true,
@@ -12,3 +13,4 @@
     "tailwindcss": "4.3.5"
   }
 }
+{{- end}}

@@ -69,6 +69,13 @@ func Check(p *project.Project, set *blueprint.Set) diag.List {
 			return f.Blueprint.Ref.Pos
 		}
 		diags = append(diags, checkRedirects(p, f.Name)...)
+		switch styles, _ := f.Options["styles"].(string); {
+		case styles != "tailwind" && styles != "css":
+			diags.Errorf(at("styles"), at("styles"), "styles %s is not tailwind or css", styles)
+		case styles == "tailwind" && set.Get("workspace") == nil:
+			diags.Errorf(f.Blueprint.Ref.Pos, f.Blueprint.Ref.Pos, "ssr %s has its styles built by Tailwind, with Node, which needs blueprint workspace", f.Name).
+				Suggestion = "add blueprint workspace to app.esq, or write the styles in plain CSS: styles css"
+		}
 		if engine, _ := f.Options["engine"].(string); engine != "go" {
 			diags.Errorf(at("engine"), at("engine"), "engine %s is not one esquadro generates yet: go is (the app's binary renders the site)", engine)
 		}

@@ -30,6 +30,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -80,11 +81,25 @@ const realm = {{quote (or (and $realm $realm.Name) "")}}
 // pageSize is how many records a list shows at a time.
 const pageSize = {{$o.page_size}}
 
+{{- if siteCSSOnly $o}}
+// files are the styles, plain CSS served as written: the theme's tokens
+// and site.css, yours.
+//
+//go:embed theme.gen.css site.css
+var files embed.FS
+
+// assetsDir is where files keeps the assets.
+const assetsDir = "."
+{{- else}}
 // files are the built styles and scripts: dist/assets, when built (npm run
 // build), and dist/README.md.
 //
 //go:embed all:dist
 var files embed.FS
+
+// assetsDir is where files keeps the assets.
+const assetsDir = "dist/{{$sys.assets}}"
+{{- end}}
 
 // Deps are what the site reads: the modules of its pages{{if or $images $og}}, and the
 // store of their pictures{{end}}{{if $og}} and of the images it draws{{end}}.
@@ -249,8 +264,8 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHT
 func (s *Site) routes() {
 	m := s.mux
 	m.HandleFunc("GET /{$}", s.home)
-	assets, _ := fs.Sub(files, "dist")
-	static := http.FileServerFS(assets)
+	assets, _ := fs.Sub(files, assetsDir)
+	static := http.StripPrefix("/{{$sys.assets}}/", http.FileServerFS(assets))
 	m.Handle("GET /{{$sys.assets}}/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assetCache(w, r, strings.TrimPrefix(r.URL.Path, "/{{$sys.assets}}/"))
 		static.ServeHTTP(w, r)
@@ -385,9 +400,9 @@ func (p Page) FullTitle() string {
 // is a new address and browsers keep each one for good.
 var assetVersions = func() map[string]string {
 	v := map[string]string{"kit.js": version(kitJS)}
-	entries, _ := fs.ReadDir(files, "dist/{{$sys.assets}}")
+	entries, _ := fs.ReadDir(files, assetsDir)
 	for _, e := range entries {
-		if b, err := fs.ReadFile(files, "dist/{{$sys.assets}}/"+e.Name()); err == nil && !e.IsDir() {
+		if b, err := fs.ReadFile(files, path.Join(assetsDir, e.Name())); err == nil && !e.IsDir() {
 			v[e.Name()] = version(b)
 		}
 	}
