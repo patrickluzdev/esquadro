@@ -47,12 +47,7 @@ func ReadLimits(e *project.Entity, opts map[string]any) []ReadLimit {
 // anyReadLimited reports whether one of entities has a field only some may
 // read.
 func anyReadLimited(entities []*project.Entity) bool {
-	for _, e := range entities {
-		if readLimited(e) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(entities, readLimited)
 }
 
 // readLimited reports whether e has a field only some may read.
