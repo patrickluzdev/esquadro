@@ -50,7 +50,8 @@ type Config struct {
 	// http://localhost:5173; shop.com: http://site.localhost:8080, a site's
 	// alias): in Development, a link to a page of one opens there.
 	DevServers map[string]string
-	// Development is the app's first environment, where DevServers count.
+	// Development is the app's first environment, where DevServers count
+	// and an address on this machine may be sent to.
 	Development bool
 	// RedirectURLs are where, besides the app's own paths, people may be sent
 	// back to after signing in with a provider, or by an email's link: an

@@ -24,8 +24,8 @@
 			{{quote .At}}: {{if .Host}}security.OnHost(d.config.PublicURL, {{quote .Host}}){{else}}{{quote .URL}}{{end}},
 {{- end}}
 		},
-		Development: d.config.Env == "{{index $.Environments 0}}",
 {{- end}}
+		Development: d.config.Env == "{{index .Environments 0}}",
 		Mailer: securityMail{d.mail},
 		VerifyEmailHours: {{.Options.verify_email_hours}}, PasswordResetMinutes: {{.Options.password_reset_minutes}}, InviteDays: {{.Options.invite_days}},
 		ResendMinutes: {{.Options.resend_minutes}}, ResendPerDay: {{.Options.resend_per_day}},
