@@ -12,6 +12,12 @@ blueprint git {
   /// The branch a new repository starts on, whatever git's own default is;
   /// with branching, its main option decides.
   option branch string default("main")
+  /// The project's folder in its repository, e.g. "api", when the
+  /// repository holds more than the project (a monorepo): the repository is
+  /// found, or created, at the root, and the files of the repository, such
+  /// as the CI workflow, are written there. Empty: the project is the
+  /// repository.
+  option path string default("")
 
   hook post-gen "init"
 }

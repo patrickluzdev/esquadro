@@ -154,6 +154,7 @@ Functions, besides text/template's:
 | `goType .`, `goDoc`, `quote`, `rawQuote` | Go types, doc comments, string literals |
 | `lower`, `upper`, `join`, `contains`, `hasPrefix`, `trimPrefix`, `indent` | text |
 | `strs`, `goStrings` | a list option as strings, or as a Go `[]string` literal |
+| `repoRoot`, `repoPath`, `inRepo "path"`, `tagPrefix`, `workflowName` | the project's place in its repository ([in a monorepo](../monorepo/)): a file name starting with `{{repoRoot}}` is a file of the repository; `inRepo "clients/ts"` is a path as CI steps see it |
 
 ## Slots
 

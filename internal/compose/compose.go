@@ -397,6 +397,7 @@ func (c *composer) funcs(bp *blueprint.Blueprint) template.FuncMap {
 		return string(b), nil
 	}
 	maps.Copy(funcs, envFuncs(func(name string) map[string]any { return c.set.Options[name] }))
+	maps.Copy(funcs, repositoryFuncs(c.repoPath()))
 	maps.Copy(funcs, c.extra[bp.Key])
 	return funcs
 }
@@ -713,9 +714,9 @@ func (c *composer) renderTemplate(bp *blueprint.Blueprint, p string) []*File {
 			c.errorf(name, 0, "invalid template in file name: %s", cleanTemplateMsg(strings.TrimPrefix(err.Error(), "template: "+name+": ")))
 			return out
 		}
-		target, ok := CleanTarget(pb.String())
+		target, ok := cleanRepoTarget(pb.String(), repoRootOf(c.repoPath()), c.repoPath())
 		if !ok {
-			c.errorf(name, 0, "file name renders to %q, which is not a path inside the project", pb.String())
+			c.errorf(name, 0, "file name renders to %q, which is not a path inside the project or a file of its repository", pb.String())
 			return out
 		}
 		f := &File{Path: target, Blueprint: bp.Manifest.Name, Template: rel, Once: once}

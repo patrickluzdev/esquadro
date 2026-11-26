@@ -20,6 +20,7 @@ blueprint git
 | `initial_commit` | bool | `true` | Commit everything on the first generation. |
 | `message` | string | `"chore: generate project with esquadro"` | Message of the first commit. |
 | `branch` | string | `"main"` | The branch a new repository starts on, whatever git's own default is; with branching, its main option decides. |
+| `path` | string | `""` | The project's folder in its repository, e.g. "api", when the repository holds more than the project (a monorepo): the repository is found, or created, at the root, and the files of the repository, such as the CI workflow, are written there. Empty: the project is the repository. |
 
 ```esquadro
 blueprint git {

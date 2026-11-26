@@ -11,4 +11,4 @@
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
-          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" "$GITHUB_REF_NAME"
+          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" {{with tagPrefix}}"${GITHUB_REF_NAME#{{.}}}"{{else}}"$GITHUB_REF_NAME"{{end}}

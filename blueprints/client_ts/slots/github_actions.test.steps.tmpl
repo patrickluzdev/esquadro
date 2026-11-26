@@ -5,7 +5,7 @@
         with:
           node-version: 24
       - name: The TypeScript client type-checks
-        working-directory: clients/ts
+        working-directory: {{inRepo "clients/ts"}}
         run: |
           npm install --no-audit --no-fund
           npx tsc --noEmit

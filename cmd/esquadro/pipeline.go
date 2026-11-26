@@ -70,6 +70,7 @@ func init() {
 	blueprint.Checks["integration"] = integration.Check
 	blueprint.Checks["rate_limit"] = ratelimit.Check
 	blueprint.Checks["mail"] = mailbp.Check
+	blueprint.Checks["git"] = git.Check
 }
 
 // builtinFuncs are the template helpers of the built-in blueprints, by name.

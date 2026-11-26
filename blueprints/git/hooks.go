@@ -24,15 +24,17 @@ func Init(ctx context.Context, in hook.Input) (hook.Output, error) {
 	if err != nil {
 		return out, errors.New("git is not on PATH; install it, or remove the git blueprint")
 	}
+	path, _ := in.Options["path"].(string)
+	root := filepath.Join(in.ProjectDir, filepath.FromSlash(repoRootOf(path)))
 	git := func(args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, gitcmd, args...)
-		cmd.Dir = in.ProjectDir
+		cmd.Dir = root
 		var buf bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &buf, &buf
 		err := cmd.Run()
 		return strings.TrimSpace(buf.String()), err
 	}
-	if _, err := os.Stat(filepath.Join(in.ProjectDir, ".git")); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(filepath.Join(root, ".git")); errors.Is(err, os.ErrNotExist) {
 		branch, _ := in.Options["branch"].(string)
 		if main, ok := in.Blueprints["branching"]["main"].(string); ok && main != "" {
 			branch = main
@@ -43,7 +45,11 @@ func Init(ctx context.Context, in hook.Input) (hook.Output, error) {
 		if msg, err := git("init", "-q", "-b", branch); err != nil {
 			return out, fmt.Errorf("git init: %w\n%s", err, msg)
 		}
-		out.Messages = append(out.Messages, hook.Message{Level: "info", Text: "created a git repository"})
+		text := "created a git repository"
+		if root != in.ProjectDir {
+			text += " at " + root
+		}
+		out.Messages = append(out.Messages, hook.Message{Level: "info", Text: text})
 	}
 	if commit, _ := in.Options["initial_commit"].(bool); !commit {
 		return out, nil
