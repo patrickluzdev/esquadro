@@ -95,35 +95,50 @@ jobs:
   image:
     if: startsWith(github.ref, 'refs/tags/{{tagPrefix}}v')
     runs-on: {{$runsOn}}
-    timeout-minutes: 30
+    timeout-minutes: 35
     permissions:
       contents: read
       packages: write
       actions: read
     steps:
-      # The tag's commit passed this CI on a branch (main, pushed before the
-      # tag): its tests are not run again. While that run is still going, it
-      # waits for it; a commit never tested is not published.
-      - name: The commit passed the CI on a branch
+      # A tag's commit that passed this CI on its branch (main, pushed before
+      # the tag) is not tested again. One that has not passed yet, its run
+      # still going or never made, is tested here: never waited for, as a
+      # single runner of your own would wait for itself.
+      - id: tested
+        name: The commit passed the CI on a branch
         env:
           GH_TOKEN: {{"${{"}} github.token {{"}}"}}
         run: |
-          for _ in $(seq 1 60); do
-            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push&per_page=100" \
-              --jq "[.workflow_runs[] | select(.name == \"$GITHUB_WORKFLOW\" and .head_branch != \"$GITHUB_REF_NAME\")]")
-            if [ "$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$runs")" -gt 0 ]; then
-              echo "$GITHUB_SHA passed on its branch"
-              exit 0
-            fi
-            if [ "$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")" -eq 0 ]; then
-              echo "::error::$GITHUB_SHA has not passed this CI on a branch: push it to main, wait for it to pass, then tag it."
-              exit 1
-            fi
-            sleep 20
-          done
-          echo "::error::the CI of $GITHUB_SHA on its branch did not finish in 20 minutes"
-          exit 1
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push&status=success&per_page=100" \
+            --jq "[.workflow_runs[] | select(.name == \"$GITHUB_WORKFLOW\" and .head_branch != \"$GITHUB_REF_NAME\")] | length")
+          if [ "$passed" -gt 0 ]; then
+            echo "$GITHUB_SHA passed on its branch: not tested again"
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$GITHUB_SHA has not passed on a branch yet: tested here"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7.0.1
+{{- if $own}}
+      - if: steps.tested.outputs.passed != 'true'
+        run: |
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+{{- end}}
+      - if: steps.tested.outputs.passed != 'true'
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: {{inRepo "go.mod"}}
+{{- if $own}}
+          cache: false
+{{- else}}
+{{- with $in}}
+          cache-dependency-path: {{.}}/go.sum
+{{- end}}
+{{- end}}
+      - if: steps.tested.outputs.passed != 'true'
+        run: go vet ./... && go test ./... && go build ./...
       - uses: docker/setup-buildx-action@v4.4.1
       - uses: docker/login-action@v4.7.0
         with:
