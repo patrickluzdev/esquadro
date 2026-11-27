@@ -29,6 +29,10 @@ type Queue struct {
 	client *river.Client[pgx.Tx]
 	// working is whether there is work to do: a registered job.
 	working bool
+{{- if uses "observability"}}
+	// health measures the queue, from the process that works it.
+	health *health
+{{- end}}
 }
 
 // NewQueue returns a queue to open.
@@ -118,11 +122,7 @@ func (q *Queue) Open(pool *pgxpool.Pool, r *Registry, cfg Config, logger *slog.L
 		return fmt.Errorf("jobs: %w", err)
 	}
 	config.Middleware = append(config.Middleware, health)
-	if r.n > 0 {
-		if err := health.watch(); err != nil {
-			return fmt.Errorf("jobs: %w", err)
-		}
-	}
+	q.health = health
 {{- end}}
 	if r.n > 0 {
 		config.Queues = map[string]river.QueueConfig{}
@@ -226,6 +226,13 @@ func (q *Queue) Run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+{{- if uses "observability"}}
+	// The queue's measures come from the process that works it: the API,
+	// which only enqueues, would report them twice.
+	if err := q.health.watch(); err != nil {
+		return fmt.Errorf("jobs: %w", err)
+	}
+{{- end}}
 	// Jobs must not stop when ctx does: Stop lets them finish.
 	if err := q.client.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("jobs: %w", err)
