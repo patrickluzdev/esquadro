@@ -76,6 +76,19 @@ blueprint jobs {
 - `deals.esq`/`app.esq`: `jobs { ui "/jobs" ui_access [user.admin] }`.
 - Endereço: `https://api.promododuro.com.br/jobs`, só para Administrador. O papel Gestor não entra.
 
+## Como ficou na construção
+
+- O `security.Authenticate` continua na frente de todas as rotas, a tela inclusive. `EmbeddedUI(prefix, rules, realms, next)` registra o caminho da tela. Para um caminho registrado, o `Authenticate` não pede o `X-CSRF-Token`, mas exige `OwnOrigin`: `Sec-Fetch-Site: same-origin` ou, em navegador antigo, `Origin`/`Referer` do próprio endereço da API. Nem os frontends que o CORS aceita passam. O resto da API não muda.
+- O CSP da tela libera só o script embutido da página do riverui (o que escolhe o tema), pelo hash calculado quando o app sobe. Não usa `'unsafe-inline'` em scripts.
+- O River subiu para v0.51.2, junto com o riverui v0.23.0. Não há migração nova de banco do River entre as duas versões (as duas param na 008).
+- O README do app é escrito uma vez só (`.once`), então não ganhou a linha. A opção está na página de referência do blueprint `jobs`.
+- Testado num app gerado (starter `api`) com Postgres:
+  - visitante recebe 401;
+  - gestor recebe 403;
+  - administrador recebe 200 e a tela abre no navegador, sem erro de CSP;
+  - um POST de outro site recebe 403;
+  - o resto da API continua exigindo o CSRF.
+
 ## Restrições
 
 - Código em inglês. Textos visíveis em pt-BR (e nas outras línguas do `i18n`).

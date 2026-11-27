@@ -44,7 +44,10 @@ func (s *Security) Authenticate(realms []string, origins []string) edge.Middlewa
 			ctx := r.Context()
 			principals := map[string]Principal{}
 			unsafe := r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions
-			if unsafe && !SameOrigin(r, origins) {
+			// An embedded screen's pages send no CSRF token: what they change
+			// must come from the API's own address (see EmbeddedUI).
+			embedded := s.embeddedUI(r.URL.Path)
+			if unsafe && (!SameOrigin(r, origins) || embedded && !OwnOrigin(r)) {
 				edge.Write(w, r, ErrCSRF)
 				return
 			}
@@ -79,7 +82,7 @@ func (s *Security) Authenticate(realms []string, origins []string) edge.Middlewa
 					edge.Write(w, r, edge.ErrInternal)
 					return
 				}
-				if unsafe && !s.CheckCSRF(*p.SessionID, r.Header.Get("X-CSRF-Token")) {
+				if unsafe && !embedded && !s.CheckCSRF(*p.SessionID, r.Header.Get("X-CSRF-Token")) {
 					edge.Write(w, r, ErrCSRF)
 					return
 				}

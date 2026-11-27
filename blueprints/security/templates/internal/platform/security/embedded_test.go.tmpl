@@ -1,0 +1,77 @@
+{{- if realms .Entities -}}
+{{- $realm := (index (realms .Entities) 0).Name -}}
+package security
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"uuid"
+)
+
+func TestEmbeddedUI(t *testing.T) {
+	s := &Security{logger: slog.New(slog.DiscardHandler)}
+	screen := s.EmbeddedUI("/screen", []string{"{{$realm}}.keeper"}, nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	open := func(ctx context.Context) int {
+		w := httptest.NewRecorder()
+		screen.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/screen/", nil).WithContext(ctx))
+		return w.Code
+	}
+	if code := open(context.Background()); code != http.StatusUnauthorized {
+		t.Errorf("no one: %d", code)
+	}
+	other := Principal{ID: uuid.NewV7(), Realm: "{{$realm}}", Roles: []string{"other"}}
+	if code := open(WithPrincipal(context.Background(), other)); code != http.StatusForbidden {
+		t.Errorf("without the role: %d", code)
+	}
+	keeper := Principal{ID: uuid.NewV7(), Realm: "{{$realm}}", Roles: []string{"keeper"}}
+	if code := open(WithPrincipal(context.Background(), keeper)); code != http.StatusTeapot {
+		t.Errorf("with the role: %d", code)
+	}
+	for path, want := range map[string]bool{"/screen": true, "/screen/api/jobs": true, "/screens": false, "/other": false} {
+		if got := s.embeddedUI(path); got != want {
+			t.Errorf("embeddedUI(%s) = %v", path, got)
+		}
+	}
+}
+
+func TestEmbeddedUIFallsBackToTheAdmins(t *testing.T) {
+	s := &Security{logger: slog.New(slog.DiscardHandler)}
+	screen := s.EmbeddedUI("/screen", nil, []Realm{ {Name: "{{$realm}}", Admins: []string{"{{$realm}}.boss"}} }, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	w := httptest.NewRecorder()
+	boss := Principal{ID: uuid.NewV7(), Realm: "{{$realm}}", Roles: []string{"boss"}}
+	screen.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/screen/", nil).WithContext(WithPrincipal(context.Background(), boss)))
+	if w.Code != http.StatusOK {
+		t.Errorf("an admin of the first realm: %d", w.Code)
+	}
+}
+
+func TestOwnOrigin(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		headers map[string]string
+		want    bool
+	}{
+		{"same-origin fetch", map[string]string{"Sec-Fetch-Site": "same-origin"}, true},
+		{"a frontend of the app", map[string]string{"Sec-Fetch-Site": "same-site", "Origin": "https://panel.example.com"}, false},
+		{"another site", map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}, false},
+		{"typed in the address bar", map[string]string{"Sec-Fetch-Site": "none"}, false},
+		{"old browser, own origin", map[string]string{"Origin": "https://api.example.com"}, true},
+		{"old browser, other origin", map[string]string{"Origin": "https://evil.example"}, false},
+		{"old browser, own referer", map[string]string{"Referer": "https://api.example.com/screen/"}, true},
+		{"nothing to tell", map[string]string{}, false},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "https://api.example.com/screen/api/jobs/retry", nil)
+		for k, v := range c.headers {
+			r.Header.Set(k, v)
+		}
+		if got := OwnOrigin(r); got != c.want {
+			t.Errorf("%s: %v", c.name, got)
+		}
+	}
+}
+{{end -}}

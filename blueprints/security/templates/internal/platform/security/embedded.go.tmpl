@@ -1,0 +1,112 @@
+{{- if realms .Entities -}}
+package security
+
+import (
+	"html/template"
+	"net/http"
+	"net/url"
+	"slices"
+	"strings"
+)
+
+// EmbeddedUI serves next, a screen of a library the app embeds (River's
+// queue, for one), at prefix, to those rules let in: realm.role rules,
+// and empty, those who administer the first realm's accounts. Its pages
+// are opened in the browser at the API's own address, with the session's
+// cookie; they do not send the session's CSRF token, so Authenticate asks
+// a request that changes something under prefix to come from the API's own
+// address instead (Sec-Fetch-Site, or Origin). Each such request is
+// logged, with who made it.
+func (s *Security) EmbeddedUI(prefix string, rules []string, realms []Realm, next http.Handler) http.Handler {
+	s.embedded = append(s.embedded, strings.TrimSuffix(prefix, "/"))
+	if len(rules) == 0 && len(realms) > 0 {
+		rules = realms[0].Admins
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var who *Principal
+		for _, rule := range rules {
+			name, role, hasRole := strings.Cut(rule, ".")
+			if p, ok := PrincipalIn(ctx, name); ok && (!hasRole || slices.Contains(p.Roles, role)) {
+				who = &p
+				break
+			}
+		}
+		if who == nil {
+			status := http.StatusForbidden
+			if Anonymous(ctx) {
+				status = http.StatusUnauthorized
+			}
+			embeddedRefusal(w, r, status)
+			return
+		}
+		if unsafeMethod(r.Method) {
+			s.logger.InfoContext(ctx, "embedded screen", "path", r.URL.Path, "method", r.Method, "realm", who.Realm, "principal", who.ID.String())
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// embeddedUI reports whether path is under the prefix of an embedded
+// screen.
+func (s *Security) embeddedUI(path string) bool {
+	for _, prefix := range s.embedded {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// OwnOrigin reports whether r comes from a page of the API's own address,
+// and not of another, not even a frontend's that CORS lets in.
+func OwnOrigin(r *http.Request) bool {
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
+		return site == "same-origin"
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = r.Header.Get("Referer")
+	}
+	u, err := url.Parse(origin)
+	return err == nil && origin != "" && strings.EqualFold(u.Host, r.Host)
+}
+
+func unsafeMethod(method string) bool {
+	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
+}
+
+var embeddedPage = template.Must(template.New("refusal").Parse(`<!doctype html>
+<html lang="{{"{{.Lang}}"}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{"{{.Title}}"}}</title>
+</head>
+<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5">
+  <h1 style="font-size: 1.25rem">{{"{{.Title}}"}}</h1>
+  <p>{{"{{.Text}}"}}</p>
+</body>
+</html>
+`))
+
+// embeddedRefusal answers a browser that may not see an embedded screen:
+// a short page in its language (Portuguese or English), as a status of
+// 401 (no one is signed in) or 403 (who is may not).
+func embeddedRefusal(w http.ResponseWriter, r *http.Request, status int) {
+	page := struct{ Lang, Title, Text string }{"en", "Sign in first", "Sign in to the app's panel with an account that may see this screen, then open this address again."}
+	if status == http.StatusForbidden {
+		page.Title, page.Text = "Not allowed", "Your account may not see this screen. Ask an administrator of the app."
+	}
+	if strings.HasPrefix(strings.ToLower(r.Header.Get("Accept-Language")), "pt") {
+		page.Lang, page.Title, page.Text = "pt-BR", "Entre primeiro", "Entre no painel do app com uma conta que pode ver esta tela e abra este endereço de novo."
+		if status == http.StatusForbidden {
+			page.Title, page.Text = "Sem permissão", "Sua conta não pode ver esta tela. Peça a um administrador do app."
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = embeddedPage.Execute(w, page)
+}
+{{end -}}

@@ -14,7 +14,7 @@ blueprint jobs {
   /// The queues the worker works, comma-separated.
   env JOBS_QUEUES list prefixed default("{{join \",\" (strs .Options.queues)}}")
   requires app, domain, postgres, migrations, worker
-  optional testcontainers
+  optional testcontainers, http
 
   /// Jobs worked at once, per queue, by each process; <APP>_JOBS_WORKERS
   /// overrides it.
@@ -22,6 +22,15 @@ blueprint jobs {
   /// The queues the worker works; a job goes to default unless its
   /// @jobs(queue ...) says otherwise.
   option queues list default(["default"])
+
+  /// The path of River's own screen of the queue (jobs, their errors,
+  /// retry and cancel), served by the API behind sign-in: "/jobs". Empty,
+  /// the default, serves none. Needs the security blueprint with a
+  /// principal.
+  option ui string default("")
+  /// Who may open the screen, as realm.role rules (e.g. [user.admin]);
+  /// empty, those who administer the accounts of the first realm.
+  option ui_access list default([])
 
   /// Imports of internal/platform/jobs/jobs.go.
   slot "jobs.imports"
@@ -53,8 +62,9 @@ blueprint jobs {
     unique_while name
   }
 
-  go_require "github.com/riverqueue/river" "v0.50.0"
-  go_require "github.com/riverqueue/river/riverdriver/riverpgxv5" "v0.50.0"
-  go_require "github.com/riverqueue/river/riverdriver/riverdatabasesql" "v0.50.0"
+  go_require "github.com/riverqueue/river" "v0.51.2"
+  go_require "github.com/riverqueue/river/riverdriver/riverpgxv5" "v0.51.2"
+  go_require "github.com/riverqueue/river/riverdriver/riverdatabasesql" "v0.51.2"
   go_require "github.com/robfig/cron/v3" "v3.0.1"
+  go_require "riverqueue.com/riverui" "v0.23.0"
 }

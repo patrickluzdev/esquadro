@@ -1,0 +1,9 @@
+{{- if .Options.ui}}
+	jobsScreen, jobsErr := d.jobs.UI({{printf "%q" .Options.ui}}, d.logger)
+	if jobsErr != nil {
+		return nil, jobsErr
+	}
+	jobsScreen = d.security.EmbeddedUI({{printf "%q" .Options.ui}}, []string{ {{- range $i, $r := .Options.ui_access}}{{if $i}}, {{end}}{{printf "%q" $r}}{{end -}} }, d.realms(), jobsScreen)
+	mux.Handle({{printf "%q" .Options.ui}}, jobsScreen)
+	mux.Handle({{printf "%q" (print .Options.ui "/")}}, jobsScreen)
+{{- end}}

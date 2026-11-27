@@ -1,0 +1,74 @@
+{{- if .Options.ui -}}
+package jobs
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
+	"strings"
+	"sync"
+
+	"riverqueue.com/riverui"
+)
+
+// inlineScript is a script of a page written in it, not loaded from a file.
+var inlineScript = regexp.MustCompile(`(?s)<script>(.*?)</script>`)
+
+// UI is River's own screen of the queue at prefix ("/jobs"): its jobs by
+// state, their errors and attempts, and retry, cancel and delete. It reads
+// and changes the queue's tables; who may open it is the caller's to check
+// (the security blueprint's EmbeddedUI). The arguments of jobs are hidden
+// until asked for, as they may hold personal data.
+func (q *Queue) UI(prefix string, logger *slog.Logger) (http.Handler, error) {
+	screen, err := riverui.NewHandler(&riverui.HandlerOpts{
+		Endpoints:                riverui.NewEndpoints(q.client, nil),
+		JobListHideArgsByDefault: true,
+		Logger:                   logger,
+		Prefix:                   prefix,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jobs: the screen: %w", err)
+	}
+	policy := uiPolicy(screen, prefix)
+	// Its background work (counting the queue's jobs) starts with the first
+	// request and lasts as long as the process.
+	var start sync.Once
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start.Do(func() {
+			if err := screen.Start(context.WithoutCancel(r.Context())); err != nil {
+				logger.ErrorContext(r.Context(), "start the jobs screen", "error", err)
+			}
+		})
+		w.Header().Set("Content-Security-Policy", policy)
+		screen.ServeHTTP(w, r)
+	}), nil
+}
+
+// uiPolicy is the Content-Security-Policy of the screen: its own files and
+// API, from the app's address only, and the scripts its page writes in
+// itself (choosing the light or dark theme) by their hashes, none other.
+func uiPolicy(screen http.Handler, prefix string) string {
+	page := httptest.NewRecorder()
+	screen.ServeHTTP(page, httptest.NewRequest(http.MethodGet, prefix+"/", nil))
+	scripts := []string{"'self'"}
+	for _, m := range inlineScript.FindAllStringSubmatch(page.Body.String(), -1) {
+		sum := sha256.Sum256([]byte(m[1]))
+		scripts = append(scripts, "'sha256-"+base64.StdEncoding.EncodeToString(sum[:])+"'")
+	}
+	return strings.Join([]string{
+		"default-src 'self'",
+		"script-src " + strings.Join(scripts, " "),
+		"style-src 'self' 'unsafe-inline'",
+		"img-src 'self' data:",
+		"object-src 'none'",
+		"base-uri 'none'",
+		"form-action 'self'",
+		"frame-ancestors 'none'",
+	}, "; ")
+}
+{{end -}}

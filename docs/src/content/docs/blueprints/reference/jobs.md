@@ -16,7 +16,7 @@ blueprint jobs
 ## Works with
 
 - **Requires** [app](../app/), [domain](../domain/), [postgres](../postgres/), [migrations](../migrations/), [worker](../worker/): the app must use them too.
-- **Works with** [testcontainers](../testcontainers/) when the app uses them.
+- **Works with** [testcontainers](../testcontainers/), [http](../http/) when the app uses them.
 
 ## Options
 
@@ -24,6 +24,8 @@ blueprint jobs
 |---|---|---|---|
 | `workers` | int | `10` | Jobs worked at once, per queue, by each process; &lt;APP>_JOBS_WORKERS overrides it. |
 | `queues` | list | `["default"]` | The queues the worker works; a job goes to default unless its @jobs(queue ...) says otherwise. |
+| `ui` | string | `""` | The path of River's own screen of the queue (jobs, their errors, retry and cancel), served by the API behind sign-in: "/jobs". Empty, the default, serves none. Needs the security blueprint with a principal. |
+| `ui_access` | list | `[]` | Who may open the screen, as realm.role rules (e.g. [user.admin]); empty, those who administer the accounts of the first realm. |
 
 ```esquadro
 blueprint jobs {
@@ -66,7 +68,8 @@ Other blueprints add code at these points (see [Writing a blueprint](/esquadro/w
 
 ## Go modules
 
-- `github.com/riverqueue/river` v0.50.0
-- `github.com/riverqueue/river/riverdriver/riverpgxv5` v0.50.0
-- `github.com/riverqueue/river/riverdriver/riverdatabasesql` v0.50.0
+- `github.com/riverqueue/river` v0.51.2
+- `github.com/riverqueue/river/riverdriver/riverpgxv5` v0.51.2
+- `github.com/riverqueue/river/riverdriver/riverdatabasesql` v0.51.2
 - `github.com/robfig/cron/v3` v3.0.1
+- `riverqueue.com/riverui` v0.23.0
