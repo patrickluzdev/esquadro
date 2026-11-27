@@ -206,6 +206,33 @@ only that: each record comes with `"can": ["update", "delete"]` (its policy's
 `CanCreate`: may this person create some?). Writing `Create` in your policy,
 write `CanCreate` too, so that the two agree.
 
+Before any list is asked, the session says it all at once: `access`, in
+the answer of sign-in and of `GET session`, has for each resource of the
+API what the person may do, from the model's rules:
+
+```json
+"access": {
+  "offers": {"can": ["list", "read", "create", "update", "status:APPROVED"], "hidden": ["estimated_commission"]},
+  "site-settings": {"can": ["read"]},
+  "notes": {"can": ["list", "read"], "own": ["update", "delete"]},
+  "reports/top-offers": {"can": ["read"]}
+}
+```
+
+- `can`: `list`, `read`, `create`, `update`, `delete`; `import`,
+  `restore` and `purge` where the store has them; and each step of a flow,
+  as a record's `can` names it.
+- `own`: what the person may only with records of their own (the `owner`
+  rule): the record's `can` says which.
+- `hidden`: the fields the API leaves out for the person.
+- `accounts/<realm>`: the administration of a realm's accounts (the
+  routes below): `list`, `create` (invite), `update` (roles, invitations,
+  disabling) and `delete`, for whoever administers it.
+
+A frontend hides from its menu, buttons and columns what would be refused.
+It is a picture of the model: the API still decides each request, by the
+same rules and by a policy you wrote, which may let in less.
+
 Each operation of the API answers `401 unauthorized` to a request without a
 session or token that may not, and `403 forbidden` to one with a session;
 its description in `openapi.yaml` says who may. In your own code,
@@ -226,7 +253,7 @@ sign-up with the password's and the entity's rules; without it,
 | `POST sign-up` | `{"email", "password", ...fields of the entity}`; answers `202` whether the email had an account or not |
 | `POST sign-in` | `{"email", "password"}`: a session cookie and its `csrf_token`; with `"cookie": false`, a `session_token` for an `Authorization: Bearer` header |
 | `POST sign-out` | ends the session |
-| `GET session` | who signed in: `id`, `realm`, `roles`, `permissions`, `csrf_token` |
+| `GET session` | who signed in: `id`, `realm`, `roles`, `permissions`, `access` (what they may do, above), `csrf_token` |
 | `POST token` | a JWT of 15 minutes (`token_minutes`), for other services; they check it with `/.well-known/jwks.json` |
 | `GET sessions`, `DELETE sessions`, `DELETE sessions/{id}` | the account's devices; ending the others needs a recent sign-in |
 | `POST password` | `{"current_password", "new_password"}`; ends the other sessions |

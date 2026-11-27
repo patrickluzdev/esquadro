@@ -118,6 +118,10 @@ func (f *flow) signIn(password string) (string, string) {
 	if !strings.HasPrefix(cookie, "test_person_session=") || a.str("csrf_token") == "" {
 		f.t.Fatalf("sign-in: %q %v", cookie, a.body)
 	}
+	// What it may do, resource by resource, for a frontend (AccessOf).
+	if _, ok := a.body["access"].(map[string]any); !ok {
+		f.t.Fatalf("sign-in: no access in %v", a.body)
+	}
 	return "Cookie: " + cookie, "X-CSRF-Token: " + a.str("csrf_token")
 }
 

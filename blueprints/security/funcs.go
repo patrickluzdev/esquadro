@@ -20,6 +20,7 @@ func TemplateFuncs() template.FuncMap {
 		"realms":        RealmsOf,
 		"usesProvider":  UsesProvider,
 		"access":        Access,
+		"accessTable":   AccessTable,
 		"rulesOf":       RulesOf,
 		"realmDisplay":  Display,
 		"realmAdmins":   Admins,
