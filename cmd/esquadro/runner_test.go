@@ -47,4 +47,7 @@ func TestCIRunsOnARunnerOfOnesOwn(t *testing.T) {
 	if !strings.Contains(w, "&& !startsWith(github.ref, 'refs/tags/')") || !strings.Contains(w, "name: The commit passed the CI on a branch") || strings.Contains(w, "needs: test") {
 		t.Errorf("a tag runs its tests again:\n%s", w)
 	}
+	if !strings.Contains(w, "cache: false") || !strings.Contains(w, `GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod`) {
+		t.Errorf("a machine of one's own downloads GitHub's cache of Go modules:\n%s", w)
+	}
 }

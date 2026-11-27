@@ -37,6 +37,7 @@ defaults:
     working-directory: {{.}}
 {{- end}}
 
+{{- $own := false}}{{range strs .Options.runner}}{{if eq . "self-hosted"}}{{$own = true}}{{end}}{{end}}
 {{- $runsOn := join ", " (strs .Options.runner)}}{{if gt (len .Options.runner) 1}}{{$runsOn = printf "[%s]" $runsOn}}{{end}}
 jobs:
   test:
@@ -55,11 +56,23 @@ jobs:
 {{- with slot "github_actions.test.steps" .}}
 {{.}}
 {{- end}}
+{{- if $own}}
+      # A machine of your own keeps Go's modules and builds from one run to
+      # the next, in the runner's folder and apart from its own: no cache to
+      # download.
+      - run: |
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+{{- end}}
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: {{inRepo "go.mod"}}
+{{- if $own}}
+          cache: false
+{{- else}}
 {{- with $in}}
           cache-dependency-path: {{.}}/go.sum
+{{- end}}
 {{- end}}
       - run: go vet ./...
       - run: go test ./...
