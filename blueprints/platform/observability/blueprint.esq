@@ -5,7 +5,12 @@
 /// user's password (task secrets:init generates it); with grafana_domain,
 /// Caddy serves it there, behind that sign-in, and otherwise only an SSH
 /// tunnel reaches it: ssh -L 3000:localhost:3000 is not needed, task
-/// grafana opens one.
+/// grafana opens one. Each app gets a dashboard (/d/app-<name>) and alerts:
+/// a job that failed, was given up, keeps retrying or, on a schedule, is
+/// late; an integration that fails its check; 5xx answers, slow answers,
+/// restarts, and a database not backed up. They go to the owner by email
+/// and, with alerts_telegram_token and alerts_telegram_chat_id in the
+/// secrets, on Telegram.
 blueprint observability {
   version "0.1.0"
   for platform
@@ -17,4 +22,18 @@ blueprint observability {
   option grafana_domain string default("")
   /// Days the traces, metrics and logs are kept.
   option retention_days int default(14)
+  /// The language of the apps' alerts: en or pt-BR.
+  option alerts_language string default("en")
+  /// Alert when more than this share of an app's answers are 5xx, over 10
+  /// minutes with 20 requests or more.
+  option alerts_http_error_ratio number default(0.05)
+  /// Alert when 95% of an app's answers take longer than this, in seconds,
+  /// for 15 minutes.
+  option alerts_http_p95_seconds number default(2)
+  /// Alert when each process of an app started more than this many times in
+  /// 30 minutes.
+  option alerts_restarts int default(3)
+  /// Alert when an app's database has not been backed up for this many
+  /// hours.
+  option alerts_backup_hours int default(26)
 }

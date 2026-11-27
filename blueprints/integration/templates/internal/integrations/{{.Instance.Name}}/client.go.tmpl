@@ -72,9 +72,12 @@ func New(cfg Config) (*Client, error) {
 		return "{{$n}} " + r.Method + " " + r.URL.Path
 	}))
 {{- end}}
+	// A secret pasted with a space or a line break at an end is still the
+	// secret.
+	secrets := Secrets{Key: strings.TrimSpace(cfg.Secrets.Key), Secret: strings.TrimSpace(cfg.Secrets.Secret)}
 	return &Client{
 		base:    base,
-		secrets: cfg.Secrets,
+		secrets: secrets,
 		http:    &http.Client{Transport: transport},
 		limit:   newLimiter({{rateOf $o.rate_limit}}),
 		Wait:    sleep,

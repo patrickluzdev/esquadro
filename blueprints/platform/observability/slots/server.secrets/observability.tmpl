@@ -1,3 +1,9 @@
 # The password of Grafana's admin user. Grafana keeps the first one: to
 # change it later, change it in Grafana too.
 grafana_password: generate
+# Alerts on Telegram too, besides email: a bot's token (@BotFather, a bot
+# for the alerts only) and the chat it writes to (send /start to the bot,
+# then read chat.id in https://api.telegram.org/bot<token>/getUpdates).
+# Empty, the alerts go by email only.
+alerts_telegram_token: ""
+alerts_telegram_chat_id: ""

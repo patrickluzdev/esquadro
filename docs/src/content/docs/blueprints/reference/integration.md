@@ -16,6 +16,7 @@ blueprint integration
 ## Works with
 
 - **Requires** [app](../app/), [domain](../domain/), [env](../env/): the app must use them too.
+- **Works with** [worker](../worker/), [observability](../observability/) when the app uses them.
 
 ## Options
 
@@ -27,6 +28,7 @@ blueprint integration
 | `timeout` | string | `"30s"` | How long a call may take, its tries included: 30s, 1m. |
 | `key` | bool | `false` | The API takes a key (an app id, a bot's token): &lt;NAME>_KEY. |
 | `secret` | bool | `false` | The API takes a secret (to sign requests with): &lt;NAME>_SECRET. |
+| `check` | bool | `false` | Check the API (the client's Check) when the worker starts and every hour after: a failure is logged and, with observability, recorded as integration.check 0, which the platform's alerts watch. Off by default: Check asks GET /, which means nothing to most APIs until you write it, and some count every call. |
 
 ```esquadro
 blueprint integration {

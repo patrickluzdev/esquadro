@@ -1,0 +1,3 @@
+{{- if .Options.check}}
+		{Name: "{{.Instance.Name}} check", Run: d.{{.Instance.Name}}.Watch(d.logger)},
+{{- end}}

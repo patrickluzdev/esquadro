@@ -130,6 +130,20 @@ Um painel do Grafana provisionado por app (`dashboards/<app>.json`, gerado pelo 
 - O Patrick cria o robô de alertas, manda `/start` para ele e põe os dois segredos com o sops. Eu não vejo nem guardo esses valores.
 - Para testar ponta a ponta: forçar um alerta de teste pelo Grafana (o "Test" do ponto de contato) e confirmar que chegou no e-mail e no Telegram.
 
+## Como ficou na construção
+
+- **Nomes confirmados num Grafana local (otel-lgtm 0.39):**
+  - `river_work_count_total` (com `kind`, `status`, `attempt`);
+  - `jobs_queue`, `jobs_periodic_overdue`, `jobs_discarded_total`, `integration_check`;
+  - `http_server_request_duration_seconds_*` (com `http_route`, `http_response_status_code`);
+  - `pgxpool_*`, `go_memory_used_bytes`, `target_info`.
+- **API e worker se sobrescreviam:** os dois processos de um app mandavam métricas com os mesmos rótulos. Cada processo agora manda o próprio `service.instance.id`, e isso também é o que detecta reinícios (processos distintos em 30 min acima de `processos × (1 + alerts_restarts)`).
+- **A checagem de integração roda só no worker**, ao subir e a cada hora, e não no `serve`. Um processo só basta para o alerta, e assim cada API externa recebe metade das chamadas.
+- **O link para a tela de jobs não entrou no texto do alerta.** O texto aponta para o painel do app no Grafana e diz que o erro está na tela de jobs. Isso evita um atributo novo entre o app e a plataforma.
+- **O prefixo "bot" na chave do Telegram não é tratado no esquadro.** O jeito de autenticar fica no arquivo da integração, que é do app. O esquadro só tira espaços e quebras de linha das pontas da chave.
+- **O token do robô de alertas não aparece no arquivo de alertas:** ele fica no `.env` do Grafana (só root lê), e o arquivo usa `${ALERTS_TELEGRAM_TOKEN}`. Testado: o Grafana substitui pelo valor do ambiente.
+- **Testado ponta a ponta num app gerado:** um job de e-mail que falha disparou "apiui: um job falhou mail_send" no Grafana local, com o painel carregado.
+
 ## Restrições
 
 - Esquadro só genérico; os nomes do Promo do Duro ficam só nos exemplos desta doc.

@@ -2,3 +2,9 @@
 # Observability: where Grafana answers, and days the data is kept.
 observability_grafana_domain: {{quote $o.grafana_domain}}
 observability_retention_days: {{$o.retention_days}}
+# The apps' alerts: their language and limits.
+observability_alerts_language: {{quote $o.alerts_language}}
+observability_alerts_http_error_ratio: {{$o.alerts_http_error_ratio}}
+observability_alerts_http_p95_seconds: {{$o.alerts_http_p95_seconds}}
+observability_alerts_restarts: {{$o.alerts_restarts}}
+observability_alerts_backup_hours: {{$o.alerts_backup_hours}}
