@@ -41,4 +41,10 @@ func TestCIRunsOnARunnerOfOnesOwn(t *testing.T) {
 	if w := workflow(); strings.Count(w, "runs-on: [self-hosted, macOS]\n") != 2 {
 		t.Errorf("the runner of one's own:\n%s", w)
 	}
+	// A tag's tests are not run again: the image job checks its commit
+	// passed on a branch instead.
+	w := workflow()
+	if !strings.Contains(w, "&& !startsWith(github.ref, 'refs/tags/')") || !strings.Contains(w, "name: The commit passed the CI on a branch") || strings.Contains(w, "needs: test") {
+		t.Errorf("a tag runs its tests again:\n%s", w)
+	}
 }
