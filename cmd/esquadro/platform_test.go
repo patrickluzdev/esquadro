@@ -138,7 +138,7 @@ func TestDeployAddsTheDeployToTheCI(t *testing.T) {
 		t.Fatal(errOut)
 	}
 	ci, _ := os.ReadFile(filepath.Join(dir, ".github", "workflows", "ci.yml"))
-	if !strings.Contains(string(ci), `printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" "$GITHUB_REF_NAME"`) {
+	if !strings.Contains(string(ci), `printf '%s' "$REGISTRY_TOKEN" | ssh -F /dev/null -o IdentitiesOnly=yes -o UserKnownHostsFile="$ssh_dir/known_hosts" -i "$ssh_dir/deploy" "deploy@$DEPLOY_HOST" "$GITHUB_REF_NAME"`) {
 		t.Fatalf("ci.yml:\n%s", ci)
 	}
 	dockerfile, _ := os.ReadFile(filepath.Join(dir, "Dockerfile"))

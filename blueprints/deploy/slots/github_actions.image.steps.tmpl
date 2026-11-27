@@ -7,8 +7,12 @@
           # Lets the server pull this repository's image, for this deploy only.
           REGISTRY_TOKEN: {{"${{"}} secrets.GITHUB_TOKEN {{"}}"}}
         run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
-          chmod 600 ~/.ssh/deploy
-          printf '%s' "$REGISTRY_TOKEN" | ssh -i ~/.ssh/deploy "deploy@$DEPLOY_HOST" {{with tagPrefix}}"${GITHUB_REF_NAME#{{.}}}"{{else}}"$GITHUB_REF_NAME"{{end}}
+          # The key and the server's fingerprint in the runner's temporary
+          # folder, gone after the job: a machine of your own keeps its own
+          # ~/.ssh as it was.
+          ssh_dir=$(mktemp -d "$RUNNER_TEMP/ssh.XXXXXX")
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/deploy"
+          chmod 600 "$ssh_dir/deploy"
+          printf '%s' "$REGISTRY_TOKEN" | ssh -F /dev/null -o IdentitiesOnly=yes -o UserKnownHostsFile="$ssh_dir/known_hosts" -i "$ssh_dir/deploy" "deploy@$DEPLOY_HOST" {{with tagPrefix}}"${GITHUB_REF_NAME#{{.}}}"{{else}}"$GITHUB_REF_NAME"{{end}}
