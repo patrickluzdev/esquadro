@@ -225,6 +225,9 @@ API what the person may do, from the model's rules:
 - `own`: what the person may only with records of their own (the `owner`
   rule): the record's `can` says which.
 - `hidden`: the fields the API leaves out for the person.
+- `accounts/<realm>`: the administration of a realm's accounts (the
+  routes below): `list`, `create` (invite), `update` (roles, invitations,
+  disabling) and `delete`, for whoever administers it.
 
 A frontend hides from its menu, buttons and columns what would be refused.
 It is a picture of the model: the API still decides each request, by the

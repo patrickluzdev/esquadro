@@ -59,6 +59,9 @@ func TestAccessTable(t *testing.T) {
 	if f := byName["offers"].Fields; len(f) != 1 || f[0].Name != "cost" || !slices.Equal(f[0].Who, []string{"user.admin"}) {
 		t.Errorf("the fields only some read: %+v", f)
 	}
+	if got := who("accounts/user", "create"); !slices.Equal(got, []string{"user.admin"}) {
+		t.Errorf("who invites to the realm: %v", got)
+	}
 	if AccessTable([]*project.Entity{offer}, nil) != nil {
 		t.Error("without realms, nothing is checked")
 	}

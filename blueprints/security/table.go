@@ -9,7 +9,8 @@ import (
 // AccessEntry is what the API lets do with one of its resources, as the
 // model's rules say: the session tells a frontend, so that it shows only
 // what would not be refused. Name is the resource as the API's paths have
-// it: "offers", "site-settings", "reports/top-offers".
+// it: "offers", "site-settings", "reports/top-offers"; and "accounts/user"
+// for the administration of a realm's accounts.
 type AccessEntry struct {
 	Name string
 	// Ops are each operation and who may: list, read, create, update,
@@ -78,6 +79,19 @@ func AccessTable(entities []*project.Entity, reports []*project.Report) []Access
 			if who := names(f.Ann["security"]["read"]); who != nil {
 				entry.Fields = append(entry.Fields, AccessRule{Name: f.Snake, Who: who})
 			}
+		}
+		out = append(out, entry)
+	}
+	// The accounts of each realm, for whoever administers them: inviting
+	// (create), their roles, invitations and disabling (update), deleting.
+	for _, r := range RealmsOf(entities) {
+		admins := Admins(entities, r.Entity)
+		if len(admins) == 0 {
+			continue
+		}
+		entry := AccessEntry{Name: "accounts/" + r.Name}
+		for _, op := range []string{"list", "create", "update", "delete"} {
+			entry.Ops = append(entry.Ops, AccessRule{Name: op, Who: admins})
 		}
 		out = append(out, entry)
 	}
