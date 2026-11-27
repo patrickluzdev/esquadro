@@ -11,6 +11,9 @@ import (
 // what it installs in the runner's temporary folder, so that a machine of
 // one's own is left as it was.
 func TestCIRunsOnARunnerOfOnesOwn(t *testing.T) {
+	if testing.Short() {
+		t.Skip("generates a project with the store blueprint, which needs sqlc or Docker")
+	}
 	dir := filepath.Join(t.TempDir(), "shop")
 	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/shop", "-no-git", "-no-gen", dir); code != 0 {
 		t.Fatal(errOut)

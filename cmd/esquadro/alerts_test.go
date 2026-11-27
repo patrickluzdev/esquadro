@@ -12,6 +12,9 @@ import (
 // with the table that keeps their last runs. An integration with check
 // true is checked by the worker, and each process tells itself apart.
 func TestAppMeasuresWhatTheAlertsWatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip("generates a project with the store blueprint, which needs sqlc or Docker")
+	}
 	dir := filepath.Join(t.TempDir(), "promo")
 	if code, _, errOut := esq(t, "new", "-starter", "api", "-module", "example.com/promo", "-no-git", "-no-gen", dir); code != 0 {
 		t.Fatal(errOut)

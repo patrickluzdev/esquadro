@@ -43,6 +43,9 @@ entity User {
 // The jobs screen is served behind sign-in, to the roles ui_access names
 // (or the first realm's admins), and only with a path of its own.
 func TestJobsScreen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("generates a project with the store blueprint, which needs sqlc or Docker")
+	}
 	dir := jobsScreenProject(t, "  blueprint jobs {\n    ui \"/jobs\"\n    ui_access [user.admin]\n  }\n", jobsScreenAccounts)
 	if code, out, errOut := esq(t, "gen", dir); code != 0 {
 		t.Fatalf("gen: %s%s", out, errOut)
