@@ -8,11 +8,23 @@ set -a
 set +a
 
 apps=${1:-$(cat /opt/platform/backup/apps)}
+
+# report tells Grafana, when the platform has it, that an app's database was
+# backed up now: platform.backup.last_success, in seconds since 1970, which
+# its alerts watch. Nothing happens without Grafana.
+report() {
+  local now
+  now=$(date -u +%s)
+  curl -fsS -m 5 -o /dev/null -X POST http://127.0.0.1:4318/v1/metrics -H 'Content-Type: application/json' \
+    -d '{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"platform-backup"}}]},"scopeMetrics":[{"scope":{"name":"backup"},"metrics":[{"name":"platform.backup.last_success","gauge":{"dataPoints":[{"asDouble":'"$now"',"timeUnixNano":"'"$now"'000000000","attributes":[{"key":"app","value":{"stringValue":"'"$1"'"}}]}]}}]}]}]}' \
+    2>/dev/null || true
+}
 failed=0
 for app in $apps; do
   name="$app/$(date -u +%Y-%m-%dT%H%M%SZ).dump"
   if docker exec postgres pg_dump -U postgres -Fc "${app//-/_}" | rclone rcat "bucket:$BACKUP_BUCKET/$name"; then
     echo "backed up $app: $name"
+    report "$app"
   else
     echo "failed to back up $app" >&2
     failed=1

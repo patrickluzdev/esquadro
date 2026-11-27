@@ -1,0 +1,51 @@
+{{- if .Options.check -}}
+package {{.Instance.Name}}
+
+import (
+	"context"
+	"log/slog"
+	"time"
+{{- if uses "observability"}}
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+{{- end}}
+)
+
+// watchEvery is how often Watch checks the API.
+const watchEvery = time.Hour
+
+// Watch checks the API (Check) now and every hour after, until ctx ends: a
+// failure is logged{{if uses "observability"}} and recorded as integration.check 0 (1 when it
+// answers), which the platform's alerts watch{{end}}. A failure does not stop
+// the worker: the rest of the app goes on without this API.
+func (c *Client) Watch(logger *slog.Logger) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+{{- if uses "observability"}}
+		gauge, err := otel.Meter("integrations").Int64Gauge("integration.check", metric.WithDescription("1 when the API answered its last check, 0 when it failed."))
+		if err != nil {
+			return err
+		}
+		of := metric.WithAttributes(attribute.String("integration", "{{.Instance.Name}}"))
+{{- end}}
+		t := time.NewTicker(watchEvery)
+		defer t.Stop()
+		for {
+			if err := c.Check(ctx); err != nil && ctx.Err() == nil {
+				logger.ErrorContext(ctx, "integration check failed", "integration", "{{.Instance.Name}}", "error", err)
+{{- if uses "observability"}}
+				gauge.Record(ctx, 0, of)
+			} else if err == nil {
+				gauge.Record(ctx, 1, of)
+{{- end}}
+			}
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-t.C:
+			}
+		}
+	}
+}
+{{end -}}

@@ -82,8 +82,8 @@ func goDuration(d time.Duration) string {
 
 // Check checks the jobs' @jobs: who they are unique by, for how long and
 // while what.
-func Check(p *project.Project, _ *blueprint.Set) diag.List {
-	var diags diag.List
+func Check(p *project.Project, set *blueprint.Set) diag.List {
+	diags := checkScreen(p, set)
 	for _, j := range p.Jobs {
 		a := j.Ann["jobs"]
 		for _, name := range ui.Strings(a["unique_by"]) {

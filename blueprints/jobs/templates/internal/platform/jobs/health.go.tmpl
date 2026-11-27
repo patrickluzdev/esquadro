@@ -1,0 +1,148 @@
+{{- if uses "observability" -}}
+package jobs
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
+	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+)
+
+// The runs of the jobs on a schedule are kept in jobs_periodic_runs, which
+// the migrations make: River deletes the jobs it completed after a day,
+// which says nothing of a job that runs once a week.
+
+// health measures the queue for the alerts: the jobs of each kind in each
+// state, the jobs given up, and whether a job on a schedule is late, that
+// is, whether it has not worked since the run after its last success, and
+// half its period more.
+type health struct {
+	river.MiddlewareDefaults
+	pool      *pgxpool.Pool
+	schedules map[string]cron.Schedule
+	started   time.Time
+	discarded metric.Int64Counter
+}
+
+func newHealth(pool *pgxpool.Pool, schedules map[string]cron.Schedule) (*health, error) {
+	meter := otel.Meter("jobs")
+	discarded, err := meter.Int64Counter("jobs.discarded", metric.WithDescription("Jobs given up after their last attempt failed."))
+	if err != nil {
+		return nil, err
+	}
+	return &health{pool: pool, schedules: schedules, started: time.Now(), discarded: discarded}, nil
+}
+
+// Work records how a job ended: the last success or error of a job on a
+// schedule, and a job that failed its last attempt.
+func (h *health) Work(ctx context.Context, job *rivertype.JobRow, doInner func(context.Context) error) error {
+	err := doInner(ctx)
+	if err != nil && job.Attempt >= job.MaxAttempts {
+		h.discarded.Add(ctx, 1, metric.WithAttributes(attribute.String("kind", job.Kind)))
+	}
+	if _, ok := h.schedules[job.Kind]; ok {
+		h.record(context.WithoutCancel(ctx), job.Kind, err)
+	}
+	return err
+}
+
+func (h *health) record(ctx context.Context, kind string, failed error) {
+	var err error
+	if failed == nil {
+		_, err = h.pool.Exec(ctx, `INSERT INTO jobs_periodic_runs (kind, last_success_at) VALUES ($1, now())
+ON CONFLICT (kind) DO UPDATE SET last_success_at = now()`, kind)
+	} else {
+		_, err = h.pool.Exec(ctx, `INSERT INTO jobs_periodic_runs (kind, last_error_at, last_error) VALUES ($1, now(), $2)
+ON CONFLICT (kind) DO UPDATE SET last_error_at = now(), last_error = $2`, kind, failed.Error())
+	}
+	if err != nil {
+		otel.Handle(fmt.Errorf("jobs: record the run of %s: %w", kind, err))
+	}
+}
+
+// watch reports, at each reading of the metrics, the jobs of each kind in
+// each state (jobs.queue) and the jobs on a schedule that are late
+// (jobs.periodic.overdue, 1 or 0); only in the process that works them.
+func (h *health) watch() error {
+	meter := otel.Meter("jobs")
+	queue, err := meter.Int64ObservableGauge("jobs.queue", metric.WithDescription("Jobs in the queue, by kind and state."))
+	if err != nil {
+		return err
+	}
+	overdue, err := meter.Int64ObservableGauge("jobs.periodic.overdue", metric.WithDescription("1 when a job on a schedule has not worked in time."))
+	if err != nil {
+		return err
+	}
+	_, err = meter.RegisterCallback(func(ctx context.Context, o metric.Observer) error {
+		rows, err := h.pool.Query(ctx, `SELECT kind, state::text, count(*) FROM river_job
+WHERE state IN ('available', 'running', 'retryable', 'scheduled') GROUP BY kind, state`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var kind, state string
+			var n int64
+			if err := rows.Scan(&kind, &state, &n); err != nil {
+				return err
+			}
+			o.ObserveInt64(queue, n, metric.WithAttributes(attribute.String("kind", kind), attribute.String("state", state)))
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		last, err := h.lastSuccesses(ctx)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		for kind, schedule := range h.schedules {
+			var late int64
+			if Late(schedule, last[kind], h.started, now) {
+				late = 1
+			}
+			o.ObserveInt64(overdue, late, metric.WithAttributes(attribute.String("kind", kind)))
+		}
+		return nil
+	}, queue, overdue)
+	return err
+}
+
+func (h *health) lastSuccesses(ctx context.Context) (map[string]time.Time, error) {
+	rows, err := h.pool.Query(ctx, `SELECT kind, last_success_at FROM jobs_periodic_runs WHERE last_success_at IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]time.Time{}
+	for rows.Next() {
+		var kind string
+		var at time.Time
+		if err := rows.Scan(&kind, &at); err != nil {
+			return nil, err
+		}
+		out[kind] = at
+	}
+	return out, rows.Err()
+}
+
+// Late reports whether a job on schedule is late at now: it should have
+// worked at the run after its last success (or, never worked, after the
+// worker started), and half a period has passed since without one.
+func Late(schedule cron.Schedule, lastSuccess, started, now time.Time) bool {
+	since := lastSuccess
+	if since.IsZero() {
+		since = started
+	}
+	due := schedule.Next(since)
+	period := schedule.Next(due).Sub(due)
+	return now.After(due.Add(period / 2))
+}
+{{end -}}

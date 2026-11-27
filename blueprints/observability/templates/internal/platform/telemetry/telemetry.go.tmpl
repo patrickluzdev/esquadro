@@ -4,6 +4,7 @@ package telemetry
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"log/slog"
 	"os"
@@ -68,6 +69,9 @@ func setup(ctx context.Context, cfg Config) (shutdown func(context.Context) erro
 	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
 		attribute.String("service.name", cfg.Service),
 		attribute.String("service.version", cfg.Version),
+		// Each process its own: the API and the worker apart, and a process
+		// started again as a new one.
+		attribute.String("service.instance.id", rand.Text()),
 		attribute.String("deployment.environment.name", cfg.Env),
 	))
 	if err != nil {

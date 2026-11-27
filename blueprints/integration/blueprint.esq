@@ -11,6 +11,7 @@ blueprint integration {
   version "0.1.0"
   instances
   requires app, domain, env
+  optional worker, observability
 
   /// The API's address: https://open-api.affiliate.shopee.com.br. The
   /// <NAME>_URL variable changes it per environment.
@@ -28,6 +29,12 @@ blueprint integration {
   /// The API takes a secret (to sign requests with): <NAME>_SECRET.
   option secret bool default(false)
 
+  /// Check the API (the client's Check) when the worker starts and every
+  /// hour after: a failure is logged and, with observability, recorded as
+  /// integration.check 0, which the platform's alerts watch. Off by default:
+  /// Check asks GET /, which means nothing to most APIs until you write
+  /// it, and some count every call.
+  option check bool default(false)
   /// The API's address; the url option by default.
   env INSTANCE_URL string default("{{.Options.url}}")
   /// The API's key.

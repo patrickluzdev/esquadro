@@ -37,10 +37,18 @@ defaults:
     working-directory: {{.}}
 {{- end}}
 
+{{- $own := false}}{{range strs .Options.runner}}{{if eq . "self-hosted"}}{{$own = true}}{{end}}{{end}}
+{{- $runsOn := join ", " (strs .Options.runner)}}{{if gt (len .Options.runner) 1}}{{$runsOn = printf "[%s]" $runsOn}}{{end}}
 jobs:
   test:
+{{- if uses "docker"}}
+    # Not for tags: a tag's commit was tested on its branch already, and the
+    # image job checks it was (each run is minutes, or the runner's time).
+    if: (github.event_name != 'pull_request' || !github.event.pull_request.draft) && !startsWith(github.ref, 'refs/tags/')
+{{- else}}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+{{- end}}
+    runs-on: {{$runsOn}}
     timeout-minutes: 15
     steps:
       # The code first: every step after reads it.
@@ -48,11 +56,23 @@ jobs:
 {{- with slot "github_actions.test.steps" .}}
 {{.}}
 {{- end}}
+{{- if $own}}
+      # A machine of your own keeps Go's modules and builds from one run to
+      # the next, in the runner's folder and apart from its own: no cache to
+      # download.
+      - run: |
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+{{- end}}
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: {{inRepo "go.mod"}}
+{{- if $own}}
+          cache: false
+{{- else}}
 {{- with $in}}
           cache-dependency-path: {{.}}/go.sum
+{{- end}}
 {{- end}}
       - run: go vet ./...
       - run: go test ./...
@@ -61,8 +81,10 @@ jobs:
         run: |
           version=$(jq -r .esquadro esquadro/lock.json)
           case "$version" in v*) ;; *) version=latest ;; esac
-          go install github.com/patrickluzdev/esquadro/cmd/esquadro@"$version"
-          esquadro gen -check
+          # In the runner's temporary folder: a machine of your own keeps
+          # its own esquadro.
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/patrickluzdev/esquadro/cmd/esquadro@"$version"
+          "$RUNNER_TEMP/bin/esquadro" gen -check
 {{- with slot "github_actions.jobs" .}}
 
 {{.}}
@@ -71,15 +93,52 @@ jobs:
 
   # Built and published for tags {{tagPrefix}}v* only.
   image:
-    needs: test
     if: startsWith(github.ref, 'refs/tags/{{tagPrefix}}v')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: {{$runsOn}}
+    timeout-minutes: 35
     permissions:
       contents: read
       packages: write
+      actions: read
     steps:
+      # A tag's commit that passed this CI on its branch (main, pushed before
+      # the tag) is not tested again. One that has not passed yet, its run
+      # still going or never made, is tested here: never waited for, as a
+      # single runner of your own would wait for itself.
+      - id: tested
+        name: The commit passed the CI on a branch
+        env:
+          GH_TOKEN: {{"${{"}} github.token {{"}}"}}
+        run: |
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push&status=success&per_page=100" \
+            --jq "[.workflow_runs[] | select(.name == \"$GITHUB_WORKFLOW\" and .head_branch != \"$GITHUB_REF_NAME\")] | length")
+          if [ "$passed" -gt 0 ]; then
+            echo "$GITHUB_SHA passed on its branch: not tested again"
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$GITHUB_SHA has not passed on a branch yet: tested here"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7.0.1
+{{- if $own}}
+      - if: steps.tested.outputs.passed != 'true'
+        run: |
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+{{- end}}
+      - if: steps.tested.outputs.passed != 'true'
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: {{inRepo "go.mod"}}
+{{- if $own}}
+          cache: false
+{{- else}}
+{{- with $in}}
+          cache-dependency-path: {{.}}/go.sum
+{{- end}}
+{{- end}}
+      - if: steps.tested.outputs.passed != 'true'
+        run: go vet ./... && go test ./... && go build ./...
       - uses: docker/setup-buildx-action@v4.4.1
       - uses: docker/login-action@v4.7.0
         with:

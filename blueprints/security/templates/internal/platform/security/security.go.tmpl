@@ -88,6 +88,9 @@ type Security struct {
 	mailer  Mailer
 	logger  *slog.Logger
 	now     func() time.Time
+
+	// embedded are the prefixes of the screens EmbeddedUI serves.
+	embedded []string
 }
 
 // New returns the security of the app on db.

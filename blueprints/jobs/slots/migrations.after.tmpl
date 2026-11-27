@@ -6,3 +6,14 @@
 	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
 		return fmt.Errorf("migrations: job queue: %w", err)
 	}
+{{- if uses "observability"}}
+	// When each job on a schedule last worked and failed, for the alerts.
+	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS jobs_periodic_runs (
+  kind            text PRIMARY KEY,
+  last_success_at timestamptz,
+  last_error_at   timestamptz,
+  last_error      text
+)`); err != nil {
+		return fmt.Errorf("migrations: job queue: %w", err)
+	}
+{{- end}}

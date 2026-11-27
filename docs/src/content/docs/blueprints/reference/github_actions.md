@@ -18,6 +18,18 @@ blueprint github_actions
 - **Requires** [app](../app/): the app must use them too.
 - **Works with** [docker](../docker/) when the app uses them.
 
+## Options
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `runner` | list | `["ubuntu-latest"]` | The runner of every job, as GitHub's labels: ["ubuntu-latest"], or a machine of your own, ["self-hosted", "macOS"], whose minutes GitHub does not count. The jobs keep what they write (the esquadro they install, the deploy's SSH key) in the runner's temporary folder, and, on self-hosted, Go's modules and builds in the runner's own folder instead of GitHub's cache, so a machine of your own is left as it was. Never a machine of your own for a public repository: anyone's pull request would run on it. |
+
+```esquadro
+blueprint github_actions {
+  runner ["ubuntu-latest"]
+}
+```
+
 ## Slots
 
 Other blueprints add code at these points (see [Writing a blueprint](/esquadro/writing-blueprints/#slots)).

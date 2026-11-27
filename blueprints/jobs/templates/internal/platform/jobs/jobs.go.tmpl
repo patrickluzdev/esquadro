@@ -29,6 +29,10 @@ type Queue struct {
 	client *river.Client[pgx.Tx]
 	// working is whether there is work to do: a registered job.
 	working bool
+{{- if uses "observability"}}
+	// health measures the queue, from the process that works it.
+	health *health
+{{- end}}
 }
 
 // NewQueue returns a queue to open.
@@ -50,11 +54,15 @@ type Registry struct {
 	queues   map[string]string // the queue of each kind of job
 	n        int
 	errs     []error
+{{- if uses "observability"}}
+	// schedules are those of the jobs enqueued on one, by kind.
+	schedules map[string]cron.Schedule
+{{- end}}
 }
 
 // NewRegistry returns an empty registry.
 func NewRegistry() *Registry {
-	return &Registry{workers: river.NewWorkers(), queues: map[string]string{}}
+	return &Registry{workers: river.NewWorkers(), queues: map[string]string{}{{if uses "observability"}}, schedules: map[string]cron.Schedule{}{{end}}}
 }
 
 // Add registers the work of a kind of job: work runs once per job, and an
@@ -82,6 +90,9 @@ func Every(r *Registry, schedule string, args river.JobArgs) {
 			return
 		}
 	}
+{{- if uses "observability"}}
+	r.schedules[args.Kind()] = s
+{{- end}}
 	r.periodic = append(r.periodic, river.NewPeriodicJob(s,
 		func() (river.JobArgs, *river.InsertOpts) { return args, nil },
 		&river.PeriodicJobOpts{ID: args.Kind()}))
@@ -102,6 +113,16 @@ func (q *Queue) Open(pool *pgxpool.Pool, r *Registry, cfg Config, logger *slog.L
 	config := &river.Config{Workers: r.workers, PeriodicJobs: r.periodic, Logger: logger}
 {{- with slot "jobs.middleware" .}}
 {{.}}
+{{- end}}
+{{- if uses "observability"}}
+	// How jobs end, for the alerts: the runs of those on a schedule, and
+	// those given up.
+	health, err := newHealth(pool, r.schedules)
+	if err != nil {
+		return fmt.Errorf("jobs: %w", err)
+	}
+	config.Middleware = append(config.Middleware, health)
+	q.health = health
 {{- end}}
 	if r.n > 0 {
 		config.Queues = map[string]river.QueueConfig{}
@@ -205,6 +226,13 @@ func (q *Queue) Run(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+{{- if uses "observability"}}
+	// The queue's measures come from the process that works it: the API,
+	// which only enqueues, would report them twice.
+	if err := q.health.watch(); err != nil {
+		return fmt.Errorf("jobs: %w", err)
+	}
+{{- end}}
 	// Jobs must not stop when ctx does: Stop lets them finish.
 	if err := q.client.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("jobs: %w", err)
