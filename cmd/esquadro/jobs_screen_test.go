@@ -57,8 +57,12 @@ func TestJobsScreen(t *testing.T) {
 			t.Errorf("routes_gen.go lacks %s:\n%s", want, routes)
 		}
 	}
-	if ui := read(t, filepath.Join(dir, "internal", "platform", "jobs", "ui.go")); !strings.Contains(ui, "JobListHideArgsByDefault: true") {
+	ui := read(t, filepath.Join(dir, "internal", "platform", "jobs", "ui.go"))
+	if !strings.Contains(ui, "JobListHideArgsByDefault: true") {
 		t.Errorf("the screen shows the jobs' arguments:\n%s", ui)
+	}
+	if !strings.Contains(ui, "q.client == nil") {
+		t.Errorf("the screen fails on a queue not opened, as in the API's tests:\n%s", ui)
 	}
 
 	dir = jobsScreenProject(t, "  blueprint jobs\n", jobsScreenAccounts)

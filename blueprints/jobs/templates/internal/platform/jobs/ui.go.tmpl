@@ -25,6 +25,12 @@ var inlineScript = regexp.MustCompile(`(?s)<script>(.*?)</script>`)
 // (the security blueprint's EmbeddedUI). The arguments of jobs are hidden
 // until asked for, as they may hold personal data.
 func (q *Queue) UI(prefix string, logger *slog.Logger) (http.Handler, error) {
+	if q == nil || q.client == nil {
+		// A queue not opened (the dependencies of a test): no screen to show.
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "the job queue is not open", http.StatusServiceUnavailable)
+		}), nil
+	}
 	screen, err := riverui.NewHandler(&riverui.HandlerOpts{
 		Endpoints:                riverui.NewEndpoints(q.client, nil),
 		JobListHideArgsByDefault: true,
